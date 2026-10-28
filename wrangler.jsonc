@@ -1,0 +1,3 @@
+{ "name": "nwebnotfound-site", "main": "src/worker.js", "compatibility_date": "2026-10-01",
+  "routes": [{"pattern":"nwebnotfound.dev","custom_domain":true},{"pattern":"www.nwebnotfound.dev","custom_domain":true}],
+  "d1_databases": [{"binding":"DB","database_name":"nwebnotfound-guestbook","database_id":"3bf5816d-ee8a-4504-b98c-d17dd9cc712f"}] }

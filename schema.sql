@@ -1,0 +1,2 @@
+-- secret TURNSTILE_SECRET set via API (wrangler secret put TURNSTILE_SECRET)
+CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')));
