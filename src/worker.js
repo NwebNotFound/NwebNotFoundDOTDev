@@ -16,18 +16,52 @@ document.getElementById('f').onsubmit=async ev=>{ev.preventDefault();const st=do
 load();
 </script>`, `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`);
 
-const MC = page("Minecraft", `<h1>Minecraft-Server</h1><div class="card"><p><span id="dot" class="dot" style="background:#6b7280"></span><b id="state">Prüfe Status…</b></p><p>Adresse: <code>mc.nwebnotfound.dev</code></p><p id="info" class="mut"></p></div><p class="mut">Status via <a href="https://mcsrvstat.us">mcsrvstat.us</a> (kann einige Minuten gecacht sein).</p>
+const MC = page("Minecraft", `<h1>Minecraft-Server</h1>
+<div class="card"><p style="font-size:1.3rem;margin:.2rem 0"><span id="dot" class="dot" style="background:#6b7280"></span><b id="state">Prüfe Status…</b></p>
+<p id="motd" class="mut" style="font-style:italic"></p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem;margin:1rem 0">
+<div class="card" style="margin:0"><div class="mut">Spieler</div><b id="pl" style="font-size:1.4rem">–</b><div style="height:6px;background:#0b0d12;border-radius:3px;margin-top:.4rem"><div id="bar" style="height:6px;width:0;background:var(--acc);border-radius:3px;transition:width .5s"></div></div></div>
+<div class="card" style="margin:0"><div class="mut">Version</div><b id="ver" style="font-size:1.4rem">–</b></div>
+<div class="card" style="margin:0"><div class="mut">Adresse</div><code>mc.nwebnotfound.dev</code> <button id="cp" style="padding:.2rem .6rem;font-size:.8rem">Kopieren</button></div></div>
+<p id="names" class="mut"></p></div>
+<p class="mut" style="font-size:.85rem">Aktualisiert sich automatisch alle 60 Sekunden · zuletzt: <span id="ts">–</span></p>
 <script>
-const e=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const off=m=>{document.getElementById('dot').style.background='#ef4444';document.getElementById('state').textContent='Offline';document.getElementById('info').textContent=m||'Der Server ist aktuell nicht erreichbar (noch nicht live).';};
-fetch('https://api.mcsrvstat.us/3/mc.nwebnotfound.dev').then(r=>r.json()).then(d=>{if(!d.online)return off();document.getElementById('dot').style.background='#22c55e';document.getElementById('state').textContent='Online';const p=d.players||{};document.getElementById('info').innerHTML='Spieler: '+e(p.online??0)+' / '+e(p.max??'?')+(d.version?' · Version '+e(d.version):'')+(p.list?'<br>'+p.list.map(x=>e(x.name||x)).join(', '):'');}).catch(()=>off('Status konnte nicht abgefragt werden.'));
+const $=id=>document.getElementById(id);
+$('cp').onclick=()=>{navigator.clipboard.writeText('mc.nwebnotfound.dev');$('cp').textContent='Kopiert!';setTimeout(()=>$('cp').textContent='Kopieren',1500);};
+function set(on,txt){$('dot').style.background=on?'#22c55e':'#ef4444';$('state').textContent=txt;}
+async function load(){try{const d=await (await fetch('/api/mc-status')).json();
+if(!d.online){set(false,d.error?'Status nicht abrufbar':'Offline');$('motd').textContent=d.error?'Bitte später nochmal versuchen.':'Der Server ist gerade nicht erreichbar.';$('pl').textContent='–';$('ver').textContent='–';$('bar').style.width='0';$('names').textContent='';}
+else{set(true,'Online');$('motd').textContent=d.motd||'';const o=d.players.online??0,m=d.players.max??0;$('pl').textContent=o+' / '+m;$('bar').style.width=(m?Math.min(100,o/m*100):0)+'%';$('ver').textContent=d.version||'?';$('names').textContent=d.players.list&&d.players.list.length?'Online: '+d.players.list.join(', '):'';}
+}catch(_){set(false,'Status nicht abrufbar');}
+$('ts').textContent=new Date().toLocaleTimeString('de-DE');}
+load();setInterval(load,60000);
 </script>`);
+
+const MC_HOST = "mc.nwebnotfound.dev";
+async function mcStatus(ctx) {
+  const cache = caches.default, key = new Request("https://nwebnotfound.dev/__cache/mc-status");
+  const hit = await cache.match(key); if (hit) return hit;
+  let out = null;
+  try {
+    const r = await fetch(`https://api.mcsrvstat.us/3/${MC_HOST}`, { headers: { "user-agent": "nwebnotfound.dev status page" } });
+    if (r.ok) { const d = await r.json(); out = { online: !!d.online, players: { online: d.players?.online ?? 0, max: d.players?.max ?? 0, list: (d.players?.list || []).map(x => x.name || String(x)).slice(0, 50) }, version: d.version || null, motd: (d.motd?.clean || []).join(" ").trim() || null, source: "mcsrvstat.us" }; }
+  } catch {}
+  if (!out) try {
+    const r = await fetch(`https://api.mcstatus.io/v2/status/java/${MC_HOST}`);
+    if (r.ok) { const d = await r.json(); out = { online: !!d.online, players: { online: d.players?.online ?? 0, max: d.players?.max ?? 0, list: (d.players?.list || []).map(x => x.name_clean || x.name_raw).slice(0, 50) }, version: d.version?.name_clean || null, motd: (d.motd?.clean || "").trim() || null, source: "mcstatus.io" }; }
+  } catch {}
+  if (!out) out = { online: false, players: { online: 0, max: 0, list: [] }, version: null, motd: null, error: "Status-APIs nicht erreichbar" };
+  out.host = MC_HOST; out.checked_at = new Date().toISOString();
+  const res = new Response(JSON.stringify(out), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=60" } });
+  ctx.waitUntil(cache.put(key, res.clone()));
+  return res;
+}
 
 const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8" } });
 const html = (h) => new Response(h, { headers: { "content-type": "text/html; charset=utf-8", "x-content-type-options": "nosniff" } });
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (url.hostname === "www.nwebnotfound.dev") { url.hostname = "nwebnotfound.dev"; return Response.redirect(url.toString(), 301); }
     const p = url.pathname.replace(/\/$/, "") || "/";
@@ -48,6 +82,7 @@ export default {
       }
       return json({ error: "Method not allowed" }, 405);
     }
+    if (p === "/api/mc-status") return mcStatus(ctx);
     if (p === "/") return html(HOME);
     if (p === "/guestbook") return html(GUEST);
     if (p === "/minecraft") return html(MC);
