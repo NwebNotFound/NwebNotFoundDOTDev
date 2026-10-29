@@ -182,3 +182,26 @@ Body-Keys: `v_auctions` (Alias `auctions`) = Liste aller aktuellen Auktionen (er
 - v_auction_bids: `id`, `auction_id`, `bidder` (UUID, Alias `bidder_uuid`), `amount`, `created_at` (s/ms), `source`.
 - Alle Beträge ganzzahlige Cent. Mindestgebot: `min_next_bid` ?? (keine Gebote ? `min_price` : höchstes + max(100, ceil 5 %)).
 - Namen: aus `mc_links` per UUID, sonst gekürzte UUID. Doppelte Gebots-`id`s werden ignoriert. Max. 1000 Auktionen, 200 Gebote pro Auktion angezeigt.
+
+## Craft-Views direkt (Bestenlisten, Spieler-Stats, Preishistorie) – `POST /api/mc-ingest`
+Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, leaderboards}` zur Kontrolle.
+
+**`v_leaderboards`** (Alias: `leaderboards` als Zeilen-Array; altes Objekt-Format `{kategorie:[{name,value}]}` geht weiter)
+- Kategorie: `category` | `stat` | `key` | `board` | `leaderboard` | `kind` | `type` | `metric`
+- Spieler: `uuid` | `player` | `player_uuid` | `mc_uuid`; Name optional: `name` | `player_name` | `mc_name` | `username` (sonst aus `mc_links`; ohne Namen wird die Zeile übersprungen)
+- Wert: `value` | `score` | `amount` | `total` | `count`; Rang optional: `rank` (sonst nach Wert absteigend). Top 10 je Kategorie.
+- Zeitraum optional: `period` | `scope` | `range` | `timeframe` – enthält „week“/„woche“/„7d“ → Wochenliste, sonst Gesamt.
+- Kategorie-Aliase → Website-Tabs: cp/balance/coins/money → `money`; playtime/play_time/playtime_s/time_played → `playtime` (Sekunden); mined/blocks/blocks_mined/blocks_broken → `blocks_mined`; kills/player_kills/pvp_kills → `kills`; kd/kdr/k_d → `kd`; distance/distance_m/travelled → `distance` (Meter). Unbekannte Kategorien bekommen einen eigenen Tab.
+
+**`v_player_stats_ext`** (Aliase: `player_stats_ext`, `player_stats`, `players_stats` als Array)
+- Breit: eine Zeile pro Spieler, `uuid` | `player` | `player_uuid` | `mc_uuid` + beliebige Zahl-/Textspalten (max. 24).
+- Lang: `uuid`/`player` + `stat` | `key` + `value`.
+- JSON-Strings werden geparst. `mined`, `placed`, `killed`, `deaths_by`, `crafted`, `playtime_by_world` (Objekte), `distance_m` (Objekt) und `fished`, `traded`, `jumps`, `damage_dealt`, `damage_taken`, `cp_earned`, `shop_sales` landen in den Profil-Details.
+
+**`v_market_history`** (alt: `market_history`)
+- `item` | `material` | `item_id`; Zeit: `hour_ts` | `hour` | `bucket` | `ts` | `time` | `timestamp` | `created_at` (s, ms oder ISO; auf die Stunde gerundet, 30 Tage)
+- Preis: `avg_price` | `avg` | `price` | `close` | `buy_price` | `value`; optional `min_price`|`min`|`low`, `max_price`|`max`|`high`, `volume_qty`|`volume`|`qty`|`amount`|`menge`.
+- Sobald Historie da ist, berechnet die Website die 24h-Änderung selbst (letzter Stundenwert vs. letzter Wert ≥ 24 h davor) und zeichnet Charts daraus; ohne Historie und ohne Trades zeigt sie „—“.
+
+## Tests
+`node scripts/e2e.mjs` – startet `wrangler dev` mit frischer lokaler D1 (`.wrangler/e2e`), spielt Ingest/Gebote/Bestellungen/Bot-Ack/Rate-Limits durch und prüft die UI (Chromium 390/1440, `scripts/e2e_ui.py`). Berührt keine Produktionsdaten.

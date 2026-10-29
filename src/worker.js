@@ -175,13 +175,13 @@ const ICON_JS = `const ICO=id=>'<span class="ic"><img alt="" loading="lazy" src=
 const NM=id=>String(id).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase());const NF=v=>(+v).toLocaleString('de-DE');const KM=m=>m>=1000?(m/1000).toLocaleString('de-DE',{maximumFractionDigits:1})+' km':NF(Math.round(m))+' m';`;
 const DET_CSS = `<style>
 .dg{display:grid;gap:1.2rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
-.dc{border-radius:24px;padding:1.5rem;border:1px solid var(--line);background:linear-gradient(160deg,color-mix(in srgb,var(--fg) 5%,transparent),color-mix(in srgb,var(--fg) 1.5%,transparent));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+
 .dc h3{font-size:1.1rem;margin:0 0 1rem;display:flex;justify-content:space-between;align-items:baseline}.dc h3 small{font-size:.75rem;font-weight:500;opacity:.55}
 .row{display:flex;align-items:center;gap:.75rem;padding:.5rem 0}.row+.row{border-top:1px solid var(--line)}
 .row .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.92rem}.row b{font-variant-numeric:tabular-nums;font-size:.92rem}
-.ic{width:32px;height:32px;flex:none;border-radius:8px;background:color-mix(in srgb,var(--fg) 7%,transparent);display:grid;place-items:center;font-size:.62rem;font-weight:700;opacity:.9}.ic img{width:24px;height:24px;image-rendering:pixelated}
-.meter{height:4px;border-radius:2px;background:var(--line);margin-top:.3rem;overflow:hidden}.meter i{display:block;height:100%;background:var(--acc,#4ade80);border-radius:2px}
-.mini{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem}.mini div{padding:.85rem 1rem;border-radius:16px;background:color-mix(in srgb,var(--fg) 5%,transparent)}.mini .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;opacity:.6}.mini .v{font-size:1.25rem;font-weight:650;margin-top:.15rem;font-variant-numeric:tabular-nums}
+.ic{width:32px;height:32px;flex:none;font-size:.62rem;font-weight:700}.ic img{width:24px;height:24px;image-rendering:pixelated}
+.meter{margin-top:.3rem}
+.mini{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem}.mini div{padding:.85rem 1rem}.mini .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;opacity:.6}.mini .v{font-size:1.25rem;font-weight:650;margin-top:.15rem;font-variant-numeric:tabular-nums}
 .emp{padding:1.4rem 0 .4rem;text-align:center;opacity:.55;font-size:.9rem}
 </style>`;
 const PROFILE_DETAILS = `${DET_CSS}<script>(()=>{${ICON_JS}const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -214,9 +214,9 @@ const LEADERBOARDS_MC = () => shell({ title: "Bestenlisten · NwebNotFound MC", 
 <script>(()=>{${ICON_JS}const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const up=t=>{t=+t||0;const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+' T '+h+' Std':h?h+' Std '+m+' Min':m+' Min'};
 const T=[['money','CP',v=>NF(v)+' CP'],['playtime','Spielzeit',up],['blocks_mined','Blöcke',NF],['kills','Kills',NF],['kd','K/D',v=>(+v).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})],['distance','Distanz',KM]];
-let D={},tab=(location.hash.slice(1)||'money'),per='total';if(!T.some(t=>t[0]===tab))tab='money';
+let D={},tab=(location.hash.slice(1)||'money'),per='total';
 const av=n=>'https://mc-heads.net/avatar/'+encodeURIComponent(n)+'/72';
-function draw(){document.getElementById('tabs').innerHTML=T.map(([k,t])=>'<button role="tab" data-k="'+k+'" aria-selected="'+(k===tab)+'">'+t+'</button>').join('');
+function draw(){const X=Object.keys(Object.assign({},D.total&&D.total.lists,D.weekly&&D.weekly.lists)).filter(k=>!T.some(t=>t[0]===k));X.forEach(k=>T.push([k,k.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase()),NF]));if(location.hash.slice(1)===tab&&!T.some(t=>t[0]===tab))tab='money';document.getElementById('tabs').innerHTML=T.map(([k,t])=>'<button role="tab" data-k="'+k+'" aria-selected="'+(k===tab)+'">'+t+'</button>').join('');
 document.querySelectorAll('#seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===per));
 const [,lbl,f]=T.find(t=>t[0]===tab),P=D[per],L=(P&&P.lists&&P.lists[tab])||[],O=document.getElementById('out');
 document.getElementById('upd').textContent=P&&P.updated_at?'Stand: '+new Date(P.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'';
@@ -231,7 +231,6 @@ draw();fetch('/api/mc-leaderboards').then(r=>r.json()).then(d=>{D=d;draw()}).cat
 const PROFILE_BODY = (mc) => `
 <style>
 .mch{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:2rem;align-items:center;padding:2.2rem;border-radius:28px;border:1px solid var(--line);background:linear-gradient(160deg,color-mix(in srgb,var(--fg) 6%,transparent),color-mix(in srgb,var(--fg) 1%,transparent));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 30px 80px -40px var(--shadow,rgba(0,0,0,.5))}
-.mch-glow{position:absolute;inset:-40% auto auto -20%;width:70%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(74,222,128,.28),transparent 65%);filter:blur(30px);pointer-events:none}
 .mch-model{position:relative;height:400px;display:grid;place-items:center}
 .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchIn .8s ease forwards}
 .mch-model.ready .mch-fb{opacity:0;transition:opacity .4s}
@@ -285,7 +284,7 @@ const u=d.user;H.innerHTML='<img alt="" src="'+E(u.avatar)+'" width="112" height
 let h='';const m=d.minecraft;
 if(m&&m.visible){const st=m.stats||{};const ks=Object.keys(st).filter(k=>k!=='inventory');
 const SK=['money','playtime','kills','deaths','blocks_mined'].concat(ks.filter(k=>!LBL[k]));const id=encodeURIComponent(m.mc_uuid||m.mc_name);
-h+='<div class="mch"><div class="mch-glow"></div><div class="mch-model" id="mcm"><img class="mch-fb" alt="Skin von '+E(m.mc_name)+'" src="https://mc-heads.net/body/'+id+'/220" loading="lazy"></div><div class="mch-info"><p class="eyebrow" style="margin:0">Minecraft</p><h2 class="mch-name">'+E(m.mc_name)+'</h2><p class="mch-sub">Verifiziert · Survival</p>'+
+h+='<div class="mch"><div class="mch-model" id="mcm"><img class="mch-fb" alt="Skin von '+E(m.mc_name)+'" src="https://mc-heads.net/body/'+id+'/220" loading="lazy"></div><div class="mch-info"><p class="eyebrow" style="margin:0">Minecraft</p><h2 class="mch-name">'+E(m.mc_name)+'</h2><p class="mch-sub">Verifiziert · Survival</p>'+
 '<div class="mch-grid">'+SK.map((k,j)=>{const [t,f]=LBL[k]||[k.replace(/_/g,' '),v=>typeof v==='number'?v.toLocaleString('de-DE'):String(v)];const has=st[k]!=null&&st[k]!=='';return '<div class="mch-tile'+(j===0?' wide':'')+(has?'':' empty')+'"><div class="k">'+E(t)+'</div><div class="v">'+(has?E(f(st[k])):'–')+'</div>'+(has?'':'<div class="nd">noch keine Daten</div>')+'</div>'}).join('')+'</div>'+
 (m.updated_at?'<p class="mut" style="font-size:.78rem;margin:1rem 0 0">Stand: '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}))+'</p>':'')+'</div></div>';
 window.__skin='https://mc-heads.net/skin/'+id;
@@ -396,6 +395,51 @@ async function auth(p, req, env, url) {
 }
 
 /* ---------- MC-Ingest (Push von PC-Nils) ---------- */
+// Craft-Views direkt annehmen (v_leaderboards, v_player_stats_ext, v_market_history) → interne Formen
+const pk = (o, ...k) => { for (const x of k) if (o?.[x] != null && o[x] !== "") return o[x]; return null; };
+const UUIDX = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
+const nU = (x) => String(x).toLowerCase().replace(/-/g, "").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+const tsMs = (v) => { if (v == null || v === "") return null; const n = typeof v === "number" || /^\d+(\.\d+)?$/.test(String(v)) ? Number(v) : Date.parse(v); return Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : null; };
+const LB_CAT = ["category", "stat", "key", "board", "leaderboard", "kind", "type", "metric"], LB_U = ["uuid", "player", "player_uuid", "mc_uuid"], LB_N = ["name", "player_name", "mc_name", "username"], LB_V = ["value", "score", "amount", "total", "count"];
+const SKIP_STAT = new Set(["uuid", "player", "player_uuid", "mc_uuid", "name", "player_name", "mc_name", "username", "updated_at", "ts", "created_at", "id", "stat", "key", "value"]);
+const LB_ALIAS = { cp: "money", balance: "money", coins: "money", geld: "money", kontostand: "money", play_time: "playtime", playtime_s: "playtime", playtime_seconds: "playtime", time_played: "playtime", spielzeit: "playtime", mined: "blocks_mined", blocks: "blocks_mined", mined_blocks: "blocks_mined", blocks_broken: "blocks_mined", player_kills: "kills", pvp_kills: "kills", kdr: "kd", k_d: "kd", kill_death: "kd", distance_m: "distance", distance_walked: "distance", travelled: "distance", traveled: "distance" };
+const lbKey = (k) => { const c = String(k).toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 24); return LB_ALIAS[c] || c; };
+async function normalizeViews(env, b) {
+  const rowsLb = Array.isArray(b.v_leaderboards) ? b.v_leaderboards : Array.isArray(b.leaderboards) ? b.leaderboards : null;
+  const rowsPs = Array.isArray(b.v_player_stats_ext) ? b.v_player_stats_ext : Array.isArray(b.player_stats_ext) ? b.player_stats_ext : Array.isArray(b.players_stats) ? b.players_stats : Array.isArray(b.player_stats) ? b.player_stats : null;
+  const rowsH = Array.isArray(b.v_market_history) ? b.v_market_history : null;
+  const info = { leaderboard_rows: rowsLb ? rowsLb.length : 0, player_stat_rows: rowsPs ? rowsPs.length : 0, history_rows: rowsH ? rowsH.length : 0 };
+  if (!rowsLb && !rowsPs && !rowsH && !b.player_stats_ext && !(b.players_stats && !Array.isArray(b.players_stats) && !Object.keys(b.players_stats).length)) return info;
+  // Namen: Payload-Namen, dann mc_links
+  const names = {};
+  for (const r of [...(rowsLb || []), ...(rowsPs || [])]) { const u = pk(r, ...LB_U), n = pk(r, ...LB_N); if (u && UUIDX.test(String(u)) && n && /^[A-Za-z0-9_]{1,16}$/.test(String(n))) names[nU(u)] = String(n); }
+  const need = [...new Set([...(rowsLb || [])].map((r) => pk(r, ...LB_U)).filter((u) => u && UUIDX.test(String(u))).map(nU).filter((u) => !names[u]))];
+  for (let i = 0; i < need.length; i += 90) { const c = need.slice(i, i + 90); const { results } = await env.DB.prepare(`SELECT mc_uuid, mc_name FROM mc_links WHERE mc_uuid IN (${c.map(() => "?").join(",")})`).bind(...c).all().catch(() => ({ results: [] })); for (const r of results) names[r.mc_uuid] = r.mc_name; }
+  if (rowsLb) {
+    const tot = {}, wk = {};
+    for (const r of rowsLb.slice(0, 5000)) {
+      const raw = pk(r, ...LB_CAT); if (raw == null) continue; const cat = lbKey(raw);
+      const u = pk(r, ...LB_U), name = pk(r, ...LB_N) ?? (u && UUIDX.test(String(u)) ? names[nU(u)] : null); if (!name || !/^[A-Za-z0-9_]{1,16}$/.test(String(name))) continue;
+      const per = String(pk(r, "period", "scope", "range", "timeframe") ?? "total").toLowerCase(); const T = /week|woche|7d/.test(per) ? wk : tot;
+      (T[cat] ||= []).push({ name: String(name), value: Number(pk(r, ...LB_V)) || 0, rank: Number(r.rank) || null });
+    }
+    const fin = (T) => { for (const k in T) T[k] = T[k].sort((a, c) => (a.rank && c.rank ? a.rank - c.rank : c.value - a.value)).slice(0, 10).map(({ name, value }) => ({ name, value })); return T; };
+    b.leaderboards = fin(tot); if (Object.keys(wk).length) b.leaderboards_weekly = fin(wk);
+    info.leaderboards = Object.keys(tot).length + Object.keys(wk).length;
+  }
+  if (rowsPs) {
+    const ps = {};
+    for (const r of rowsPs.slice(0, 20000)) {
+      const u = pk(r, ...LB_U); if (!u || !UUIDX.test(String(u))) continue; const o = (ps[nU(u)] ||= {});
+      const sk = pk(r, "stat", "key", "category"); if (sk != null && r.value !== undefined) { const k = String(sk).toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 24); const v = r.value; o[k] = typeof v === "string" && /^[[{]/.test(v) ? (() => { try { return JSON.parse(v); } catch { return v; } })() : v; continue; }
+      for (const [k, v] of Object.entries(r)) { if (SKIP_STAT.has(k)) continue; o[k] = typeof v === "string" && /^[[{]/.test(v) ? (() => { try { return JSON.parse(v); } catch { return v; } })() : v; }
+    }
+    for (const o of Object.values(ps)) { const d = {}; for (const k of [...DETAIL_MAPS, ...DETAIL_NUMS, "distance_m"]) if (o[k] !== undefined && (typeof o[k] === "object" || DETAIL_NUMS.includes(k))) { d[k] = o[k]; if (typeof o[k] === "object") delete o[k]; } if (Object.keys(d).length) o.details = d; }
+    b.players_stats = ps;
+  }
+  if (rowsH) b.market_history = rowsH.map((r) => ({ item: pk(r, "item", "material", "item_id"), hour_ts: (tsMs(pk(r, "hour_ts", "hour", "bucket", "ts", "time", "timestamp", "created_at")) ?? NaN) / 1000, avg_price: pk(r, "avg_price", "avg", "price", "close", "buy_price", "value"), min_price: pk(r, "min_price", "min", "low"), max_price: pk(r, "max_price", "max", "high"), volume_qty: pk(r, "volume_qty", "volume", "qty", "amount", "menge") }));
+  return info;
+}
 const FRESH_MS = 5 * 60 * 1000;
 const clip = (v, n = 32) => String(v ?? "").slice(0, n);
 function cleanIngest(b) {
@@ -406,9 +450,9 @@ function cleanIngest(b) {
       max: Number.isFinite(+v.max) ? +v.max : null, version: v.version ? clip(v.version, 40) : null, mode: v.mode ? clip(v.mode, 40) : null, uptime_seconds: Number.isFinite(+(v.uptime_seconds ?? v.uptime)) && (v.uptime_seconds ?? v.uptime) !== null ? Math.max(0, Math.floor(+(v.uptime_seconds ?? v.uptime))) : null, tps: Number.isFinite(+v.tps) ? Math.round(+v.tps * 10) / 10 : null };
   }
   const leaderboards = {};
-  for (const [k, v] of Object.entries(b?.leaderboards || {}).slice(0, 12)) {
+  for (const [k, v] of Object.entries(b?.leaderboards || {}).slice(0, 32)) {
     if (!/^[a-z0-9_-]{1,24}$/i.test(k) || !Array.isArray(v)) continue;
-    leaderboards[k] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => x.name);
+    leaderboards[lbKey(k)] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => x.name);
   }
   const leaderboards_weekly = cleanLb(b?.leaderboards_weekly);
   const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
@@ -433,9 +477,9 @@ function cleanIngest(b) {
 function cleanLb(o) {
   if (!o || typeof o !== "object" || Array.isArray(o)) return null;
   const r = {};
-  for (const [k, v] of Object.entries(o).slice(0, 12)) {
+  for (const [k, v] of Object.entries(o).slice(0, 32)) {
     if (!/^[a-z0-9_-]{1,24}$/i.test(k) || !Array.isArray(v)) continue;
-    r[k] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => /^[A-Za-z0-9_]{1,16}$/.test(x.name)).sort((a, b) => b.value - a.value);
+    r[lbKey(k)] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => /^[A-Za-z0-9_]{1,16}$/.test(x.name)).sort((a, b) => b.value - a.value);
   }
   return r;
 }
@@ -473,6 +517,8 @@ async function mcIngest(req, env) {
   if (!env.MC_INGEST_TOKEN || !safeEq(tok, env.MC_INGEST_TOKEN)) return json({ error: "unauthorized" }, 401);
   const raw = await req.text(); if (raw.length > 8388608) return json({ error: "too large" }, 413);
   let b; try { b = JSON.parse(raw); } catch { return json({ error: "invalid json" }, 400); }
+  if (!b || typeof b !== "object") return json({ error: "invalid json" }, 400);
+  const vinfo = await normalizeViews(env, b);
   const { links, players_stats, details, leaderboards_weekly, ...data } = cleanIngest(b), now = Date.now();
   const st = [], market = cleanMarket(b?.market), market_history = cleanHistory(b?.market_history);
   if (b?.servers || b?.leaderboards) {
@@ -497,7 +543,7 @@ async function mcIngest(req, env) {
   if (shops) st.push(blobStatement(env, "shops", shops, now));
   if (auctions) st.push(blobStatement(env, "auctions", auctions, now));
   if (st.length) await env.DB.batch(st);
-  return json({ ok: true, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0 });
+  return json({ ok: true, views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0 });
 }
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
@@ -559,8 +605,17 @@ function marketStatements(env, market, hist) {
   }
   return st;
 }
+// %-Änderung aus der Preishistorie (letzter Stundenwert vs. Wert vor ≥24h); ohne Historie bleibt der Ingest-Wert, has_hist=0
+async function histPct(env, items) {
+  if (!items.length) return; const now = Math.floor(Date.now() / 1000), since = now - 8 * 86400;
+  const q = (extra, ...bind) => env.DB.prepare(`SELECT item, avg_price, MAX(hour_ts) AS t FROM mc_market_history WHERE hour_ts >= ? ${extra} GROUP BY item`).bind(since, ...bind).all().then((r) => r.results).catch(() => []);
+  const [last, prev] = await Promise.all([q(""), q("AND hour_ts <= ?", now - 86400)]);
+  const L = new Map(last.map((r) => [r.item, r])), P = new Map(prev.map((r) => [r.item, r]));
+  for (const x of items) { const l = L.get(x.item), p = P.get(x.item); x.has_hist = l ? 1 : 0; if (l && p && p.avg_price > 0 && l.t > p.t) { x.change_24h_pct = Math.round(((l.avg_price - p.avg_price) / p.avg_price) * 10000) / 100; x.hist_pct = 1; } }
+}
 async function mcMarket(env) {
   const { results: items } = await env.DB.prepare("SELECT * FROM mc_market").all().catch(() => ({ results: [] }));
+  await histPct(env, items);
   const spark = {};
   if (items.length) {
     const by = [...items].sort((a, b) => b.change_24h_pct - a.change_24h_pct);
@@ -575,6 +630,7 @@ async function mcMarket(env) {
 async function mcMarketItem(env, raw) {
   const id = cleanItem(raw); if (!id) return json({ error: "invalid item" }, 400);
   const item = await env.DB.prepare("SELECT * FROM mc_market WHERE item = ?").bind(id).first().catch(() => null);
+  if (item) await histPct(env, [item]);
   const { results } = await env.DB.prepare("SELECT hour_ts, avg_price, min_price, max_price, volume_qty FROM mc_market_history WHERE item = ? AND hour_ts >= ? ORDER BY hour_ts").bind(id, Math.floor(Date.now() / 1000) - HIST_DAYS * 86400).all().catch(() => ({ results: [] }));
   return json({ item: item || null, history: results.map((r) => [r.hour_ts, r.avg_price, r.min_price, r.max_price, r.volume_qty]) }, 200, { "cache-control": "public, max-age=60" });
 }
@@ -647,6 +703,7 @@ export default {
       }
       if (p === "/shops") return html(mcPage("Shops · NwebNotFound MC", "Spielershops: Angebote, Preise, Lager und Orte", shopsBody()));
       if (p.startsWith("/shops/")) { const id = decodeURIComponent(p.slice(7)); if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Shop · NwebNotFound MC", "Spielershop", shopBody(id))); }
+      if (p === "/bestenlisten" || p === "/bestenliste") return Response.redirect(`https://${MCD}/leaderboards`, 301);
       if (p === "/auktionen") return html(mcPage("Auktionen · NwebNotFound MC", "Live-Auktionen vom Server", auctionsBody()));
       if (p.startsWith("/auktionen/")) { const id = decodeURIComponent(p.slice(11)); if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Auktion · NwebNotFound MC", "Auktion mit Gebotsverlauf", auctionBody(id))); }
       if (p === "/markt") return html(mcPage("Markt · NwebNotFound MC", "Preise, Gewinner und Verlierer im Server-Shop", marketBody()));

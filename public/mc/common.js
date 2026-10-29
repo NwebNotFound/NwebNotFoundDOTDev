@@ -23,6 +23,6 @@ const draw=()=>{const t=inp.value.trim();if(!t){close();return}cur=items.map(x=>
 box.innerHTML=cur.length?cur.map((x,i)=>'<a role="option" href="/markt/'+encodeURIComponent(x.item)+'" aria-selected="'+(i===sel)+'">'+ICO(x.item)+E(NM(x.item))+'<small class="tnum">'+(x.buy_locked?'gesperrt':CP(x.buy_price))+'</small></a>').join(''):'<div class="mut" style="padding:.7rem">Kein Item gefunden.</div>';box.hidden=false;inp.setAttribute('aria-expanded','true');document.documentElement.classList.add('ac-open')};
 inp.addEventListener('input',()=>{sel=-1;draw()});inp.addEventListener('keydown',e=>{if(box.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();sel=(sel+(e.key==='ArrowDown'?1:cur.length-1))%Math.max(1,cur.length);draw()}else if(e.key==='Enter'){const x=cur[Math.max(0,sel)];if(x){e.preventDefault();go(x.item)}}else if(e.key==='Escape')close()});
 document.addEventListener('click',e=>{if(!box.contains(e.target)&&e.target!==inp)close()})}
-const HASCH=x=>(+x.trades_24h||0)>0||Math.abs(+x.change_24h_pct||0)>0.004;const PX=x=>HASCH(x)?PCT(x.change_24h_pct):'<span class="mut">—</span>';
+const HASCH=x=>!!x.hist_pct||(+x.trades_24h||0)>0||Math.abs(+x.change_24h_pct||0)>0.004;const PX=x=>HASCH(x)?PCT(x.change_24h_pct):'<span class="mut">—</span>';
 const LOCK='<span class="tag tl">Nicht bei der Bank kaufbar</span>';const BUYP=x=>x.buy_locked?LOCK:CP(x.buy_price);
 return{SCORE,E,NM,NF,CP,C2,LEFT,LOC,BIG,ICO,PCT,PX,HASCH,LOCK,BUYP,spark,get,post,search}})();
