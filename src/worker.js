@@ -159,7 +159,7 @@ load();
 
 /* ---------- Minecraft-Bereich ---------- */
 const BLOCK_SVG = `<svg class="block" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect width="8" height="8" fill="#6b4a2b"/><rect width="8" height="3" fill="#4ade80"/><rect y="3" width="1" height="1" fill="#4ade80"/><rect x="3" y="3" width="1" height="2" fill="#4ade80"/><rect x="6" y="3" width="1" height="1" fill="#4ade80"/><rect x="1" y="1" width="1" height="1" fill="#22c55e"/><rect x="5" y="0" width="1" height="1" fill="#86efac"/><rect x="2" y="5" width="1" height="1" fill="#5a3c22"/><rect x="5" y="6" width="1" height="1" fill="#7c5a37"/></svg>`;
-const mNav = `<a class="brand" href="/"><span class="px" style="color:var(--acc)">■</span> NwebNotFound MC</a><a class="l hide-s" href="#join">Beitreten</a><a class="l" href="https://${MAIN}/">nwebnotfound.dev</a>`;
+const mNav = `<a class="brand" href="/"><span class="px" style="color:var(--acc)">■</span> NwebNotFound MC</a><a class="l" href="/leaderboards">Bestenlisten</a><a class="l hide-s" href="/#join">Beitreten</a><a class="l hide-s" href="https://${MAIN}/">nwebnotfound.dev</a>`;
 const mFoot = `<span>© {{Y}} Nils Weberruß · Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt oder mit ihnen verbunden.</span><span><a href="https://${MAIN}/">Hauptseite</a></span>`;
 
 const MC = shell({ title: "Minecraft-Server · NwebNotFound", desc: "Status und Infos zum Minecraft-Server mc.nwebnotfound.dev", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `
@@ -220,6 +220,63 @@ $('lb').innerHTML=L.map(([k,v])=>{const [t,f]=LB[k]||[k,x=>x.toLocaleString('de-
 }catch(_){}}
 load();data();setInterval(()=>{load();data()},60000);
 </script>` });
+
+/* ---------- Detail-Stats (Profil) + Bestenlisten ---------- */
+const ICON_JS = `const ICO=id=>{const b='https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.1/assets/minecraft/textures/';return '<span class="ic"><img alt="" loading="lazy" src="'+b+'block/'+id+'.png" data-i="'+b+'item/'+id+'.png" onerror="if(this.dataset.i){this.src=this.dataset.i;this.dataset.i=\\'\\'}else{this.parentNode.textContent=\\''+id.slice(0,2).toUpperCase()+'\\'}"></span>'};
+const NM=id=>String(id).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase());const NF=v=>(+v).toLocaleString('de-DE');const KM=m=>m>=1000?(m/1000).toLocaleString('de-DE',{maximumFractionDigits:1})+' km':NF(Math.round(m))+' m';`;
+const DET_CSS = `<style>
+.dg{display:grid;gap:1.2rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+.dc{border-radius:24px;padding:1.5rem;border:1px solid var(--line);background:linear-gradient(160deg,color-mix(in srgb,var(--fg) 5%,transparent),color-mix(in srgb,var(--fg) 1.5%,transparent));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.dc h3{font-size:1.1rem;margin:0 0 1rem;display:flex;justify-content:space-between;align-items:baseline}.dc h3 small{font-size:.75rem;font-weight:500;opacity:.55}
+.row{display:flex;align-items:center;gap:.75rem;padding:.5rem 0}.row+.row{border-top:1px solid var(--line)}
+.row .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.92rem}.row b{font-variant-numeric:tabular-nums;font-size:.92rem}
+.ic{width:32px;height:32px;flex:none;border-radius:8px;background:color-mix(in srgb,var(--fg) 7%,transparent);display:grid;place-items:center;font-size:.62rem;font-weight:700;opacity:.9}.ic img{width:24px;height:24px;image-rendering:pixelated}
+.meter{height:4px;border-radius:2px;background:var(--line);margin-top:.3rem;overflow:hidden}.meter i{display:block;height:100%;background:var(--acc,#4ade80);border-radius:2px}
+.mini{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem}.mini div{padding:.85rem 1rem;border-radius:16px;background:color-mix(in srgb,var(--fg) 5%,transparent)}.mini .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;opacity:.6}.mini .v{font-size:1.25rem;font-weight:650;margin-top:.15rem;font-variant-numeric:tabular-nums}
+.emp{padding:1.4rem 0 .4rem;text-align:center;opacity:.55;font-size:.9rem}
+</style>`;
+const PROFILE_DETAILS = `${DET_CSS}<script>(()=>{${ICON_JS}const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const MOB={zombie:'🧟',skeleton:'💀',creeper:'💥',spider:'🕷️',enderman:'👁️',cow:'🐄',pig:'🐖',sheep:'🐑',chicken:'🐔',witch:'🧙',slime:'🟩',drowned:'🌊',blaze:'🔥',ender_dragon:'🐉',wither:'☠️',phantom:'🦇',pillager:'🏹',villager:'🧑'};
+const DB={fall:'Fallschaden',lava:'Lava',drown:'Ertrunken',fire:'Feuer',on_fire:'Verbrannt',starve:'Verhungert',void:'Void',explosion:'Explosion',suffocation:'Erstickt',zombie:'Zombie',skeleton:'Skelett',creeper:'Creeper',player:'Spieler'};
+const list=(o,f,n=10)=>{const e=Object.entries(o||{}).sort((a,b)=>b[1]-a[1]).slice(0,n);if(!e.length)return '<div class="emp">Noch keine Daten. Spiel eine Runde auf Survival.</div>';const mx=e[0][1]||1;return e.map(([k,v])=>'<div class="row">'+f(k)+'<div class="n">'+E(NM(k))+'<div class="meter"><i style="width:'+Math.max(4,v/mx*100)+'%"></i></div></div><b>'+NF(v)+'</b></div>').join('')};
+const card=(t,sub,body)=>'<div class="dc"><h3>'+t+(sub?'<small>'+sub+'</small>':'')+'</h3>'+body+'</div>';
+document.addEventListener('mcprofile',ev=>{const m=ev.detail.minecraft;if(!m||!m.visible)return;const d=m.details||{},B=document.getElementById('pb');
+const emo=k=>'<span class="ic" style="font-size:1rem">'+(MOB[k]||'⚔️')+'</span>';const dd=d.distance_m||{};const DL={walk:'Gelaufen',sprint:'Gesprintet',fly:'Geflogen',swim:'Geschwommen',boat:'Boot',horse:'Pferd'};
+const dist=Object.keys(DL).filter(k=>dd[k]!=null);const tot=dist.reduce((a,k)=>a+dd[k],0);
+const MS=[['fished','Gefischt'],['traded','Gehandelt'],['jumps','Sprünge'],['damage_dealt','Schaden ausgeteilt'],['damage_taken','Schaden erlitten'],['cp_earned','CP verdient'],['shop_sales','Shop-Verkäufe']].filter(([k])=>d[k]!=null);
+const h='<div class="dg">'+card('Top-Blöcke','abgebaut',list(d.mined,ICO))+card('Mob-Kills','',list(d.killed,emo,8))+card('Distanzen',tot?KM(tot)+' gesamt':'',dist.length?'<div class="mini">'+dist.map(k=>'<div><div class="k">'+DL[k]+'</div><div class="v">'+KM(dd[k])+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')
++card('Todesursachen','',list(d.deaths_by,k=>'<span class="ic" style="font-size:1rem">🪦</span>',8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)}))
++card('Gesetzt & gecraftet','',list(Object.assign({},d.placed),ICO,5)+(d.crafted?'<div style="height:.8rem"></div>'+list(d.crafted,ICO,5):''))
++card('Sonstiges','',MS.length?'<div class="mini">'+MS.map(([k,t])=>'<div><div class="k">'+t+'</div><div class="v">'+NF(Math.round(d[k]))+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')+'</div>';
+const w=document.createElement('div');w.innerHTML=h;const mch=B.querySelector('.mch');if(mch)mch.after(w.firstChild);else B.prepend(w.firstChild);});})();</script>`;
+const LEADERBOARDS_MC = () => shell({ title: "Bestenlisten · NwebNotFound MC", desc: "Bestenlisten des Minecraft-Servers", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `${DET_CSS}<style>
+.tabs{display:flex;gap:.35rem;overflow-x:auto;padding:.3rem;border-radius:99px;background:color-mix(in srgb,var(--fg) 6%,transparent);border:1px solid var(--line);scrollbar-width:none;max-width:100%}.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:none;border:0;background:transparent;color:var(--mut);font:inherit;font-size:.88rem;font-weight:500;padding:.5rem 1rem;border-radius:99px;cursor:pointer;transition:background .2s,color .2s}.tabs button[aria-selected=true]{background:var(--acc);color:var(--accfg)}
+.seg{display:inline-flex;padding:.25rem;border-radius:12px;background:color-mix(in srgb,var(--fg) 6%,transparent);margin-top:1rem}.seg button{border:0;background:transparent;color:var(--mut);font:inherit;font-size:.82rem;padding:.4rem 1rem;border-radius:9px;cursor:pointer}.seg button[aria-pressed=true]{background:var(--card);color:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.3);background:#1f2a22}
+.pod{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:.8rem;align-items:end;margin:1.6rem 0}.pod>div{text-align:center;padding:1.2rem .6rem;border-radius:22px;border:1px solid var(--line);background:color-mix(in srgb,var(--fg) 4%,transparent)}
+.pod img{width:56px;height:56px;margin:0 auto .6rem;border-radius:10px;image-rendering:pixelated}.pod .p1{padding-top:1.8rem;background:linear-gradient(180deg,rgba(74,222,128,.18),transparent);border-color:rgba(74,222,128,.35)}.pod .p1 img{width:72px;height:72px}
+.pod b{display:block;font-size:.95rem;overflow:hidden;text-overflow:ellipsis}.pod span{font-size:.8rem;opacity:.7;font-variant-numeric:tabular-nums}.pod .r{font-size:.7rem;font-weight:700;letter-spacing:.1em;color:var(--acc)}
+.lbr{display:flex;align-items:center;gap:.8rem;padding:.75rem .4rem}.lbr+.lbr{border-top:1px solid var(--line)}.lbr .px{width:1.6rem;opacity:.6}.lbr img{width:30px;height:30px;border-radius:6px;image-rendering:pixelated}.lbr .n{flex:1}.lbr b{font-variant-numeric:tabular-nums}
+</style>
+<section class="hero center" style="padding-bottom:1.5rem"><div class="pixbg"></div><div class="wrap"><p class="eyebrow">Minecraft</p><h1 class="h-xl">Bestenlisten.</h1><p class="lead">Wer auf dem Server vorne liegt.</p></div></section>
+<section style="padding-top:0"><div class="wrap" style="max-width:760px">
+<div style="display:flex;flex-direction:column;align-items:center"><div class="tabs" role="tablist" id="tabs"></div><div class="seg" id="seg"><button data-k="weekly" aria-pressed="false">Woche</button><button data-k="total" aria-pressed="true">Gesamt</button></div></div>
+<div id="out"></div><p class="mut center" id="upd" style="font-size:.78rem;margin-top:1.4rem"></p></div></section>
+<script>(()=>{${ICON_JS}const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const up=t=>{t=+t||0;const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+' T '+h+' Std':h?h+' Std '+m+' Min':m+' Min'};
+const T=[['money','CP',v=>NF(v)+' CP'],['playtime','Spielzeit',up],['blocks_mined','Blöcke',NF],['kills','Kills',NF],['kd','K/D',v=>(+v).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})],['distance','Distanz',KM]];
+let D={},tab=(location.hash.slice(1)||'money'),per='total';if(!T.some(t=>t[0]===tab))tab='money';
+const av=n=>'https://mc-heads.net/avatar/'+encodeURIComponent(n)+'/72';
+function draw(){document.getElementById('tabs').innerHTML=T.map(([k,t])=>'<button role="tab" data-k="'+k+'" aria-selected="'+(k===tab)+'">'+t+'</button>').join('');
+document.querySelectorAll('#seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===per));
+const [,lbl,f]=T.find(t=>t[0]===tab),P=D[per],L=(P&&P.lists&&P.lists[tab])||[],O=document.getElementById('out');
+document.getElementById('upd').textContent=P&&P.updated_at?'Stand: '+new Date(P.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'';
+if(!L.length){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:3rem 1.5rem"><div style="font-size:2.4rem">🏆</div><h3 style="justify-content:center;margin:.6rem 0 .3rem">Noch niemand auf dem Treppchen</h3><p class="mut" style="margin:0">'+(per==='weekly'?'Diese Woche gibt es noch keine Werte für '+lbl+'.':'Für '+lbl+' gibt es noch keine Werte.')+' Spiel auf Survival und hol dir Platz 1.</p></div>';return}
+const pd=[L[1],L[0],L[2]];O.innerHTML='<div class="pod">'+pd.map((x,i)=>x?'<div class="'+(i===1?'p1':'')+'"><div class="r">#'+(i===1?1:i===0?2:3)+'</div><img alt="" src="'+av(x.name)+'"><b>'+E(x.name)+'</b><span>'+E(f(x.value))+'</span></div>':'<div style="opacity:0"></div>').join('')+'</div>'+
+(L.length>3?'<div class="dc">'+L.slice(3).map((x,i)=>'<div class="lbr"><span class="px">'+(i+4)+'</span><img alt="" src="'+av(x.name).replace('/72','/30')+'"><span class="n">'+E(x.name)+'</span><b>'+E(f(x.value))+'</b></div>').join('')+'</div>':'');}
+document.getElementById('tabs').onclick=e=>{const k=e.target.dataset.k;if(k){tab=k;history.replaceState(null,'','#'+k);draw()}};
+document.getElementById('seg').onclick=e=>{const k=e.target.dataset.k;if(k){per=k;draw()}};
+draw();fetch('/api/mc-leaderboards').then(r=>r.json()).then(d=>{D=d;draw()}).catch(()=>{});})();</script>` });
 
 /* ---------- Profil ---------- */
 const PROFILE_BODY = (mc) => `
@@ -286,8 +343,8 @@ window.__skin='https://mc-heads.net/skin/'+id;
 h+='<div class="card"><h3>Inventar</h3><p class="mut" style="font-size:.8rem;margin-top:0">Nur für dich sichtbar.</p>'+(Array.isArray(st.inventory)&&st.inventory.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:.5rem;margin-top:1rem">'+st.inventory.map(i=>'<div title="'+E(i.item)+'" style="aspect-ratio:1;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;font-size:.62rem;text-align:center;padding:.3rem;position:relative">'+E(String(i.item||'').replace(/^minecraft:/,'').replace(/_/g,' '))+'<b style="position:absolute;right:5px;bottom:3px;font-size:.7rem">'+(i.count>1?i.count:'')+'</b></div>').join('')+'</div>':'<p class="mut">Inventar-Anzeige kommt bald.</p>')+'</div>';}
 else if(m){h+='<div class="card" style="text-align:center"><p class="eyebrow">Minecraft</p><h3>Noch nicht verknüpft</h3><p>'+E(m.hint)+'</p></div>';}
 const g=d.guestbook||[];h+='<div class="card"><h3 style="margin-bottom:.6rem">Deine Gästebuch-Einträge</h3>'+(g.length?g.map(x=>'<div style="padding:.9rem 0;border-top:1px solid var(--line)"><span class="mut" style="font-size:.8rem">'+E(fd(x.created_at))+'</span><p style="margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word;color:var(--fg)">'+E(x.message)+'</p></div>').join(''):'<p>Noch keine Einträge. <a href="https://${MAIN}/guestbook">Jetzt einen schreiben ›</a></p>')+'</div>';
-B.innerHTML=h;if(window.__skin)sv3d(window.__skin);})();
-</script>`;
+B.innerHTML=h;document.dispatchEvent(new CustomEvent('mcprofile',{detail:d}));if(window.__skin)sv3d(window.__skin);})();
+</script>${PROFILE_DETAILS}`;
 const PROFILE_MAIN = () => portfolio({ title: "Profil · NwebNotFound", desc: "Dein Profil", nav: pNav("profile"), body: PROFILE_BODY(false) });
 const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein Profil", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: PROFILE_BODY(true) });
 
@@ -301,8 +358,8 @@ async function profileApi(req, env) {
   const link = await env.DB.prepare("SELECT mc_name, mc_uuid, has_role, verified FROM mc_links WHERE discord_id = ?").bind(u.id).first().catch(() => null);
   let minecraft = { visible: false, hint: "Verknüpfe deinen Account im Discord mit /link" };
   if (link && link.verified && link.has_role) {
-    const ps = await env.DB.prepare("SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = ?").bind(link.mc_uuid).first().catch(() => null);
-    minecraft = { visible: true, mc_name: link.mc_name, mc_uuid: link.mc_uuid, stats: ps ? JSON.parse(ps.stats) : {}, updated_at: ps ? new Date(ps.updated_at).toISOString() : null };
+    const ps = await env.DB.prepare("SELECT stats, updated_at, details FROM mc_player_stats WHERE mc_uuid = ?").bind(link.mc_uuid).first().catch(() => null);
+    minecraft = { visible: true, mc_name: link.mc_name, mc_uuid: link.mc_uuid, stats: ps ? JSON.parse(ps.stats) : {}, details: ps && ps.details ? JSON.parse(ps.details) : null, updated_at: ps ? new Date(ps.updated_at).toISOString() : null };
   } else if (link && !link.verified) minecraft.hint = "Bestätige die Verknüpfung im Discord mit deinem Code (/link).";
   else if (link && !link.has_role) minecraft.hint = "Dir fehlt noch die Server-Rolle im Discord. Danach erscheinen hier deine Stats.";
   return json({ user: { id: u.id, name: u.name, username: u.username, avatar: u.avatar, member_since: since?.c || null }, guestbook: gb, minecraft }, 200, cors);
@@ -404,45 +461,98 @@ function cleanIngest(b) {
     if (!/^[a-z0-9_-]{1,24}$/i.test(k) || !Array.isArray(v)) continue;
     leaderboards[k] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => x.name);
   }
+  const leaderboards_weekly = cleanLb(b?.leaderboards_weekly);
   const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
   const normU = (x) => String(x).toLowerCase().replace(/-/g, "").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
   const links = Array.isArray(b?.links) ? b.links.slice(0, 200).filter(l => /^\d{15,21}$/.test(String(l?.discord_id ?? "")) && UUID.test(String(l?.mc_uuid ?? "")) && /^[A-Za-z0-9_]{1,16}$/.test(String(l?.mc_name ?? "")))
     .map(l => ({ discord_id: String(l.discord_id), mc_name: String(l.mc_name), mc_uuid: normU(l.mc_uuid), has_role: l.has_role === true, verified: l.verified === true })) : null;
-  const players_stats = {};
+  const players_stats = {}, details = {};
   for (const [k, v] of Object.entries(b?.players_stats || {}).slice(0, 200)) {
     if (!UUID.test(k) || typeof v !== "object" || !v) continue;
     const o = {};
-    for (const [sk, sv] of Object.entries(v).slice(0, 24)) {
+    if (v.details !== undefined) { const d = cleanDetails(v.details); if (d) details[normU(k)] = d; }
+    for (const [sk, sv] of Object.entries(v).filter(([x]) => x !== "details").slice(0, 24)) {
       if (!/^[a-z0-9_]{1,24}$/i.test(sk)) continue;
       if (sk === "inventory") { if (Array.isArray(sv)) o.inventory = sv.slice(0, 41).map(i => ({ item: clip(i?.item, 48), count: Math.max(0, Math.min(999, Math.floor(+i?.count || 0))) })).filter(i => i.item); continue; }
       if (Number.isFinite(+sv) && typeof sv !== "boolean") o[sk] = +sv; else if (typeof sv === "string") o[sk] = clip(sv, 40);
     }
     players_stats[normU(k)] = o;
   }
-  return { servers, leaderboards, links, players_stats };
+  return { servers, leaderboards, links, players_stats, details, leaderboards_weekly };
+}
+/* Erweiterung Detail-Stats + Wochen-Bestenlisten */
+function cleanLb(o) {
+  if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+  const r = {};
+  for (const [k, v] of Object.entries(o).slice(0, 12)) {
+    if (!/^[a-z0-9_-]{1,24}$/i.test(k) || !Array.isArray(v)) continue;
+    r[k] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => /^[A-Za-z0-9_]{1,16}$/.test(x.name)).sort((a, b) => b.value - a.value);
+  }
+  return r;
+}
+const DETAIL_MAPS = ["mined", "placed", "killed", "deaths_by", "crafted", "playtime_by_world"];
+const DETAIL_NUMS = ["fished", "traded", "jumps", "damage_dealt", "damage_taken", "cp_earned", "shop_sales"];
+const DIST_KEYS = ["walk", "sprint", "fly", "swim", "boat", "horse"];
+const num = (v) => (typeof v === "number" || (typeof v === "string" && v.trim() !== "")) && Number.isFinite(+v) ? Math.max(0, +v) : null;
+function cleanDetails(d) {
+  if (!d || typeof d !== "object" || Array.isArray(d)) return null;
+  const o = {};
+  for (const m of DETAIL_MAPS) {
+    const src = d[m]; if (!src || typeof src !== "object" || Array.isArray(src)) continue;
+    const e = [];
+    for (const [k, v] of Object.entries(src)) {
+      const id = String(k).toLowerCase().replace(/^minecraft:/, ""), n = num(v);
+      if (/^[a-z0-9_./-]{1,48}$/.test(id) && n !== null) e.push([id, n]);
+    }
+    e.sort((a, b) => b[1] - a[1]); if (e.length) o[m] = Object.fromEntries(e.slice(0, 25));
+  }
+  if (d.distance_m && typeof d.distance_m === "object") { const r = {}; for (const k of DIST_KEYS) { const n = num(d.distance_m[k]); if (n !== null) r[k] = Math.round(n); } if (Object.keys(r).length) o.distance_m = r; }
+  for (const k of DETAIL_NUMS) { const n = num(d[k]); if (n !== null) o[k] = n; }
+  if (!Object.keys(o).length) return null;
+  return JSON.stringify(o).length <= 16384 ? o : null;
+}
+async function mcLeaderboards(env) {
+  const { results } = await env.DB.prepare("SELECT kind, data, updated_at FROM mc_leaderboards").all().catch(() => ({ results: [] }));
+  const out = { total: null, weekly: null };
+  for (const r of results) if (r.kind in out) out[r.kind] = { updated_at: new Date(r.updated_at).toISOString(), lists: JSON.parse(r.data) };
+  if (!out.total) { const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null); const lb = row ? JSON.parse(row.data).leaderboards : null; if (lb && Object.keys(lb).length) out.total = { updated_at: new Date(row.updated_at).toISOString(), lists: lb }; }
+  return json(out, 200, { "cache-control": "public, max-age=30" });
 }
 async function mcIngest(req, env) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const tok = req.headers.get("x-ingest-token") || "";
   if (!env.MC_INGEST_TOKEN || !safeEq(tok, env.MC_INGEST_TOKEN)) return json({ error: "unauthorized" }, 401);
-  const raw = await req.text(); if (raw.length > 65536) return json({ error: "too large" }, 413);
+  const raw = await req.text(); if (raw.length > 1048576) return json({ error: "too large" }, 413);
   let b; try { b = JSON.parse(raw); } catch { return json({ error: "invalid json" }, 400); }
-  const { links, players_stats, ...data } = cleanIngest(b), now = Date.now();
+  const { links, players_stats, details, leaderboards_weekly, ...data } = cleanIngest(b), now = Date.now();
   const st = [];
-  if (b?.servers || b?.leaderboards || (!links && !Object.keys(players_stats).length))
-    st.push(env.DB.prepare("INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(JSON.stringify(data), now));
+  if (b?.servers || b?.leaderboards) {
+    // Teile unabhängig mergen: jeder Teil mit eigenem Zeitstempel
+    const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
+    const cur = row ? JSON.parse(row.data) : {};
+    if (cur.servers && !cur.servers_at) cur.servers_at = row.updated_at;
+    if (cur.leaderboards && !cur.leaderboards_at) cur.leaderboards_at = row.updated_at;
+    if (b.servers) { cur.servers = data.servers; cur.servers_at = now; }
+    if (b.leaderboards) { cur.leaderboards = data.leaderboards; cur.leaderboards_at = now; }
+    st.push(env.DB.prepare("INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(JSON.stringify(cur), now));
+  }
   if (links) {
     if (b.links_full === true) st.push(env.DB.prepare("DELETE FROM mc_links"));
     for (const l of links) st.push(env.DB.prepare("INSERT INTO mc_links (discord_id, mc_name, mc_uuid, has_role, verified, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(discord_id) DO UPDATE SET mc_name=excluded.mc_name, mc_uuid=excluded.mc_uuid, has_role=excluded.has_role, verified=excluded.verified, updated_at=excluded.updated_at").bind(l.discord_id, l.mc_name, l.mc_uuid, l.has_role ? 1 : 0, l.verified ? 1 : 0, now));
   }
-  for (const [k, v] of Object.entries(players_stats)) st.push(env.DB.prepare("INSERT INTO mc_player_stats (mc_uuid, stats, updated_at) VALUES (?, ?, ?) ON CONFLICT(mc_uuid) DO UPDATE SET stats=excluded.stats, updated_at=excluded.updated_at").bind(k, JSON.stringify(v), now));
+  if (b?.leaderboards) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('total', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at").bind(JSON.stringify(cleanLb(b.leaderboards) || {}), now));
+  if (leaderboards_weekly) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('weekly', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at").bind(JSON.stringify(leaderboards_weekly), now));
+  for (const [k, v] of Object.entries(players_stats)) st.push(env.DB.prepare("INSERT INTO mc_player_stats (mc_uuid, stats, updated_at, details) VALUES (?, ?, ?, ?) ON CONFLICT(mc_uuid) DO UPDATE SET stats=excluded.stats, updated_at=excluded.updated_at, details=COALESCE(excluded.details, mc_player_stats.details)").bind(k, JSON.stringify(v), now, details[k] ? JSON.stringify(details[k]) : null));
   if (st.length) await env.DB.batch(st);
-  return json({ ok: true, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length });
+  return json({ ok: true, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0 });
 }
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
-  if (!row || Date.now() - row.updated_at > FRESH_MS) return json({ fresh: false, updated_at: row ? new Date(row.updated_at).toISOString() : null }, 200, { "cache-control": "public, max-age=30" });
-  return json({ fresh: true, updated_at: new Date(row.updated_at).toISOString(), ...JSON.parse(row.data) }, 200, { "cache-control": "public, max-age=30" });
+  const d = row ? JSON.parse(row.data) : {}, now = Date.now(), iso = (t) => t ? new Date(t).toISOString() : null;
+  const sAt = d.servers_at || (d.servers ? row.updated_at : null), lAt = d.leaderboards_at || (d.leaderboards ? row.updated_at : null);
+  const sF = !!sAt && now - sAt <= FRESH_MS, lF = !!lAt && now - lAt <= FRESH_MS;
+  return json({ fresh: sF || lF, updated_at: iso(row?.updated_at), servers_fresh: sF, servers_at: iso(sAt), leaderboards_fresh: lF, leaderboards_at: iso(lAt),
+    servers: sF ? d.servers || {} : {}, leaderboards: lF ? d.leaderboards || {} : {} }, 200, { "cache-control": "public, max-age=30" });
 }
 
 /* ---------- Helfer ---------- */
@@ -493,6 +603,7 @@ export default {
     if (p === "/api/mc-ingest") return mcIngest(req, env);
     if (p === "/api/mc-data") return mcData(env);
     if (p === "/api/profile") return profileApi(req, env);
+    if (p === "/api/mc-leaderboards") return mcLeaderboards(env);
     if (p.startsWith("/auth/")) {
       if (isMc) { url.hostname = MAIN; return redirect(url.toString()); }
       const r = await auth(p, req, env, url); if (r) return r;
@@ -500,6 +611,7 @@ export default {
     if (isMc) {
       if (p === "/") return html(MC);
       if (p === "/profile") return html(PROFILE_MC());
+      if (p === "/leaderboards") return html(LEADERBOARDS_MC());
       return notFound(true);
     }
     if (p === "/api/guestbook") return guestbookApi(req, env);

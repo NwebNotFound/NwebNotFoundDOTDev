@@ -1,13 +1,13 @@
 # MC-Ingest API (`POST https://nwebnotfound.dev/api/mc-ingest`)
 
-Header: `x-ingest-token: <token>` (unverändert), `content-type: application/json`. Max. 64 KB pro Request.
+Header: `x-ingest-token: <token>` (unverändert), `content-type: application/json`. Max. 1 MB pro Request.
 Alle Felder sind optional; alte Payloads (`servers` + `leaderboards`) funktionieren unverändert.
 
 ## Bestehend
 - `servers`: `{ <key>: {online, players[], max, version, mode, uptime_seconds, tps} }` – max. 8 Server.
 - `leaderboards`: `{ money|playtime|kills|deaths|blocks_mined|…: [{name, value}] }` – max. 12 Listen à 10 Einträge, **sortiert senden**.
 - Jede Minute pushen; die Seite zeigt nur Daten < 5 Min.
-- Der Snapshot (servers/leaderboards) wird nur überschrieben, wenn `servers` oder `leaderboards` im Request enthalten sind. Reine Link/Stats-Pushes lassen ihn in Ruhe.
+- **Teile werden unabhängig gemergt** (`servers`, `leaderboards`, `leaderboards_weekly`, `links`, `players_stats`): Ein Push mit nur `leaderboards` lässt `servers` unangetastet und umgekehrt. Jeder Teil hat einen eigenen Zeitstempel; `/api/mc-data` prüft die Frische (< 5 Min.) pro Teil (`servers_fresh`, `leaderboards_fresh`, `servers_at`, `leaderboards_at`).
 
 ## Neu (Phase 2: Profile)
 ### `links` – verknüpfte Accounts (vom Discord-Bot)
@@ -41,3 +41,34 @@ Alle Felder sind optional; alte Payloads (`servers` + `leaderboards`) funktionie
 ## Anzeige
 `/api/profile` (Session-Cookie) liefert MC-Stats **nur**, wenn `verified && has_role`. Sonst einen Hinweis
 („Verknüpfe deinen Account im Discord mit /link“ / Code bestätigen / Rolle fehlt).
+
+
+## Neu (Phase 3: Detail-Stats + Bestenlisten)
+### `leaderboards` / `leaderboards_weekly`
+```json
+"leaderboards":        {"money":[{"name":"Steve","value":12500}], "playtime":[...], "blocks_mined":[...], "kills":[...], "kd":[...], "distance":[...]},
+"leaderboards_weekly": {"money":[...], "playtime":[...], "blocks_mined":[...], "kills":[...], "kd":[...], "distance":[...]}
+```
+- Keys für die Seite `mc.nwebnotfound.dev/leaderboards`: `money` (CP), `playtime` (Sekunden), `blocks_mined`, `kills`, `kd` (Dezimalzahl, z. B. 2.35), `distance` (**Meter**).
+- Max. 12 Listen à 10 Einträge `{name (MC-Name), value}`; der Server sortiert absteigend nach. `leaderboards_weekly` = laufende Woche (Mo 00:00 Europe/Berlin), gleiche Form.
+- Beide werden getrennt gespeichert (eigener Zeitstempel) und bleiben auch ohne frischen Push sichtbar (mit „Stand“). Lesen: `GET /api/mc-leaderboards` → `{total:{updated_at,lists}, weekly:{updated_at,lists}}`.
+
+### `players_stats.<uuid>.details`
+```json
+"players_stats": { "<uuid>": { "money": 12500, "playtime": 93600, "kills": 42, "deaths": 7, "blocks_mined": 18342,
+  "details": {
+    "mined":   {"stone": 9000, "deepslate": 3100, "diamond_ore": 14},
+    "placed":  {"cobblestone": 800},
+    "killed":  {"zombie": 30, "creeper": 12},
+    "deaths_by": {"fall": 3, "lava": 1, "creeper": 2},
+    "crafted": {"torch": 256},
+    "playtime_by_world": {"world": 80000, "world_nether": 12000, "world_the_end": 1600},
+    "distance_m": {"walk": 120000, "sprint": 40000, "fly": 9000, "swim": 2000, "boat": 3000, "horse": 0},
+    "fished": 12, "traded": 40, "jumps": 5021, "damage_dealt": 3400, "damage_taken": 1200, "cp_earned": 40000, "shop_sales": 18
+  } } }
+```
+- Maps (`mined`, `placed`, `killed`, `deaths_by`, `crafted`, `playtime_by_world`): `id → Zahl`, IDs ohne `minecraft:` (wird sonst entfernt), `[a-z0-9_./-]{1,48}`, max. 25 Einträge (der Server behält die 25 größten).
+- `distance_m`: Meter (Vanilla-Stats in cm ÷ 100). `playtime_by_world` in Sekunden.
+- Zahlen ≥ 0; ungültige Werte werden verworfen. Max. 16 KB JSON pro Spieler, sonst wird `details` verworfen.
+- Gespeichert als JSON-Spalte `mc_player_stats.details`. Ohne `details` im Push bleiben die alten Details erhalten.
+- Antwort enthält zusätzlich `details` und `leaderboards_weekly` (Anzahl).
