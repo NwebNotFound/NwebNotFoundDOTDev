@@ -89,54 +89,126 @@ export const marketItemBody = (item) => `
 
 /* ---------- Wiki ---------- */
 const T = (s = "") => `<span class="todo" title="Noch offen">TODO${s ? ": " + s : ""}</span>`;
-export const WIKI = [
-  { slug: "erste-schritte", icon: "🚀", title: "Erste Schritte", sum: "Beitreten, Discord verknüpfen, Whitelist.", body: (H) => `
-<h2>1. Discord beitreten</h2><p>Der Server ist für unsere Freundesgruppe. Du brauchst eine Einladung zu unserem Discord ${T("Invite-Link")} und die Mitglieder-Rolle.</p>
-<h2>2. Account verknüpfen</h2><p>Im Discord schreibst du <code>/link &lt;Minecraft-Name&gt;</code>. Unser Bot <b>Creepy</b> prüft deinen Namen bei Mojang und deine Rolle. Danach bekommst du einen <b>einmaligen Bestätigungscode</b>, den du im Spiel eingibst ${T("genauer Befehl im Spiel")}. <code>/setup</code> schickt dir die Anleitung zusätzlich per DM.</p>
-<h2>3. Whitelist</h2><p>Nach der Bestätigung setzt dich Creepy automatisch auf die Whitelist aller Server. Verlässt du den Discord oder verlierst die Rolle, wirst du automatisch wieder entfernt.</p>
-<h2>4. Verbinden</h2><ol><li>Minecraft <b>Java Edition</b> starten ${T("unterstützte Version")}.</li><li><b>Mehrspieler → Server hinzufügen</b>.</li><li>Adresse <code>${H}</code> eintragen und verbinden.</li></ol><p>Du landest zuerst in der <a href="/wiki/server">Lobby</a>.</p>` },
-  { slug: "server", icon: "🗺️", title: "Server-Übersicht", sum: "Lobby, Survival und VIP-Welten.", body: () => `
-<h2>Lobby</h2><p>Treffpunkt und Spawn. Von hier wechselst du in die anderen Welten ${T("Portal/NPC/Befehl zum Wechseln")}.</p>
-<h2>Survival</h2><p>Die Hauptwelt: Vanilla+ im CraftAttack-Stil, mit <a href="/wiki/voice-chat">Simple Voice Chat</a> und eigener <a href="/wiki/economy">Economy</a>.</p>
-<h2>VIP-Welten</h2><p>${T("Welche VIP-Welten es gibt, wer Zugang hat und wie man ihn bekommt")}</p>
-<h2>Technik</h2><p>Die Server laufen hinter einem Velocity-Proxy, Wechsel zwischen Welten geht ohne Neuverbinden.</p>` },
-  { slug: "economy", icon: "🪙", title: "Economy & Shop", sum: "CP, Kontostand und der Shop.", body: () => `
-<h2>CP</h2><p>Die Währung auf dem Server heißt <b>CP</b>. Deinen Kontostand siehst du in deinem <a href="/profile">Profil</a> und in der Bestenliste „CP“.</p>
-<h2>CP verdienen</h2><p>${T("Wie man CP verdient (Verkauf an den Shop, Jobs, Belohnungen …)")}</p>
-<h2>Shop</h2><p>Im Shop kaufst und verkaufst du Items gegen CP ${T("Wo/wie der Shop geöffnet wird")}. Die Preise bewegen sich mit Angebot und Nachfrage, siehe <a href="/wiki/markt">Markt erklärt</a>.</p>
-<h2>Überweisen</h2><p>${T("Befehl zum Bezahlen anderer Spieler")}</p>` },
-  { slug: "markt", icon: "📈", title: "Markt erklärt", sum: "Kaufpreis, Verkaufspreis, Basispreis, Charts.", body: () => `
-<p>Die <a href="/markt">Markt-Seite</a> zeigt die Shop-Preise wie an einer Börse.</p>
-<ul><li><b>Kaufpreis</b>: was du zahlst, wenn du ein Item im Shop kaufst.</li><li><b>Verkaufspreis</b>: was du bekommst, wenn du es verkaufst.</li><li><b>Basispreis</b>: der Ausgangspreis, um den sich der Preis bewegt.</li><li><b>24h-Änderung</b>: Preisänderung gegenüber vor 24 Stunden.</li><li><b>Volumen</b>: gehandelte Menge bzw. CP in den letzten 24 Stunden.</li></ul>
-<h2>Charts</h2><p>Pro Item gibt es einen Preisverlauf für 1, 7, 30 und 90 Tage, stündlich aufgelöst. Daten werden etwa alle 5 Minuten aktualisiert.</p>
-<h2>Wie entstehen die Preise?</h2><p>${T("Preisformel / wie stark Käufe und Verkäufe den Preis bewegen")}</p>` },
-  { slug: "voice-chat", icon: "🎙️", title: "Voice Chat", sum: "Simple Voice Chat einrichten.", body: () => `
-<p>Auf Survival läuft <b>Simple Voice Chat</b>: Spieler in deiner Nähe hörst du im Spiel, je weiter weg, desto leiser.</p>
-<h2>Installation</h2><ol><li>Einen Mod-Loader installieren, z. B. <b>Fabric</b> oder <b>NeoForge</b> ${T("empfohlener Loader")}.</li><li>Simple Voice Chat für deine Minecraft-Version von <a href="https://modrinth.com/plugin/simple-voice-chat" rel="noopener">Modrinth</a> laden und in den <code>mods</code>-Ordner legen.</li><li>Spiel starten und verbinden. Ohne Mod kannst du spielen, hörst aber niemanden.</li></ol>
-<h2>Einstellungen</h2><p>Mit <kbd>V</kbd> öffnest du das Voice-Chat-Menü: Mikrofon wählen, Lautstärke, Push-to-Talk (Standard <kbd>Caps Lock</kbd>) oder Sprachaktivierung. Gruppen erstellst du über <kbd>G</kbd>.</p>
-<h2>Probleme?</h2><p>Hörst du nichts, prüfe im Menü, ob das richtige Gerät gewählt ist und der Mod zur Spielversion passt.</p>` },
-  { slug: "regeln", icon: "📜", title: "Regeln", sum: "Was auf dem Server gilt.", body: () => `<p>${T("Offizielle Regeln von Nils einfügen")}</p><p>Grundsätzlich gilt: fair spielen, nichts von anderen kaputt machen oder klauen, keine Hacks oder X-Ray.</p>` },
-  { slug: "befehle", icon: "⌨️", title: "Befehle", sum: "Discord- und Ingame-Befehle.", body: () => `
-<h2>Discord (Creepy)</h2><table><tr><td><code>/setup</code></td><td>Einsteiger-Anleitung per DM</td></tr><tr><td><code>/link</code></td><td>Minecraft-Account verknüpfen (mit Bestätigungscode)</td></tr><tr><td><code>/status</code></td><td>Serverstatus und Spieler online</td></tr></table>
-<h2>Im Spiel</h2><p>${T("Liste der Ingame-Befehle (Shop, Geld, Homes, Teleport …)")}</p>` },
-  { slug: "faq", icon: "❓", title: "FAQ", sum: "Häufige Fragen.", body: (H) => `
-<h3>Ich komme nicht auf den Server („nicht auf der Whitelist“).</h3><p>Verknüpfe deinen Account mit <code>/link</code> im Discord und bestätige den Code im Spiel. Siehe <a href="/wiki/erste-schritte">Erste Schritte</a>.</p>
-<h3>Welche Adresse?</h3><p><code>${H}</code>, Java Edition.</p>
-<h3>Geht Bedrock / Handy / Konsole?</h3><p>${T("Bedrock-Support ja/nein")}</p>
-<h3>Ich höre niemanden im Voice Chat.</h3><p>Du brauchst den Simple-Voice-Chat-Mod, siehe <a href="/wiki/voice-chat">Voice Chat</a>.</p>
-<h3>Warum sehe ich keine Stats im Profil?</h3><p>Melde dich auf der Website mit Discord an. Die Stats erscheinen, wenn dein Account verknüpft und bestätigt ist.</p>
-<h3>Wo melde ich Bugs oder Griefing?</h3><p>${T("Kanal im Discord")}</p>` },
+const WIP = `<span class="wip" title="Wird gerade gebaut, Stand 29.10.2026">im Aufbau</span>`;
+// Befehle: [befehl, beschreibung, ort, status]  status: "" = live, "wip" = im Aufbau
+export const COMMANDS = [
+  ["/link <Minecraft-Name>", "Minecraft-Account mit Discord verknüpfen; Creepy prüft den Namen bei Mojang und deine Rolle und schickt einen Einmal-Code", "Discord", ""],
+  ["/setup", "Einsteiger-Anleitung per DM", "Discord", ""],
+  ["/status", "Serverstatus und Spieler online", "Discord", ""],
+  ["/event", "Server-Events anzeigen", "Discord", ""],
+  ["/whitelist · /restart · /backup", "Admin-Befehle (nur Admins)", "Discord", ""],
+  ["/spawn", "Nach 10 Sekunden Stillstehen zum Lobby-Spawn; Bewegung oder Schaden bricht ab. Von Survival aus geht's über den Proxy in die Lobby", "Lobby, Survival", ""],
+  ["/home", "Zu deinem Home teleportieren", "Survival", ""],
+  ["/sethome", "Home setzen; der erste Home-Slot ist gratis, weitere kosten CP", "Survival", ""],
+  ["/tpteam", "Zu deinem Team teleportieren (statt Warps)", "Survival", ""],
+  ["/menu", "Ein Menü für Bank, Shop, Auktionshaus, Homes und Warps", "alle", "wip"],
+  ["/bank", "Items an die Bank verkaufen oder von ihr kaufen", "Lobby", ""],
+  ["/market", "Marktpreise im Spiel ansehen", "Lobby", ""],
+  ["/shop", "Spielershops: kaufen (auch Teilmengen 1/8/16/32/64/Alles) und Kaufaufträge", "Survival", ""],
+  ["/shop sell", "Eigenes Angebot einstellen (Preis pro Stück)", "Survival", ""],
+  ["/shop show · /shop remove", "Eigene Angebote ansehen bzw. zurückziehen (Items kommen zurück)", "Survival", ""],
+  ["/ah", "Auktionshaus: zwischen Spielern handeln, auch seltene Items", "Survival", ""],
+  ["/pay <Spieler> <CP>", "CP an einen anderen Spieler überweisen", "alle", ""],
+  ["/trade <Spieler>", "Sicherer Direkthandel per Menü", "Survival", "wip"],
+  ["/abholen", "Gekaufte oder zurückgegebene Items aus dem Abholfach holen (passiert auch automatisch beim Join)", "Survival", "wip"],
+  ["/challenges", "Tägliche und wöchentliche Aufgaben mit CP-Belohnung", "Survival", ""],
+  ["/stats", "Deine Statistiken im Spiel", "Survival", ""],
+  ["/bounty <Spieler> <CP> · /bounty list", "Kopfgeld aussetzen bzw. offene Kopfgelder ansehen", "Survival", "wip"],
+  ["/season top", "Season-Bestenliste", "Survival", "wip"],
+  ["/minerush party invite|accept|leave", "MineRush-Dungeon in Parties von 1 bis 4 Spielern", "Survival", "wip"],
 ];
-const WIKI_CSS = `<style>.wk h2{font-size:1.3rem;margin:2rem 0 .6rem;letter-spacing:-.01em}.wk h3{font-size:1.05rem;margin:1.6rem 0 .4rem}.wk p,.wk li{color:color-mix(in srgb,var(--fg) 85%,transparent);line-height:1.7}.wk code,.wk kbd{background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:6px;font-size:.9em}.wk table{border-collapse:collapse;width:100%}.wk td{padding:.6rem .4rem;border-top:1px solid var(--line);vertical-align:top}.wk>:first-child{margin-top:0}
+const cmdTable = (filter) => `<div class="srch" style="margin:1rem 0"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input class="inp" id="cq" type="search" placeholder="Befehl suchen, z. B. home" aria-label="Befehle filtern"></div>
+<div style="overflow-x:auto"><table class="cmd" id="ct"><tr><th>Befehl</th><th>Was es macht</th><th>Wo</th></tr>${COMMANDS.filter(filter || (() => true)).map(([c, d, w, s]) => `<tr><td><code>${c.replace(/</g, "&lt;")}</code>${s ? " " + WIP : ""}</td><td>${d}</td><td class="mut">${w}</td></tr>`).join("")}</table></div><p class="mut" id="cnone" hidden>Kein Befehl gefunden.</p>
+<script>(()=>{const q=document.getElementById('cq'),R=[...document.querySelectorAll('#ct tr')].slice(1);q.oninput=()=>{const t=q.value.toLowerCase().replace(/^\\//,'').trim();let n=0;R.forEach(r=>{const ok=!t||r.textContent.toLowerCase().includes(t);r.hidden=!ok;n+=ok});document.getElementById('cnone').hidden=!!n}})()</script>`;
+
+export const WIKI = [
+  { slug: "erste-schritte", icon: "🚀", title: "Erste Schritte", sum: "Discord, Verknüpfung, Whitelist und dein erster Join.", body: (H) => `
+<p>Der Server ist ein privater <b>Java-Edition</b>-Server für unsere Freundesgruppe (ca. 12–15 Leute), CraftAttack-artig: Vanilla+ mit Voice Chat, eigener Economy und Discord-Anbindung. Reinkommen geht nur über die Whitelist, und die läuft komplett über Discord.</p>
+<h2>1. Discord beitreten</h2><p>Du brauchst eine Einladung in unseren Discord ${T("Invite-Link")} und dort die Mitglieder-Rolle. Ohne Rolle kann dich der Bot nicht freischalten.</p>
+<h2>2. Account verknüpfen mit Creepy</h2><ol><li>Schreib im Discord <code>/link &lt;dein Minecraft-Name&gt;</code>. Mit <code>/setup</code> bekommst du die Anleitung auch per DM.</li><li>Unser Bot <b>Creepy</b> prüft deinen Namen bei Mojang (UUID) und ob du die Rolle hast.</li><li>Du bekommst per DM einen <b>Einmal-Bestätigungscode</b> mit Hilfe-Button und Fortschrittsanzeige. Den gibst du im Spiel ein ${T("genauer Ingame-Befehl für den Code")}.</li></ol>
+<h2>3. Whitelist</h2><p>Nach der Bestätigung setzt Creepy dich automatisch auf die Whitelist <b>aller</b> Server (Lobby, Survival). Verlässt du den Discord oder verlierst die Rolle, wirst du automatisch wieder entfernt.</p>
+<h2>4. Verbinden</h2><ol><li>Minecraft <b>Java Edition</b> starten. Der Server meldet Version <b>26.3</b> ${T("weitere unterstützte Versionen bestätigen")}.</li><li><b>Mehrspieler → Server hinzufügen</b>, Adresse <code>${H}</code>.</li><li>Verbinden. Du landest in der <a href="/wiki/server">Lobby</a>, von dort geht's per Portal nach Survival.</li></ol>
+<h2>5. Website</h2><p>Melde dich auf dieser Seite mit Discord an. Ist dein Account verknüpft und bestätigt, siehst du im <a href="/profile">Profil</a> deinen 3D-Skin und deine Stats.</p>
+<h2>Tipps für den Start</h2><ul><li>Installier <a href="/wiki/voice-chat">Simple Voice Chat</a>, sonst hörst du niemanden.</li><li>Auf Survival landest du an einem <b>sicheren Zufalls-Spawn</b> im Umkreis von 100 Blöcken (nicht auf Blättern, nicht in Höhlen).</li><li>Setz dir früh ein Home mit <code>/sethome</code>, der erste Slot ist gratis.</li><li>Zurück in die Lobby kommst du immer mit <code>/spawn</code>.</li></ul>` },
+  { slug: "server", icon: "🗺️", title: "Server-Übersicht", sum: "Lobby, Survival, MineRush und VIP-Welten.", body: () => `
+<p>Alle Server laufen hinter einem <b>Velocity</b>-Proxy unter einer Adresse. Zwischen den Welten wechselst du ohne neu zu verbinden.</p>
+<h2>Lobby</h2><ul><li>Treffpunkt und Spawn, hier landest du beim Join.</li><li><b>Portale</b> bringen dich auf Survival.</li><li><b>Parkour</b> mit Bestenlisten-Hologramm.</li><li><code>/bank</code> und <code>/market</code> funktionieren hier.</li><li>NPCs für Bank und Auktionshaus ${WIP}</li></ul>
+<h2>Survival</h2><ul><li>Die Hauptwelt: Vanilla+ im CraftAttack-Stil.</li><li><a href="/wiki/voice-chat">Simple Voice Chat</a> mit <b>VoiceSculk</b>: lautes Sprechen kann Sculk-Sensoren im Umkreis von 8 Blöcken auslösen. Flüstern und Gruppen-Voice lösen nichts aus.</li><li>Teams: <code>/tpteam</code>, Team-Einladungen über alle Server. Die Locator-Bar (Spielermarker auf der XP-Leiste) zeigt nur deine Teammitglieder.</li><li>Claim-Schutz für Bauten, Truhen und Tiere ${T("wie man claimt")}</li><li>Homes, Shops, Auktionshaus, Challenges, siehe <a href="/wiki/befehle">Befehle</a>.</li></ul>
+<h2>MineRush ${WIP}</h2><p>Ein instanzierter Dungeon: Parties von 1–4 Spielern bekommen eine eigene Instanz mit Etagen, jede 5. Etage ein Boss. Gegner skalieren mit der Partygröße, Belohnungen sinken, je langsamer ihr seid. Stirbst du, geht's zurück zum Eingang. Noch nicht spielbar.</p>
+<h2>VIP-Welten ${WIP}</h2><p>Bis zu 3 VIP-Welten sind geplant. ${T("wer Zugang bekommt und wie")}</p>
+<h2>Servermodus</h2><p>Der Server hat die Modi <b>dev</b>, <b>online</b> und <b>wartung</b>. Er steht im MOTD und in der Tab-Liste. Im Moment läuft <b>dev</b>: Bis zum Go-Live können Welten und Economy noch zurückgesetzt werden. Whitelist, Ränge, Lobby-Bauten und der Parkour bleiben dabei erhalten. ${T("Go-Live-Datum")}</p>
+<h2>Backups</h2><p>Geplant sind tägliche Backups um 04:50 Uhr (Welten und Datenbank, 7 Tage lang) mit einem Neustart danach.</p>` },
+  { slug: "economy", icon: "🪙", title: "Economy & CP", sum: "CP, Bank, Shops, Auktionshaus und Limits.", body: () => `
+<h2>CP</h2><p>Die Währung heißt <b>CP</b>. Deinen Kontostand siehst du im Scoreboard, im <a href="/profile">Profil</a> und in der Bestenliste „CP“. Überweisen geht mit <code>/pay &lt;Spieler&gt; &lt;CP&gt;</code>.</p>
+<h2>Bank (Server)</h2><ul><li>Mit <code>/bank</code> verkaufst du Items an den Server oder kaufst welche.</li><li>Die Bank ist absichtlich knauserig: Beim Verkauf bekommst du <b>25 %</b> vom Wert, beim Kauf zahlst du <b>150 %</b>.</li><li>Verkaufst du viel vom selben Item an einem Tag, bekommst du immer weniger dafür. Massenware wie Cobble, Dirt oder Rotten Flesh bringt fast nichts.</li><li><b>Verkaufslimit: 1.500 CP pro Tag</b>.</li><li>Teure Items wie Diamant oder Netherite haben einen Mindestpreis, unter den sie nie fallen.</li></ul>
+<h2>Seltene Items</h2><p>Elytra, Netherite, Totems, Beacon, Nether Star, Heavy Core, Trident, Dragon Egg, verzauberte goldene Äpfel und Ähnliches gibt es <b>nie</b> bei der Bank, nur von anderen Spielern im Auktionshaus.</p>
+<h2>Spielershops und Auktionshaus</h2><ul><li><code>/shop sell</code> stellt ein Angebot mit <b>Preis pro Stück</b> ein. Käufer können Teilmengen nehmen (1, 8, 16, 32, 64 oder alles).</li><li>Verkäufe, während du offline warst, bekommst du beim nächsten Join zusammengefasst gemeldet.</li><li><b>Kaufaufträge</b>: Unter <code>/shop</code> kannst du ein Gesuch aufgeben. Die CP werden reserviert, Teilverkauf und Storno gehen.</li><li><code>/ah</code> ist das Auktionshaus für Handel zwischen Spielern.</li></ul>
+<h2>CP verdienen</h2><ul><li>Items an die Bank oder an Spieler verkaufen.</li><li><b>Challenges</b> (<code>/challenges</code>): 3 tägliche (ca. 50–150 CP) und 3 wöchentliche (ca. 300–600 CP), z. B. Mining, Mobs, Fischen, Craften, Erkunden. Dazu kommen Season-Punkte.</li><li>Login-Streak, Spielzeit-Titel und Meilensteine.</li><li>Kopfgelder ${WIP}: Bei PvP-Kills droppt der Kopf des Opfers. Mit <code>/bounty</code> setzt du ein Kopfgeld aus, das CP liegt sicher hinterlegt. Nicht auf dich selbst oder Teammitglieder, 1 Stunde Cooldown pro Opfer, nur in PvP-Zonen.</li><li>Startguthaben: ${T("Startguthaben in CP")}</li></ul>
+<h2>Homes</h2><p>Der erste Home-Slot ist gratis, weitere kosten CP ${T("Preise der Home-Slots")}.</p>
+<h2>Seasons ${WIP}</h2><p>Seasons mit Start und Ende. Die Top 3 bekommen einzigartige, nummerierte Trophäen, die nie nachproduziert werden. Bestenliste mit <code>/season top</code> und als Hologramm in der Lobby.</p>` },
+  { slug: "markt", icon: "📈", title: "Markt erklärt", sum: "Kaufpreis, Verkaufspreis, Basispreis und Charts.", body: () => `
+<p>Die <a href="/markt">Markt-Seite</a> zeigt die Shop-Preise wie an einer Börse: Top-Gewinner und -Verlierer der letzten 24 h, eine Item-Suche und für jedes Item einen eigenen Chart. Im Spiel siehst du die Preise mit <code>/market</code>.</p>
+<h2>Begriffe</h2><ul><li><b>Kaufpreis</b>: was du zahlst, wenn du das Item kaufst.</li><li><b>Verkaufspreis</b>: was du beim Verkauf bekommst.</li><li><b>Basispreis</b>: der Grundwert, um den sich der dynamische Preis bewegt. An der Bank: Verkauf 25 %, Kauf 150 % vom Wert.</li><li><b>24h-Änderung</b>: Preisänderung gegenüber vor 24 Stunden.</li><li><b>Volumen</b>: gehandelte Stückzahl bzw. CP in den letzten 24 Stunden. <b>Trades</b>: Anzahl der Käufe und Verkäufe.</li></ul>
+<h2>Charts</h2><p>Für 1, 7, 30 und 90 Tage, stündlich aufgelöst (Durchschnitt, Min, Max, Menge). Fahr mit der Maus über den Chart oder tipp drauf, dann siehst du die Werte einer Stunde. Creepy aktualisiert die Daten etwa alle 5 Minuten.</p>
+<h2>Tipps</h2><ul><li>Massenware fällt, wenn alle sie verkaufen. Verkauf lieber verteilt über mehrere Tage, auch wegen des Tageslimits von 1.500 CP.</li><li>Seltene Items gibt's nur im <code>/ah</code>, dort bestimmen die Spieler den Preis.</li></ul>
+<h2>Preisformel</h2><p>${T("wie stark Käufe und Verkäufe den Preis bewegen")}</p>` },
+  { slug: "voice-chat", icon: "🎙️", title: "Voice Chat", sum: "Simple Voice Chat installieren und einstellen.", body: () => `
+<p>Auf Survival läuft <b>Simple Voice Chat</b>: Wer in deiner Nähe ist, den hörst du im Spiel, und je weiter weg, desto leiser. Ohne den Mod kannst du trotzdem spielen, hörst aber niemanden.</p>
+<h2>Installation</h2><ol><li>Einen Mod-Loader für deine Minecraft-Version installieren, z. B. <b>Fabric</b> (mit Fabric API) oder <b>NeoForge</b>.</li><li><a href="https://modrinth.com/plugin/simple-voice-chat" rel="noopener">Simple Voice Chat von Modrinth</a> laden (passend zu Loader und Version) und in den <code>mods</code>-Ordner legen.</li><li>Mit dem Loader-Profil starten und auf <code>mc.nwebnotfound.dev</code> verbinden.</li></ol>
+<h2>Einstellungen</h2><ul><li><kbd>V</kbd>: Voice-Chat-Menü (Mikrofon, Lautstärke, Test).</li><li>Push-to-Talk (Standard <kbd>Caps Lock</kbd>) oder Sprachaktivierung.</li><li><kbd>G</kbd>: Gruppen, damit ihr unabhängig von der Entfernung miteinander redet.</li><li>Flüstern ist leiser und hat weniger Reichweite.</li></ul>
+<h2>Sculk-Sensoren (VoiceSculk)</h2><p>Normales Sprechen kann Sculk-Sensoren im Umkreis von <b>8 Blöcken</b> auslösen. Flüstern und Gruppen-Voice lösen keine aus. Vorsicht in der Deep Dark!</p>
+<h2>Probleme?</h2><ul><li>Kein Ton: im Menü (<kbd>V</kbd>) das richtige Ein- und Ausgabegerät wählen.</li><li>„Voice Chat nicht verfügbar“: Mod-Version passt nicht zur Spielversion, oder du bist in der Lobby. Voice ist auf Survival aktiv ${T("Voice auch in der Lobby?")}.</li></ul>` },
+  { slug: "befehle", icon: "⌨️", title: "Befehle", sum: "Alle Discord- und Ingame-Befehle, durchsuchbar.", body: () => `
+<p>Alle bekannten Befehle. „im Aufbau“ heißt: wird gerade gebaut oder getestet und kann sich noch ändern. Die meisten Hauptbefehle öffnen ohne Argumente ein Menü.</p>${cmdTable()}` },
+  { slug: "plugins", icon: "🧩", title: "Plugins & Technik", sum: "Was auf dem Server läuft.", body: () => `
+<table class="cmd"><tr><th>Plugin</th><th>Wofür</th></tr>
+<tr><td><b>CraftCore</b></td><td>Unser eigenes Plugin: CP-Economy, Bank, Markt, Shops, Auktionshaus, Homes, Teams, Challenges, Stats, Scoreboard, Spawn, MineRush</td></tr>
+<tr><td><b>Simple Voice Chat</b></td><td>Proximity-Voice-Chat (Survival)</td></tr>
+<tr><td><b>VoiceSculk</b></td><td>Sprechen löst Sculk-Sensoren aus</td></tr>
+<tr><td><b>Advanced Portals</b></td><td>Portale zwischen Lobby und Survival</td></tr>
+<tr><td><b>Lobby Parkour</b></td><td>Parkour in der Lobby mit Bestenliste</td></tr>
+<tr><td><b>LuckPerms</b></td><td>Ränge und Rechte</td></tr>
+<tr><td><b>Vault</b></td><td>Economy-Schnittstelle</td></tr>
+<tr><td><b>WorldEdit, WorldGuard</b></td><td>Bauen und Schutz der Lobby</td></tr>
+<tr><td><b>DiscordLink</b></td><td>Verbindung zum Discord (Verknüpfung, Chat-Sync)</td></tr></table>
+<h2>Discord-Bot Creepy</h2><p>Verknüpfung und Auto-Whitelist, Status-Kanal, Chat-Sync Discord ↔ Minecraft, Wochen-Recap jeden Sonntag um 18 Uhr, Events, Admin-Befehle. Er schickt auch die Daten für diese Website (Bestenlisten, Profile, Markt).</p>
+<h2>Technik</h2><p>Paper-Server (Lobby, Survival) hinter einem Velocity-Proxy, in Docker. Die Website läuft auf Cloudflare. Die Server-IP bleibt verborgen, verbunden wird nur über <code>mc.nwebnotfound.dev</code>.</p>` },
+  { slug: "regeln", icon: "📜", title: "Regeln", sum: "Was auf dem Server gilt.", body: () => `<p>${T("Offizielle Serverregeln von Nils")}</p>
+<h2>Was technisch gilt</h2><ul><li>Zugang nur mit verknüpftem Discord-Account und Mitglieder-Rolle.</li><li>Kopfgelder nicht auf dich selbst oder Teammitglieder; Kills durch Teammitglieder oder verdächtige Zweit-Accounts zählen nicht.</li><li>Claims schützen Bauten, Truhen und Tiere.</li></ul>` },
+  { slug: "faq", icon: "❓", title: "FAQ", sum: "Häufige Fragen.", body: (H) => `
+<h3>„Du bist nicht auf der Whitelist“</h3><p>Verknüpfe deinen Account mit <code>/link</code> im Discord und bestätige den Code im Spiel. Du brauchst die Mitglieder-Rolle. Siehe <a href="/wiki/erste-schritte">Erste Schritte</a>.</p>
+<h3>Welche Adresse und Version?</h3><p><code>${H}</code>, Java Edition. Der Server meldet Version 26.3.</p>
+<h3>Geht Bedrock, Handy oder Konsole?</h3><p>${T("Bedrock-Support ja/nein")}</p>
+<h3>Wie komme ich zurück in die Lobby?</h3><p><code>/spawn</code>, dann 10 Sekunden stillstehen.</p>
+<h3>Wie setze ich ein Home?</h3><p><code>/sethome</code>, zurück mit <code>/home</code>. Nur auf Survival. Der erste Slot ist gratis.</p>
+<h3>Ich höre niemanden.</h3><p>Du brauchst den Mod <a href="/wiki/voice-chat">Simple Voice Chat</a>.</p>
+<h3>Wo sind meine gekauften Items?</h3><p>Passt etwas nicht ins Inventar, landet es im Abholfach (<code>/abholen</code>, auch automatisch beim Join).</p>
+<h3>Warum fällt mein Verkaufspreis?</h3><p>Die Bank zahlt bei vielen Verkäufen desselben Items an einem Tag immer weniger, und es gibt ein Tageslimit von 1.500 CP. Siehe <a href="/wiki/economy">Economy</a>.</p>
+<h3>Wird die Welt zurückgesetzt?</h3><p>Bis zum Go-Live (Servermodus „dev“) ja, danach nicht mehr.</p>
+<h3>Warum sehe ich keine Stats im Profil?</h3><p>Melde dich hier mit Discord an. Die Stats erscheinen, wenn dein Account verknüpft und bestätigt ist und du einmal auf Survival warst.</p>
+<h3>Wo melde ich Bugs oder Griefing?</h3><p>${T("Discord-Kanal")}</p>` },
+];
+const WIKI_CSS = `<style>.wk h2{font-size:1.3rem;margin:2rem 0 .6rem;letter-spacing:-.01em}.wk h3{font-size:1.05rem;margin:1.6rem 0 .4rem}.wk p,.wk li{color:color-mix(in srgb,var(--fg) 85%,transparent);line-height:1.7}.wk code,.wk kbd{background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:6px;font-size:.9em;white-space:nowrap}.wk table{border-collapse:collapse;width:100%}.wk td,.wk th{padding:.6rem .5rem;border-top:1px solid var(--line);vertical-align:top;text-align:left}.wk th{font-size:.78rem;color:var(--mut);font-weight:500;border:0}.wk>:first-child{margin-top:0}
+.wip{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.04em;color:#60a5fa;border:1px solid rgba(96,165,250,.45);border-radius:6px;padding:.02rem .4rem;vertical-align:middle;white-space:nowrap}
 .wl{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}.wl a{display:flex!important;gap:1rem;align-items:flex-start;padding:1.2rem}.wl .qi{font-size:1.4rem;width:44px;height:44px;border-radius:12px;background:rgba(74,222,128,.12);display:grid;place-items:center;flex:none}.wl b{display:block;margin-bottom:.15rem}.wl span{color:var(--mut);font-size:.9rem}
+.hits{display:grid;gap:.7rem}.hits a{display:block;padding:1rem 1.2rem}.hits b{display:block;margin-bottom:.25rem}.hits p{margin:.2rem 0 0;color:var(--mut);font-size:.9rem;line-height:1.5}.hits mark{background:rgba(74,222,128,.25);color:var(--fg);border-radius:3px;padding:0 .1rem}
 .wgrid{display:grid;gap:1.4rem}@media(min-width:900px){.wgrid{grid-template-columns:240px 1fr}}.wside a{display:block;padding:.5rem .8rem;border-radius:10px;color:var(--mut)}.wside a[aria-current]{background:rgba(74,222,128,.12);color:var(--fg)}@media(max-width:899px){.wside{display:flex;overflow-x:auto;gap:.3rem;scrollbar-width:none}.wside a{flex:none}}</style>`;
-const strip = (h) => h.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+const strip = (h) => h.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<\/(p|li|h2|h3|tr|td)>/g, " · ").replace(/<[^>]+>/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").replace(/(\s*·\s*)+/g, " · ").replace(/^ · | · $/g, "").trim();
+// Suchindex: pro Artikel Abschnitte (Überschrift + Text), damit Treffer auf den Abschnitt zeigen
+const sections = (a, H) => { const html = a.body(H), parts = html.split(/(?=<h[23][^>]*>)/); return parts.map((p) => { const m = p.match(/^<h[23][^>]*>([\s\S]*?)<\/h[23]>/); return { h: m ? strip(m[1]) : "", t: strip(m ? p.slice(m[0].length) : p) }; }).filter((s) => s.t || s.h); };
+const wikiIndex = (H) => JSON.stringify(WIKI.map((a) => ({ s: a.slug, ti: a.title, i: a.icon, su: a.sum, x: sections(a, H) }))).replace(/</g, "\\u003c");
 export const wikiIndexBody = (H) => `${WIKI_CSS}
-<section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Wiki</p><h1 class="hub-h">Alles, was du wissen musst.</h1><p class="sub">Anleitungen, Regeln und Antworten rund um den Server.</p>
-<div class="srch" style="margin-top:1.4rem;max-width:560px">${SEARCH_SVG}<input class="inp" id="wq" type="search" placeholder="Wiki durchsuchen" autocomplete="off" aria-label="Wiki durchsuchen"></div></div></section>
-<section class="sec" style="padding-top:1.2rem"><div class="hub-wrap"><div class="wl" id="wl">${WIKI.map((a) => `<a class="g" href="/wiki/${a.slug}" data-t="${(a.title + " " + a.sum + " " + strip(a.body(H))).toLowerCase().replace(/"/g, "")}"><div class="qi">${a.icon}</div><div><b>${a.title}</b><span>${a.sum}</span></div></a>`).join("")}</div>
-<p class="mut" id="wnone" hidden>Nichts gefunden.</p></div></section>
-<script>(()=>{const q=document.getElementById('wq'),L=[...document.querySelectorAll('#wl a')];q.oninput=()=>{const t=q.value.toLowerCase().trim().split(/\\s+/);let n=0;L.forEach(a=>{const ok=t.every(w=>a.dataset.t.includes(w));a.hidden=!ok;n+=ok});document.getElementById('wnone').hidden=!!n}})()</script>`;
+<section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Wiki</p><h1 class="hub-h">Alles, was du wissen musst.</h1><p class="sub">Anleitungen, Befehle, Economy und Antworten rund um den Server.</p>
+<div class="srch" style="margin-top:1.4rem;max-width:560px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input class="inp" id="wq" type="search" placeholder="Wiki durchsuchen, z. B. /home, CP, Voice" autocomplete="off" aria-label="Wiki durchsuchen"></div></div></section>
+<section class="sec" style="padding-top:1.2rem"><div class="hub-wrap"><div class="hits" id="hits" hidden></div><div class="wl" id="wl">${WIKI.map((a) => `<a class="g" href="/wiki/${a.slug}"><div class="qi">${a.icon}</div><div><b>${a.title}</b><span>${a.sum}</span></div></a>`).join("")}</div>
+<p class="mut" id="wnone" hidden>Nichts gefunden. Versuch's mit einem anderen Wort.</p></div></section>
+<script>(()=>{const IX=${wikiIndex(H)};const q=document.getElementById('wq'),H=document.getElementById('hits'),L=document.getElementById('wl'),N=document.getElementById('wnone');
+const E=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');
+const snip=(t,w)=>{const n=norm(t),i=Math.max(0,n.indexOf(w[0]));let s=t.slice(Math.max(0,i-60),i+140);s=(i>60?'… ':'')+E(s)+(t.length>i+140?' …':'');w.forEach(x=>{if(!x)return;s=s.replace(new RegExp('('+x.replace(/[.*+?^$\{\}()|[\\]\\\\\\/]/g,'\\\\$&')+')','ig'),'<mark>$1</mark>')});return s};
+function run(){const raw=q.value.trim();if(!raw){H.hidden=true;L.hidden=false;N.hidden=true;return}const w=norm(raw).split(/\\s+/).filter(Boolean);const R=[];
+IX.forEach(a=>a.x.forEach(sec=>{const hay=norm(a.ti+' '+sec.h+' '+sec.t);if(w.every(x=>hay.includes(x))){let sc=0;w.forEach(x=>{if(norm(sec.h).includes(x))sc+=3;if(norm(a.ti).includes(x))sc+=2;sc+=hay.split(x).length-1});R.push({a,sec,sc})}}));
+R.sort((x,y)=>y.sc-x.sc);L.hidden=true;H.hidden=!R.length;N.hidden=!!R.length;H.innerHTML=R.slice(0,12).map(r=>'<a class="g" href="/wiki/'+r.a.s+'"><b>'+r.a.i+' '+E(r.a.ti)+(r.sec.h?' › '+E(r.sec.h):'')+'</b><p>'+snip(r.sec.t||r.sec.h,w)+'</p></a>').join('')}
+q.oninput=run;const p=new URLSearchParams(location.search).get('q');if(p){q.value=p;run()}})()</script>`;
 export const wikiArticleBody = (a, H) => `${WIKI_CSS}
 <section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p style="margin:0 0 1rem"><a href="/wiki">‹ Wiki</a></p><p class="eyb">${a.icon} Wiki</p><h1 class="hub-h" style="font-size:clamp(2rem,5vw,3.2rem)">${a.title}</h1><p class="sub">${a.sum}</p></div></section>
 <section class="sec" style="padding-top:1rem"><div class="hub-wrap wgrid"><nav class="wside g" style="padding:.5rem;align-self:start">${WIKI.map((x) => `<a href="/wiki/${x.slug}"${x.slug === a.slug ? ' aria-current="page"' : ""}>${x.icon} ${x.title}</a>`).join("")}</nav>

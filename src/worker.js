@@ -499,7 +499,7 @@ async function mcData(env) {
   const sAt = d.servers_at || (d.servers ? row.updated_at : null), lAt = d.leaderboards_at || (d.leaderboards ? row.updated_at : null);
   const sF = !!sAt && now - sAt <= FRESH_MS, lF = !!lAt && now - lAt <= FRESH_MS;
   return json({ fresh: sF || lF, updated_at: iso(row?.updated_at), servers_fresh: sF, servers_at: iso(sAt), leaderboards_fresh: lF, leaderboards_at: iso(lAt),
-    servers: sF ? d.servers || {} : {}, leaderboards: lF ? d.leaderboards || {} : {} }, 200, { "cache-control": "public, max-age=30" });
+    servers: d.servers || {}, leaderboards: lF ? d.leaderboards || {} : {} }, 200, { "cache-control": "public, max-age=30" });
 }
 
 /* ---------- Markt ---------- */
