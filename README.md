@@ -29,3 +29,8 @@ Das Turnstile-Secret liegt **nicht** im Repo. Setzen mit:
 npx wrangler secret put TURNSTILE_SECRET
 ```
 Der Sitekey in `worker.js` ist öffentlich und darf im Code stehen.
+
+## Phase 1 (Redesign, mc.nwebnotfound.dev, Discord-Login)
+- Hosts: `nwebnotfound.dev` (Portfolio, Gästebuch), `mc.nwebnotfound.dev` (Minecraft-Bereich, Worker Custom Domain; SRV `_minecraft._tcp.mc` bleibt unberührt). `/minecraft` → 301 auf mc.
+- Auth: `/auth/discord/login|callback|logout`, `/api/me`. Secrets: `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `SESSION_SECRET`. Redirect-URI: `https://nwebnotfound.dev/auth/discord/callback`.
+- MC-Daten: `POST /api/mc-ingest` (Header `x-ingest-token: <MC_INGEST_TOKEN>`), `GET /api/mc-data` (nur frisch < 5 Min).
