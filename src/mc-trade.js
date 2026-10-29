@@ -19,7 +19,7 @@ export function cleanShops(a) {
   if (!Array.isArray(a)) return null; const out = [], seen = new Set();
   for (const s of a.slice(0, 500)) {
     const id = String(s?.id ?? ""); if (!ID_RE.test(id) || seen.has(id)) continue; seen.add(id);
-    const items = (Array.isArray(s.items) ? s.items : []).slice(0, 200).map((x) => ({ item: item(x?.item), price: cents(x?.price), stock: int(x?.stock), mode: x?.mode === "buy" ? "buy" : "sell" })).filter((x) => x.item && x.price != null);
+    const items = (Array.isArray(s.items) ? s.items : []).slice(0, 200).map((x) => ({ listing_id: x?.listing_id != null && /^[A-Za-z0-9_:.-]{1,64}$/.test(String(x.listing_id)) ? String(x.listing_id) : null, item: item(x?.item), price: cents(x?.price), stock: int(x?.stock), mode: x?.mode === "buy" ? "buy" : "sell" })).filter((x) => x.item && x.price != null);
     out.push({ id, owner_uuid: UUID_RE.test(s.owner_uuid || "") ? normU(s.owner_uuid) : null, owner_name: NAME_RE.test(s.owner_name || "") ? s.owner_name : clip(s.owner_name, 16), name: clip(s.name, 48) || "Shop", location: cleanLoc(s.location), items, updated_at: ts(s.updated_at) });
   }
   return out;
@@ -95,13 +95,16 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
   async function order(req, env) {
     const r = await prep(req, env); if (r.err) return r.err; const { b, a, l, ip } = r;
     const qty = Math.floor(Number(b.qty)); if (!(qty >= 1 && qty <= 2304)) return json({ error: "Menge 1 bis 2304" }, 400);
-    const it = item(b.item); const { list } = await blob(env, "shops"); const sh = list.find((x) => x.id === String(b.shop_id ?? ""));
-    if (!sh) return json({ error: "Shop nicht gefunden" }, 404);
+    const { list } = await blob(env, "shops"); const lid = b.listing_id != null ? String(b.listing_id) : null; let sh, off;
+    if (lid) { for (const x of list) { const o = x.items.find((y) => y.listing_id === lid); if (o) { sh = x; off = o; break; } } if (!sh) return json({ error: "Angebot nicht gefunden" }, 404); if (off.mode !== "sell") return json({ error: "Item wird hier nicht verkauft" }, 404); }
+    else { sh = list.find((x) => x.id === String(b.shop_id ?? "")); }
+    if (!sh) return json({ error: "Shop nicht gefunden" }, 404); const it = off ? off.item : item(b.item);
     if (sh.owner_uuid && sh.owner_uuid === l.mc_uuid) return json({ error: "Du kannst nicht in deinem eigenen Shop kaufen" }, 403);
-    const off = sh.items.find((x) => x.item === it && x.mode === "sell"); if (!off) return json({ error: "Item wird hier nicht verkauft" }, 404);
+    if (!off) off = sh.items.find((x) => x.item === it && x.mode === "sell"); if (!off) return json({ error: "Item wird hier nicht verkauft" }, 404);
+    if (!off.listing_id) return json({ error: "Angebot hat keine listing_id, bitte später erneut" }, 409);
     if (off.stock < qty) return json({ error: "Nur noch " + off.stock + " auf Lager" }, 409);
     const id = crypto.randomUUID(), now = Date.now();
-    await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ip).run();
+    await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ip).run();
     return json({ ok: true, request_id: id, status: "pending", qty, unit_price: off.price, total: off.price * qty }, 202);
   }
   // Pull + Ack für Server/Bot (nur Ingest-Token)
@@ -109,7 +112,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (!tokenOk(req, env)) return json({ error: "unauthorized" }, 401);
     const since = Math.max(0, Number(url.searchParams.get("since")) || 0), limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 100));
     const { results } = await env.DB.prepare(`SELECT ${cols} FROM ${table} WHERE status = 'pending' AND created_at > ? ORDER BY created_at ASC LIMIT ?`).bind(since, limit).all();
-    return json({ now: Date.now(), items: results.map((x) => ({ ...x, request_id: x.id })) });
+    return json({ now: Date.now(), items: results.map((x) => ({ ...x, request_id: x.id, idem_key: x.id })) });
   };
   const ack = (table) => async (req, env) => {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -120,7 +123,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const res = acks.length ? await env.DB.batch(acks.map((x) => env.DB.prepare(`UPDATE ${table} SET status = ?, reason = ?, acked_at = ? WHERE id = ? AND status = 'pending'`).bind(x.status, clip(x.reason, 120) || null, now, x.id))) : [];
     return json({ ok: true, updated: res.reduce((s, r) => s + (r.meta?.changes || 0), 0) });
   };
-  const BID_COLS = "id, auction_id, bidder_uuid, bidder_name, amount, source, created_at", ORD_COLS = "id, shop_id, item, qty, buyer_uuid, buyer_name, unit_price, source, created_at";
+  const BID_COLS = "id, auction_id, bidder_uuid, bidder_name, amount, source, created_at", ORD_COLS = "id, listing_id, shop_id, item, qty, buyer_uuid, buyer_uuid AS uuid, buyer_name, unit_price, unit_price AS max_unit_price_cent, source, created_at";
 
   async function me(req, env) { const u = await getUser(req, env); if (!u) return { user: null }; const l = await linkFor(env, u.id); return { user: u, link: l, can: !!(l && l.verified && l.has_role) }; }
   async function auctions(req, env) {

@@ -109,11 +109,12 @@ Antwort enthält zusätzlich `market` und `market_history` (Anzahl angenommener 
 ```json
 {"shops":[{"id":"s1","owner_uuid":"…","owner_name":"KaiDasEi","name":"Kais Erzladen",
   "location":{"world":"survival","x":120,"y":64,"z":-340},
-  "items":[{"item":"diamond","price":4500,"stock":32,"mode":"sell"}],"updated_at":1793288000000}]}
+  "items":[{"listing_id":"L123","item":"diamond","price":4500,"stock":32,"mode":"sell"}],"updated_at":1793288000000}]}
 ```
 - `location` ist ein String oder `{world,x,y,z}`.
 - `mode`: `sell` heißt, der Shop verkauft an Spieler. `buy` heißt, der Shop kauft an (Gesuch).
 - `price` ist in Cent pro Stück.
+- `listing_id` ist Pflicht für Website-Käufe. Angebote ohne `listing_id` können nicht über die Website gekauft werden.
 
 ### `auctions` (komplette Liste, **ersetzt** den Bestand; Dex mappt `v_auctions` + `v_auction_bids`)
 ```json
@@ -136,7 +137,7 @@ Die Detail-Endpunkte liefern zusätzlich:
 ### Gebote und Bestellungen von Website und Bot (Pending-Queue)
 `POST /api/mc-bid`, Body `{"auction_id":"a1","amount":262500}`, Antwort `202 {"ok":true,"request_id":"<uuid>","status":"pending"}`.
 
-`POST /api/mc-shop-order`, Body `{"shop_id":"s1","item":"diamond","qty":2}`, Antwort `202 {request_id,unit_price,total}`. `unit_price` ist ein Snapshot des Preises beim Bestellen.
+`POST /api/mc-shop-order`, Body `{"listing_id":"L123","qty":2}` (Fallback ohne `listing_id`: `{shop_id,item,qty}`, nur wenn das Angebot eine `listing_id` hat), Antwort `202 {request_id,unit_price,total}`. `unit_price` ist ein Snapshot des Preises beim Bestellen.
 
 Sicherheitsregeln, alle serverseitig geprüft:
 - **Website:** nur mit gültiger Discord-Session und nur, wenn der `Origin` `nwebnotfound.dev` oder `mc.nwebnotfound.dev` ist, sonst 403. Turnstile wird geprüft, falls ein Token mitgeschickt wird.
@@ -151,18 +152,20 @@ Sicherheitsregeln, alle serverseitig geprüft:
   - Gebote auf beendete Auktionen (409)
   - Gebote unter `max(min_price, current_bid + Inkrement)` oder unter dem eigenen höchsten offenen Gebot + 1
   - Bestellungen über dem Lagerbestand. `qty` muss zwischen 1 und 2304 liegen.
-- Das Inkrement ist **vorläufig** `max(100, ceil(current_bid*0.05))` Cent. **TODO (Craft):** echten Wert bestätigen.
+- Inkrement (final): `max(100, ceil(current_bid*0.05))` Cent.
 
 ### Abholen und Bestätigen (Creepy/Server, Header `x-ingest-token`)
 - `GET /api/mc-bids/pending?since=<ms>` liefert `{"now":…, "items":[{"id","request_id","auction_id","bidder_uuid","bidder_name","amount","source","created_at"}]}`.
-- `GET /api/mc-shop-orders/pending?since=<ms>` liefert `{"now":…, "items":[{"id","request_id","shop_id","item","qty","buyer_uuid","buyer_name","unit_price","source","created_at"}]}`.
+- `GET /api/mc-shop-orders/pending?since=<ms>` liefert `{"now":…, "items":[{"id","request_id","idem_key","listing_id","uuid","qty","max_unit_price_cent","shop_id","item","buyer_uuid","buyer_name","unit_price","source","created_at"}]}`.
 - `POST /api/mc-bids/ack` bzw. `/api/mc-shop-orders/ack` mit Body `{"acks":[{"id":"<request_id>","status":"accepted"|"rejected","reason":"…"}]}`.
   - Es werden nur Zeilen aktualisiert, die noch `pending` sind. Ein doppelter Ack ist also harmlos (`updated:0`).
   - Die Website zeigt dann „bestätigt“ oder „abgelehnt“ mit Grund an.
 
 Ausführung im Spiel, idempotent über `request_id`:
 - `ah bid <auction_id> <bidder_uuid> <amount_cent> <request_id>` gibt `OK` oder `ERR <reason>` zurück. Dabei werden die CP reserviert und beim Überbieten zurückerstattet. Ein Gebot in den letzten 2 Minuten verlängert die Auktion (Anti-Snipe).
-- `shop buy <shop_id> <item> <qty> <buyer_uuid> <max_unit_price_cent> <request_id>` gibt `OK` oder `ERR <reason>` zurück. Diese Signatur ist ein **Vorschlag**, **TODO (Craft):** bestätigen. `max_unit_price_cent` ist der `unit_price` aus der Queue und schützt vor Preisänderungen.
+- `shop buy <uuid> <listing_id> <menge> <max_preis_cent> <idem_key> [source]` (genauso `ah buy`) gibt `OK…` oder `ERR <grund>` zurück. `idem_key` ist die `request_id`. Liegt der Preis über `max_preis_cent`, gibt es ERR.
+- Auktionsdauer 1 bis 72 Stunden. Ein Gebot in den letzten 2 Minuten verlängert um 2 Minuten.
+- Käufe von Website und Discord sowie gewonnene Auktionen landen in der Abholkiste im Spiel (`/abholen`), auch offline, nie direkt im Inventar.
 
 ### Redirect
 `/markt?item=minecraft:diamond` leitet mit 302 auf `/markt/diamond` weiter. Bei einem unbekannten Item geht es auf `/markt?q=<item>`, die Suche ist dann vorausgefüllt.

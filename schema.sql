@@ -28,3 +28,5 @@ CREATE INDEX IF NOT EXISTS idx_orders_ip ON mc_shop_orders_pending(ip, created_a
 -- (nachgetragen) Bestenlisten + Detail-Stats
 CREATE TABLE IF NOT EXISTS mc_leaderboards (kind TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL);
 -- ALTER TABLE mc_player_stats ADD COLUMN details TEXT;
+
+ALTER TABLE mc_shop_orders_pending ADD COLUMN listing_id TEXT;
