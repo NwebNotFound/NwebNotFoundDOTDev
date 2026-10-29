@@ -68,6 +68,7 @@ const PORT_CSS = `:root{--bg:#fbfbfd;--fg:#1d1d1f;--mut:#6e6e73;--link:#0066cc;-
 .entry:last-child{border:0}.av{width:40px;height:40px;border-radius:50%;flex:none;background:var(--line);display:grid;place-items:center;font-weight:600;color:var(--mut);overflow:hidden}
 .entry p{margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word}`;
 
+const DSV = "1";
 const MC_CSS = `:root{--bg:#0b0f0c;--fg:#eef5ef;--mut:#93a39a;--link:#7ee787;--acc:#4ade80;--acc2:#4ade80;--accfg:#052e12;--card:rgba(255,255,255,.04);--line:rgba(255,255,255,.09);--navbg:rgba(11,15,12,.72);--field:rgba(255,255,255,.05);--ring:rgba(74,222,128,.25);--shadow:rgba(0,0,0,.9);--menubg:#141a16;color-scheme:dark}
 body{background:radial-gradient(1200px 600px at 50% -10%,rgba(74,222,128,.14),transparent 60%),var(--bg)}
 .px{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:0}
@@ -105,12 +106,12 @@ window.__me=d;document.dispatchEvent(new CustomEvent('me',{detail:d}));}catch(_)
 const DISCORD_SVG = `<svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor" aria-hidden="true"><path d="M60.1 4.9A58.5 58.5 0 0045.4.4a40 40 0 00-1.9 3.8 54 54 0 00-16.2 0A40 40 0 0025.4.4 58.4 58.4 0 0010.7 4.9C1.4 18.7-1.1 32.2.1 45.5a59 59 0 0018 9.1 43 43 0 003.8-6.2 38 38 0 01-6-2.9l1.5-1.1a42 42 0 0036 0l1.5 1.1a38 38 0 01-6 2.9 43 43 0 003.8 6.2 58.7 58.7 0 0018-9.1c1.5-15.4-2.5-28.8-10.6-40.6zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2z"/></svg>`;
 
 function shell({ title, desc, css, nav, body, head = "", footer, loginBase = "", themeColor }) {
-  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  return `<!doctype html><html lang="de"${css === MC_CSS ? ' class="mc"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${themeColor}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
-<script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}</style>${head}</head><body>
+<script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/mc/ds.css?v=${DSV}">` : ""}${head}</head><body>
 <header class="nav"><div class="wrap">${nav}<div class="acct" id="acct"></div></div></header>
-<main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}${ACCT_JS(loginBase)}</body></html>`;
+<main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}${ACCT_JS(loginBase)}${css === MC_CSS ? `<script>(function(){var a=document.querySelector(".nl [aria-current=page]");if(a&&a.parentNode.scrollWidth>a.parentNode.clientWidth)a.parentNode.scrollLeft=a.offsetLeft-a.parentNode.clientWidth/2+a.offsetWidth/2})()</script>` : ""}</body></html>`;
 }
 
 /* ---------- Portfolio ---------- */

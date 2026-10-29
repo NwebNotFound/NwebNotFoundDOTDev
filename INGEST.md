@@ -114,7 +114,9 @@ Antwort enthält zusätzlich `market` und `market_history` (Anzahl angenommener 
 - `location` ist ein String oder `{world,x,y,z}`.
 - `mode`: `sell` heißt, der Shop verkauft an Spieler. `buy` heißt, der Shop kauft an (Gesuch).
 - `price` ist in Cent pro Stück.
-- `listing_id` ist Pflicht für Website-Käufe. Angebote ohne `listing_id` können nicht über die Website gekauft werden.
+- Pro Angebot wird eine `listing_id` mitgeschickt. Das ist der Standard, und die Website-Bestellung bezieht sich darauf. `qty` darf höchstens den Lagerbestand **dieses einen** Angebots haben, sonst lehnt die Website ab und der Bot meldet `NOT_FOUND`.
+- Die Website gruppiert Shops nach `owner_uuid`, also nach Verkäufer.
+- Ack-Gründe wie `PRICE_CHANGED` und `NOT_FOUND` zeigt die Website auf Deutsch an.
 
 ### `auctions` (komplette Liste, **ersetzt** den Bestand; Dex mappt `v_auctions` + `v_auction_bids`)
 ```json
@@ -137,7 +139,7 @@ Die Detail-Endpunkte liefern zusätzlich:
 ### Gebote und Bestellungen von Website und Bot (Pending-Queue)
 `POST /api/mc-bid`, Body `{"auction_id":"a1","amount":262500}`, Antwort `202 {"ok":true,"request_id":"<uuid>","status":"pending"}`.
 
-`POST /api/mc-shop-order`, Body `{"listing_id":"L123","qty":2}` (Fallback ohne `listing_id`: `{shop_id,item,qty}`, nur wenn das Angebot eine `listing_id` hat), Antwort `202 {request_id,unit_price,total}`. `unit_price` ist ein Snapshot des Preises beim Bestellen.
+`POST /api/mc-shop-order`, Body `{"listing_id":"L123","qty":2}` (bevorzugt). Legacy-Fallback: `{shop_id,item,qty}`. Dann wird das Angebot mit dem größten Lagerbestand für dieses Item gewählt, und dessen `listing_id` wird mitgegeben, falls vorhanden., Antwort `202 {request_id,unit_price,total}`. `unit_price` ist ein Snapshot des Preises beim Bestellen.
 
 Sicherheitsregeln, alle serverseitig geprüft:
 - **Website:** nur mit gültiger Discord-Session und nur, wenn der `Origin` `nwebnotfound.dev` oder `mc.nwebnotfound.dev` ist, sonst 403. Turnstile wird geprüft, falls ein Token mitgeschickt wird.

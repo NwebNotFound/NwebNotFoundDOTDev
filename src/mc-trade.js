@@ -100,8 +100,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     else { sh = list.find((x) => x.id === String(b.shop_id ?? "")); }
     if (!sh) return json({ error: "Shop nicht gefunden" }, 404); const it = off ? off.item : item(b.item);
     if (sh.owner_uuid && sh.owner_uuid === l.mc_uuid) return json({ error: "Du kannst nicht in deinem eigenen Shop kaufen" }, 403);
-    if (!off) off = sh.items.find((x) => x.item === it && x.mode === "sell"); if (!off) return json({ error: "Item wird hier nicht verkauft" }, 404);
-    if (!off.listing_id) return json({ error: "Angebot hat keine listing_id, bitte später erneut" }, 409);
+    if (!off) off = sh.items.filter((x) => x.item === it && x.mode === "sell").sort((x, y) => y.stock - x.stock)[0]; if (!off) return json({ error: "Item wird hier nicht verkauft" }, 404);
     if (off.stock < qty) return json({ error: "Nur noch " + off.stock + " auf Lager" }, 409);
     const id = crypto.randomUUID(), now = Date.now();
     await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ip).run();
