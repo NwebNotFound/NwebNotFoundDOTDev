@@ -10,3 +10,7 @@ CREATE TABLE IF NOT EXISTS mc_snapshot (id INTEGER PRIMARY KEY CHECK (id = 1), d
 CREATE TABLE IF NOT EXISTS mc_links (discord_id TEXT PRIMARY KEY, mc_name TEXT NOT NULL, mc_uuid TEXT NOT NULL, has_role INTEGER NOT NULL DEFAULT 0, verified INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_mc_links_uuid ON mc_links(mc_uuid);
 CREATE TABLE IF NOT EXISTS mc_player_stats (mc_uuid TEXT PRIMARY KEY, stats TEXT NOT NULL, updated_at INTEGER NOT NULL);
+-- Phase 4 (Markt)
+CREATE TABLE IF NOT EXISTS mc_market (item TEXT PRIMARY KEY, buy_price REAL NOT NULL, sell_price REAL NOT NULL, base_price REAL NOT NULL, volume_24h_qty REAL NOT NULL DEFAULT 0, volume_24h_cp REAL NOT NULL DEFAULT 0, trades_24h INTEGER NOT NULL DEFAULT 0, change_24h_pct REAL NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS mc_market_history (item TEXT NOT NULL, hour_ts INTEGER NOT NULL, avg_price REAL NOT NULL, min_price REAL NOT NULL, max_price REAL NOT NULL, volume_qty REAL NOT NULL DEFAULT 0, PRIMARY KEY (item, hour_ts));
+CREATE INDEX IF NOT EXISTS idx_mc_mh_ts ON mc_market_history(hour_ts);

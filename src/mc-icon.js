@@ -1,0 +1,70 @@
+import { TEX_BLOCK, TEX_ITEM } from "./mc-textures.js";
+export const TEX_BASE = "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.1/assets/minecraft/textures/";
+// IDs, deren Texturname abweicht
+const ALIAS = {
+  grass_block: "block/grass_block_side", water: "block/water_still", lava: "block/lava_still", water_bucket: "item/water_bucket",
+  short_grass: "block/short_grass", tall_grass: "block/tall_grass_top", sunflower: "block/sunflower_front", lilac: "block/lilac_top",
+  rose_bush: "block/rose_bush_top", peony: "block/peony_top", large_fern: "block/large_fern_top", fire: "block/fire_0", soul_fire: "block/soul_fire_0",
+  crafting_table: "block/crafting_table_front", furnace: "block/furnace_front", blast_furnace: "block/blast_furnace_front", smoker: "block/smoker_front",
+  tnt: "block/tnt_side", bookshelf: "block/bookshelf", chest: null, trapped_chest: null, ender_chest: "block/obsidian",
+  snow_block: "block/snow", snow: "item/snowball", podzol: "block/podzol_side", mycelium: "block/mycelium_side", dirt_path: "block/dirt_path_side",
+  farmland: "block/farmland", melon: "block/melon_side", pumpkin: "block/pumpkin_side", carved_pumpkin: "block/carved_pumpkin", jack_o_lantern: "block/jack_o_lantern",
+  hay_block: "block/hay_block_side", bone_block: "block/bone_block_side", quartz_block: "block/quartz_block_side", smooth_quartz: "block/quartz_block_bottom",
+  smooth_stone: "block/smooth_stone", smooth_sandstone: "block/sandstone_top", smooth_red_sandstone: "block/red_sandstone_top",
+  sandstone: "block/sandstone", red_sandstone: "block/red_sandstone", cut_sandstone: "block/cut_sandstone", magma_block: "block/magma",
+  wheat: "item/wheat", carrots: "item/carrot", potatoes: "item/potato", beetroots: "item/beetroot", sweet_berry_bush: "item/sweet_berries", cocoa: "item/cocoa_beans",
+  redstone_wire: "item/redstone", tripwire: "item/string", bamboo_block: "block/bamboo_block", cave_vines: "item/glow_berries", cave_vines_plant: "item/glow_berries",
+  kelp_plant: "item/kelp", seagrass: "block/seagrass", tall_seagrass: "block/tall_seagrass_top", nether_portal: "block/nether_portal", end_portal_frame: "block/end_portal_frame_side",
+  enchanting_table: "block/enchanting_table_top", anvil: "block/anvil_top", chipped_anvil: "block/chipped_anvil_top", damaged_anvil: "block/damaged_anvil_top",
+  barrel: "block/barrel_side", composter: "block/composter_side", beehive: "block/beehive_front", bee_nest: "block/bee_nest_front", target: "block/target_side",
+  observer: "block/observer_front", dispenser: "block/dispenser_front", dropper: "block/dropper_front", piston: "block/piston_side", sticky_piston: "block/piston_side",
+  loom: "block/loom_front", cartography_table: "block/cartography_table_side3", fletching_table: "block/fletching_table_front", smithing_table: "block/smithing_table_front",
+  stonecutter: "block/stonecutter_saw", grindstone: "block/grindstone_side", lectern: "block/lectern_front", jukebox: "block/jukebox_side", note_block: "block/note_block",
+  respawn_anchor: "block/respawn_anchor_side4", lodestone: "block/lodestone_side", beacon: "block/beacon", conduit: "block/conduit", spawner: "block/spawner",
+  deepslate: "block/deepslate", basalt: "block/basalt_side", polished_basalt: "block/polished_basalt_side", ancient_debris: "block/ancient_debris_side",
+  crimson_nylium: "block/crimson_nylium_side", warped_nylium: "block/warped_nylium_side", sculk_sensor: "block/sculk_sensor_side", sculk_catalyst: "block/sculk_catalyst_side",
+  sculk_shrieker: "block/sculk_shrieker_side", reinforced_deepslate: "block/reinforced_deepslate_side", dried_kelp_block: "block/dried_kelp_side",
+  air: null, cave_air: null, void_air: null,
+};
+const MAT = { brick: "bricks", stone_brick: "stone_bricks", nether_brick: "nether_bricks", red_nether_brick: "red_nether_bricks", mud_brick: "mud_bricks",
+  end_stone_brick: "end_stone_bricks", deepslate_brick: "deepslate_bricks", deepslate_tile: "deepslate_tiles", polished_blackstone_brick: "polished_blackstone_bricks",
+  prismarine_brick: "prismarine_bricks", tuff_brick: "tuff_bricks", quartz: "quartz_block_side", purpur: "purpur_block", smooth_quartz: "quartz_block_bottom",
+  smooth_sandstone: "sandstone_top", smooth_red_sandstone: "red_sandstone_top", petrified_oak: "oak_planks", bamboo_mosaic: "bamboo_mosaic", cut_copper: "cut_copper" };
+const WOODS = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "bamboo", "crimson", "warped", "pale_oak"];
+const has = (p) => (p.startsWith("block/") ? TEX_BLOCK : TEX_ITEM).has(p.slice(p.indexOf("/") + 1));
+const first = (...c) => c.find((p) => p && has(p)) || null;
+const cache = new Map();
+export function resolveIcon(raw) {
+  const id = String(raw || "").toLowerCase().replace(/^minecraft:/, "").replace(/[^a-z0-9_]/g, "");
+  if (!id) return null;
+  if (cache.has(id)) return cache.get(id);
+  const r = resolve(id, 0); cache.set(id, r); return r;
+}
+function resolve(id, depth) {
+  if (depth > 3) return null;
+  if (id in ALIAS) return ALIAS[id] && has(ALIAS[id]) ? ALIAS[id] : null;
+  const direct = first(`item/${id}`, `block/${id}`, `block/${id}_front`, `block/${id}_side`, `block/${id}_top`, `block/${id}_0`, `block/${id}_stage0`, `block/${id}_still`, `item/${id}_00`);
+  if (direct) return direct;
+  let m;
+  if ((m = id.match(/^(waxed_)(.+)$/))) return resolve(m[2], depth + 1);
+  if ((m = id.match(/^(.+?)_?wall_(torch|sign|hanging_sign|banner|head|skull|fan)$/))) return resolve(`${m[1]}_${m[2]}`.replace(/^_/, ""), depth + 1);
+  if ((m = id.match(/^(soul_|redstone_)?wall_torch$/))) return resolve(`${m[1] || ""}torch`, depth + 1);
+  if ((m = id.match(/^potted_(.+)$/))) return resolve(m[1], depth + 1);
+  if ((m = id.match(/^(.+)_(slab|stairs|wall|pressure_plate|button)$/))) {
+    const b = m[1], w = WOODS.find((x) => b === x);
+    return first(w && `block/${w}_planks`, MAT[b] && `block/${MAT[b]}`, `block/${b}`, `block/${b}s`, `block/${b}_block`, `block/${b}_planks`, `block/${b}_top`) || null;
+  }
+  if ((m = id.match(/^(.+)_(fence_gate|fence)$/))) { const w = WOODS.find((x) => m[1] === x); return first(w && `block/${w}_planks`, `block/${m[1]}`, `block/${m[1]}s`); }
+  if ((m = id.match(/^(.+)_wood$/))) return first(`block/${m[1]}_log`);
+  if ((m = id.match(/^(.+)_hyphae$/))) return first(`block/${m[1]}_stem`);
+  if ((m = id.match(/^(.+)_(carpet)$/))) return first(`block/${m[1]}_wool`, `block/${m[1]}`);
+  if ((m = id.match(/^(.+)_bed$/))) return first(`block/${m[1]}_wool`);
+  if ((m = id.match(/^(.+)_(shulker_box)$/))) return first(`block/${m[1]}_shulker_box`, "block/shulker_box");
+  if ((m = id.match(/^(.+)_(banner)$/))) return first(`block/${m[1]}_wool`);
+  if ((m = id.match(/^(.+)_concrete_powder$/))) return first(`block/${m[1]}_concrete_powder`);
+  if ((m = id.match(/^(.+)_(head|skull)$/))) return first(`item/${m[1]}_head`);
+  if ((m = id.match(/^(.+)_(crop|stem|plant)$/))) return resolve(m[1], depth + 1);
+  if ((m = id.match(/^(.+)_spawn_egg$/))) return first("item/egg");
+  if (id.endsWith("s")) return resolve(id.slice(0, -1), depth + 1);
+  return null;
+}

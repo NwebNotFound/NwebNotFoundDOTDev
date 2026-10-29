@@ -1,0 +1,16 @@
+window.MC=(()=>{const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const NM=id=>String(id).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+const NF=(v,d=0)=>(+v||0).toLocaleString('de-DE',{maximumFractionDigits:d,minimumFractionDigits:d});
+const CP=v=>{v=+v||0;return (v>=100?NF(v):NF(v,v<10?2:1))+' CP'};
+const BIG=v=>{v=+v||0;return v>=1e6?NF(v/1e6,1)+' Mio':v>=1e4?NF(v/1e3,1)+' Tsd':NF(v)};
+const ICO=id=>'<span class="ic"><img alt="" loading="lazy" src="/mc-icon/'+encodeURIComponent(id)+'" onerror="this.parentNode.textContent=\''+E(String(id).slice(0,2).toUpperCase())+'\'"></span>';
+const PCT=p=>{p=+p||0;const c=p>0.005?'up':p<-0.005?'dn':'flat';return '<span class="'+c+' tnum">'+(p>0?'+':'')+NF(p,2)+' %</span>'};
+const spark=(pts,w=120,h=36)=>{if(!pts||pts.length<2)return '<svg width="'+w+'" height="'+h+'"></svg>';const mn=Math.min(...pts),mx=Math.max(...pts),r=mx-mn||1;const P=pts.map((v,i)=>[(i/(pts.length-1)*w).toFixed(1),(h-2-(v-mn)/r*(h-4)).toFixed(1)]);const c=pts[pts.length-1]>=pts[0]?'#4ade80':'#f87171';const id='s'+Math.random().toString(36).slice(2,8);
+return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true"><defs><linearGradient id="'+id+'" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="'+c+'" stop-opacity=".35"/><stop offset="1" stop-color="'+c+'" stop-opacity="0"/></linearGradient></defs><path d="M'+P.join('L')+'L'+w+','+h+'L0,'+h+'Z" fill="url(#'+id+')"/><path d="M'+P.join('L')+'" fill="none" stroke="'+c+'" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>'};
+const get=u=>fetch(u).then(r=>{if(!r.ok)throw 0;return r.json()});
+function search(inp,box,items,go){let sel=-1,cur=[];const close=()=>{box.hidden=true;inp.setAttribute('aria-expanded','false');sel=-1};
+const draw=()=>{const t=inp.value.toLowerCase().trim().replace(/ /g,'_');if(!t){close();return}cur=items.filter(x=>x.item.includes(t)||NM(x.item).toLowerCase().includes(inp.value.toLowerCase().trim())).sort((a,b)=>(b.item.startsWith(t))-(a.item.startsWith(t))||b.volume_24h_cp-a.volume_24h_cp).slice(0,8);
+box.innerHTML=cur.length?cur.map((x,i)=>'<a role="option" href="/markt/'+encodeURIComponent(x.item)+'" aria-selected="'+(i===sel)+'">'+ICO(x.item)+E(NM(x.item))+'<small class="tnum">'+CP(x.buy_price)+'</small></a>').join(''):'<div class="mut" style="padding:.7rem">Kein Item gefunden.</div>';box.hidden=false;inp.setAttribute('aria-expanded','true')};
+inp.addEventListener('input',()=>{sel=-1;draw()});inp.addEventListener('keydown',e=>{if(box.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();sel=(sel+(e.key==='ArrowDown'?1:cur.length-1))%Math.max(1,cur.length);draw()}else if(e.key==='Enter'){const x=cur[Math.max(0,sel)];if(x){e.preventDefault();go(x.item)}}else if(e.key==='Escape')close()});
+document.addEventListener('click',e=>{if(!box.contains(e.target)&&e.target!==inp)close()})}
+return{E,NM,NF,CP,BIG,ICO,PCT,spark,get,search}})();
