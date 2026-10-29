@@ -223,6 +223,28 @@ load();data();setInterval(()=>{load();data()},60000);
 
 /* ---------- Profil ---------- */
 const PROFILE_BODY = (mc) => `
+<style>
+.mch{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:2rem;align-items:center;padding:2.2rem;border-radius:28px;border:1px solid var(--line);background:linear-gradient(160deg,color-mix(in srgb,var(--fg) 6%,transparent),color-mix(in srgb,var(--fg) 1%,transparent));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 30px 80px -40px var(--shadow,rgba(0,0,0,.5))}
+.mch-glow{position:absolute;inset:-40% auto auto -20%;width:70%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(74,222,128,.28),transparent 65%);filter:blur(30px);pointer-events:none}
+.mch-model{position:relative;height:400px;display:grid;place-items:center}
+.mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchIn .8s ease forwards}
+.mch-model.ready .mch-fb{opacity:0;transition:opacity .4s}
+.mch-fb{max-height:300px;image-rendering:pixelated;filter:drop-shadow(0 20px 30px rgba(0,0,0,.35))}
+.mch-model::after{content:"";position:absolute;bottom:18px;left:50%;width:46%;height:16px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(rgba(0,0,0,.45),transparent 70%);z-index:-1}
+@keyframes mchIn{to{opacity:1}}
+.mch-info{position:relative;min-width:0}
+.mch-name{font-size:clamp(2rem,5vw,3.2rem);letter-spacing:-.03em;line-height:1.05;margin:.2rem 0 .3rem;font-weight:700}
+.mch-sub{margin:0 0 1.4rem;font-size:.85rem;opacity:.65}
+.mch-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem}
+.mch-tile{padding:1rem 1.1rem;border-radius:18px;background:color-mix(in srgb,var(--fg) 5%,transparent);border:1px solid var(--line);transition:transform .25s ease,background .25s}
+.mch-tile:hover{transform:translateY(-2px);background:color-mix(in srgb,var(--fg) 8%,transparent)}
+.mch-tile.wide{grid-column:1/-1}.mch-tile.wide .v{font-size:2rem}
+.mch-tile .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;opacity:.6}
+.mch-tile .v{font-size:1.45rem;font-weight:650;letter-spacing:-.02em;margin-top:.25rem;font-variant-numeric:tabular-nums}
+.mch-tile.empty .v{opacity:.35}.mch-tile .nd{font-size:.7rem;opacity:.5;margin-top:.15rem}
+@media (max-width:760px){.mch{grid-template-columns:1fr;padding:1.4rem;gap:.5rem;text-align:center}.mch-model{height:320px}.mch-grid{text-align:left}}
+@media (prefers-reduced-motion:reduce){.mch-model canvas{animation:none;opacity:1}.mch-tile{transition:none}}
+</style>
 <section class="hero center" style="padding-bottom:2rem">${mc ? '<div class="pixbg"></div>' : ""}<div class="wrap" id="ph"><p class="mut">Lade Profil…</p></div></section>
 <section style="padding-top:0"><div class="wrap" style="max-width:860px;display:grid;gap:1.2rem" id="pb"></div></section>
 <script>
@@ -230,19 +252,41 @@ const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt
 const fd=t=>{try{return new Date(t.replace(' ','T')+(t.includes('Z')?'':'Z')).toLocaleDateString('de-DE',{dateStyle:'long'})}catch(_){return t}};
 const up=t=>{t=+t||0;const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+' T '+h+' Std':h?h+' Std '+m+' Min':m+' Min'};
 const LBL={money:['Kontostand',v=>(+v).toLocaleString('de-DE')+' CP'],playtime:['Spielzeit',up],kills:['Kills',v=>(+v).toLocaleString('de-DE')],deaths:['Tode',v=>(+v).toLocaleString('de-DE')],blocks_mined:['Abgebaute Blöcke',v=>(+v).toLocaleString('de-DE')]};
+
+function sv3d(url){const box=document.getElementById('mcm');if(!box)return;
+const ok=(()=>{try{const c=document.createElement('canvas');return !!(c.getContext('webgl2')||c.getContext('webgl'))}catch(_){return false}})();if(!ok)return;
+const go=()=>{const s=document.createElement('script');s.src='/vendor/skinview3d-3.4.2.min.js';s.async=true;s.onload=()=>init();document.head.appendChild(s)};
+const io=new IntersectionObserver(e=>{if(e[0].isIntersecting){io.disconnect();go()}},{rootMargin:'200px'});io.observe(box);
+function init(){try{const RM=matchMedia('(prefers-reduced-motion: reduce)').matches,fine=matchMedia('(hover: hover) and (pointer: fine)').matches;
+const cv=document.createElement('canvas');const w=box.clientWidth||300,hh=box.clientHeight||380;
+const v=new skinview3d.SkinViewer({canvas:cv,width:w,height:hh,skin:url,zoom:.82,fov:40});
+v.controls.enableRotate=false;v.controls.enableZoom=false;v.controls.enablePan=false;v.globalLight.intensity=2.6;v.cameraLight.intensity=.7;
+v.loadSkin(url).then(()=>{box.classList.add('ready');box.appendChild(cv)}).catch(()=>{try{v.dispose()}catch(_){}});
+new ResizeObserver(()=>{v.setSize(box.clientWidth,box.clientHeight)}).observe(box);
+const P=v.playerObject,head=P.skin.head;P.rotation.y=-.35;
+if(RM){v.renderPaused=false;return}
+if(!fine){const a=new skinview3d.IdleAnimation();v.animation=a;let t=0;const tick=()=>{t+=.012;P.rotation.y=Math.sin(t*.6)*.45-.1;head.rotation.y=Math.sin(t*.9)*.18;requestAnimationFrame(tick)};tick();return}
+v.animation=new skinview3d.IdleAnimation();v.animation.speed=.6;
+let tx=0,ty=0,cx=0,cy=0;addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect();const ox=r.left+r.width/2,oy=r.top+r.height*.22;
+tx=Math.max(-1,Math.min(1,(e.clientX-ox)/(innerWidth*.45)));ty=Math.max(-1,Math.min(1,(e.clientY-oy)/(innerHeight*.45)))},{passive:true});
+addEventListener('pointerleave',()=>{tx=0;ty=0});
+const loop=()=>{cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;head.rotation.y=cx*.85;head.rotation.x=cy*.55;P.rotation.y=cx*.35;requestAnimationFrame(loop)};loop();
+}catch(err){console.warn('skinview3d',err)}}}
 (async()=>{const H=document.getElementById('ph'),B=document.getElementById('pb');
 const r=await fetch('/api/profile',{credentials:'include'});const d=await r.json().catch(()=>({}));
 if(!d.user){H.innerHTML='<h1 class="h-l">Dein Profil.</h1><p class="lead">Melde dich mit Discord an, um dein Profil zu sehen.</p><p style="margin-top:2rem"><a class="btn discord" href="${mc ? `https://${MAIN}` : ""}/auth/discord/login?next='+encodeURIComponent(location.href)+'">${DISCORD_SVG} Mit Discord anmelden</a></p>';return}
 const u=d.user;H.innerHTML='<img alt="" src="'+E(u.avatar)+'" width="112" height="112" style="width:112px;height:112px;border-radius:50%;margin:0 auto 1.2rem;box-shadow:0 10px 40px -10px var(--shadow)"><h1 class="h-l">'+E(u.name)+'</h1><p class="mut" style="margin:.4rem 0 0">@'+E(u.username)+(u.member_since?' · Mitglied seit '+E(fd(u.member_since)):'')+'</p>';
 let h='';const m=d.minecraft;
 if(m&&m.visible){const st=m.stats||{};const ks=Object.keys(st).filter(k=>k!=='inventory');
-h+='<div class="card"><div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem"><img alt="" width="56" height="56" style="border-radius:8px;image-rendering:pixelated" src="https://mc-heads.net/avatar/'+encodeURIComponent(m.mc_uuid||m.mc_name)+'/56"><div><p class="eyebrow" style="margin:0">Minecraft</p><h3 style="font-size:1.4rem">'+E(m.mc_name)+'</h3></div></div>'+
-'<div class="stats mcgrid" style="margin-top:0">'+['money','playtime','kills','deaths','blocks_mined'].concat(ks.filter(k=>!LBL[k])).map(k=>{const [t,f]=LBL[k]||[k.replace(/_/g,' '),v=>typeof v==='number'?v.toLocaleString('de-DE'):String(v)];const has=st[k]!=null&&st[k]!=='';return '<div class="card stat"><div class="k">'+E(t)+'</div><div class="v">'+(has?E(f(st[k])):'–')+'</div>'+(has?'':'<div class="k" style="font-size:.7rem;margin-top:.2rem">noch keine Daten</div>')+'</div>'}).join('')+'</div>'+
-(m.updated_at?'<p class="mut" style="font-size:.78rem;margin:1rem 0 0">Stand: '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}))+'</p>':'')+'</div>';
+const SK=['money','playtime','kills','deaths','blocks_mined'].concat(ks.filter(k=>!LBL[k]));const id=encodeURIComponent(m.mc_uuid||m.mc_name);
+h+='<div class="mch"><div class="mch-glow"></div><div class="mch-model" id="mcm"><img class="mch-fb" alt="Skin von '+E(m.mc_name)+'" src="https://mc-heads.net/body/'+id+'/220" loading="lazy"></div><div class="mch-info"><p class="eyebrow" style="margin:0">Minecraft</p><h2 class="mch-name">'+E(m.mc_name)+'</h2><p class="mch-sub">Verifiziert · Survival</p>'+
+'<div class="mch-grid">'+SK.map((k,j)=>{const [t,f]=LBL[k]||[k.replace(/_/g,' '),v=>typeof v==='number'?v.toLocaleString('de-DE'):String(v)];const has=st[k]!=null&&st[k]!=='';return '<div class="mch-tile'+(j===0?' wide':'')+(has?'':' empty')+'"><div class="k">'+E(t)+'</div><div class="v">'+(has?E(f(st[k])):'–')+'</div>'+(has?'':'<div class="nd">noch keine Daten</div>')+'</div>'}).join('')+'</div>'+
+(m.updated_at?'<p class="mut" style="font-size:.78rem;margin:1rem 0 0">Stand: '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}))+'</p>':'')+'</div></div>';
+window.__skin='https://mc-heads.net/skin/'+id;
 h+='<div class="card"><h3>Inventar</h3><p class="mut" style="font-size:.8rem;margin-top:0">Nur für dich sichtbar.</p>'+(Array.isArray(st.inventory)&&st.inventory.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:.5rem;margin-top:1rem">'+st.inventory.map(i=>'<div title="'+E(i.item)+'" style="aspect-ratio:1;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;font-size:.62rem;text-align:center;padding:.3rem;position:relative">'+E(String(i.item||'').replace(/^minecraft:/,'').replace(/_/g,' '))+'<b style="position:absolute;right:5px;bottom:3px;font-size:.7rem">'+(i.count>1?i.count:'')+'</b></div>').join('')+'</div>':'<p class="mut">Inventar-Anzeige kommt bald.</p>')+'</div>';}
 else if(m){h+='<div class="card" style="text-align:center"><p class="eyebrow">Minecraft</p><h3>Noch nicht verknüpft</h3><p>'+E(m.hint)+'</p></div>';}
 const g=d.guestbook||[];h+='<div class="card"><h3 style="margin-bottom:.6rem">Deine Gästebuch-Einträge</h3>'+(g.length?g.map(x=>'<div style="padding:.9rem 0;border-top:1px solid var(--line)"><span class="mut" style="font-size:.8rem">'+E(fd(x.created_at))+'</span><p style="margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word;color:var(--fg)">'+E(x.message)+'</p></div>').join(''):'<p>Noch keine Einträge. <a href="https://${MAIN}/guestbook">Jetzt einen schreiben ›</a></p>')+'</div>';
-B.innerHTML=h;})();
+B.innerHTML=h;if(window.__skin)sv3d(window.__skin);})();
 </script>`;
 const PROFILE_MAIN = () => portfolio({ title: "Profil · NwebNotFound", desc: "Dein Profil", nav: pNav("profile"), body: PROFILE_BODY(false) });
 const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein Profil", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: PROFILE_BODY(true) });
