@@ -18,6 +18,12 @@ img{max-width:100%;display:block}
 .nav a.l{color:var(--mut);font-size:.86rem}.nav a.l:hover,.nav a.l[aria-current]{color:var(--fg);text-decoration:none}
 .acct{display:flex;align-items:center;gap:.5rem;font-size:.82rem}
 .acct img{width:26px;height:26px;border-radius:50%}
+.um{position:relative}.um>button{display:flex;align-items:center;gap:.5rem;background:transparent;border:0;color:var(--fg);font:inherit;font-size:.82rem;padding:.25rem .5rem .25rem .25rem;border-radius:99px;cursor:pointer;transition:background .2s}
+.um>button:hover,.um>button[aria-expanded=true]{background:var(--line)}.um .chev{width:10px;height:10px;opacity:.6;transition:transform .25s}.um>button[aria-expanded=true] .chev{transform:rotate(180deg)}
+.menu{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:var(--menubg,var(--card));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:14px;padding:.4rem;box-shadow:0 20px 50px -20px var(--shadow);opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top right;pointer-events:none;transition:opacity .18s ease,transform .18s ease;z-index:60}
+.menu.open{opacity:1;transform:none;pointer-events:auto}.menu .hd{padding:.55rem .7rem .6rem;border-bottom:1px solid var(--line);margin-bottom:.3rem}.menu .hd b{display:block;font-size:.88rem}.menu .hd span{font-size:.75rem;color:var(--mut)}
+.menu a{display:flex;align-items:center;gap:.6rem;padding:.6rem .7rem;border-radius:9px;color:var(--fg);font-size:.88rem}.menu a:hover,.menu a:focus-visible{background:var(--line);text-decoration:none;outline:none}.menu a.out{color:#ff453a}
+@media (max-width:640px){.menu{position:fixed;left:.75rem;right:.75rem;top:60px;min-width:0}.menu a{padding:.8rem .8rem;font-size:.95rem}}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:0;border-radius:980px;padding:.62rem 1.25rem;font:inherit;font-size:.95rem;font-weight:500;cursor:pointer;background:var(--acc);color:var(--accfg);transition:transform .2s ease,opacity .2s ease,background .2s}
 .btn:hover{text-decoration:none;transform:translateY(-1px)}.btn:active{transform:scale(.98)}
 .btn.sec{background:transparent;color:var(--link);box-shadow:inset 0 0 0 1px currentColor}
@@ -58,7 +64,7 @@ const PORT_CSS = `:root{--bg:#fbfbfd;--fg:#1d1d1f;--mut:#6e6e73;--link:#0066cc;-
 .entry:last-child{border:0}.av{width:40px;height:40px;border-radius:50%;flex:none;background:var(--line);display:grid;place-items:center;font-weight:600;color:var(--mut);overflow:hidden}
 .entry p{margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word}`;
 
-const MC_CSS = `:root{--bg:#0b0f0c;--fg:#eef5ef;--mut:#93a39a;--link:#7ee787;--acc:#4ade80;--acc2:#4ade80;--accfg:#052e12;--card:rgba(255,255,255,.04);--line:rgba(255,255,255,.09);--navbg:rgba(11,15,12,.72);--field:rgba(255,255,255,.05);--ring:rgba(74,222,128,.25);--shadow:rgba(0,0,0,.9);color-scheme:dark}
+const MC_CSS = `:root{--bg:#0b0f0c;--fg:#eef5ef;--mut:#93a39a;--link:#7ee787;--acc:#4ade80;--acc2:#4ade80;--accfg:#052e12;--card:rgba(255,255,255,.04);--line:rgba(255,255,255,.09);--navbg:rgba(11,15,12,.72);--field:rgba(255,255,255,.05);--ring:rgba(74,222,128,.25);--shadow:rgba(0,0,0,.9);--menubg:#141a16;color-scheme:dark}
 body{background:radial-gradient(1200px 600px at 50% -10%,rgba(74,222,128,.14),transparent 60%),var(--bg)}
 .px{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:0}
 .pixbg{position:absolute;inset:0;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:32px 32px;mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%);-webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%)}
@@ -83,7 +89,10 @@ const REVEAL_JS = `<script>(()=>{const els=document.querySelectorAll('.reveal');
 
 // Account-Chip: lädt /api/me clientseitig (Seiten bleiben cachebar)
 const ACCT_JS = (loginBase) => `<script>(async()=>{const el=document.getElementById('acct');if(!el)return;try{const d=await(await fetch('/api/me',{credentials:'include'})).json();const nx=encodeURIComponent(location.href);
-if(d.user){el.innerHTML='<img alt="" src="'+d.user.avatar+'"><span class="hide-s">'+d.user.name.replace(/[<>&"]/g,'')+'</span><a class="btn sec sm" href="${loginBase}/auth/discord/logout?next='+nx+'">Abmelden</a>';}
+if(d.user){const n=d.user.name.replace(/[<>&"']/g,''),un=(d.user.username||'').replace(/[<>&"']/g,'');el.innerHTML='<div class="um"><button type="button" id="umb" aria-haspopup="menu" aria-expanded="false" aria-controls="umm"><img alt="" src="'+d.user.avatar+'"><span class="hide-s">'+n+'</span><svg class="chev" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><div class="menu" id="umm" role="menu"><div class="hd"><b>'+n+'</b><span>@'+un+'</span></div><a role="menuitem" href="/profile">Profil</a><a role="menuitem" class="out" href="${loginBase}/auth/discord/logout?next='+nx+'">Abmelden</a></div></div>';
+const b=document.getElementById('umb'),m=document.getElementById('umm'),it=()=>[...m.querySelectorAll('a')];const set=o=>{b.setAttribute('aria-expanded',o);m.classList.toggle('open',o);if(o)setTimeout(()=>it()[0].focus(),20)};
+b.onclick=e=>{e.stopPropagation();set(!m.classList.contains('open'))};document.addEventListener('click',e=>{if(!m.contains(e.target))set(false)});
+document.addEventListener('keydown',e=>{if(!m.classList.contains('open'))return;if(e.key==='Escape'){set(false);b.focus()}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const a=it(),i=a.indexOf(document.activeElement);a[(i+(e.key==='ArrowDown'?1:a.length-1))%a.length].focus()}});}
 else if(d.available){el.innerHTML='<a class="btn discord sm" href="${loginBase}/auth/discord/login?next='+nx+'">Mit Discord anmelden</a>';}
 else{el.innerHTML='<button class="btn sm sec" disabled title="Discord-Login ist bald verfügbar"><span class="hide-s">Login </span>bald</button>';}
 window.__me=d;document.dispatchEvent(new CustomEvent('me',{detail:d}));}catch(_){}})();</script>`;
@@ -211,6 +220,49 @@ $('lb').innerHTML=L.map(([k,v])=>{const [t,f]=LB[k]||[k,x=>x.toLocaleString('de-
 load();data();setInterval(()=>{load();data()},60000);
 </script>` });
 
+/* ---------- Profil ---------- */
+const PROFILE_BODY = (mc) => `
+<section class="hero center" style="padding-bottom:2rem">${mc ? '<div class="pixbg"></div>' : ""}<div class="wrap" id="ph"><p class="mut">Lade Profil…</p></div></section>
+<section style="padding-top:0"><div class="wrap" style="max-width:860px;display:grid;gap:1.2rem" id="pb"></div></section>
+<script>
+const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fd=t=>{try{return new Date(t.replace(' ','T')+(t.includes('Z')?'':'Z')).toLocaleDateString('de-DE',{dateStyle:'long'})}catch(_){return t}};
+const up=t=>{t=+t||0;const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+' T '+h+' Std':h?h+' Std '+m+' Min':m+' Min'};
+const LBL={money:['Kontostand',v=>(+v).toLocaleString('de-DE')+' CP'],playtime:['Spielzeit',up],kills:['Kills',v=>(+v).toLocaleString('de-DE')],deaths:['Tode',v=>(+v).toLocaleString('de-DE')],blocks_mined:['Abgebaute Blöcke',v=>(+v).toLocaleString('de-DE')]};
+(async()=>{const H=document.getElementById('ph'),B=document.getElementById('pb');
+const r=await fetch('/api/profile',{credentials:'include'});const d=await r.json().catch(()=>({}));
+if(!d.user){H.innerHTML='<h1 class="h-l">Dein Profil.</h1><p class="lead">Melde dich mit Discord an, um dein Profil zu sehen.</p><p style="margin-top:2rem"><a class="btn discord" href="${mc ? `https://${MAIN}` : ""}/auth/discord/login?next='+encodeURIComponent(location.href)+'">${DISCORD_SVG} Mit Discord anmelden</a></p>';return}
+const u=d.user;H.innerHTML='<img alt="" src="'+E(u.avatar)+'" width="112" height="112" style="width:112px;height:112px;border-radius:50%;margin:0 auto 1.2rem;box-shadow:0 10px 40px -10px var(--shadow)"><h1 class="h-l">'+E(u.name)+'</h1><p class="mut" style="margin:.4rem 0 0">@'+E(u.username)+(u.member_since?' · Mitglied seit '+E(fd(u.member_since)):'')+'</p>';
+let h='';const m=d.minecraft;
+if(m&&m.visible){const st=m.stats||{};const ks=Object.keys(st).filter(k=>k!=='inventory');
+h+='<div class="card"><div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem"><img alt="" width="56" height="56" style="border-radius:8px;image-rendering:pixelated" src="https://mc-heads.net/avatar/'+encodeURIComponent(m.mc_uuid||m.mc_name)+'/56"><div><p class="eyebrow" style="margin:0">Minecraft</p><h3 style="font-size:1.4rem">'+E(m.mc_name)+'</h3></div></div>'+
+(ks.length?'<div class="stats" style="margin-top:0">'+ks.map(k=>{const [t,f]=LBL[k]||[k.replace(/_/g,' '),v=>typeof v==='number'?v.toLocaleString('de-DE'):String(v)];return '<div class="card stat"><div class="k">'+E(t)+'</div><div class="v">'+E(f(st[k]))+'</div></div>'}).join('')+'</div>':'<p class="mut">Noch keine Stats. Die erscheinen, sobald du gespielt hast.</p>')+
+(m.updated_at?'<p class="mut" style="font-size:.78rem;margin:1rem 0 0">Stand: '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}))+'</p>':'')+'</div>';
+h+='<div class="card"><h3>Inventar</h3><p class="mut" style="font-size:.8rem;margin-top:0">Nur für dich sichtbar.</p>'+(Array.isArray(st.inventory)&&st.inventory.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:.5rem;margin-top:1rem">'+st.inventory.map(i=>'<div title="'+E(i.item)+'" style="aspect-ratio:1;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;font-size:.62rem;text-align:center;padding:.3rem;position:relative">'+E(String(i.item||'').replace(/^minecraft:/,'').replace(/_/g,' '))+'<b style="position:absolute;right:5px;bottom:3px;font-size:.7rem">'+(i.count>1?i.count:'')+'</b></div>').join('')+'</div>':'<p class="mut">Inventar-Anzeige kommt bald.</p>')+'</div>';}
+else if(m){h+='<div class="card" style="text-align:center"><p class="eyebrow">Minecraft</p><h3>Noch nicht verknüpft</h3><p>'+E(m.hint)+'</p></div>';}
+const g=d.guestbook||[];h+='<div class="card"><h3 style="margin-bottom:.6rem">Deine Gästebuch-Einträge</h3>'+(g.length?g.map(x=>'<div style="padding:.9rem 0;border-top:1px solid var(--line)"><span class="mut" style="font-size:.8rem">'+E(fd(x.created_at))+'</span><p style="margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word;color:var(--fg)">'+E(x.message)+'</p></div>').join(''):'<p>Noch keine Einträge. <a href="https://${MAIN}/guestbook">Jetzt einen schreiben ›</a></p>')+'</div>';
+B.innerHTML=h;})();
+</script>`;
+const PROFILE_MAIN = () => portfolio({ title: "Profil · NwebNotFound", desc: "Dein Profil", nav: pNav("profile"), body: PROFILE_BODY(false) });
+const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein Profil", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: PROFILE_BODY(true) });
+
+async function profileApi(req, env) {
+  const origin = req.headers.get("origin");
+  const cors = origin === `https://${MCD}` || origin === `https://${MAIN}` ? { "access-control-allow-origin": origin, "access-control-allow-credentials": "true", vary: "origin" } : {};
+  const u = await getUser(req, env).catch(() => null);
+  if (!u) return json({ user: null }, 200, cors);
+  const since = await env.DB.prepare("SELECT MIN(created_at) AS c FROM sessions WHERE discord_id = ?").bind(u.id).first().catch(() => null);
+  const { results: gb } = await env.DB.prepare("SELECT message, created_at FROM entries WHERE discord_id = ? ORDER BY id DESC LIMIT 20").bind(u.id).all().catch(() => ({ results: [] }));
+  const link = await env.DB.prepare("SELECT mc_name, mc_uuid, has_role, verified FROM mc_links WHERE discord_id = ?").bind(u.id).first().catch(() => null);
+  let minecraft = { visible: false, hint: "Verknüpfe deinen Account im Discord mit /link" };
+  if (link && link.verified && link.has_role) {
+    const ps = await env.DB.prepare("SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = ?").bind(link.mc_uuid).first().catch(() => null);
+    minecraft = { visible: true, mc_name: link.mc_name, mc_uuid: link.mc_uuid, stats: ps ? JSON.parse(ps.stats) : {}, updated_at: ps ? new Date(ps.updated_at).toISOString() : null };
+  } else if (link && !link.verified) minecraft.hint = "Bestätige die Verknüpfung im Discord mit deinem Code (/link).";
+  else if (link && !link.has_role) minecraft.hint = "Dir fehlt noch die Server-Rolle im Discord. Danach erscheinen hier deine Stats.";
+  return json({ user: { id: u.id, name: u.name, username: u.username, avatar: u.avatar, member_since: since?.c || null }, guestbook: gb, minecraft }, 200, cors);
+}
+
 /* ---------- Status-API ---------- */
 async function mcStatus(ctx) {
   const cache = caches.default, key = new Request("https://nwebnotfound.dev/__cache/mc-status");
@@ -307,7 +359,22 @@ function cleanIngest(b) {
     if (!/^[a-z0-9_-]{1,24}$/i.test(k) || !Array.isArray(v)) continue;
     leaderboards[k] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => x.name);
   }
-  return { servers, leaderboards };
+  const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
+  const normU = (x) => String(x).toLowerCase().replace(/-/g, "").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+  const links = Array.isArray(b?.links) ? b.links.slice(0, 200).filter(l => /^\d{15,21}$/.test(String(l?.discord_id ?? "")) && UUID.test(String(l?.mc_uuid ?? "")) && /^[A-Za-z0-9_]{1,16}$/.test(String(l?.mc_name ?? "")))
+    .map(l => ({ discord_id: String(l.discord_id), mc_name: String(l.mc_name), mc_uuid: normU(l.mc_uuid), has_role: l.has_role === true, verified: l.verified === true })) : null;
+  const players_stats = {};
+  for (const [k, v] of Object.entries(b?.players_stats || {}).slice(0, 200)) {
+    if (!UUID.test(k) || typeof v !== "object" || !v) continue;
+    const o = {};
+    for (const [sk, sv] of Object.entries(v).slice(0, 24)) {
+      if (!/^[a-z0-9_]{1,24}$/i.test(sk)) continue;
+      if (sk === "inventory") { if (Array.isArray(sv)) o.inventory = sv.slice(0, 41).map(i => ({ item: clip(i?.item, 48), count: Math.max(0, Math.min(999, Math.floor(+i?.count || 0))) })).filter(i => i.item); continue; }
+      if (Number.isFinite(+sv) && typeof sv !== "boolean") o[sk] = +sv; else if (typeof sv === "string") o[sk] = clip(sv, 40);
+    }
+    players_stats[normU(k)] = o;
+  }
+  return { servers, leaderboards, links, players_stats };
 }
 async function mcIngest(req, env) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -315,9 +382,17 @@ async function mcIngest(req, env) {
   if (!env.MC_INGEST_TOKEN || !safeEq(tok, env.MC_INGEST_TOKEN)) return json({ error: "unauthorized" }, 401);
   const raw = await req.text(); if (raw.length > 65536) return json({ error: "too large" }, 413);
   let b; try { b = JSON.parse(raw); } catch { return json({ error: "invalid json" }, 400); }
-  const data = cleanIngest(b);
-  await env.DB.prepare("INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(JSON.stringify(data), Date.now()).run();
-  return json({ ok: true, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length });
+  const { links, players_stats, ...data } = cleanIngest(b), now = Date.now();
+  const st = [];
+  if (b?.servers || b?.leaderboards || (!links && !Object.keys(players_stats).length))
+    st.push(env.DB.prepare("INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(JSON.stringify(data), now));
+  if (links) {
+    if (b.links_full === true) st.push(env.DB.prepare("DELETE FROM mc_links"));
+    for (const l of links) st.push(env.DB.prepare("INSERT INTO mc_links (discord_id, mc_name, mc_uuid, has_role, verified, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(discord_id) DO UPDATE SET mc_name=excluded.mc_name, mc_uuid=excluded.mc_uuid, has_role=excluded.has_role, verified=excluded.verified, updated_at=excluded.updated_at").bind(l.discord_id, l.mc_name, l.mc_uuid, l.has_role ? 1 : 0, l.verified ? 1 : 0, now));
+  }
+  for (const [k, v] of Object.entries(players_stats)) st.push(env.DB.prepare("INSERT INTO mc_player_stats (mc_uuid, stats, updated_at) VALUES (?, ?, ?) ON CONFLICT(mc_uuid) DO UPDATE SET stats=excluded.stats, updated_at=excluded.updated_at").bind(k, JSON.stringify(v), now));
+  if (st.length) await env.DB.batch(st);
+  return json({ ok: true, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length });
 }
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
@@ -372,17 +447,20 @@ export default {
     if (p === "/api/me") return me(req, env);
     if (p === "/api/mc-ingest") return mcIngest(req, env);
     if (p === "/api/mc-data") return mcData(env);
+    if (p === "/api/profile") return profileApi(req, env);
     if (p.startsWith("/auth/")) {
       if (isMc) { url.hostname = MAIN; return redirect(url.toString()); }
       const r = await auth(p, req, env, url); if (r) return r;
     }
     if (isMc) {
       if (p === "/") return html(MC);
+      if (p === "/profile") return html(PROFILE_MC());
       return notFound(true);
     }
     if (p === "/api/guestbook") return guestbookApi(req, env);
     if (p === "/") return html(HOME);
     if (p === "/guestbook") return html(GUEST);
+    if (p === "/profile") return html(PROFILE_MAIN());
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
     return notFound(false);
   },
