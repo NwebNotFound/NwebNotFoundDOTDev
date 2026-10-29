@@ -12,9 +12,17 @@ const LEFT=ms=>{if(ms<=0)return 'beendet';const s=Math.floor(ms/1000),d=Math.flo
 const LOC=l=>!l?'':typeof l==='string'?l:[l.world,[l.x,l.y,l.z].filter(v=>v!=null).join(' / ')].filter(Boolean).join(' · ');
 const post=(u,b)=>fetch(u,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(b)}).then(async r=>({ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}));
 const get=u=>fetch(u,{credentials:'include'}).then(r=>{if(!r.ok)throw 0;return r.json()});
-function search(inp,box,items,go){let sel=-1,cur=[];const close=()=>{box.hidden=true;inp.setAttribute('aria-expanded','false');sel=-1};
-const draw=()=>{const t=inp.value.toLowerCase().trim().replace(/ /g,'_');if(!t){close();return}cur=items.filter(x=>x.item.includes(t)||NM(x.item).toLowerCase().includes(inp.value.toLowerCase().trim())).sort((a,b)=>(b.item.startsWith(t))-(a.item.startsWith(t))||b.volume_24h_cp-a.volume_24h_cp).slice(0,8);
-box.innerHTML=cur.length?cur.map((x,i)=>'<a role="option" href="/markt/'+encodeURIComponent(x.item)+'" aria-selected="'+(i===sel)+'">'+ICO(x.item)+E(NM(x.item))+'<small class="tnum">'+CP(x.buy_price)+'</small></a>').join(''):'<div class="mut" style="padding:.7rem">Kein Item gefunden.</div>';box.hidden=false;inp.setAttribute('aria-expanded','true')};
+function SCORE(x,q){q=q.toLowerCase().trim().replace(/[_\s]+/g,' ');if(!q)return 0;const n=NM(x.item).toLowerCase(),id=x.item.replace(/_/g,' ');let best=0;
+for(const h of [n,id]){const w=h.split(' ');if(h===q)return 1000;if(h.startsWith(q))best=Math.max(best,800-h.length);
+if(w.some(v=>v.startsWith(q)))best=Math.max(best,600-h.length);const qw=q.split(' ');if(qw.length>1&&qw.every(p=>w.some(v=>v.startsWith(p))))best=Math.max(best,550-h.length);
+const ini=w.map(v=>v[0]).join('');if(q.length>=2&&!q.includes(' ')&&ini.startsWith(q))best=Math.max(best,500-h.length);
+if(h.includes(q))best=Math.max(best,400-h.length);
+if(q.length>=3&&!best&&w.some(v=>v[0]===q[0])){let i=0;for(const c of h){if(c===q[i])i++;if(i===q.length)break}if(i===q.length)best=Math.max(best,100-h.length/4)}}return best}
+function search(inp,box,items,go){inp.addEventListener('focus',()=>document.documentElement.classList.add('srch-focus'));inp.addEventListener('blur',()=>setTimeout(()=>document.documentElement.classList.remove('srch-focus'),200));let sel=-1,cur=[];const close=()=>{box.hidden=true;inp.setAttribute('aria-expanded','false');document.documentElement.classList.remove('ac-open');sel=-1};
+const draw=()=>{const t=inp.value.trim();if(!t){close();return}cur=items.map(x=>[x,SCORE(x,inp.value)]).filter(a=>a[1]>0).sort((a,b)=>b[1]-a[1]||(+b[0].volume_24h_cp||0)-(+a[0].volume_24h_cp||0)).map(a=>a[0]).slice(0,8);
+box.innerHTML=cur.length?cur.map((x,i)=>'<a role="option" href="/markt/'+encodeURIComponent(x.item)+'" aria-selected="'+(i===sel)+'">'+ICO(x.item)+E(NM(x.item))+'<small class="tnum">'+(x.buy_locked?'gesperrt':CP(x.buy_price))+'</small></a>').join(''):'<div class="mut" style="padding:.7rem">Kein Item gefunden.</div>';box.hidden=false;inp.setAttribute('aria-expanded','true');document.documentElement.classList.add('ac-open')};
 inp.addEventListener('input',()=>{sel=-1;draw()});inp.addEventListener('keydown',e=>{if(box.hidden)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();sel=(sel+(e.key==='ArrowDown'?1:cur.length-1))%Math.max(1,cur.length);draw()}else if(e.key==='Enter'){const x=cur[Math.max(0,sel)];if(x){e.preventDefault();go(x.item)}}else if(e.key==='Escape')close()});
 document.addEventListener('click',e=>{if(!box.contains(e.target)&&e.target!==inp)close()})}
-return{E,NM,NF,CP,C2,LEFT,LOC,BIG,ICO,PCT,spark,get,post,search}})();
+const HASCH=x=>(+x.trades_24h||0)>0||Math.abs(+x.change_24h_pct||0)>0.004;const PX=x=>HASCH(x)?PCT(x.change_24h_pct):'<span class="mut">—</span>';
+const LOCK='<span class="tag tl">Nicht bei der Bank kaufbar</span>';const BUYP=x=>x.buy_locked?LOCK:CP(x.buy_price);
+return{SCORE,E,NM,NF,CP,C2,LEFT,LOC,BIG,ICO,PCT,PX,HASCH,LOCK,BUYP,spark,get,post,search}})();

@@ -171,3 +171,7 @@ Ausführung im Spiel, idempotent über `request_id`:
 
 ### Redirect
 `/markt?item=minecraft:diamond` leitet mit 302 auf `/markt/diamond` weiter. Bei einem unbekannten Item geht es auf `/markt?q=<item>`, die Suche ist dann vorausgefüllt.
+
+## Bank-Sperre (seltene Items)
+`POST /api/mc/ingest/market`: Ein Item gilt als **nicht bei der Bank kaufbar**, wenn `locked: true`, `buy_enabled: false` oder `buy_price` null/0 ist. Gespeichert als `mc_market.buy_locked = 1`. Website zeigt dann „Nicht bei der Bank kaufbar“, keinen Kaufpreis, und nimmt das Item aus preisbasierten Listen (Ticker, Gewinner/Verlierer).
+Analog `sell_enabled: false` oder `sell_price` null/0 → `sell_locked = 1` („Nicht an die Bank verkaufbar“). Items mit beiden Preisen null werden trotzdem übernommen.

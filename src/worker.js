@@ -1,3 +1,4 @@
+import { AV } from "./asset-version.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
 import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
@@ -68,11 +69,10 @@ const PORT_CSS = `:root{--bg:#fbfbfd;--fg:#1d1d1f;--mut:#6e6e73;--link:#0066cc;-
 .entry:last-child{border:0}.av{width:40px;height:40px;border-radius:50%;flex:none;background:var(--line);display:grid;place-items:center;font-weight:600;color:var(--mut);overflow:hidden}
 .entry p{margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word}`;
 
-const DSV = "1";
 const MC_CSS = `:root{--bg:#0b0f0c;--fg:#eef5ef;--mut:#93a39a;--link:#7ee787;--acc:#4ade80;--acc2:#4ade80;--accfg:#052e12;--card:rgba(255,255,255,.04);--line:rgba(255,255,255,.09);--navbg:rgba(11,15,12,.72);--field:rgba(255,255,255,.05);--ring:rgba(74,222,128,.25);--shadow:rgba(0,0,0,.9);--menubg:#141a16;color-scheme:dark}
-body{background:radial-gradient(1200px 600px at 50% -10%,rgba(74,222,128,.14),transparent 60%),var(--bg)}
+
 .px{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:0}
-.pixbg{position:absolute;inset:0;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:32px 32px;mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%);-webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%)}
+
 .hero{position:relative;isolation:isolate;padding-top:clamp(4rem,11vw,8rem)}
 .block{width:56px;height:56px;margin:0 auto 1.6rem;image-rendering:pixelated;animation:float 6s ease-in-out infinite}
 @keyframes float{50%{transform:translateY(-8px)}}
@@ -109,7 +109,7 @@ function shell({ title, desc, css, nav, body, head = "", footer, loginBase = "",
   return `<!doctype html><html lang="de"${css === MC_CSS ? ' class="mc"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${themeColor}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
-<script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/mc/ds.css?v=${DSV}">` : ""}${head}</head><body>
+<script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}</style>${css === MC_CSS ? `<link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/mc/ds.css?v=${AV}">` : ""}${head}</head><body>
 <header class="nav"><div class="wrap">${nav}<div class="acct" id="acct"></div></div></header>
 <main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}${ACCT_JS(loginBase)}${css === MC_CSS ? `<script>(function(){var a=document.querySelector(".nl [aria-current=page]");if(a&&a.parentNode.scrollWidth>a.parentNode.clientWidth)a.parentNode.scrollLeft=a.offsetLeft-a.parentNode.clientWidth/2+a.offsetWidth/2})()</script>` : ""}</body></html>`;
 }
@@ -519,10 +519,12 @@ function cleanMarket(a) {
   const seen = new Set(), out = [];
   for (const x of a.slice(0, MARKET_MAX)) {
     const item = cleanItem(x?.item); if (!item || seen.has(item)) continue;
-    const buy = price(x.buy_price), sell = price(x.sell_price); if (buy === null && sell === null) continue;
+    const buy = price(x.buy_price), sell = price(x.sell_price);
+    const locked = x.locked === true || x.buy_enabled === false || !(buy > 0) ? 1 : 0;
+    const slocked = x.sell_enabled === false || !(sell > 0) ? 1 : 0;
     const ch = Number(x.change_24h_pct), up = Number(x.updated_at);
     seen.add(item);
-    out.push({ item, buy_price: buy ?? sell, sell_price: sell ?? buy, base_price: price(x.base_price) ?? buy ?? sell, volume_24h_qty: price(x.volume_24h_qty) ?? 0, volume_24h_cp: price(x.volume_24h_cp) ?? 0,
+    out.push({ item, buy_locked: locked, sell_locked: slocked, buy_price: buy ?? 0, sell_price: sell ?? 0, base_price: price(x.base_price) ?? buy ?? sell ?? 0, volume_24h_qty: price(x.volume_24h_qty) ?? 0, volume_24h_cp: price(x.volume_24h_cp) ?? 0,
       trades_24h: Math.floor(price(x.trades_24h) ?? 0), change_24h_pct: Number.isFinite(ch) ? Math.max(-1e4, Math.min(1e4, Math.round(ch * 100) / 100)) : 0,
       updated_at: Number.isFinite(up) && up > 0 ? Math.floor(up > 1e11 ? up / 1000 : up) : Math.floor(Date.now() / 1000) });
   }
@@ -543,10 +545,10 @@ function marketStatements(env, market, hist) {
   const st = [];
   if (market) {
     // Nur geänderte Zeilen schreiben (Push jede Minute): Upsert mit WHERE, danach verschwundene Items löschen
-    for (let i = 0; i < market.length; i += HIST_CHUNK) st.push(env.DB.prepare(`INSERT INTO mc_market (item, buy_price, sell_price, base_price, volume_24h_qty, volume_24h_cp, trades_24h, change_24h_pct, updated_at)
-      SELECT json_extract(value,'$.item'), json_extract(value,'$.buy_price'), json_extract(value,'$.sell_price'), json_extract(value,'$.base_price'), json_extract(value,'$.volume_24h_qty'), json_extract(value,'$.volume_24h_cp'), json_extract(value,'$.trades_24h'), json_extract(value,'$.change_24h_pct'), json_extract(value,'$.updated_at') FROM json_each(?) WHERE 1
-      ON CONFLICT(item) DO UPDATE SET buy_price=excluded.buy_price, sell_price=excluded.sell_price, base_price=excluded.base_price, volume_24h_qty=excluded.volume_24h_qty, volume_24h_cp=excluded.volume_24h_cp, trades_24h=excluded.trades_24h, change_24h_pct=excluded.change_24h_pct, updated_at=excluded.updated_at
-      WHERE buy_price IS NOT excluded.buy_price OR sell_price IS NOT excluded.sell_price OR base_price IS NOT excluded.base_price OR volume_24h_qty IS NOT excluded.volume_24h_qty OR volume_24h_cp IS NOT excluded.volume_24h_cp OR trades_24h IS NOT excluded.trades_24h OR change_24h_pct IS NOT excluded.change_24h_pct`).bind(JSON.stringify(market.slice(i, i + HIST_CHUNK))));
+    for (let i = 0; i < market.length; i += HIST_CHUNK) st.push(env.DB.prepare(`INSERT INTO mc_market (item, buy_locked, sell_locked, buy_price, sell_price, base_price, volume_24h_qty, volume_24h_cp, trades_24h, change_24h_pct, updated_at)
+      SELECT json_extract(value,'$.item'), json_extract(value,'$.buy_locked'), json_extract(value,'$.sell_locked'), json_extract(value,'$.buy_price'), json_extract(value,'$.sell_price'), json_extract(value,'$.base_price'), json_extract(value,'$.volume_24h_qty'), json_extract(value,'$.volume_24h_cp'), json_extract(value,'$.trades_24h'), json_extract(value,'$.change_24h_pct'), json_extract(value,'$.updated_at') FROM json_each(?) WHERE 1
+      ON CONFLICT(item) DO UPDATE SET buy_locked=excluded.buy_locked, sell_locked=excluded.sell_locked, buy_price=excluded.buy_price, sell_price=excluded.sell_price, base_price=excluded.base_price, volume_24h_qty=excluded.volume_24h_qty, volume_24h_cp=excluded.volume_24h_cp, trades_24h=excluded.trades_24h, change_24h_pct=excluded.change_24h_pct, updated_at=excluded.updated_at
+      WHERE buy_locked IS NOT excluded.buy_locked OR sell_locked IS NOT excluded.sell_locked OR buy_price IS NOT excluded.buy_price OR sell_price IS NOT excluded.sell_price OR base_price IS NOT excluded.base_price OR volume_24h_qty IS NOT excluded.volume_24h_qty OR volume_24h_cp IS NOT excluded.volume_24h_cp OR trades_24h IS NOT excluded.trades_24h OR change_24h_pct IS NOT excluded.change_24h_pct`).bind(JSON.stringify(market.slice(i, i + HIST_CHUNK))));
     st.push(env.DB.prepare("DELETE FROM mc_market WHERE item NOT IN (SELECT value FROM json_each(?))").bind(JSON.stringify(market.map((m) => m.item))));
   }
   if (hist && hist.length) {
@@ -580,7 +582,7 @@ async function mcMarketItem(env, raw) {
 /* ---------- Helfer ---------- */
 const SEC_HEADERS = { "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
 const json = (o, s = 200, extra = {}) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
-const html = (h, s = 200) => new Response(h.replaceAll("{{Y}}", String(new Date().getUTCFullYear())), { status: s, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60", ...SEC_HEADERS } });
+const html = (h, s = 200) => new Response(h.replaceAll("{{Y}}", String(new Date().getUTCFullYear())), { status: s, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...SEC_HEADERS } });
 const notFound = (mc) => html(mc
   ? shell({ title: "404 · NwebNotFound MC", desc: "", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Diesen Chunk gibt es nicht.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` })
   : portfolio({ title: "404 · NwebNotFound", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Not Found. Passend zum Namen.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` }), 404);

@@ -30,3 +30,5 @@ CREATE TABLE IF NOT EXISTS mc_leaderboards (kind TEXT PRIMARY KEY, data TEXT NOT
 -- ALTER TABLE mc_player_stats ADD COLUMN details TEXT;
 
 ALTER TABLE mc_shop_orders_pending ADD COLUMN listing_id TEXT;
+ALTER TABLE mc_market ADD COLUMN buy_locked INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE mc_market ADD COLUMN sell_locked INTEGER NOT NULL DEFAULT 0;
