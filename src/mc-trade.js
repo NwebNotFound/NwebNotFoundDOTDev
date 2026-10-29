@@ -3,12 +3,12 @@ const ID_RE = /^[A-Za-z0-9_.:-]{1,64}$/, ITEM_RE = /^[a-z0-9_]{1,48}$/, NAME_RE 
 const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 const normU = (x) => String(x).toLowerCase().replace(/-/g, "").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
 const clip = (v, n) => String(v ?? "").replace(/[\u0000-\u001f]/g, "").slice(0, n);
-const cents = (v) => { const n = Number(v); return Number.isSafeInteger(n) && n >= 0 && n <= 1e13 ? n : null; };
+const cents = (v) => { if (v == null || v === "") return null; const n = Number(v); return Number.isSafeInteger(n) && n >= 0 && n <= 1e13 ? n : null; };
 const int = (v, max = 1e9) => { const n = Math.floor(Number(v)); return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0; };
 const ts = (v) => { if (v == null || v === "") return null; const n = typeof v === "number" ? (v < 1e12 ? v * 1000 : v) : Date.parse(v); return Number.isFinite(n) ? n : null; };
 const item = (v) => { const s = String(v ?? "").toLowerCase().replace(/^minecraft:/, ""); return ITEM_RE.test(s) ? s : null; };
 export const BID_INC = (cur) => Math.max(100, Math.ceil(cur * 0.05)); // TODO mit Craft abgleichen; Server entscheidet
-export const minNext = (a) => a.bid_count > 0 && a.current_bid != null ? Math.max(a.min_price, a.current_bid + BID_INC(a.current_bid)) : a.min_price;
+export const minNext = (a) => a.min_next_bid != null ? a.min_next_bid : (a.bid_count > 0 && a.current_bid != null ? a.current_bid + BID_INC(a.current_bid) : a.min_price);
 
 function cleanLoc(l) {
   if (typeof l === "string") return clip(l, 80) || null;
@@ -24,17 +24,33 @@ export function cleanShops(a) {
   }
   return out;
 }
-export function cleanAuctions(a) {
-  if (!Array.isArray(a)) return null; const out = [], seen = new Set();
+const pick = (o, ...k) => { for (const x of k) if (o?.[x] != null && o[x] !== "") return o[x]; return null; };
+const uu = (v) => (v != null && UUID_RE.test(String(v)) ? normU(v) : null);
+const cleanBid = (b) => ({ id: b?.id != null ? clip(b.id, 64) : null, bidder_uuid: uu(pick(b, "bidder", "bidder_uuid", "uuid")), name: clip(pick(b, "bidder_name", "name"), 16) || null, amount: cents(b?.amount), at: ts(pick(b, "created_at", "at", "time")), source: clip(b?.source, 16) || null });
+// Auktionen: v_auctions-Spalten (Craft) + ältere Aliase. bids: verschachtelt (x.bids) oder separat (v_auction_bids → bidsTop).
+export function cleanAuctions(a, bidsTop) {
+  if (!Array.isArray(a)) return null; const out = [], seen = new Set(), byA = new Map();
+  for (const b of (Array.isArray(bidsTop) ? bidsTop : []).slice(0, 20000)) { const k = String(pick(b, "auction_id", "auction") ?? ""); if (!k) continue; (byA.get(k) || byA.set(k, []).get(k)).push(b); }
   for (const x of a.slice(0, 1000)) {
     const id = String(x?.id ?? ""); if (!ID_RE.test(id) || seen.has(id)) continue; seen.add(id);
-    const min = cents(x.min_price) ?? 0, cur = cents(x.current_bid);
-    out.push({ id, seller_uuid: UUID_RE.test(x.seller_uuid || "") ? normU(x.seller_uuid) : null, seller_name: clip(x.seller_name, 16), item: item(x.item) || "barrier", amount: Math.max(1, int(x.amount, 6400) || 1), nbt_summary: clip(x.nbt_summary, 300) || null,
-      min_price: min, current_bid: cur, current_bidder_name: clip(x.current_bidder_name, 16) || null, bid_count: int(x.bid_count, 1e6), ends_at: ts(x.ends_at), status: ["active", "ended", "cancelled"].includes(x.status) ? x.status : "active",
-      bids: (Array.isArray(x.bids) ? x.bids : []).slice(0, 200).map((b) => ({ name: clip(b?.name, 16), amount: cents(b?.amount), at: ts(b?.at) })).filter((b) => b.name && b.amount != null).sort((p, q) => (q.at || 0) - (p.at || 0)) });
+    const min = cents(x.min_price) ?? 0, cur = cents(x.current_bid), mnb = cents(x.min_next_bid);
+    const st = String(x.status ?? "active").toLowerCase(), status = ["ended", "sold", "expired", "finished", "closed"].includes(st) ? "ended" : ["cancelled", "canceled", "removed"].includes(st) ? "cancelled" : "active";
+    const seenB = new Set(); const bids = [...(Array.isArray(x.bids) ? x.bids : []), ...(byA.get(id) || [])].slice(0, 500).map(cleanBid).filter((b) => b.amount != null && (b.bidder_uuid || b.name) && (!b.id || (seenB.has(b.id) ? false : seenB.add(b.id)))).sort((p, q) => (q.at || 0) - (p.at || 0) || q.amount - p.amount).slice(0, 200);
+    const bc = int(x.bid_count, 1e6);
+    out.push({ id, seller_uuid: uu(pick(x, "seller", "seller_uuid")), seller_name: clip(x.seller_name, 16) || null, item: item(x.item) || "barrier", amount: Math.max(1, int(pick(x, "menge", "qty", "amount"), 6400) || 1), nbt_summary: clip(x.nbt_summary, 300) || null,
+      min_price: min, current_bid: cur, current_bidder_uuid: uu(pick(x, "current_bidder", "current_bidder_uuid")), current_bidder_name: clip(x.current_bidder_name, 16) || null, bid_count: bc || (cur != null ? Math.max(1, bids.length) : bids.length),
+      min_next_bid: mnb, source_last_bid: clip(x.source_last_bid, 16) || null, created_at: ts(x.created_at), ends_at: ts(x.ends_at), status, bids });
   }
   return out;
 }
+// Namen zu UUIDs aus mc_links (falls bekannt)
+export async function nameMap(env, uuids) {
+  const ids = [...new Set(uuids.filter(Boolean))].slice(0, 500); if (!ids.length) return {};
+  const m = {}; for (let i = 0; i < ids.length; i += 90) { const c = ids.slice(i, i + 90); const { results } = await env.DB.prepare(`SELECT mc_uuid, mc_name FROM mc_links WHERE mc_uuid IN (${c.map(() => "?").join(",")})`).bind(...c).all().catch(() => ({ results: [] })); for (const r of results) if (r.mc_name) m[r.mc_uuid] = r.mc_name; }
+  return m;
+}
+const shortU = (u) => (u ? u.slice(0, 8) + "…" : null);
+const named = (a, N) => ({ ...a, seller_name: a.seller_name || N[a.seller_uuid] || shortU(a.seller_uuid), current_bidder_name: a.current_bidder_name || N[a.current_bidder_uuid] || shortU(a.current_bidder_uuid) });
 export const blobStatement = (env, kind, data, now) => env.DB.prepare("INSERT INTO mc_blobs (kind, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at WHERE data IS NOT excluded.data OR updated_at < excluded.updated_at - 240000").bind(kind, JSON.stringify(data), now);
 const blob = async (env, kind) => { const r = await env.DB.prepare("SELECT data, updated_at FROM mc_blobs WHERE kind = ?").bind(kind).first().catch(() => null); return r ? { list: JSON.parse(r.data), updated_at: r.updated_at } : { list: [], updated_at: null }; };
 const iso = (t) => (t ? new Date(t).toISOString() : null);
@@ -126,11 +142,12 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
 
   async function me(req, env) { const u = await getUser(req, env); if (!u) return { user: null }; const l = await linkFor(env, u.id); return { user: u, link: l, can: !!(l && l.verified && l.has_role) }; }
   async function auctions(req, env) {
-    const { list, updated_at } = await blob(env, "auctions");
-    return json({ updated_at: iso(updated_at), now: Date.now(), auctions: list.map(({ bids, ...a }) => ({ ...a, min_next: minNext(a) })) }, 200, { "cache-control": "public, max-age=15" });
+    const { list, updated_at } = await blob(env, "auctions"); const N = await nameMap(env, list.flatMap((a) => [a.seller_uuid, a.current_bidder_uuid]));
+    return json({ updated_at: iso(updated_at), now: Date.now(), auctions: list.map(({ bids, ...a }) => ({ ...named(a, N), min_next: minNext(a) })) }, 200, { "cache-control": "public, max-age=15" });
   }
   async function auction(req, env, id) {
-    const { list, updated_at } = await blob(env, "auctions"); const a = list.find((x) => x.id === id); if (!a) return json({ error: "not found" }, 404);
+    const { list, updated_at } = await blob(env, "auctions"); let a = list.find((x) => x.id === id); if (!a) return json({ error: "not found" }, 404);
+    { const N = await nameMap(env, [a.seller_uuid, a.current_bidder_uuid, ...(a.bids || []).map((b) => b.bidder_uuid)]); a = { ...named(a, N), bids: (a.bids || []).map((b) => ({ ...b, name: b.name || N[b.bidder_uuid] || shortU(b.bidder_uuid) })) }; }
     const m = await me(req, env); let mine = [];
     if (m.user && m.link) mine = (await env.DB.prepare("SELECT id, amount, status, reason, created_at FROM mc_bids_pending WHERE auction_id = ? AND discord_id = ? ORDER BY created_at DESC LIMIT 20").bind(id, m.user.id).all()).results;
     return json({ updated_at: iso(updated_at), now: Date.now(), auction: { ...a, min_next: minNext(a) }, viewer: m.user ? { logged_in: true, mc_name: m.link?.mc_name || null, can_bid: m.can && !(a.seller_uuid && m.link?.mc_uuid === a.seller_uuid), own: !!(a.seller_uuid && m.link?.mc_uuid === a.seller_uuid) } : { logged_in: false }, mine });

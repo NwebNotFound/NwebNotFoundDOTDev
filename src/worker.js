@@ -493,7 +493,7 @@ async function mcIngest(req, env) {
   if (leaderboards_weekly) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('weekly', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at WHERE data IS NOT excluded.data OR updated_at < excluded.updated_at - 240000").bind(JSON.stringify(leaderboards_weekly), now));
   for (const [k, v] of Object.entries(players_stats)) st.push(env.DB.prepare("INSERT INTO mc_player_stats (mc_uuid, stats, updated_at, details) VALUES (?, ?, ?, ?) ON CONFLICT(mc_uuid) DO UPDATE SET stats=excluded.stats, updated_at=excluded.updated_at, details=COALESCE(excluded.details, mc_player_stats.details) WHERE stats IS NOT excluded.stats OR (excluded.details IS NOT NULL AND details IS NOT excluded.details) OR updated_at < excluded.updated_at - 240000").bind(k, JSON.stringify(v), now, details[k] ? JSON.stringify(details[k]) : null));
   st.push(...marketStatements(env, market, market_history));
-  const shops = cleanShops(b?.shops), auctions = cleanAuctions(b?.auctions);
+  const shops = cleanShops(b?.shops), auctions = cleanAuctions(b?.auctions ?? b?.v_auctions, b?.auction_bids ?? b?.v_auction_bids);
   if (shops) st.push(blobStatement(env, "shops", shops, now));
   if (auctions) st.push(blobStatement(env, "auctions", auctions, now));
   if (st.length) await env.DB.batch(st);

@@ -175,3 +175,10 @@ Ausführung im Spiel, idempotent über `request_id`:
 ## Bank-Sperre (seltene Items)
 `POST /api/mc/ingest/market`: Ein Item gilt als **nicht bei der Bank kaufbar**, wenn `locked: true`, `buy_enabled: false` oder `buy_price` null/0 ist. Gespeichert als `mc_market.buy_locked = 1`. Website zeigt dann „Nicht bei der Bank kaufbar“, keinen Kaufpreis, und nimmt das Item aus preisbasierten Listen (Ticker, Gewinner/Verlierer).
 Analog `sell_enabled: false` oder `sell_price` null/0 → `sell_locked = 1` („Nicht an die Bank verkaufbar“). Items mit beiden Preisen null werden trotzdem übernommen.
+
+## Auktionen (Craft-Views) – `POST /api/mc-ingest`
+Body-Keys: `v_auctions` (Alias `auctions`) = Liste aller aktuellen Auktionen (ersetzt den Stand komplett), `v_auction_bids` (Alias `auction_bids`) = Gebote, per `auction_id` zugeordnet. Alternativ weiterhin `bids` verschachtelt pro Auktion.
+- v_auctions: `id`, `item`, `menge` (Alias `qty`/`amount`), `seller` (UUID, Alias `seller_uuid`), `min_price`, `current_bid` (null), `current_bidder` (UUID/null, Alias `current_bidder_uuid`), `bid_count`, `ends_at` (ms), `status` (active | ended/sold/expired | cancelled), `created_at` (s oder ms, wird an der Größe erkannt), `source_last_bid` (null), `min_next_bid` (null, Cent). Optional: `seller_name`, `current_bidder_name`, `nbt_summary`.
+- v_auction_bids: `id`, `auction_id`, `bidder` (UUID, Alias `bidder_uuid`), `amount`, `created_at` (s/ms), `source`.
+- Alle Beträge ganzzahlige Cent. Mindestgebot: `min_next_bid` ?? (keine Gebote ? `min_price` : höchstes + max(100, ceil 5 %)).
+- Namen: aus `mc_links` per UUID, sonst gekürzte UUID. Doppelte Gebots-`id`s werden ignoriert. Max. 1000 Auktionen, 200 Gebote pro Auktion angezeigt.
