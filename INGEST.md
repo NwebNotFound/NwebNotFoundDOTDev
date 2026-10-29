@@ -199,7 +199,7 @@ Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, 
 - JSON-Strings werden geparst. `mined`, `placed`, `killed`, `deaths_by`, `crafted`, `playtime_by_world` (Objekte), `distance_m` (Objekt) und `fished`, `traded`, `jumps`, `damage_dealt`, `damage_taken`, `cp_earned`, `shop_sales` landen in den Profil-Details.
 
 **`v_market_history`** (alt: `market_history`)
-- `item` | `material` | `item_id`; Zeit: `hour_ts` | `hour` | `bucket` | `ts` | `time` | `timestamp` | `created_at` (s, ms oder ISO; auf die Stunde gerundet, 30 Tage)
+- `item` | `material` | `item_id`; Zeit: `hour_ts` | `hour` | `bucket` | `ts` | `time` | `timestamp` | `created_at` (s, ms oder ISO; auf die Stunde gerundet, 90 Tage)
 - Preis: `avg_price` | `avg` | `price` | `close` | `buy_price` | `value`; optional `min_price`|`min`|`low`, `max_price`|`max`|`high`, `volume_qty`|`volume`|`qty`|`amount`|`menge`.
 - Sobald Historie da ist, berechnet die Website die 24h-Änderung selbst (letzter Stundenwert vs. letzter Wert ≥ 24 h davor) und zeichnet Charts daraus; ohne Historie und ohne Trades zeigt sie „—“.
 
