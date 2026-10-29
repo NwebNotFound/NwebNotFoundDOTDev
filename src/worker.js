@@ -1,5 +1,6 @@
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
-import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody } from "./mc-hub.js";
+import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
+import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -20,16 +21,17 @@ img{max-width:100%;display:block}
 .nav a.l{color:var(--mut);font-size:.86rem}.nav a.l:hover,.nav a.l[aria-current]{color:var(--fg);text-decoration:none}
 .acct{display:flex;align-items:center;gap:.5rem;font-size:.82rem}
 .acct img{width:26px;height:26px;border-radius:50%}
-.um{position:relative}.um>button{display:flex;align-items:center;gap:.5rem;background:transparent;border:0;color:var(--fg);font:inherit;font-size:.82rem;padding:.25rem .5rem .25rem .25rem;border-radius:99px;cursor:pointer;transition:background .2s}
+.only-s{display:none}.um{position:relative}.um>button{display:flex;min-height:44px;align-items:center;gap:.5rem;background:transparent;border:0;color:var(--fg);font:inherit;font-size:.82rem;padding:.25rem .5rem .25rem .25rem;border-radius:99px;cursor:pointer;transition:background .2s}
 .um>button:hover,.um>button[aria-expanded=true]{background:var(--line)}.um .chev{width:10px;height:10px;opacity:.6;transition:transform .25s}.um>button[aria-expanded=true] .chev{transform:rotate(180deg)}
 .menu{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:var(--menubg,var(--card));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:14px;padding:.4rem;box-shadow:0 20px 50px -20px var(--shadow);opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top right;pointer-events:none;transition:opacity .18s ease,transform .18s ease;z-index:60}
 .menu.open{opacity:1;transform:none;pointer-events:auto}.menu .hd{padding:.55rem .7rem .6rem;border-bottom:1px solid var(--line);margin-bottom:.3rem}.menu .hd b{display:block;font-size:.88rem}.menu .hd span{font-size:.75rem;color:var(--mut)}
 .menu a{display:flex;align-items:center;gap:.6rem;padding:.6rem .7rem;border-radius:9px;color:var(--fg);font-size:.88rem}.menu a:hover,.menu a:focus-visible{background:var(--line);text-decoration:none;outline:none}.menu a.out{color:#ff453a}
 @media (max-width:640px){.menu{position:fixed;left:.75rem;right:.75rem;top:60px;min-width:0}.menu a{padding:.8rem .8rem;font-size:.95rem}}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:0;border-radius:980px;padding:.62rem 1.25rem;font:inherit;font-size:.95rem;font-weight:500;cursor:pointer;background:var(--acc);color:var(--accfg);transition:transform .2s ease,opacity .2s ease,background .2s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:0;border-radius:980px;min-height:44px;padding:0 1.25rem;line-height:1.2;white-space:nowrap;max-width:100%;font:inherit;font-size:.95rem;font-weight:500;cursor:pointer;background:var(--acc);color:var(--accfg);transition:transform .2s ease,opacity .2s ease,background .2s}
 .btn:hover{text-decoration:none;transform:translateY(-1px)}.btn:active{transform:scale(.98)}
 .btn.sec{background:transparent;color:var(--link);box-shadow:inset 0 0 0 1px currentColor}
-.btn.sm{padding:.38rem .85rem;font-size:.8rem}
+.btn.sm{min-height:36px;padding:0 .95rem;font-size:.84rem;position:relative}.btn.sm::before{content:"";position:absolute;inset:-4px -2px}
+@media(pointer:coarse){.btn.sm{min-height:40px}}
 .btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
 .discord{background:#5865F2;color:#fff}
 .mut{color:var(--mut)}
@@ -53,7 +55,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0
 .js .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.2,.8,.2,1),transform .8s cubic-bezier(.2,.8,.2,1)}
 .js .reveal.in{opacity:1;transform:none}
 .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
-@media (max-width:640px){.nav .wrap{gap:.9rem}.nav a.l{font-size:.8rem}.hide-s{display:none}}
+@media (max-width:420px){.nav .wrap{gap:.55rem!important}.nav a.l{font-size:.76rem!important}.brand{font-size:.95rem}}@media (max-width:640px){.only-s{display:inline}.nav .wrap{gap:.9rem}.nav a.l{font-size:.8rem}.hide-s{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.js .reveal{opacity:1;transform:none}@view-transition{navigation:none}}`;
 
 const PORT_CSS = `:root{--bg:#fbfbfd;--fg:#1d1d1f;--mut:#6e6e73;--link:#0066cc;--acc:#0071e3;--acc2:#bf4800;--accfg:#fff;--card:#fff;--line:rgba(0,0,0,.08);--navbg:rgba(251,251,253,.72);--field:#fff;--ring:rgba(0,113,227,.18);--shadow:rgba(0,0,0,.25);color-scheme:light dark}
@@ -96,7 +98,7 @@ if(d.user){const n=d.user.name.replace(/[<>&"']/g,''),un=(d.user.username||'').r
 const b=document.getElementById('umb'),m=document.getElementById('umm'),it=()=>[...m.querySelectorAll('a')];const set=o=>{b.setAttribute('aria-expanded',o);m.classList.toggle('open',o);if(o)setTimeout(()=>it()[0].focus(),20)};
 b.onclick=e=>{e.stopPropagation();set(!m.classList.contains('open'))};document.addEventListener('click',e=>{if(!m.contains(e.target))set(false)});
 document.addEventListener('keydown',e=>{if(!m.classList.contains('open'))return;if(e.key==='Escape'){set(false);b.focus()}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const a=it(),i=a.indexOf(document.activeElement);a[(i+(e.key==='ArrowDown'?1:a.length-1))%a.length].focus()}});}
-else if(d.available){el.innerHTML='<a class="btn discord sm" href="${loginBase}/auth/discord/login?next='+nx+'">Mit Discord anmelden</a>';}
+else if(d.available){el.innerHTML='<a class="btn discord sm" href="${loginBase}/auth/discord/login?next='+nx+'"><span class="hide-s">Mit Discord anmelden</span><span class="only-s">Anmelden</span></a>';}
 else{el.innerHTML='<button class="btn sm sec" disabled title="Discord-Login ist bald verfügbar"><span class="hide-s">Login </span>bald</button>';}
 window.__me=d;document.dispatchEvent(new CustomEvent('me',{detail:d}));}catch(_){}})();</script>`;
 
@@ -182,16 +184,16 @@ const DET_CSS = `<style>
 .emp{padding:1.4rem 0 .4rem;text-align:center;opacity:.55;font-size:.9rem}
 </style>`;
 const PROFILE_DETAILS = `${DET_CSS}<script>(()=>{${ICON_JS}const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const MOB={zombie:'🧟',skeleton:'💀',creeper:'💥',spider:'🕷️',enderman:'👁️',cow:'🐄',pig:'🐖',sheep:'🐑',chicken:'🐔',witch:'🧙',slime:'🟩',drowned:'🌊',blaze:'🔥',ender_dragon:'🐉',wither:'☠️',phantom:'🦇',pillager:'🏹',villager:'🧑'};
+const MOB={zombie:'rotten_flesh',skeleton:'bone',creeper:'gunpowder',spider:'string',enderman:'ender_pearl',cow:'leather',pig:'porkchop',sheep:'white_wool',chicken:'feather',witch:'glass_bottle',slime:'slime_ball',drowned:'trident',blaze:'blaze_rod',ender_dragon:'dragon_egg',wither:'nether_star',phantom:'phantom_membrane',pillager:'bow',villager:'emerald'};const MIC=id=>'<span class="ic"><img alt="" width="22" height="22" style="image-rendering:pixelated" src="/mc-icon/'+id+'"></span>';
 const DB={fall:'Fallschaden',lava:'Lava',drown:'Ertrunken',fire:'Feuer',on_fire:'Verbrannt',starve:'Verhungert',void:'Void',explosion:'Explosion',suffocation:'Erstickt',zombie:'Zombie',skeleton:'Skelett',creeper:'Creeper',player:'Spieler'};
 const list=(o,f,n=10)=>{const e=Object.entries(o||{}).sort((a,b)=>b[1]-a[1]).slice(0,n);if(!e.length)return '<div class="emp">Noch keine Daten. Spiel eine Runde auf Survival.</div>';const mx=e[0][1]||1;return e.map(([k,v])=>'<div class="row">'+f(k)+'<div class="n">'+E(NM(k))+'<div class="meter"><i style="width:'+Math.max(4,v/mx*100)+'%"></i></div></div><b>'+NF(v)+'</b></div>').join('')};
 const card=(t,sub,body)=>'<div class="dc"><h3>'+t+(sub?'<small>'+sub+'</small>':'')+'</h3>'+body+'</div>';
 document.addEventListener('mcprofile',ev=>{const m=ev.detail.minecraft;if(!m||!m.visible)return;const d=m.details||{},B=document.getElementById('pb');
-const emo=k=>'<span class="ic" style="font-size:1rem">'+(MOB[k]||'⚔️')+'</span>';const dd=d.distance_m||{};const DL={walk:'Gelaufen',sprint:'Gesprintet',fly:'Geflogen',swim:'Geschwommen',boat:'Boot',horse:'Pferd'};
+const emo=k=>MIC(MOB[k]||'iron_sword');const dd=d.distance_m||{};const DL={walk:'Gelaufen',sprint:'Gesprintet',fly:'Geflogen',swim:'Geschwommen',boat:'Boot',horse:'Pferd'};
 const dist=Object.keys(DL).filter(k=>dd[k]!=null);const tot=dist.reduce((a,k)=>a+dd[k],0);
 const MS=[['fished','Gefischt'],['traded','Gehandelt'],['jumps','Sprünge'],['damage_dealt','Schaden ausgeteilt'],['damage_taken','Schaden erlitten'],['cp_earned','CP verdient'],['shop_sales','Shop-Verkäufe']].filter(([k])=>d[k]!=null);
 const h='<div class="dg">'+card('Top-Blöcke','abgebaut',list(d.mined,ICO))+card('Mob-Kills','',list(d.killed,emo,8))+card('Distanzen',tot?KM(tot)+' gesamt':'',dist.length?'<div class="mini">'+dist.map(k=>'<div><div class="k">'+DL[k]+'</div><div class="v">'+KM(dd[k])+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')
-+card('Todesursachen','',list(d.deaths_by,k=>'<span class="ic" style="font-size:1rem">🪦</span>',8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)}))
++card('Todesursachen','',list(d.deaths_by,k=>MIC(MOB[k]||'bone'),8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)}))
 +card('Gesetzt & gecraftet','',list(Object.assign({},d.placed),ICO,5)+(d.crafted?'<div style="height:.8rem"></div>'+list(d.crafted,ICO,5):''))
 +card('Sonstiges','',MS.length?'<div class="mini">'+MS.map(([k,t])=>'<div><div class="k">'+t+'</div><div class="v">'+NF(Math.round(d[k]))+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')+'</div>';
 const w=document.createElement('div');w.innerHTML=h;const mch=B.querySelector('.mch');if(mch)mch.after(w.firstChild);else B.prepend(w.firstChild);});})();</script>`;
@@ -217,7 +219,7 @@ function draw(){document.getElementById('tabs').innerHTML=T.map(([k,t])=>'<butto
 document.querySelectorAll('#seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===per));
 const [,lbl,f]=T.find(t=>t[0]===tab),P=D[per],L=(P&&P.lists&&P.lists[tab])||[],O=document.getElementById('out');
 document.getElementById('upd').textContent=P&&P.updated_at?'Stand: '+new Date(P.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'';
-if(!L.length){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:3rem 1.5rem"><div style="font-size:2.4rem">🏆</div><h3 style="justify-content:center;margin:.6rem 0 .3rem">Noch niemand auf dem Treppchen</h3><p class="mut" style="margin:0">'+(per==='weekly'?'Diese Woche gibt es noch keine Werte für '+lbl+'.':'Für '+lbl+' gibt es noch keine Werte.')+' Spiel auf Survival und hol dir Platz 1.</p></div>';return}
+if(!L.length){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:3rem 1.5rem"><div style="font-size:2.4rem"><img alt="" width="48" height="48" style="image-rendering:pixelated;margin:0 auto" src="/mc-icon/diamond"></div><h3 style="justify-content:center;margin:.6rem 0 .3rem">Noch niemand auf dem Treppchen</h3><p class="mut" style="margin:0">'+(per==='weekly'?'Diese Woche gibt es noch keine Werte für '+lbl+'.':'Für '+lbl+' gibt es noch keine Werte.')+' Spiel auf Survival und hol dir Platz 1.</p></div>';return}
 const pd=[L[1],L[0],L[2]];O.innerHTML='<div class="pod">'+pd.map((x,i)=>x?'<div class="'+(i===1?'p1':'')+'"><div class="r">#'+(i===1?1:i===0?2:3)+'</div><img alt="" src="'+av(x.name)+'"><b>'+E(x.name)+'</b><span>'+E(f(x.value))+'</span></div>':'<div style="opacity:0"></div>').join('')+'</div>'+
 (L.length>3?'<div class="dc">'+L.slice(3).map((x,i)=>'<div class="lbr"><span class="px">'+(i+4)+'</span><img alt="" src="'+av(x.name).replace('/72','/30')+'"><span class="n">'+E(x.name)+'</span><b>'+E(f(x.value))+'</b></div>').join('')+'</div>':'');}
 document.getElementById('tabs').onclick=e=>{const k=e.target.dataset.k;if(k){tab=k;history.replaceState(null,'','#'+k);draw()}};
@@ -400,7 +402,7 @@ function cleanIngest(b) {
   for (const [k, v] of Object.entries(b?.servers || {}).slice(0, 8)) {
     if (!/^[a-z0-9_-]{1,24}$/i.test(k) || typeof v !== "object" || !v) continue;
     servers[k] = { online: !!v.online, players: (Array.isArray(v.players) ? v.players : []).slice(0, 100).map(x => clip(typeof x === "string" ? x : x?.name, 16)).filter(Boolean),
-      max: Number.isFinite(+v.max) ? +v.max : null, version: v.version ? clip(v.version, 40) : null, mode: v.mode ? clip(v.mode, 40) : null, uptime_seconds: Number.isFinite(+v.uptime_seconds) ? Math.max(0, Math.floor(+v.uptime_seconds)) : null, tps: Number.isFinite(+v.tps) ? Math.round(+v.tps * 10) / 10 : null };
+      max: Number.isFinite(+v.max) ? +v.max : null, version: v.version ? clip(v.version, 40) : null, mode: v.mode ? clip(v.mode, 40) : null, uptime_seconds: Number.isFinite(+(v.uptime_seconds ?? v.uptime)) && (v.uptime_seconds ?? v.uptime) !== null ? Math.max(0, Math.floor(+(v.uptime_seconds ?? v.uptime))) : null, tps: Number.isFinite(+v.tps) ? Math.round(+v.tps * 10) / 10 : null };
   }
   const leaderboards = {};
   for (const [k, v] of Object.entries(b?.leaderboards || {}).slice(0, 12)) {
@@ -484,15 +486,19 @@ async function mcIngest(req, env) {
   }
   if (links) {
     if (b.links_full === true) st.push(env.DB.prepare("DELETE FROM mc_links"));
-    for (const l of links) st.push(env.DB.prepare("INSERT INTO mc_links (discord_id, mc_name, mc_uuid, has_role, verified, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(discord_id) DO UPDATE SET mc_name=excluded.mc_name, mc_uuid=excluded.mc_uuid, has_role=excluded.has_role, verified=excluded.verified, updated_at=excluded.updated_at").bind(l.discord_id, l.mc_name, l.mc_uuid, l.has_role ? 1 : 0, l.verified ? 1 : 0, now));
+    for (const l of links) st.push(env.DB.prepare("INSERT INTO mc_links (discord_id, mc_name, mc_uuid, has_role, verified, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(discord_id) DO UPDATE SET mc_name=excluded.mc_name, mc_uuid=excluded.mc_uuid, has_role=excluded.has_role, verified=excluded.verified, updated_at=excluded.updated_at WHERE mc_name IS NOT excluded.mc_name OR mc_uuid IS NOT excluded.mc_uuid OR has_role IS NOT excluded.has_role OR verified IS NOT excluded.verified").bind(l.discord_id, l.mc_name, l.mc_uuid, l.has_role ? 1 : 0, l.verified ? 1 : 0, now));
   }
-  if (b?.leaderboards) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('total', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at").bind(JSON.stringify(cleanLb(b.leaderboards) || {}), now));
-  if (leaderboards_weekly) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('weekly', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at").bind(JSON.stringify(leaderboards_weekly), now));
-  for (const [k, v] of Object.entries(players_stats)) st.push(env.DB.prepare("INSERT INTO mc_player_stats (mc_uuid, stats, updated_at, details) VALUES (?, ?, ?, ?) ON CONFLICT(mc_uuid) DO UPDATE SET stats=excluded.stats, updated_at=excluded.updated_at, details=COALESCE(excluded.details, mc_player_stats.details)").bind(k, JSON.stringify(v), now, details[k] ? JSON.stringify(details[k]) : null));
+  if (b?.leaderboards) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('total', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at WHERE data IS NOT excluded.data OR updated_at < excluded.updated_at - 240000").bind(JSON.stringify(cleanLb(b.leaderboards) || {}), now));
+  if (leaderboards_weekly) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('weekly', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at WHERE data IS NOT excluded.data OR updated_at < excluded.updated_at - 240000").bind(JSON.stringify(leaderboards_weekly), now));
+  for (const [k, v] of Object.entries(players_stats)) st.push(env.DB.prepare("INSERT INTO mc_player_stats (mc_uuid, stats, updated_at, details) VALUES (?, ?, ?, ?) ON CONFLICT(mc_uuid) DO UPDATE SET stats=excluded.stats, updated_at=excluded.updated_at, details=COALESCE(excluded.details, mc_player_stats.details) WHERE stats IS NOT excluded.stats OR (excluded.details IS NOT NULL AND details IS NOT excluded.details) OR updated_at < excluded.updated_at - 240000").bind(k, JSON.stringify(v), now, details[k] ? JSON.stringify(details[k]) : null));
   st.push(...marketStatements(env, market, market_history));
+  const shops = cleanShops(b?.shops), auctions = cleanAuctions(b?.auctions);
+  if (shops) st.push(blobStatement(env, "shops", shops, now));
+  if (auctions) st.push(blobStatement(env, "auctions", auctions, now));
   if (st.length) await env.DB.batch(st);
-  return json({ ok: true, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0 });
+  return json({ ok: true, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0 });
 }
+let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
   const d = row ? JSON.parse(row.data) : {}, now = Date.now(), iso = (t) => t ? new Date(t).toISOString() : null;
@@ -535,14 +541,17 @@ function cleanHistory(a) {
 function marketStatements(env, market, hist) {
   const st = [];
   if (market) {
-    st.push(env.DB.prepare("DELETE FROM mc_market"));
+    // Nur geänderte Zeilen schreiben (Push jede Minute): Upsert mit WHERE, danach verschwundene Items löschen
     for (let i = 0; i < market.length; i += HIST_CHUNK) st.push(env.DB.prepare(`INSERT INTO mc_market (item, buy_price, sell_price, base_price, volume_24h_qty, volume_24h_cp, trades_24h, change_24h_pct, updated_at)
-      SELECT json_extract(value,'$.item'), json_extract(value,'$.buy_price'), json_extract(value,'$.sell_price'), json_extract(value,'$.base_price'), json_extract(value,'$.volume_24h_qty'), json_extract(value,'$.volume_24h_cp'), json_extract(value,'$.trades_24h'), json_extract(value,'$.change_24h_pct'), json_extract(value,'$.updated_at') FROM json_each(?)`).bind(JSON.stringify(market.slice(i, i + HIST_CHUNK))));
+      SELECT json_extract(value,'$.item'), json_extract(value,'$.buy_price'), json_extract(value,'$.sell_price'), json_extract(value,'$.base_price'), json_extract(value,'$.volume_24h_qty'), json_extract(value,'$.volume_24h_cp'), json_extract(value,'$.trades_24h'), json_extract(value,'$.change_24h_pct'), json_extract(value,'$.updated_at') FROM json_each(?) WHERE 1
+      ON CONFLICT(item) DO UPDATE SET buy_price=excluded.buy_price, sell_price=excluded.sell_price, base_price=excluded.base_price, volume_24h_qty=excluded.volume_24h_qty, volume_24h_cp=excluded.volume_24h_cp, trades_24h=excluded.trades_24h, change_24h_pct=excluded.change_24h_pct, updated_at=excluded.updated_at
+      WHERE buy_price IS NOT excluded.buy_price OR sell_price IS NOT excluded.sell_price OR base_price IS NOT excluded.base_price OR volume_24h_qty IS NOT excluded.volume_24h_qty OR volume_24h_cp IS NOT excluded.volume_24h_cp OR trades_24h IS NOT excluded.trades_24h OR change_24h_pct IS NOT excluded.change_24h_pct`).bind(JSON.stringify(market.slice(i, i + HIST_CHUNK))));
+    st.push(env.DB.prepare("DELETE FROM mc_market WHERE item NOT IN (SELECT value FROM json_each(?))").bind(JSON.stringify(market.map((m) => m.item))));
   }
   if (hist && hist.length) {
     for (let i = 0; i < hist.length; i += HIST_CHUNK) st.push(env.DB.prepare(`INSERT INTO mc_market_history (item, hour_ts, avg_price, min_price, max_price, volume_qty)
       SELECT json_extract(value,'$.item'), json_extract(value,'$.hour_ts'), json_extract(value,'$.avg_price'), json_extract(value,'$.min_price'), json_extract(value,'$.max_price'), json_extract(value,'$.volume_qty') FROM json_each(?) WHERE 1
-      ON CONFLICT(item, hour_ts) DO UPDATE SET avg_price=excluded.avg_price, min_price=excluded.min_price, max_price=excluded.max_price, volume_qty=excluded.volume_qty`).bind(JSON.stringify(hist.slice(i, i + HIST_CHUNK))));
+      ON CONFLICT(item, hour_ts) DO UPDATE SET avg_price=excluded.avg_price, min_price=excluded.min_price, max_price=excluded.max_price, volume_qty=excluded.volume_qty WHERE avg_price IS NOT excluded.avg_price OR min_price IS NOT excluded.min_price OR max_price IS NOT excluded.max_price OR volume_qty IS NOT excluded.volume_qty`).bind(JSON.stringify(hist.slice(i, i + HIST_CHUNK))));
     st.push(env.DB.prepare("DELETE FROM mc_market_history WHERE hour_ts < ?").bind(Math.floor(Date.now() / 1000) - HIST_DAYS * 86400));
   }
   return st;
@@ -610,6 +619,7 @@ export default {
     const p = url.pathname.replace(/\/$/, "") || "/";
     const isMc = url.hostname === MCD;
 
+    if (p.startsWith("/api/mc-")) { const r = TRADE().route(p, req, env, url); if (r) return r; }
     if (p === "/api/mc-status") return mcStatus(ctx);
     if (p === "/api/me") return me(req, env);
     if (p === "/api/mc-ingest") return mcIngest(req, env);
@@ -627,6 +637,15 @@ export default {
       if (p === "/") return html(MC_HOME);
       if (p === "/profile") return html(PROFILE_MC());
       if (p === "/leaderboards") return html(LEADERBOARDS_MC());
+      if (p === "/markt" && url.searchParams.has("item")) {
+        const raw = String(url.searchParams.get("item") || "").trim(), it = cleanItem(raw);
+        const known = it ? await env.DB.prepare("SELECT 1 FROM mc_market WHERE item = ?").bind(it).first().catch(() => null) : null;
+        return redirect(known ? `/markt/${encodeURIComponent(it)}` : `/markt?q=${encodeURIComponent(raw.replace(/^minecraft:/i, "").replace(/_/g, " ").slice(0, 48))}`);
+      }
+      if (p === "/shops") return html(mcPage("Shops · NwebNotFound MC", "Spielershops: Angebote, Preise, Lager und Orte", shopsBody()));
+      if (p.startsWith("/shops/")) { const id = decodeURIComponent(p.slice(7)); if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Shop · NwebNotFound MC", "Spielershop", shopBody(id))); }
+      if (p === "/auktionen") return html(mcPage("Auktionen · NwebNotFound MC", "Live-Auktionen vom Server", auctionsBody()));
+      if (p.startsWith("/auktionen/")) { const id = decodeURIComponent(p.slice(11)); if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Auktion · NwebNotFound MC", "Auktion mit Gebotsverlauf", auctionBody(id))); }
       if (p === "/markt") return html(mcPage("Markt · NwebNotFound MC", "Preise, Gewinner und Verlierer im Server-Shop", marketBody()));
       if (p.startsWith("/markt/")) { const it = cleanItem(decodeURIComponent(p.slice(7))); if (!it) return notFound(true); return html(mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
       if (p === "/wiki") return html(mcPage("Wiki · NwebNotFound MC", "Anleitungen, Regeln und FAQ zum Minecraft-Server", wikiIndexBody(MC_HOST)));

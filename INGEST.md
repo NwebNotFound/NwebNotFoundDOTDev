@@ -97,3 +97,72 @@ Antwort enthält zusätzlich `market` und `market_history` (Anzahl angenommener 
 
 ## Item-Icons
 `GET /mc-icon/<id>` leitet auf die passende Textur aus minecraft-assets 1.21.1 weiter (Item- vor Block-Texturen, `_front/_side/_top`, `wall_*`, Stufen/Treppen/Mauern → Grundblock, `waxed_*`, `potted_*` …), sonst 404 → Textkürzel.
+
+## Phase 5: Server-Status, Shops, Auktionshaus
+
+**Geld:** immer ganze **Cent** (Integer). Die Website zeigt `CP` mit 2 Nachkommastellen, also `250000` = `2.500,00 CP`. Die Website ist **nicht** maßgeblich für Geld. Alles Geldrelevante entscheidet der Server.
+
+### `servers` (Push jede Minute)
+`{"lobby":{"online":true,"players":["Name"],"max":20,"tps":20,"uptime_seconds":3600,"version":"26.3","mode":"dev"}, "survival":{...}}`. Statt `uptime_seconds` ist auch `uptime` erlaubt. Unveränderte Zeilen schreibt D1 nicht neu, auch nicht für market, history, links, leaderboards und stats. Nach 4 Minuten wird ein Refresh erzwungen, damit die Daten als frisch gelten.
+
+### `shops` (komplette Liste, **ersetzt** den Bestand)
+```json
+{"shops":[{"id":"s1","owner_uuid":"…","owner_name":"KaiDasEi","name":"Kais Erzladen",
+  "location":{"world":"survival","x":120,"y":64,"z":-340},
+  "items":[{"item":"diamond","price":4500,"stock":32,"mode":"sell"}],"updated_at":1793288000000}]}
+```
+- `location` ist ein String oder `{world,x,y,z}`.
+- `mode`: `sell` heißt, der Shop verkauft an Spieler. `buy` heißt, der Shop kauft an (Gesuch).
+- `price` ist in Cent pro Stück.
+
+### `auctions` (komplette Liste, **ersetzt** den Bestand; Dex mappt `v_auctions` + `v_auction_bids`)
+```json
+{"auctions":[{"id":"a1","seller_uuid":"…","seller_name":"KaiDasEi","item":"elytra","amount":1,
+  "nbt_summary":"Haltbarkeit III","min_price":200000,"current_bid":250000,"current_bidder_name":"hadzyc05",
+  "bid_count":3,"ends_at":1793292168700,"status":"active",
+  "bids":[{"name":"hadzyc05","amount":250000,"at":1793287968700}]}]}
+```
+- `status` ist `active`, `ended` oder `cancelled`.
+- `ends_at` ist in ms. Die Website zeigt `ends_at` aus dem Ingest an und rechnet die Endzeit nie selbst aus. Anti-Snipe-Verlängerungen kommen deshalb über den nächsten Push.
+
+### Lesen (öffentlich)
+- `GET mc.nwebnotfound.dev/api/mc-shops` und `/api/mc-shops/<id>`
+- `GET /api/mc-auctions` und `/api/mc-auctions/<id>`
+
+Die Detail-Endpunkte liefern zusätzlich:
+- `viewer`: `logged_in`, `can_bid` oder `can_buy`, `own`
+- `mine`: eigene Gebote oder Bestellungen mit Status
+
+### Gebote und Bestellungen von Website und Bot (Pending-Queue)
+`POST /api/mc-bid`, Body `{"auction_id":"a1","amount":262500}`, Antwort `202 {"ok":true,"request_id":"<uuid>","status":"pending"}`.
+
+`POST /api/mc-shop-order`, Body `{"shop_id":"s1","item":"diamond","qty":2}`, Antwort `202 {request_id,unit_price,total}`. `unit_price` ist ein Snapshot des Preises beim Bestellen.
+
+Sicherheitsregeln, alle serverseitig geprüft:
+- **Website:** nur mit gültiger Discord-Session und nur, wenn der `Origin` `nwebnotfound.dev` oder `mc.nwebnotfound.dev` ist, sonst 403. Turnstile wird geprüft, falls ein Token mitgeschickt wird.
+- **Bot im Auftrag eines Spielers:** Header `x-ingest-token` und zusätzlich `discord_id` im Body. Dann gibt es **keinen** Session-Zugriff. `source` ist `discord` statt `web`.
+- `bidder_uuid` und `buyer_uuid` kommen **immer** aus `mc_links` für die `discord_id` und setzen `verified` und `has_role` voraus. Werte vom Client werden ignoriert.
+- Rate-Limit über Gebote und Bestellungen zusammen:
+  - pro `discord_id`: 5 pro Minute und 30 pro Stunde
+  - pro IP: 10 pro Minute und 60 pro Stunde
+  - darüber gibt es 429.
+- Abgelehnt werden:
+  - Gebote auf eigene Auktionen und Käufe im eigenen Shop
+  - Gebote auf beendete Auktionen (409)
+  - Gebote unter `max(min_price, current_bid + Inkrement)` oder unter dem eigenen höchsten offenen Gebot + 1
+  - Bestellungen über dem Lagerbestand. `qty` muss zwischen 1 und 2304 liegen.
+- Das Inkrement ist **vorläufig** `max(100, ceil(current_bid*0.05))` Cent. **TODO (Craft):** echten Wert bestätigen.
+
+### Abholen und Bestätigen (Creepy/Server, Header `x-ingest-token`)
+- `GET /api/mc-bids/pending?since=<ms>` liefert `{"now":…, "items":[{"id","request_id","auction_id","bidder_uuid","bidder_name","amount","source","created_at"}]}`.
+- `GET /api/mc-shop-orders/pending?since=<ms>` liefert `{"now":…, "items":[{"id","request_id","shop_id","item","qty","buyer_uuid","buyer_name","unit_price","source","created_at"}]}`.
+- `POST /api/mc-bids/ack` bzw. `/api/mc-shop-orders/ack` mit Body `{"acks":[{"id":"<request_id>","status":"accepted"|"rejected","reason":"…"}]}`.
+  - Es werden nur Zeilen aktualisiert, die noch `pending` sind. Ein doppelter Ack ist also harmlos (`updated:0`).
+  - Die Website zeigt dann „bestätigt“ oder „abgelehnt“ mit Grund an.
+
+Ausführung im Spiel, idempotent über `request_id`:
+- `ah bid <auction_id> <bidder_uuid> <amount_cent> <request_id>` gibt `OK` oder `ERR <reason>` zurück. Dabei werden die CP reserviert und beim Überbieten zurückerstattet. Ein Gebot in den letzten 2 Minuten verlängert die Auktion (Anti-Snipe).
+- `shop buy <shop_id> <item> <qty> <buyer_uuid> <max_unit_price_cent> <request_id>` gibt `OK` oder `ERR <reason>` zurück. Diese Signatur ist ein **Vorschlag**, **TODO (Craft):** bestätigen. `max_unit_price_cent` ist der `unit_price` aus der Queue und schützt vor Preisänderungen.
+
+### Redirect
+`/markt?item=minecraft:diamond` leitet mit 302 auf `/markt/diamond` weiter. Bei einem unbekannten Item geht es auf `/markt?q=<item>`, die Suche ist dann vorausgefüllt.
