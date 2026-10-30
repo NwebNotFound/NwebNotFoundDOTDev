@@ -21,12 +21,12 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t };
 };
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
-const now = Date.now(), H = 3600;
+const now = Date.now(), H = 3600, HR0 = Math.floor(now / 1000 / H) * H, RESET = new Date((HR0 - 28 * H) * 1000).toISOString();
 
 // --- Setup
 fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
-fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\n`);
+fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\nPRICE_RESET_AT=${RESET}\n`);
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
 const wd = spawn("npx", ["wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: true });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
@@ -51,9 +51,13 @@ try {
       { item: "beacon", buy_price: 18000, sell_price: null, buy_enabled: true, sell_enabled: false },
       { item: "dirt", buy_price: 0.1, sell_price: 0.01 },
       { item: "dragon_egg", buy_price: null, sell_price: null, buy_enabled: false, sell_enabled: false },
+      { item: "copper_ingot", buy_price: 2.4, sell_price: 1, base_price: 2, volume_24h_cp: 900, trades_24h: 5, change_24h_pct: -97.6 },
+      { item: "shulker_box", buy_price: 50, sell_price: 30, base_price: 50, volume_24h_cp: 100, trades_24h: 1, change_24h_pct: 4900 },
     ],
     v_market_history: [
       { item: "diamond", ts: hr - 26 * H, price: 10, volume: 4 }, { item: "diamond", hour_ts: (hr - 1 * H) * 1000, avg_price: 11, min: 10.5, max: 11.5, qty: 2 },
+      // Preis-Reset (PRICE_RESET_AT = hr-28h): Kupfer 100 → (Reset) 2 → 2,4; alter Punkt bleibt in der Historie, zählt aber nicht für %
+      { item: "copper_ingot", ts: hr - 40 * H, price: 100, volume: 1 }, { item: "copper_ingot", ts: hr - 27 * H, price: 2, volume: 3 }, { item: "copper_ingot", ts: hr - 1 * H, price: 2.4, volume: 3 },
     ],
     shops: [{ id: "s1", owner_uuid: U2, owner_name: "Seller", name: "Seller-Shop", items: [{ listing_id: "L1", item: "diamond", price: 1500, stock: 10, mode: "sell" }, { listing_id: "L2", item: "dirt", price: null, stock: 5 }] },
             { id: "s2", owner_uuid: U1, owner_name: "Nils", name: "Mein Shop", items: [{ listing_id: "L3", item: "oak_log", price: 100, stock: 64 }] }],
@@ -73,9 +77,9 @@ try {
   };
   const ing = await req("/api/mc-ingest", { method: "POST", body: payload, token: TOK });
   ok(ing.s === 200 && ing.j?.ok, "Ingest mit Token → 200", ing.t.slice(0, 200));
-  ok(ing.j?.auctions === 5 && ing.j?.shops === 2 && ing.j?.market === 6, "Zählung auctions/shops/market", JSON.stringify(ing.j));
+  ok(ing.j?.auctions === 5 && ing.j?.shops === 2 && ing.j?.market === 8, "Zählung auctions/shops/market", JSON.stringify(ing.j));
   ok(ing.j?.views?.leaderboards >= 3 && ing.j?.players_stats === 2, "Views: Leaderboards + Player-Stats erkannt", JSON.stringify(ing.j));
-  ok(ing.j?.market_history === 2, "v_market_history: 2 Punkte", JSON.stringify(ing.j));
+  ok(ing.j?.market_history === 5, "v_market_history: 5 Punkte", JSON.stringify(ing.j));
 
   console.log("2) Markt");
   const m = (await req("/api/mc-market")).j, by = Object.fromEntries(m.items.map((x) => [x.item, x]));
@@ -84,6 +88,18 @@ try {
   ok(by.dragon_egg && by.dragon_egg.buy_locked === 1 && by.dragon_egg.sell_locked === 1, "beide Preise null → trotzdem übernommen, gesperrt");
   ok(by.diamond.hist_pct === 1 && Math.abs(by.diamond.change_24h_pct - 10) < 0.01, "%-Änderung aus Historie (10 → 11 = +10 %)", JSON.stringify(by.diamond));
   ok(!by.dirt.hist_pct && !by.dirt.has_hist, "ohne Historie: kein hist_pct (UI zeigt —)");
+  ok(m.price_reset_at === RESET, "price_reset_at aus PRICE_RESET_AT", m.price_reset_at);
+  ok(by.copper_ingot.hist_pct === 1 && Math.abs(by.copper_ingot.change_24h_pct - 20) < 0.01, "Preis-Reset: % nur ab Stichtag (2 → 2,4 = +20 %, kein −98 %-Crash)", JSON.stringify(by.copper_ingot));
+  ok(m.spark.copper_ingot?.length === 3 && m.spark_reset?.copper_ingot === 1, "Preis-Reset: Sparkline behält alte Punkte + Reset-Index", JSON.stringify([m.spark.copper_ingot, m.spark_reset]));
+  ok(!m.spark_reset?.diamond, "Diamant: kein Reset-Marker (alle Punkte nach Stichtag)");
+  const mc = (await req("/api/mc-market/copper_ingot")).j; ok(mc.history.length === 3 && mc.price_reset_at === RESET && mc.item.change_24h_pct === 20, "Item-API: volle Historie + Reset-Zeit", JSON.stringify(mc).slice(0, 300));
+  // Ingest-Feld price_reset_at hat Vorrang vor env; null löscht wieder
+  const R2 = new Date((HR0 - 2 * H) * 1000).toISOString();
+  const ir = await req("/api/mc-ingest", { method: "POST", body: { price_reset_at: R2 }, token: TOK }); ok(ir.s === 200 && ir.j.price_reset_at === R2 && sqlRows("SELECT value FROM mc_meta WHERE key='price_reset_at'")[0]?.value === R2, "Ingest price_reset_at → mc_meta gespeichert", ir.t);
+  const m2 = (await req("/api/mc-market")).j, cu2 = m2.items.find((x) => x.item === "copper_ingot");
+  ok(m2.price_reset_at === R2 && m2.spark_reset.copper_ingot === 2 && cu2.reset_new === 1 && cu2.change_24h_pct === 0 && !cu2.hist_pct, "Ingest-Reset vor env: <24h nach Reset keine %-Änderung ('neu')", JSON.stringify([m2.price_reset_at, m2.spark_reset, cu2]));
+  ok((await req("/api/mc-ingest", { method: "POST", body: { price_reset_at: "kaputt" }, token: TOK })).j.price_reset_at === "invalid" && (await req("/api/mc-market")).j.price_reset_at === R2, "ungültiges price_reset_at wird ignoriert");
+  ok((await req("/api/mc-ingest", { method: "POST", body: { price_reset_at: null }, token: TOK })).j.price_reset_at === null && (await req("/api/mc-market")).j.price_reset_at === RESET, "price_reset_at: null → zurück auf env PRICE_RESET_AT");
   const mi = (await req("/api/mc-market/diamond")).j; ok(mi.history.length === 2 && mi.item.hist_pct === 1, "Item-API: Historie + hist_pct");
 
   console.log("3) Bestenlisten + Stats");
@@ -219,7 +235,7 @@ try {
   ok((await req("/api/feedback/admin/99999", { method: "PATCH", body: { status: "done" }, headers: AH })).s === 404, "Admin PATCH unbekannt → 404");
   ok((await req("/api/feedback/admin?status=done", { headers: AH })).j.items.length === 1, "Admin GET Filter done");
   console.log("7) Seiten");
-  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
+  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
   console.log("8) UI (Chromium 390/1440)");
