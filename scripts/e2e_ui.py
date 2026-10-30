@@ -72,8 +72,40 @@ with sync_playwright() as p:
         ok(pg.locator(".inv .iv-pane").count() >= 1 and pg.locator(".inv .ivs").count() >= 41, f"{w}px Profil: volles Inventar-Layout")
         ok("AB" not in pg.locator(".inv").inner_text(), f"{w}px Profil: keine Text-Platzhalter")
         pg.locator(".inv").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-polish-profil-{w}.png", full_page=True)
-        ok(pg.locator("#umm a[href$='/abholungen']").count() == 1, f"{w}px Dropdown: Abholungen")
-        t = go("/abholungen"); ok("Abholfach" in t and "fehlgeschlagen" in t and "abgeholt" in t and "Diamond" in t, f"{w}px Abholungen: Stufen + Abholfach", t[:400])
+        ok(pg.locator("#umm a[href$='/bestellungen']").count() == 1, f"{w}px Dropdown: Bestellungen")
+        # 1) Profil: kein doppelter Tab, klare Blöcke
+        ok(pg.locator(".nl a[href='/profile']").count() == 0, f"{w}px Nav: kein extra Profil-Tab")
+        pg.locator("#pordl ul, #pordl p").first.wait_for(timeout=10000)
+        ok(pg.locator("#pbal").count() == 1 and pg.locator(".pstats").count() == 1 and pg.locator("#pord").count() == 1, f"{w}px Profil: Blöcke Kontostand/Stats/Bestellungen")
+        ys = pg.evaluate("['#pbal','.pstats','#pord'].map(s=>document.querySelector(s).getBoundingClientRect().top+scrollY)")
+        ok(ys[0] < ys[1] < ys[2], f"{w}px Profil: Reihenfolge Kontostand → Stats → Bestellungen", ys)
+        ok("Kontostand" not in pg.inner_text(".pstats"), f"{w}px Profil: Kontostand nicht doppelt in Stats")
+        # 2) Dropdown im MC-Theme
+        pg.click("#umb"); pg.wait_for_timeout(300)
+        st = pg.evaluate("(()=>{const c=getComputedStyle(document.querySelector('#umm'));return [c.backgroundColor,c.borderTopColor]})()")
+        ok("18, 13, 31" not in st[0] and "45, 29, 90" not in st[1], f"{w}px Dropdown: MC-Theme statt Lila", st)
+        pg.screenshot(path=f"{SH}/ux-dropdown-{w}.png")
+        # 4) einheitliches Hover
+        hov = []
+        for sel in ("#umm a[role=menuitem]", "#pbal .acts .btn.sec"):
+            el = pg.locator(sel).first; el.hover(); pg.wait_for_timeout(200)
+            hov.append(el.evaluate("e=>{const c=getComputedStyle(e);return c.backgroundColor+'|'+c.boxShadow}"))
+        pg.keyboard.press("Escape")
+        ok(len(set(hov)) == 1, f"{w}px Hover: Menüeintrag = Button (gleiches Token)", hov)
+        t = go("/abholungen"); ok("Abholfach" in t and "abgelehnt" in t and "erledigt" in t and "Diamond" in t, f"{w}px Bestellungen: Stufen + Abholfach in einer Liste", t[:400])
+        ok(pg.locator("#olist").count() == 1 and pg.locator(".card").count() == 1, f"{w}px Bestellungen: genau eine Liste")
+        if pg.locator("[data-hide]").count():
+            a = pg.locator("[data-hide]").first.bounding_box(); ok(a and a["height"] >= 32, f"{w}px Ausblenden-Button tippbar")
+        r1 = pg.locator("#olist .po").first; r1.hover(); pg.wait_for_timeout(200)
+        ok(r1.evaluate("e=>getComputedStyle(e).backgroundColor") == hov[0].split("|")[0], f"{w}px Hover: Listenzeile nutzt dasselbe Token")
+        # 6) Bank-Direktkauf auf der Item-Seite
+        go("/markt/diamond"); pg.locator("#bbf").wait_for(timeout=10000)
+        ok(pg.evaluate("document.documentElement.scrollWidth<=innerWidth+1"), f"{w}px Item-Seite mit Bank-Kauf: kein Overflow")
+        t0 = pg.inner_text("#bbt"); pg.fill("#bba", "2"); ok(pg.inner_text("#bbt") != t0, f"{w}px Bank-Kauf: Summe live", pg.inner_text("#bbt"))
+        pg.click("#bbb"); pg.wait_for_function("document.getElementById('bbm').textContent.length>0", timeout=10000)
+        ok("gesendet" in pg.inner_text("#bbm") or "Zu viele" in pg.inner_text("#bbm"), f"{w}px Bank-Kauf: Absenden", pg.inner_text("#bbm"))
+        pg.locator("#bbuy").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/ux-bankkauf-{w}.png")
+        go("/markt/elytra"); pg.wait_for_timeout(600); ok("nicht kaufbar" in pg.inner_text("#bbuy"), f"{w}px Bank-Kauf: gesperrtes Item ohne Formular")
         ok(pg.evaluate("document.documentElement.scrollWidth<=innerWidth+1"), f"{w}px Abholungen: kein Overflow")
         pg.screenshot(path=f"{SH}/local-polish-abholungen-{w}.png", full_page=True)
         t = go("/shops/s1"); ok("15,00" in t, f"{w}px Shop: Preis 15,00 CP")

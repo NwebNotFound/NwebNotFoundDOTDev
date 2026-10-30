@@ -207,3 +207,23 @@ Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, 
 
 ## Tests
 `node scripts/e2e.mjs` – startet `wrangler dev` mit frischer lokaler D1 (`.wrangler/e2e`), spielt Ingest/Gebote/Bestellungen/Bot-Ack/Rate-Limits durch und prüft die UI (Chromium 390/1440, `scripts/e2e_ui.py`). Berührt keine Produktionsdaten.
+
+## API-Vertrag: Bank-Direktkauf (`bank_buy`)
+
+**POST `/api/mc-shop-order`** (gleiche Route, gleiche Prüfung wie Shop-Orders: Login/Ingest-Token, Rolle + verifizierter Link, Origin, optional Turnstile, Rate-Limit)
+
+```json
+{ "type": "bank_buy", "item": "diamond", "amount": 3, "mc_uuid": "<uuid>", "request_id": "<8-64 [A-Za-z0-9_.:-]>", "discord_id": "<nur Bot-Pfad>", "turnstile": "<optional, Website>" }
+```
+- Website: Session-Cookie + Origin; `discord_id` wird ignoriert. Bot (Dex): `Authorization: Bearer <INGEST_TOKEN>` + `discord_id`.
+- `amount` Ganzzahl 1–2304; `item` muss im Markt existieren (404) und kaufbar sein (409 bei Sperre/kein Preis).
+- `mc_uuid` optional; wenn gesetzt, muss sie zur UUID aus `mc_links` passen (403). Gespeichert wird immer die UUID aus `mc_links`.
+- `request_id` = Idempotenz-Schlüssel (fehlt sie, erzeugt der Server eine). Gleiche ID + gleiche Daten → `200 {duplicate:true}`; gleiche ID, andere Daten → `409`.
+- Erfolg: `202 {ok, request_id, type:"bank_buy", item, amount, unit_price (Cent, Schätzung), total}`. Der Preis ist nur eine Schätzung, maßgeblich ist der Server beim Ausführen.
+- Sonst `400` unbekannter `type`. Ohne `type` (oder `type:"shop"`) verhält sich alles exakt wie bisher.
+
+**GET `/api/mc-shop-orders/pending`** (Ingest-Token): Standard nur `type=shop` (alte Konsumenten unverändert, Feld `type` kommt neu dazu). Mit `?types=shop,bank_buy` zusätzlich bank_buy-Einträge mit `{id, request_id, type, item, amount, qty, mc_uuid, buyer_uuid, discord_id, unit_price, shop_id:null, listing_id:null}`.
+
+**POST `/api/mc-shop-orders/ack`**: unverändert, gleiche Stati wie Shop-Orders; Status landet über `v_order_fulfillment` in der Liste `/bestellungen`.
+
+**POST `/api/mc-orders/hide`** `{id}` oder `{ids:[]}` (Session): blendet eigene erledigte/abgelehnte Einträge nur für den User aus (`mc_order_hidden`), nichts wird gelöscht.

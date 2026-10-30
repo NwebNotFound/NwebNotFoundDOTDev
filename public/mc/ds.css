@@ -316,3 +316,38 @@ html.mc #pb .mch-tile.empty .v{opacity:.35}
 html.mc #pb .mch-tile .nd{font-size:.7rem;color:var(--c-dim);margin-top:.15rem}
 @media(max-width:760px){html.mc #pb .mch{grid-template-columns:1fr;padding:var(--s5);gap:var(--s3);text-align:center}html.mc #pb .mch-model{height:320px}html.mc #pb .mch-grid{text-align:left}}
 @media(prefers-reduced-motion:reduce){html.mc #pb .mch-model canvas{animation:none;opacity:1}html.mc #pb .mch-tile:hover{transform:none}}
+
+/* ---------- Einheitliches Hover-/Fokus-Highlight (ein Token für alle klickbaren Zeilen & Buttons) ---------- */
+html.mc{--hl-bg:var(--c-s3);--hl-fg:var(--c-fg);--hl-ring:inset 0 0 0 2px var(--c-acc-d);--hl-t:background-color .12s ease,box-shadow .12s ease,color .12s ease}
+html.mc :is(a.lrow,a.mrow,.il .ir,a.ir,a.g,a.card,.menu a,.ac a,.tabs button,.seg button,.um>button,.btn,.po,.hl){transition:var(--hl-t)}
+html.mc :is(a.lrow,a.mrow,.il .ir,a.ir,a.g,a.card,.menu a,.ac a,.tabs button,.seg button,.um>button,.btn.sec,.btn.sm:not(.go):not(.discord),.po.hl,.hl):is(:hover,:focus-visible),
+html.mc .ac a[aria-selected=true],html.mc .um>button[aria-expanded=true]{background:var(--hl-bg);color:var(--hl-fg);box-shadow:var(--hl-ring);transform:none;text-decoration:none;outline:none}
+html.mc :is(.btn:not(.sec):not(.sm),.btn.go,.btn.discord):is(:hover,:focus-visible){box-shadow:var(--hl-ring),0 0 0 2px var(--c-bg);transform:none;filter:brightness(1.08)}
+html.mc .nl .l:is(:hover,:focus-visible){color:var(--c-fg);background:none;box-shadow:none}
+
+/* ---------- Profil-Dropdown im MC-Theme (kein Lila) ---------- */
+html.mc .menu{background:var(--c-s2);border:var(--b) solid var(--mc-edge);border-radius:var(--r-sm);box-shadow:var(--mc-inset-panel),var(--mc-raised);backdrop-filter:none;-webkit-backdrop-filter:none;padding:var(--s1)}
+html.mc .menu .hd{border-bottom:var(--b) solid var(--c-line)}
+html.mc .menu .hd b{font-family:var(--f-px)}
+html.mc .menu a{color:var(--c-fg)}html.mc .menu a.out{color:var(--c-red)}
+html.mc .tt,html.mc .ac,html.mc .mctip{background:var(--c-s2);border:var(--b) solid var(--mc-edge);box-shadow:var(--mc-inset-panel),var(--mc-raised)}
+
+/* ---------- Profil: Blöcke Kontostand / Stats / Bestellungen ---------- */
+html.mc #pb .pblk{background:var(--c-s1);border:var(--b) solid var(--mc-edge);border-radius:var(--r);box-shadow:var(--mc-inset-panel);padding:clamp(1rem,3vw,1.4rem)}
+html.mc #pb .pblk>header{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s3)}
+html.mc #pb .pblk>header h2{font-size:var(--t-lg);margin:0}
+html.mc #pb .pbal{display:flex;align-items:center;gap:var(--s4);flex-wrap:wrap}
+html.mc #pb .pbal .v{font-family:var(--f-px);font-size:clamp(1.6rem,6vw,2.4rem);color:var(--c-gold)}
+html.mc #pb .pbal .acts{display:flex;gap:var(--s2);flex-wrap:wrap;margin-left:auto}
+html.mc #pb .pord{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+html.mc #pb .pord li{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:var(--s3);align-items:center;padding:var(--s2);border-radius:var(--r-sm)}
+html.mc #pb .pord .ic img{width:28px;height:28px;image-rendering:pixelated}
+html.mc #pb .pord .tag{font-size:var(--t-xs)}
+@media(max-width:480px){html.mc #pb .pbal .acts{margin-left:0;width:100%}html.mc #pb .pbal .acts .btn{flex:1}}
+
+/* ---------- Bestellungen (zusammengelegt) + Bank-Direktkauf ---------- */
+html.mc .po .hide{margin-left:auto;align-self:start}
+html.mc .otype{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--c-dia);margin-right:var(--s2)}
+html.mc .bbuy{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:var(--s2);align-items:end;margin-top:var(--s3)}
+html.mc .bbuy label{display:grid;gap:var(--s1);font-size:var(--t-sm);color:var(--c-mut)}
+@media(max-width:480px){html.mc .bbuy{grid-template-columns:1fr 1fr}html.mc .bbuy .btn{grid-column:1/-1}}

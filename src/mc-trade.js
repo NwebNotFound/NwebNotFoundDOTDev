@@ -120,6 +120,8 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
   }
   async function order(req, env) {
     const r = await prep(req, env); if (r.err) return r.err; const { b, a, l, ip } = r;
+    if (b.type === "bank_buy") return bankBuy(req, env, r);
+    if (b.type != null && b.type !== "shop") return json({ error: "Unbekannter Bestelltyp" }, 400);
     const qty = Math.floor(Number(b.qty)); if (!(qty >= 1 && qty <= 2304)) return json({ error: "Menge 1 bis 2304" }, 400);
     const { list } = await blob(env, "shops"); const lid = b.listing_id != null ? String(b.listing_id) : null; let sh, off;
     if (lid) { for (const x of list) { const o = x.items.find((y) => y.listing_id === lid); if (o) { sh = x; off = o; break; } } if (!sh) return json({ error: "Angebot nicht gefunden" }, 404); if (off.mode !== "sell") return json({ error: "Item wird hier nicht verkauft" }, 404); }
@@ -132,12 +134,51 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ip).run();
     return json({ ok: true, request_id: id, status: "pending", qty, unit_price: off.price, total: off.price * qty }, 202);
   }
+  // Bank-Direktkauf: gleiche Queue wie Shop-Orders (type='bank_buy', shop_id NULL). Preis ist nur Anzeige/Obergrenze;
+  // der Server prüft beim Ausführen Sperre, Tageslimit, Kontostand und aktuellen Preis.
+  async function bankBuy(req, env, pre) {
+    const r = pre || await prep(req, env); if (r.err) return r.err; const { b, a, l, ip } = r;
+    const it = item(b.item); if (!it) return json({ error: "Item ungültig" }, 400);
+    const raw = b.amount ?? b.qty, qty = Number(raw); if (!(Number.isInteger(qty) && qty >= 1 && qty <= 2304)) return json({ error: "Menge 1 bis 2304" }, 400);
+    if (b.mc_uuid != null && (!UUID_RE.test(String(b.mc_uuid)) || normU(b.mc_uuid) !== l.mc_uuid)) return json({ error: "mc_uuid passt nicht zum verknüpften Account" }, 403);
+    // Idempotenz: request_id vom Client (Bot/Website); fehlt sie, erzeugt der Server eine
+    const rid = b.request_id != null ? String(b.request_id) : crypto.randomUUID();
+    if (!/^[A-Za-z0-9_.:-]{8,64}$/.test(rid)) return json({ error: "request_id ungültig (8-64 Zeichen [A-Za-z0-9_.:-])" }, 400);
+    const ex = await env.DB.prepare("SELECT id, discord_id, item, qty, unit_price, status, type FROM mc_shop_orders_pending WHERE id = ?").bind(rid).first();
+    if (ex) { if (ex.discord_id !== a.discordId || ex.type !== "bank_buy" || ex.item !== it || ex.qty !== qty) return json({ error: "request_id schon für eine andere Bestellung benutzt" }, 409);
+      return json({ ok: true, duplicate: true, request_id: ex.id, type: "bank_buy", status: ex.status, item: ex.item, amount: ex.qty, unit_price: ex.unit_price, total: ex.unit_price * ex.qty }, 200); }
+    const m = await env.DB.prepare("SELECT buy_locked, buy_price FROM mc_market WHERE item = ?").bind(it).first().catch(() => null);
+    if (!m) return json({ error: "Item gibt es bei der Bank nicht" }, 404);
+    if (m.buy_locked || !(m.buy_price > 0)) return json({ error: "Nicht bei der Bank kaufbar" }, 409);
+    const unit = Math.max(1, Math.round(m.buy_price * 100)), now = Date.now();
+    const ins = await env.DB.prepare("INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, type) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'bank_buy')").bind(rid, it, qty, l.mc_uuid, l.mc_name, a.discordId, unit, a.source, now, ip).run();
+    if (!ins.meta?.changes) return json({ error: "request_id kollidiert, bitte erneut senden" }, 409);
+    return json({ ok: true, request_id: rid, type: "bank_buy", status: "pending", item: it, amount: qty, unit_price: unit, total: unit * qty }, 202);
+  }
+  // Ausblenden (nur für den eigenen User, nur erledigte/abgelehnte; nichts wird gelöscht)
+  async function hideOrder(req, env) {
+    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    if (!originOk(req)) return json({ error: "Ungültige Herkunft" }, 403);
+    const u = await getUser(req, env); if (!u) return json({ error: "Bitte mit Discord anmelden" }, 401);
+    let b; try { b = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
+    const ids = (Array.isArray(b?.ids) ? b.ids : [b?.id]).filter((x) => typeof x === "string" && x.length <= 64).slice(0, 50); if (!ids.length) return json({ error: "id fehlt" }, 400);
+    const now = Date.now(); let n = 0;
+    for (const id of ids) {
+      const o = await env.DB.prepare("SELECT status FROM mc_shop_orders_pending WHERE id = ? AND discord_id = ?").bind(id, u.id).first();
+      if (!o) continue; const g = stageOf(o.status); if (g !== "collected" && g !== "failed") continue;
+      n += (await env.DB.prepare("INSERT OR IGNORE INTO mc_order_hidden (discord_id, order_id, hidden_at) VALUES (?, ?, ?)").bind(u.id, id, now).run()).meta?.changes || 0;
+    }
+    return json({ ok: true, hidden: n });
+  }
   // Pull + Ack für Server/Bot (nur Ingest-Token)
-  const pending = (table, cols) => async (req, env, url) => {
+  const pending = (table, cols, typed) => async (req, env, url) => {
     if (!tokenOk(req, env)) return json({ error: "unauthorized" }, 401);
     const since = Math.max(0, Number(url.searchParams.get("since")) || 0), limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 100));
-    const { results } = await env.DB.prepare(`SELECT ${cols} FROM ${table} WHERE status = 'pending' AND created_at > ? ORDER BY created_at ASC LIMIT ?`).bind(since, limit).all();
-    return json({ now: Date.now(), items: results.map((x) => ({ ...x, request_id: x.id, idem_key: x.id })) });
+    // Shop-Queue: ohne ?types= nur 'shop' (alte Konsumenten sehen keine bank_buy-Orders); ?types=shop,bank_buy für beide
+    const types = typed ? [...new Set((url.searchParams.get("types") || "shop").split(",").filter((t) => ORDER_TYPES.includes(t)))] : [];
+    const tw = typed ? ` AND type IN (${types.map(() => "?").join(",") || "'shop'"})` : "";
+    const { results } = await env.DB.prepare(`SELECT ${cols} FROM ${table} WHERE status = 'pending'${tw} AND created_at > ? ORDER BY created_at ASC LIMIT ?`).bind(...types, since, limit).all();
+    return json({ now: Date.now(), items: results.map((x) => ({ ...x, request_id: x.id, idem_key: x.id, order_type: x.type, ...(x.type === "bank_buy" ? { amount: x.qty, mc_uuid: x.buyer_uuid } : {}) })) });
   };
   const ack = (table) => async (req, env) => {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -148,19 +189,20 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const res = acks.length ? await env.DB.batch(acks.map((x) => env.DB.prepare(`UPDATE ${table} SET status = ?, reason = ?, acked_at = ? WHERE id = ? AND status != ? AND (status = 'pending' OR (? = 0 AND status NOT IN ('rejected','failed','refunded','collected','picked_up','delivered','cancelled')))`).bind(x.status, clip(x.reason, 120) || null, now, x.id, x.status, x.status === "accepted" || x.status === "rejected" ? 1 : 0))) : [];
     return json({ ok: true, updated: res.reduce((s, r) => s + (r.meta?.changes || 0), 0) });
   };
-  const BID_COLS = "id, auction_id, bidder_uuid, bidder_name, amount, source, created_at", ORD_COLS = "id, listing_id, shop_id, item, qty, buyer_uuid, buyer_uuid AS uuid, buyer_name, unit_price, unit_price AS max_unit_price_cent, source, created_at";
+  const BID_COLS = "id, auction_id, bidder_uuid, bidder_name, amount, source, created_at", ORD_COLS = "id, listing_id, shop_id, item, qty, buyer_uuid, buyer_uuid AS uuid, buyer_name, unit_price, unit_price AS max_unit_price_cent, source, created_at, type";
+  const ORDER_TYPES = ["shop", "bank_buy"];
 
   // Abholungen: eigene Bestellungen + Abholfach (aus dem Sync), Status flexibel auf Stufen abgebildet
   async function pickups(req, env) {
     const m = await me(req, env);
     if (!m.user) return json({ logged_in: false }, 200, { "cache-control": "private, no-store" });
     if (!m.link) return json({ logged_in: true, linked: false, orders: [], pickup: [] }, 200, { "cache-control": "private, no-store" });
-    const rows = (await env.DB.prepare("SELECT id, shop_id, item, qty, unit_price, status, reason, created_at, acked_at FROM mc_shop_orders_pending WHERE discord_id = ? ORDER BY created_at DESC LIMIT 50").bind(m.user.id).all().catch(() => ({ results: [] }))).results || [];
+    const rows = (await env.DB.prepare("SELECT o.id, o.shop_id, o.item, o.qty, o.unit_price, o.status, o.reason, o.created_at, o.acked_at, o.type FROM mc_shop_orders_pending o WHERE o.discord_id = ?1 AND NOT EXISTS (SELECT 1 FROM mc_order_hidden h WHERE h.discord_id = ?1 AND h.order_id = o.id) ORDER BY o.created_at DESC LIMIT 50").bind(m.user.id).all().catch(() => ({ results: [] }))).results || [];
     const ps = await env.DB.prepare("SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = ?").bind(m.link.mc_uuid).first().catch(() => null);
     let st = {}; try { st = JSON.parse(ps?.stats || "{}"); } catch {}
     const pick = Array.isArray(st.pickup) ? st.pickup : [];
-    const orders = rows.map((r) => ({ ...r, stage: stageOf(r.status), created_at: iso(r.created_at), acked_at: r.acked_at ? iso(r.acked_at) : null }));
-    return json({ logged_in: true, linked: true, mc_name: m.link.mc_name, orders, pickup: pick, pickup_at: ps?.updated_at ? iso(ps.updated_at) : null }, 200, { "cache-control": "private, no-store" });
+    const orders = rows.map((r) => ({ ...r, type: r.type || "shop", order_type: r.type || "shop", stage: stageOf(r.status), hideable: ["collected", "failed"].includes(stageOf(r.status)), created_at: iso(r.created_at), acked_at: r.acked_at ? iso(r.acked_at) : null }));
+    return json({ logged_in: true, linked: true, can: m.can, mc_name: m.link.mc_name, orders, pickup: pick, pickup_at: ps?.updated_at ? iso(ps.updated_at) : null }, 200, { "cache-control": "private, no-store" });
   }
   async function me(req, env) { const u = await getUser(req, env); if (!u) return { user: null }; const l = await linkFor(env, u.id); return { user: u, link: l, can: !!(l && l.verified && l.has_role) }; }
   async function auctions(req, env) {
@@ -187,11 +229,13 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
       if (p === "/api/mc-shop-order") return order(req, env);
       if (p === "/api/mc-bids/pending") return pending("mc_bids_pending", BID_COLS)(req, env, url);
       if (p === "/api/mc-bids/ack") return ack("mc_bids_pending")(req, env);
-      if (p === "/api/mc-shop-orders/pending") return pending("mc_shop_orders_pending", ORD_COLS)(req, env, url);
+      if (p === "/api/mc-shop-orders/pending") return pending("mc_shop_orders_pending", ORD_COLS, true)(req, env, url);
       if (p === "/api/mc-shop-orders/ack") return ack("mc_shop_orders_pending")(req, env);
       if (p === "/api/mc-auctions") return auctions(req, env);
       if (p.startsWith("/api/mc-auctions/")) return auction(req, env, decodeURIComponent(p.slice(17)));
-      if (p === "/api/mc-abholungen") return pickups(req, env);
+      if (p === "/api/mc-abholungen" || p === "/api/mc-bestellungen") return pickups(req, env);
+      if (p === "/api/mc-bank-buy") return bankBuy(req, env);
+      if (p === "/api/mc-orders/hide") return hideOrder(req, env);
       if (p === "/api/mc-shops") return shops(req, env);
       if (p.startsWith("/api/mc-shops/")) return shop(req, env, decodeURIComponent(p.slice(14)));
       return null;

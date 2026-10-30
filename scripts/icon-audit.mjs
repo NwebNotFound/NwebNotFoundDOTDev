@@ -4,7 +4,7 @@ import { resolveIcon } from "../src/mc-icon.js";
 import { readFileSync } from "node:fs";
 const arg = process.argv.slice(2), json = arg.includes("--json"), file = arg.find((a) => !a.startsWith("--"));
 const reg = file ? JSON.parse(readFileSync(file, "utf8"))
-  : await (await fetch("https://raw.githubusercontent.com/misode/mcmeta/1.21.11-summary/registries/data.min.json")).json();
+  : JSON.parse(readFileSync(new URL("./items-1.21.11.json", import.meta.url), "utf8")); // aus misode/mcmeta 1.21.11-summary
 const ids = (reg.item || reg).filter((i) => i !== "air");
 const base = (p) => p.slice(p.indexOf("/") + 1);
 const out = { exact: [], mapped: [], approx: [], placeholder: [] };
