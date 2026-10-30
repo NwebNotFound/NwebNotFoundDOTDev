@@ -587,11 +587,19 @@ async function mcIngest(req, env) {
   if (leaderboards_weekly) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('weekly', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at WHERE data IS NOT excluded.data OR updated_at < excluded.updated_at - 240000").bind(JSON.stringify(leaderboards_weekly), now));
   for (const [k, v] of Object.entries(players_stats)) st.push(env.DB.prepare("INSERT INTO mc_player_stats (mc_uuid, stats, updated_at, details) VALUES (?, ?, ?, ?) ON CONFLICT(mc_uuid) DO UPDATE SET stats=excluded.stats, updated_at=excluded.updated_at, details=COALESCE(excluded.details, mc_player_stats.details) WHERE stats IS NOT excluded.stats OR (excluded.details IS NOT NULL AND details IS NOT excluded.details) OR updated_at < excluded.updated_at - 240000").bind(k, JSON.stringify(v), now, details[k] ? JSON.stringify(details[k]) : null));
   st.push(...marketStatements(env, market, market_history));
+  // optionales Top-Level-Feld price_reset_at (ISO): speichern; null/"" löscht (dann gilt wieder env PRICE_RESET_AT)
+  let reset_info;
+  if (b && "price_reset_at" in b) {
+    const v = b.price_reset_at, t = parseReset(v);
+    if (v === null || v === "") { st.push(env.DB.prepare("DELETE FROM mc_meta WHERE key = 'price_reset_at'")); reset_info = null; }
+    else if (t) { reset_info = new Date(t * 1000).toISOString(); st.push(env.DB.prepare("INSERT INTO mc_meta (key, value, updated_at) VALUES ('price_reset_at', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(reset_info, now)); }
+    else reset_info = "invalid";
+  }
   const shops = cleanShops(b?.shops), auctions = cleanAuctions(b?.auctions ?? b?.v_auctions, b?.auction_bids ?? b?.v_auction_bids);
   if (shops) st.push(blobStatement(env, "shops", shops, now));
   if (auctions) st.push(blobStatement(env, "auctions", auctions, now));
   if (st.length) await env.DB.batch(st);
-  return json({ ok: true, views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0 });
+  return json({ ok: true, views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
@@ -654,34 +662,45 @@ function marketStatements(env, market, hist) {
   }
   return st;
 }
+// Preis-Reset (env PRICE_RESET_AT, ISO-Zeitstempel; leer/ungültig = aus): Historie bleibt komplett,
+// aber %-Änderungen, Top/Flop und Badges rechnen nur mit Punkten ab dem Reset → keine Fake-Crashes durch Neubepreisung.
+// Vorrang: gespeicherter Ingest-Wert (mc_meta.price_reset_at) vor env PRICE_RESET_AT.
+const parseReset = (v) => { v = String(v ?? "").trim(); if (!v) return null; const t = Date.parse(v); return Number.isFinite(t) ? Math.floor(t / 1000) : null; };
+async function resetAt(env) {
+  const r = await env.DB.prepare("SELECT value FROM mc_meta WHERE key = 'price_reset_at'").first().catch(() => null);
+  return (r ? parseReset(r.value) : null) ?? parseReset(env?.PRICE_RESET_AT);
+}
 // %-Änderung aus der Preishistorie (letzter Stundenwert vs. Wert vor ≥24h); ohne Historie bleibt der Ingest-Wert, has_hist=0
 async function histPct(env, items) {
-  if (!items.length) return; const now = Math.floor(Date.now() / 1000), since = now - 8 * 86400;
+  if (!items.length) return; const now = Math.floor(Date.now() / 1000), rs = await resetAt(env), since = Math.max(now - 8 * 86400, rs && rs <= now ? rs : 0);
   const q = (extra, ...bind) => env.DB.prepare(`SELECT item, avg_price, MAX(hour_ts) AS t FROM mc_market_history WHERE hour_ts >= ? ${extra} GROUP BY item`).bind(since, ...bind).all().then((r) => r.results).catch(() => []);
   const [last, prev] = await Promise.all([q(""), q("AND hour_ts <= ?", now - 86400)]);
   const L = new Map(last.map((r) => [r.item, r])), P = new Map(prev.map((r) => [r.item, r]));
-  for (const x of items) { const l = L.get(x.item), p = P.get(x.item); x.has_hist = l ? 1 : 0; if (l && p && p.avg_price > 0 && l.t > p.t) { x.change_24h_pct = Math.round(((l.avg_price - p.avg_price) / p.avg_price) * 10000) / 100; x.hist_pct = 1; } }
+  const fresh = rs && rs <= now && now - rs < 86400; // <24h seit Reset: Ingest-% enthält den Reset-Sprung
+  for (const x of items) { const l = L.get(x.item), p = P.get(x.item); x.has_hist = l ? 1 : 0; if (l && p && p.avg_price > 0 && l.t > p.t) { x.change_24h_pct = Math.round(((l.avg_price - p.avg_price) / p.avg_price) * 10000) / 100; x.hist_pct = 1; } else if (fresh) { x.change_24h_pct = 0; x.hist_pct = 0; x.reset_new = 1; } }
 }
 async function mcMarket(env) {
+  const rs = await resetAt(env);
   const { results: items } = await env.DB.prepare("SELECT * FROM mc_market").all().catch(() => ({ results: [] }));
   await histPct(env, items);
-  const spark = {};
+  const spark = {}, spark_reset = {};
   if (items.length) {
     const by = [...items].sort((a, b) => b.change_24h_pct - a.change_24h_pct);
     const pick = new Set([...by.slice(0, 5), ...by.slice(-5), ...[...items].sort((a, b) => Math.abs(b.change_24h_pct) - Math.abs(a.change_24h_pct)).slice(0, 4)].map((x) => x.item));
     const ids = [...pick], since = Math.floor(Date.now() / 1000) - 7 * 86400;
-    const { results } = await env.DB.prepare(`SELECT item, avg_price FROM mc_market_history WHERE item IN (${ids.map(() => "?").join(",")}) AND hour_ts >= ? ORDER BY hour_ts`).bind(...ids, since).all().catch(() => ({ results: [] }));
-    for (const r of results) (spark[r.item] ||= []).push(r.avg_price);
+    const { results } = await env.DB.prepare(`SELECT item, avg_price, hour_ts FROM mc_market_history WHERE item IN (${ids.map(() => "?").join(",")}) AND hour_ts >= ? ORDER BY hour_ts`).bind(...ids, since).all().catch(() => ({ results: [] }));
+    for (const r of results) { (spark[r.item] ||= []).push(r.avg_price); if (rs && r.hour_ts < rs) spark_reset[r.item] = spark[r.item].length; }
   }
   const at = items.reduce((m, x) => Math.max(m, x.updated_at || 0), 0);
-  return json({ updated_at: at ? new Date(at * 1000).toISOString() : null, items, spark }, 200, { "cache-control": "public, max-age=60" });
+  return json({ updated_at: at ? new Date(at * 1000).toISOString() : null, price_reset_at: rs ? new Date(rs * 1000).toISOString() : null, items, spark, spark_reset }, 200, { "cache-control": "public, max-age=60" });
 }
 async function mcMarketItem(env, raw) {
   const id = cleanItem(raw); if (!id) return json({ error: "invalid item" }, 400);
   const item = await env.DB.prepare("SELECT * FROM mc_market WHERE item = ?").bind(id).first().catch(() => null);
   if (item) await histPct(env, [item]);
   const { results } = await env.DB.prepare("SELECT hour_ts, avg_price, min_price, max_price, volume_qty FROM mc_market_history WHERE item = ? AND hour_ts >= ? ORDER BY hour_ts").bind(id, Math.floor(Date.now() / 1000) - HIST_DAYS * 86400).all().catch(() => ({ results: [] }));
-  return json({ item: item || null, history: results.map((r) => [r.hour_ts, r.avg_price, r.min_price, r.max_price, r.volume_qty]) }, 200, { "cache-control": "public, max-age=60" });
+  const rs = await resetAt(env);
+  return json({ item: item || null, price_reset_at: rs ? new Date(rs * 1000).toISOString() : null, history: results.map((r) => [r.hour_ts, r.avg_price, r.min_price, r.max_price, r.volume_qty]) }, 200, { "cache-control": "public, max-age=60" });
 }
 
 /* ---------- Helfer ---------- */

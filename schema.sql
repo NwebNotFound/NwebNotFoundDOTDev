@@ -35,3 +35,5 @@ CREATE TABLE IF NOT EXISTS mc_leaderboards (kind TEXT PRIMARY KEY, data TEXT NOT
 CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL CHECK (type IN ('bug','idea')), title TEXT NOT NULL, body TEXT NOT NULL, location TEXT, discord_id TEXT NOT NULL, mc_name TEXT, mc_uuid TEXT, status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','in_progress','done','rejected')), admin_note TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_discord ON feedback(discord_id, created_at);
+-- Key/Value-Metadaten (price_reset_at aus dem Ingest, Vorrang vor env PRICE_RESET_AT)
+CREATE TABLE IF NOT EXISTS mc_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
