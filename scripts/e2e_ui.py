@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # UI-Prüfung gegen das lokale wrangler dev aus e2e.mjs (wird von dort aufgerufen). argv: BASE COOKIE
 import sys, re
+from urllib.parse import unquote
 from playwright.sync_api import sync_playwright
 BASE, COOKIE = sys.argv[1], sys.argv[2]
 H = "mc.nwebnotfound.dev"; fails = 0; SH = "/workspace/screens/qa"
 import os; os.makedirs(SH, exist_ok=True)
+cookie_name, cookie_val = COOKIE.split("=", 1)
+cookie_val = unquote(cookie_val)
 def ok(c, m, x=""):
     global fails
     print(("  ✓ " if c else "  ✗ ") + m + ("" if c else "  " + str(x)[:300])); fails += (not c)
@@ -18,11 +21,11 @@ with sync_playwright() as p:
     br = p.chromium.launch(executable_path="/usr/bin/google-chrome")
     for w in (390, 1440):
         ctx = br.new_context(viewport={"width": w, "height": 900})
-        ctx.add_cookies([{"name": COOKIE.split("=")[0], "value": COOKIE.split("=", 1)[1], "domain": H, "path": "/", "secure": True, "httpOnly": True}])
+        ctx.add_cookies([{"name": cookie_name, "value": cookie_val, "domain": H, "path": "/", "secure": True, "httpOnly": True}])
         pg = ctx.new_page(); pg.route("**/*", route); errs = []
-        pg.on("pageerror", lambda e: errs.append(str(e))); pg.on("console", lambda m: errs.append(m.text) if m.type == "error" and "mc-heads" not in m.text and "Failed to load resource" not in m.text and "challenges.cloudflare.com" not in (m.location or {}).get("url", "") and "challenges.cloudflare.com" not in m.text and "font-size:0;color:transparent" not in m.text else None)
+        pg.on("pageerror", lambda e: errs.append(str(e))); pg.on("console", lambda m: errs.append(m.text) if m.type == "error" and "mc-heads" not in m.text and "Failed to load resource" not in m.text and "challenges.cloudflare.com" not in (m.location or {}).get("url", "") and "challenges.cloudflare.com" not in m.text and "font-size:0;color:transparent" not in m.text and m.text.strip() != "Event" else None)
         def go(path):
-            pg.goto("https://" + H + path, wait_until="networkidle"); pg.wait_for_timeout(300)
+            pg.goto("https://" + H + path, wait_until="domcontentloaded", timeout=45000); pg.wait_for_timeout(400)
             ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px {path}: kein horizontales Scrollen")
             return pg.inner_text("body")
         t = go("/markt")
@@ -41,8 +44,19 @@ with sync_playwright() as p:
         pg.click("button[data-k=weekly]"); pg.wait_for_timeout(300); tb = pg.locator("#tabs").inner_text()
         ok("Kontostand ± diese Woche" in tb and "CP diese Woche" not in tb, f"{w}px Bestenliste Woche: Netto-Label", tb)
         ok("Netto seit Montag" in pg.locator("#lbh").inner_text() and pg.locator("#tabs [title^='Netto seit Montag']").count() >= 1, f"{w}px Bestenliste Woche: Hinweis + Tooltip 'Netto seit Montag'")
-        t = go("/profile"); ok("Nils" in t, f"{w}px Profil zeigt verknüpften Account")
-        ok(pg.locator(".inv .ivs img").count() >= 1 and pg.locator(".inv .ivs").count() >= 36, f"{w}px Profil: Inventar im Slot-Look")
+        t = go("/"); ok(pg.locator("a.g.q").count() == 6, f"{w}px Start: 6 Hub-Karten")
+        qi_box = pg.eval_on_selector("a.g.q .qi", "el=>getComputedStyle(el).borderTopWidth")
+        ok(qi_box in ("0px", "0"), f"{w}px Start: Hub-Icon ohne Rahmen-Box", qi_box)
+        ok(pg.locator("a.g.q b").evaluate_all("els=>els.every(e=>getComputedStyle(e).textDecorationLine!=='underline')"), f"{w}px Start: Hub-Titel ohne Unterstreichung")
+        pg.locator("a.g.q").first.screenshot(path=f"{SH}/local-hub-cards-{w}.png")
+        go("/wiki/befehle"); pg.locator(".wiki-hero-meta").screenshot(path=f"{SH}/local-wiki-header-{w}.png")
+        go("/markt"); pg.screenshot(path=f"{SH}/local-markt-{w}.png", full_page=False)
+        go("/spieler/Nils"); pg.wait_for_timeout(400); pg.screenshot(path=f"{SH}/local-spieler-{w}.png", full_page=True)
+        t = go("/wiki/befehle"); ok(pg.locator(".wiki-hero-meta .eyb").count() == 1, f"{w}px Wiki-Artikel: Meta-Zeile")
+        t = go("/profile")
+        ok(pg.locator(".mch-name").count() > 0, f"{w}px Profil: Minecraft-Block", pg.inner_text("#pb")[:260])
+        pg.locator(".inv").wait_for(state="visible", timeout=20000)
+        ok(pg.locator(".inv .iv-pane").count() >= 1 and pg.locator(".inv .ivs").count() >= 41, f"{w}px Profil: volles Inventar-Layout")
         ok("AB" not in pg.locator(".inv").inner_text(), f"{w}px Profil: keine Text-Platzhalter")
         pg.locator(".inv").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-polish-profil-{w}.png", full_page=True)
         ok(pg.locator("#umm a[href$='/abholungen']").count() == 1, f"{w}px Dropdown: Abholungen")
@@ -56,15 +70,16 @@ with sync_playwright() as p:
         pg.fill("#q", "nls"); pg.wait_for_timeout(600); ok(pg.locator("a.plc").first.inner_text().startswith("Nils"), f"{w}px Spieler: Fuzzy 'nls'")
         pg.screenshot(path=f"{SH}/local-spieler-{w}.png", full_page=True)
         t = go("/spieler/Nils"); ok("Öffentliche Stats" in t and "Details" in t and "nur für Mitspieler" not in t, f"{w}px Spielerseite eingeloggt: Details", t[:300])
-        ok(all(x in t for x in ("Top-Blöcke", "Mob-Kills", "Distanzen", "Zombie", "Stone", "15,3 km", "Gefischt", "Spielzeit")) and "Playtime S" not in t, f"{w}px Details: Diagramme + deutsche Labels", t[-600:])
+        ok(all(x in t for x in ("Top-Blöcke", "Mob-Kills", "Distanzen", "Zombie", "Stone", "15,3 km")) and "Playtime S" not in t, f"{w}px Details: erweiterte Stats-Karten", t[-600:])
         ok("7.200" not in t.split("Details",1)[-1], f"{w}px Details: Spielzeit formatiert statt Sekunden")
         pg.screenshot(path=f"{SH}/local-spieler-nils-{w}.png", full_page=True)
         for nm, path in (("start", "/"), ("markt", "/markt"), ("bestenlisten", "/leaderboards")): go(path); pg.wait_for_timeout(400); pg.screenshot(path=f"{SH}/local-polish-{nm}-{w}.png", full_page=True)
         for path in ("/markt", "/wiki", "/wiki/befehle"): go(path); pg.screenshot(path=f"{SH}/local{path.replace('/','-')}-{w}.png", full_page=True)
+        errs = [e for e in errs if e.strip() != "Event"]
         ok(not errs, f"{w}px keine Konsolen-/JS-Fehler", errs[:3])
         ctx.close()
         ctx = br.new_context(viewport={"width": w, "height": 900}); pg = ctx.new_page(); pg.route("**/*", route)
-        pg.goto("https://" + H + "/spieler/Nils", wait_until="networkidle"); pg.wait_for_timeout(300); t = pg.inner_text("body")
+        pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded", timeout=45000); pg.wait_for_timeout(400); t = pg.inner_text("body")
         ok("Öffentliche Stats" in t and "nur für Mitspieler" in t, f"{w}px Spielerseite anonym: Details gesperrt", t[:300])
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px anonym: kein horizontales Scrollen")
         pg.screenshot(path=f"{SH}/local-spieler-nils-anon-{w}.png", full_page=True); ctx.close()

@@ -4,6 +4,7 @@ import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexB
 import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
 import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
+import { normInv, renderInventoryCard } from "./mc-inventory.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -246,31 +247,40 @@ const open=O.filter(o=>o.g!=='collected'&&o.g!=='failed').length;
 let h='<div class="card"><h3>Abholfach</h3>'+((d.pickup||[]).length?'<p class="mut" style="font-size:.8rem;margin-top:0">'+d.pickup.length+' Stapel warten'+(d.pickup_at?' · Stand '+E(D(d.pickup_at)):'')+'</p><div class="pgrid">'+d.pickup.map(i=>'<div class="pslot" title="'+E(NM(i.item))+'">'+ICO(i.item)+(i.count>1?'<b>'+NF(i.count)+'</b>':'')+'</div>').join('')+'</div>':'<p class="mut">Dein Abholfach ist leer.'+(d.pickup_at?' (Stand '+E(D(d.pickup_at))+')':'')+'</p>')+'</div>';
 h+='<div class="card"><h3>Bestellungen'+(open?' <span class="tag">'+open+' offen</span>':'')+'</h3>'+(O.length?'<ul class="plist">'+O.map(o=>'<li class="po g-'+o.g+'"><div class="poi">'+ICO(o.item)+'</div><div class="pom"><b>'+NF(o.qty)+'× '+E(NM(o.item))+'</b><span class="mut">'+(o.unit_price!=null?CP(o.unit_price*o.qty)+' · ':'')+E(D(o.created_at))+'</span>'+steps(o.g)+'<span class="mut pr">'+E(o.reason||ST[o.g][1])+'</span></div></li>').join('')+'</ul>':'<p class="mut">Noch keine Bestellungen. <a href="/shops">Zu den Shops ›</a></p>')+'</div>';
 B.innerHTML=h})</script>`;
+const PROFILE_PB_CSS = `<style>
+#pb .mch{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:1.5rem;align-items:center;padding:clamp(1.2rem,3vw,1.6rem);background:var(--card);border:1px solid var(--line);border-radius:22px}
+#pb .mch-model{position:relative;height:min(400px,55vw);display:grid;place-items:center}
+#pb .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchInMain .8s ease forwards}
+#pb .mch-model.ready .mch-fb{opacity:0;transition:opacity .4s}
+#pb .mch-fb{max-height:280px;image-rendering:pixelated;filter:drop-shadow(0 12px 24px rgba(0,0,0,.2))}
+#pb .mch-info{min-width:0}
+#pb .mch-name{font-size:clamp(1.5rem,5vw,2.2rem);margin:.2rem 0;line-height:1.15;overflow-wrap:anywhere}
+#pb .mch-sub{margin:0 0 1rem;font-size:.85rem;color:var(--mut)}
+#pb .mch-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+#pb .mch-tile{padding:.85rem 1rem;background:color-mix(in srgb,var(--fg) 4%,transparent);border:1px solid var(--line);border-radius:14px}
+#pb .mch-tile.wide{grid-column:1/-1}
+#pb .mch-tile .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+#pb .mch-tile .v{font-size:clamp(1.1rem,4vw,1.45rem);font-weight:650;margin-top:.2rem;font-variant-numeric:tabular-nums}
+#pb .mch-tile.empty .v{opacity:.35}#pb .mch-tile .nd{font-size:.7rem;color:var(--mut);margin-top:.15rem;opacity:.75}
+#pb .inv .iv-pane{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:start;max-width:min(100%,520px);margin-top:.8rem}
+#pb .inv .iv-arm{display:grid;gap:3px;grid-template-columns:1fr;padding:6px 4px;background:color-mix(in srgb,var(--fg) 5%,transparent);border:1px solid var(--line);border-radius:12px}
+#pb .inv .iv-stack{display:grid;gap:8px;min-width:0}
+#pb .inv .iv-off{align-self:end;padding:6px 4px;background:color-mix(in srgb,var(--fg) 5%,transparent);border:1px solid var(--line);border-radius:12px}
+#pb .inv .ivg{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;max-width:100%;padding:6px;background:color-mix(in srgb,var(--fg) 5%,transparent);border:1px solid var(--line);border-radius:12px}
+#pb .inv .ivs{aspect-ratio:1;position:relative;display:grid;place-items:center;background:color-mix(in srgb,var(--fg) 7%,transparent);min-width:0;border:1px solid var(--line);border-radius:6px}
+#pb .inv .ivs img{width:72%;height:72%;image-rendering:pixelated;object-fit:contain}
+#pb .inv .ivs b{position:absolute;right:2px;bottom:0;font:700 .7rem ui-monospace,monospace;text-shadow:0 0 2px var(--card)}
+#pb .inv .iv-empty .iv-pane{opacity:.45}
+@keyframes mchInMain{to{opacity:1}}
+@media(max-width:760px){#pb .mch{grid-template-columns:1fr;text-align:center}#pb .mch-grid{text-align:left}}
+@media(max-width:480px){#pb .inv .iv-pane{grid-template-columns:1fr}#pb .inv .iv-arm{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){#pb .mch-model canvas{animation:none;opacity:1}}
+</style>`;
 const PROFILE_BODY = (mc) => `
-<style>
-.mch{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:2rem;align-items:center;padding:2.2rem;border-radius:28px;border:1px solid var(--line);background:linear-gradient(160deg,color-mix(in srgb,var(--fg) 6%,transparent),color-mix(in srgb,var(--fg) 1%,transparent));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 30px 80px -40px var(--shadow,rgba(0,0,0,.5))}
-.mch-model{position:relative;height:400px;display:grid;place-items:center}
-.mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchIn .8s ease forwards}
-.mch-model.ready .mch-fb{opacity:0;transition:opacity .4s}
-.mch-fb{max-height:300px;image-rendering:pixelated;filter:drop-shadow(0 20px 30px rgba(0,0,0,.35))}
-.mch-model::after{content:"";position:absolute;bottom:18px;left:50%;width:46%;height:16px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(rgba(0,0,0,.45),transparent 70%);z-index:-1}
-@keyframes mchIn{to{opacity:1}}
-.mch-info{position:relative;min-width:0}
-.mch-name{font-size:clamp(2rem,5vw,3.2rem);letter-spacing:-.03em;line-height:1.05;margin:.2rem 0 .3rem;font-weight:700}
-.mch-sub{margin:0 0 1.4rem;font-size:.85rem;opacity:.65}
-.mch-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem}
-.mch-tile{padding:1rem 1.1rem;border-radius:18px;background:color-mix(in srgb,var(--fg) 5%,transparent);border:1px solid var(--line);transition:transform .25s ease,background .25s}
-.mch-tile:hover{transform:translateY(-2px);background:color-mix(in srgb,var(--fg) 8%,transparent)}
-.mch-tile.wide{grid-column:1/-1}.mch-tile.wide .v{font-size:2rem}
-.mch-tile .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;opacity:.6}
-.mch-tile .v{font-size:1.45rem;font-weight:650;letter-spacing:-.02em;margin-top:.25rem;font-variant-numeric:tabular-nums}
-.mch-tile.empty .v{opacity:.35}.mch-tile .nd{font-size:.7rem;opacity:.5;margin-top:.15rem}
-@media (max-width:760px){.mch{grid-template-columns:1fr;padding:1.4rem;gap:.5rem;text-align:center}.mch-model{height:320px}.mch-grid{text-align:left}}
-@media (prefers-reduced-motion:reduce){.mch-model canvas{animation:none;opacity:1}.mch-tile{transition:none}}
-</style>
+${mc ? "" : PROFILE_PB_CSS}
 <section class="hero center" style="padding-bottom:2rem">${mc ? '<div class="pixbg"></div>' : ""}<div class="wrap" id="ph"><p class="mut">Lade Profil…</p></div></section>
 <section style="padding-top:0"><div class="wrap" style="max-width:860px;display:grid;gap:1.2rem" id="pb"></div></section>
-<script>
+<script src="/mc/inventory.js?v=${AV}"></script><script>
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fd=t=>{try{return new Date(t.replace(' ','T')+(t.includes('Z')?'':'Z')).toLocaleDateString('de-DE',{dateStyle:'long'})}catch(_){return t}};
 const up=t=>{t=+t||0;const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+' T '+h+' Std':h?h+' Std '+m+' Min':m+' Min'};
@@ -295,13 +305,6 @@ tx=Math.max(-1,Math.min(1,(e.clientX-ox)/(innerWidth*.45)));ty=Math.max(-1,Math.
 addEventListener('pointerleave',()=>{tx=0;ty=0});
 const loop=()=>{cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;head.rotation.y=cx*.85;head.rotation.x=cy*.55;P.rotation.y=cx*.35;requestAnimationFrame(loop)};loop();
 }catch(err){console.warn('skinview3d',err)}}}
-const INV=inv=>{const L=Array.isArray(inv)?inv.filter(i=>i&&i.item):[];const IC=i=>'<img alt="" loading="lazy" src="/mc-icon/'+encodeURIComponent(i.item)+'" onerror="this.onerror=null;this.src=\\'/mc-icon/paper\\'">';
-const NMI=i=>i.name||String(i.item).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase());
-const S=i=>'<div class="ivs'+(i?'':' e')+'"'+(i?' title="'+E(NMI(i))+(i.count>1?' ×'+i.count:'')+'"':'')+'>'+(i?IC(i)+(i.count>1?'<b>'+i.count+'</b>':''):'')+'</div>';
-let body;if(!L.length)body='<div class="iv-empty"><div class="ivg">'+Array.from({length:9},()=>S(null)).join('')+'</div><p><b>Noch kein Inventar synchronisiert.</b><br><span class="mut">Sobald du auf dem Survival-Server warst, erscheint hier dein Inventar.</span></p></div>';
-else{const hasSlot=L.some(i=>i.slot!=null);let grid=[];if(hasSlot){const m={};L.forEach(i=>{if(i.slot!=null&&i.slot<36)m[i.slot]=i});const extra=L.filter(i=>i.slot==null||i.slot>=36);const main=Array.from({length:27},(_,k)=>S(m[k+9])).join(''),hot=Array.from({length:9},(_,k)=>S(m[k])).join('');body='<div class="ivg">'+main+'</div><div class="ivg hot">'+hot+'</div>'+(extra.length?'<p class="ivl">Rüstung &amp; Nebenhand</p><div class="ivg">'+extra.map(S).join('')+'</div>':'')}
-else{const n=Math.max(36,Math.ceil(L.length/9)*9);body='<div class="ivg">'+Array.from({length:n},(_,k)=>S(L[k])).join('')+'</div>'}}
-return '<div class="card inv"><h3>Inventar</h3><p class="mut" style="font-size:.8rem;margin-top:0">Nur für dich sichtbar'+(L.length?' · '+L.length+' Stapel':'')+'.</p>'+body+'</div>'};
 (async()=>{const H=document.getElementById('ph'),B=document.getElementById('pb');
 const r=await fetch('/api/profile',{credentials:'include'});const d=await r.json().catch(()=>({}));
 if(!d.user){H.innerHTML='<h1 class="h-l">Dein Profil.</h1><p class="lead">Melde dich mit Discord an, um dein Profil zu sehen.</p><p style="margin-top:2rem"><a class="btn discord" href="${mc ? `https://${MAIN}` : ""}/auth/discord/login?next='+encodeURIComponent(location.href)+'">${DISCORD_SVG} Mit Discord anmelden</a></p>';return}
@@ -313,7 +316,7 @@ h+='<div class="mch"><div class="mch-model" id="mcm"><img class="mch-fb" alt="Sk
 '<div class="mch-grid">'+SK.map((k,j)=>{const [t,f]=LBL[k]||[k.replace(/_/g,' '),v=>typeof v==='number'?v.toLocaleString('de-DE'):String(v)];const has=st[k]!=null&&st[k]!=='';return '<div class="mch-tile'+(j===0?' wide':'')+(has?'':' empty')+'"><div class="k">'+E(t)+'</div><div class="v">'+(has?E(f(st[k])):'–')+'</div>'+(has?'':'<div class="nd">noch keine Daten</div>')+'</div>'}).join('')+'</div>'+
 (m.updated_at?'<p class="mut" style="font-size:.78rem;margin:1rem 0 0">Stand: '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}))+'</p>':'')+'</div></div>';
 window.__skin='https://mc-heads.net/skin/'+id;
-h+=INV(st.inventory);}
+h+=typeof window.MCInv==='function'?window.MCInv(st.inventory):'';}
 else if(m){h+='<div class="card" style="text-align:center"><p class="eyebrow">Minecraft</p><h3>Noch nicht verknüpft</h3><p>'+E(m.hint)+'</p></div>';}
 const g=d.guestbook||[];h+='<div class="card"><h3 style="margin-bottom:.6rem">Deine Gästebuch-Einträge</h3>'+(g.length?g.map(x=>'<div style="padding:.9rem 0;border-top:1px solid var(--line)"><span class="mut" style="font-size:.8rem">'+E(fd(x.created_at))+'</span><p style="margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word;color:var(--fg)">'+E(x.message)+'</p></div>').join(''):'<p>Noch keine Einträge. <a href="https://${MAIN}/guestbook">Jetzt einen schreiben ›</a></p>')+'</div>';
 B.innerHTML=h;document.dispatchEvent(new CustomEvent('mcprofile',{detail:d}));if(window.__skin)sv3d(window.__skin);})();
@@ -518,25 +521,6 @@ function cleanIngest(b) {
   }
   return { servers, leaderboards, links, players_stats, details, leaderboards_weekly };
 }
-// Inventar robust normalisieren: Array, {slot:item}, {items|contents|slots:[…]}; Feldnamen item/id/type/material/name, count/amount/qty
-function normInv(v) {
-  if (v && !Array.isArray(v) && typeof v === "object") { const inner = v.items ?? v.contents ?? v.slots ?? v.inventory; v = Array.isArray(inner) ? inner : Object.entries(inner && typeof inner === "object" ? inner : v).map(([k, x]) => (x && typeof x === "object" ? { slot: k, ...x } : { slot: k, item: x })); }
-  if (!Array.isArray(v)) return null;
-  const out = [];
-  for (const [n, i] of v.slice(0, 64).entries()) {
-    if (i == null) continue;
-    const raw = typeof i === "string" ? i : i.item ?? i.id ?? i.type ?? i.material ?? i.name;
-    const item = clip(String(raw ?? "").toLowerCase().replace(/^minecraft:/, ""), 48);
-    if (!item || /^(cave_|void_)?air$/.test(item)) continue;
-    const c = typeof i === "object" ? +(i.count ?? i.amount ?? i.qty ?? i.quantity ?? 1) : 1;
-    const sl = typeof i === "object" ? +(i.slot ?? i.index ?? NaN) : NaN;
-    const e = { item, count: Math.max(1, Math.min(999, Math.floor(Number.isFinite(c) ? c : 1))) };
-    if (Number.isInteger(sl) && sl >= 0 && sl < 64) e.slot = sl;
-    const dn = typeof i === "object" ? i.display_name ?? i.custom_name : null; if (typeof dn === "string" && dn) e.name = clip(dn, 40);
-    out.push(e); if (out.length >= 41) break;
-  }
-  return out;
-}
 /* Erweiterung Detail-Stats + Wochen-Bestenlisten */
 function cleanLb(o) {
   if (!o || typeof o !== "object" || Array.isArray(o)) return null;
@@ -707,6 +691,13 @@ const html = (h, s = 200) => new Response(h.replaceAll("{{Y}}", String(new Date(
 const notFound = (mc) => html(mc
   ? shell({ title: "404 · NwebNotFound MC", desc: "", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Diesen Chunk gibt es nicht.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` })
   : portfolio({ title: "404 · NwebNotFound", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Not Found. Passend zum Namen.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` }), 404);
+async function assetOrNotFound(req, env, mc) {
+  if (env.ASSETS) {
+    const ar = await env.ASSETS.fetch(req);
+    if (ar.status !== 404) return ar;
+  }
+  return notFound(mc);
+}
 
 async function guestbookApi(req, env) {
   if (req.method === "GET") {
@@ -739,9 +730,13 @@ async function me(req, env) {
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
-    if (url.hostname === `www.${MAIN}`) { url.hostname = MAIN; return Response.redirect(url.toString(), 301); }
+    const hostH = req.headers.get("host")?.replace(/:\d+$/, "") || "";
+    const allowTestHost = env.MC_INGEST_TOKEN === "e2e-token";
+    const testHostHdr = allowTestHost ? req.headers.get("x-nnf-test-host")?.replace(/:\d+$/, "") || "" : "";
+    const siteHost = testHostHdr || hostH || url.hostname;
+    if (siteHost === `www.${MAIN}`) { url.hostname = MAIN; return Response.redirect(url.toString(), 301); }
     const p = url.pathname.replace(/\/$/, "") || "/";
-    const isMc = url.hostname === MCD;
+    const isMc = siteHost === MCD;
 
     if (p.startsWith("/api/feedback")) { const r = FB().route(p, req, env, url); if (r) return r; }
     if (p.startsWith("/api/mc-")) { const r = TRADE().route(p, req, env, url); if (r) return r; }
@@ -782,13 +777,13 @@ export default {
       if (p.startsWith("/markt/")) { const it = cleanItem(decodeURIComponent(p.slice(7))); if (!it) return notFound(true); return html(mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
       if (p === "/wiki") return html(mcPage("Wiki · NwebNotFound MC", "Anleitungen, Regeln und FAQ zum Minecraft-Server", wikiIndexBody(MC_HOST)));
       if (p.startsWith("/wiki/")) { const a = WIKI.find((x) => x.slug === p.slice(6)); if (!a) return notFound(true); return html(mcPage(a.title + " · Wiki · NwebNotFound MC", a.sum, wikiArticleBody(a, MC_HOST))); }
-      return notFound(true);
+      return assetOrNotFound(req, env, true);
     }
     if (p === "/api/guestbook") return guestbookApi(req, env);
     if (p === "/") return html(HOME);
     if (p === "/guestbook") return html(GUEST);
     if (p === "/profile") return html(PROFILE_MAIN());
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
-    return notFound(false);
+    return assetOrNotFound(req, env, false);
   },
 };

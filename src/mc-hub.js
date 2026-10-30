@@ -14,8 +14,7 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 @media (prefers-reduced-motion:reduce){main{animation:none}}
 .nav .l[aria-current=page]{color:var(--fg);font-weight:600}.nl a.l:hover{text-decoration:none;color:var(--fg)}
 .nav .l{transition:color .2s}
-.g{background:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.025));border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 20px 40px -24px rgba(0,0,0,.8)}
-.g.pad{padding:1.4rem}@media(min-width:760px){.g.pad{padding:1.8rem}}
+/* Layout-Helfer (Panels: ds.css) */
 .hub-wrap{max-width:1120px;margin:0 auto;padding:0 clamp(1rem,4vw,2rem)}
 .hub-h{font-size:clamp(2.2rem,6.5vw,4.4rem);line-height:1.04;letter-spacing:-.035em;font-weight:700;margin:.2rem 0 .8rem}
 .hub-h2{font-size:clamp(1.5rem,3.4vw,2.2rem);letter-spacing:-.025em;font-weight:700;margin:0 0 1rem}
@@ -26,7 +25,7 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 .qgrid{display:grid;gap:.9rem;grid-template-columns:repeat(2,1fr)}@media(min-width:900px){.qgrid{grid-template-columns:repeat(3,1fr)}}@media(min-width:1100px){.qgrid.q6{grid-template-columns:repeat(6,1fr)}}
 .q{padding:1.2rem;min-height:128px;display:flex!important;flex-direction:column;justify-content:space-between}
 .mi{image-rendering:pixelated;image-rendering:crisp-edges;display:inline-block;flex:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}.wside a{display:flex!important;align-items:center;gap:.5rem;min-height:40px}
-.q b{font-size:1.05rem}.q span{font-size:.82rem;color:var(--mut)}.bigpct small{font-size:.75rem;font-weight:500;opacity:.75}.bigpct.bu{background:rgba(74,222,128,.14);color:#4ade80}.bigpct.bd{background:rgba(248,113,113,.14);color:#f87171}.bigpct.bf{background:rgba(255,255,255,.06);color:var(--mut)}.bigpct span{color:inherit}
+.bigpct small{font-size:.75rem;font-weight:500;opacity:.75}.bigpct.bu{background:rgba(74,222,128,.14);color:#4ade80}.bigpct.bd{background:rgba(248,113,113,.14);color:#f87171}.bigpct.bf{background:rgba(255,255,255,.06);color:var(--mut)}.bigpct span{color:inherit}
 .tnum{font-variant-numeric:tabular-nums}
 .todo{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:#fbbf24;border:1px dashed rgba(251,191,36,.5);border-radius:6px;padding:.05rem .4rem;margin:0 .2rem}
 .empty-st{text-align:center;padding:3rem 1rem}.empty-st .big{font-size:2.6rem;margin-bottom:.6rem}
@@ -74,12 +73,12 @@ export const homeBody = (HOST) => `
 <p id="names" class="mut" style="margin:0;font-size:.9rem;min-height:1.2em"></p></div>
 </div></section>
 <section class="sec" style="padding-top:1rem"><div class="hub-wrap"><div class="qgrid q6">
-<a class="g q" href="/profile"><div class="qi">${MI("name_tag")}</div><div><b>Profil</b><br><span>Deine Stats & dein 3D-Skin</span></div></a>
-<a class="g q" href="/leaderboards"><div class="qi">${MI("diamond")}</div><div><b>Bestenlisten</b><br><span>Woche & Gesamt</span></div></a>
-<a class="g q" href="/markt"><div class="qi">${MI("emerald")}</div><div><b>Markt</b><br><span>Preise & Verläufe</span></div></a>
-<a class="g q" href="/shops"><div class="qi">${MI("barrel")}</div><div><b>Shops</b><br><span>Spielershops & Angebote</span></div></a>
-<a class="g q" href="/auktionen"><div class="qi">${MI("bell")}</div><div><b>Auktionen</b><br><span>Live bieten</span></div></a>
-<a class="g q" href="/wiki"><div class="qi">${MI("bookshelf")}</div><div><b>Wiki</b><br><span>Anleitungen & FAQ</span></div></a>
+<a class="g q" href="/profile"><div class="qi">${MI("name_tag", 40)}</div><div class="qt"><b>Profil</b><span>Deine Stats & dein 3D-Skin</span></div></a>
+<a class="g q" href="/leaderboards"><div class="qi">${MI("diamond", 40)}</div><div class="qt"><b>Bestenlisten</b><span>Woche & Gesamt</span></div></a>
+<a class="g q" href="/markt"><div class="qi">${MI("emerald", 40)}</div><div class="qt"><b>Markt</b><span>Preise & Verläufe</span></div></a>
+<a class="g q" href="/shops"><div class="qi">${MI("barrel", 40)}</div><div class="qt"><b>Shops</b><span>Spielershops & Angebote</span></div></a>
+<a class="g q" href="/auktionen"><div class="qi">${MI("bell", 40)}</div><div class="qt"><b>Auktionen</b><span>Live bieten</span></div></a>
+<a class="g q" href="/wiki"><div class="qi">${MI("bookshelf", 40)}</div><div class="qt"><b>Wiki</b><span>Anleitungen & FAQ</span></div></a>
 </div></div></section>
 <section class="sec" id="srv-sec" hidden><div class="hub-wrap"><h2 class="hub-h2">Welten.</h2><div class="qgrid" id="srv" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))"></div></div></section>
 <section class="sec"><div class="hub-wrap" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))">
@@ -216,7 +215,7 @@ export const WIKI = [
 ];
 const WIKI_CSS = `<style>.wk h2{font-size:1.3rem;margin:2rem 0 .6rem;letter-spacing:-.01em}.wk h3{font-size:1.05rem;margin:1.6rem 0 .4rem}.wk p,.wk li{color:color-mix(in srgb,var(--fg) 85%,transparent);line-height:1.7}.wk code,.wk kbd{background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:6px;font-size:.9em;white-space:nowrap}.wk table{border-collapse:collapse;width:100%}.wk td,.wk th{padding:.6rem .5rem;border-top:1px solid var(--line);vertical-align:top;text-align:left}.wk th{font-size:.78rem;color:var(--mut);font-weight:500;border:0}.wk>:first-child{margin-top:0}
 .wip{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.04em;color:#60a5fa;border:1px solid rgba(96,165,250,.45);border-radius:6px;padding:.02rem .4rem;vertical-align:middle;white-space:nowrap}
-.wl{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}.wl a{display:flex!important;gap:1rem;align-items:flex-start;padding:1.2rem}.wl .qi{font-size:1.4rem;width:44px;height:44px;border-radius:12px;background:rgba(74,222,128,.12);display:grid;place-items:center;flex:none}.wl b{display:block;margin-bottom:.15rem}.wl span{color:var(--mut);font-size:.9rem}
+.wl{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}.wl a{display:flex!important;gap:1rem;align-items:flex-start;padding:1.2rem;color:inherit;text-decoration:none}.wl .qi{line-height:0;flex:none;display:flex;align-items:center}.wl .qi .mi{width:36px;height:36px;image-rendering:pixelated;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}.wl b{display:block;margin-bottom:.15rem;font-family:var(--f-px,monospace)}.wl span{color:var(--mut);font-size:.9rem}
 .hits{display:grid;gap:.7rem}.hits a{display:block;padding:1rem 1.2rem}.hits b{display:block;margin-bottom:.25rem}.hits p{margin:.2rem 0 0;color:var(--mut);font-size:.9rem;line-height:1.5}.hits mark{background:rgba(74,222,128,.25);color:var(--fg);border-radius:3px;padding:0 .1rem}
 .wgrid{display:grid;gap:1.4rem}@media(min-width:900px){.wgrid{grid-template-columns:240px 1fr}}.wside a{display:block;padding:.5rem .8rem;border-radius:10px;color:var(--mut)}.wside a[aria-current]{background:rgba(74,222,128,.12);color:var(--fg)}@media(max-width:899px){.wside{display:flex;overflow-x:auto;gap:.3rem;scrollbar-width:none}.wside a{flex:none}}</style>`;
 const strip = (h) => h.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<\/(p|li|h2|h3|tr|td)>/g, " · ").replace(/<[^>]+>/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").replace(/(\s*·\s*)+/g, " · ").replace(/^ · | · $/g, "").trim();
@@ -236,7 +235,7 @@ IX.forEach(a=>a.x.forEach(sec=>{const hay=norm(a.ti+' '+sec.h+' '+sec.t);if(w.ev
 R.sort((x,y)=>y.sc-x.sc);L.hidden=true;H.hidden=!R.length;N.hidden=!!R.length;H.innerHTML=R.slice(0,12).map(r=>'<a class="g" href="/wiki/'+r.a.s+'"><b><img class="mi" alt="" width="18" height="18" src="/mc-icon/'+r.a.i+'" style="vertical-align:-3px;margin-right:.35rem">'+E(r.a.ti)+(r.sec.h?' › '+E(r.sec.h):'')+'</b><p>'+snip(r.sec.t||r.sec.h,w)+'</p></a>').join('')}
 q.oninput=run;const p=new URLSearchParams(location.search).get('q');if(p){q.value=p;run()}})()</script>`;
 export const wikiArticleBody = (a, H) => `${WIKI_CSS}
-<section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p style="margin:0 0 1rem"><a href="/wiki">‹ Wiki</a></p><p class="eyb" style="display:flex;align-items:center;gap:.5rem">${MI(a.icon, 22)} Wiki</p><h1 class="hub-h" style="font-size:clamp(2rem,5vw,3.2rem)">${a.title}</h1><p class="sub">${a.sum}</p></div></section>
+<section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p style="margin:0 0 1rem"><a href="/wiki">‹ Wiki</a></p><div class="wiki-hero-meta">${MI(a.icon, 28)}<p class="eyb">Wiki</p></div><h1 class="hub-h" style="font-size:clamp(2rem,5vw,3.2rem);margin-top:0">${a.title}</h1><p class="sub">${a.sum}</p></div></section>
 <section class="sec" style="padding-top:1rem"><div class="hub-wrap wgrid"><nav class="wside g" style="padding:.5rem;align-self:start">${WIKI.map((x) => `<a href="/wiki/${x.slug}"${x.slug === a.slug ? ' aria-current="page"' : ""}>${MI(x.icon, 18)} ${x.title}</a>`).join("")}</nav>
 <article class="g pad wk">${a.body(H)}</article></div></section>`;
 

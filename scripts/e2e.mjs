@@ -3,6 +3,7 @@
 import { spawn, execSync } from "node:child_process";
 import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
+import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = 8799, BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
@@ -10,8 +11,13 @@ const sql = (q) => execSync(`npx wrangler d1 execute DB --local --persist-to ${P
 const sqlRows = (q) => JSON.parse(sql(q))[0].results;
 const b64u = (b) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 async function cookieFor(sid) { const k = await C.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return "nnf_session=" + encodeURIComponent(sid + "." + b64u(await C.subtle.sign("HMAC", k, new TextEncoder().encode(sid)))); }
-const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1", headers = {} } = {}) => {
-  const h = { host: HOST, "cf-connecting-ip": ip, ...headers }; if (body) h["content-type"] = "application/json"; if (token) h["x-ingest-token"] = token; if (cookie) h.cookie = cookie; if (origin) h.origin = origin;
+const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1", headers = {}, host = HOST, testHost } = {}) => {
+  const h = { host, "cf-connecting-ip": ip, ...headers };
+  if (testHost) h["x-nnf-test-host"] = testHost;
+  if (body) h["content-type"] = "application/json";
+  if (token) h["x-ingest-token"] = token;
+  if (cookie) h.cookie = cookie;
+  if (origin) h.origin = origin;
   const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t };
 };
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
@@ -147,6 +153,17 @@ try {
   r = await req("/api/mc-shop-orders/ack", { method: "POST", token: TOK, body: { acks: [{ id: openO, status: "accepted" }] } }); ok(r.j?.updated === 0, "accepted nur aus pending");
   const pf = (await req("/api/profile", { cookie: c1 })).j.minecraft?.stats?.inventory || [];
   ok(pf.length === 3 && pf[0].item === "diamond_sword" && pf[1].item === "oak_log" && pf[1].count === 32 && pf[1].slot === 9, "Inventar flexibel normalisiert (id/type/amount/qty, air raus)", JSON.stringify(pf));
+  ok((await req("/profile", { cookie: c1 })).t.includes("/mc/inventory.js"), "Profil lädt Inventar-Renderer");
+  const invHtml = renderInventoryCard(pf);
+  ok((invHtml.match(/class="ivs/g) || []).length >= 41 && invHtml.includes("iv-pane") && invHtml.includes("iv-arm"), "Inventar-HTML: volles Layout (41+ Slots)", invHtml.slice(0, 120));
+  const legacy = normInv([{ item: "bread", count: 5 }, { item: "diamond", count: 1 }]);
+  ok(inventorySlotMap(legacy)[0]?.item === "bread" && inventorySlotMap(legacy)[1]?.item === "diamond", "Legacy-Inventar ohne slot → Hotbar 0,1", JSON.stringify(legacy));
+  const mixed = normInv([{ item: "bread", slot: 0 }, { item: "diamond", count: 1 }, { item: "oak_log", slot: 9 }]);
+  const mm = inventorySlotMap(mixed);
+  ok(mm[0]?.item === "bread" && mm[1]?.item === "diamond" && mm[9]?.item === "oak_log", "Gemischtes Inventar: slotted zuerst, Rest in freie Slots", JSON.stringify(mm));
+  const mainProf = await req("/profile", { cookie: c1, testHost: "nwebnotfound.dev" });
+  ok(mainProf.s === 200 && mainProf.t.includes("/mc/inventory.js") && mainProf.t.includes("#pb .mch") && !/ds\.css\?v=/.test(mainProf.t), "Hauptdomain-Profil: inline CSS + Inventar-Skript");
+  ok((await req("/mc/inventory.js", { testHost: "nwebnotfound.dev" })).s === 200 && (await req("/mc/inventory.js")).s === 200, "/mc/inventory.js auf Haupt- und MC-Host");
   ok(!JSON.stringify((await req("/api/mc-players/Nils")).j).includes("diamond_sword"), "Inventar/Abholfach nicht öffentlich");
   const mine = (await req("/api/mc-auctions/a1", { cookie: c1 })).j; ok(mine.mine[0]?.status === "accepted" && mine.viewer.can_bid === true, "Auktionsseite zeigt eigenes Gebot 'accepted'");
   const mine2 = (await req("/api/mc-auctions/a2", { cookie: c1 })).j; ok(mine2.mine[0]?.status === "rejected" && mine2.mine[0]?.reason === "OUTBID", "abgelehntes Gebot mit Grund");
@@ -167,6 +184,7 @@ try {
   const pd = (await req("/api/mc-players/Nils", { cookie: c1 })).j;
   ok(pd?.details && pd.viewer.logged_in === true, "Details nur mit Discord-Login", JSON.stringify(pd));
   ok(pd?.details?.extra?.killed?.zombie === 12 && pd.details.extra.distance_m?.walk === 15300, "Details enthalten Mob-Kills + Distanzen", JSON.stringify(pd?.details));
+  ok((await req("/spieler/Nils", { cookie: c1 })).t.includes("Gefischt"), "Spieler-Details: Zähler nur in kvl (z. B. Gefischt)");
   ok((await req("/api/mc-players/Versteckt")).s === 404, "Unbestätigter Spieler → 404");
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.inventory', json('[{"item":"diamond_sword","count":1}]'), '$.pickup', json('[{"item":"diamond","count":2}]'), '$.secret_note', 'x') WHERE mc_uuid = '${U1}'`);
   sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('s3','100000000000000009','versteckt','Versteckt',datetime('now','+1 day'))`);
