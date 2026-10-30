@@ -41,3 +41,6 @@ CREATE INDEX IF NOT EXISTS idx_feedback_discord ON feedback(discord_id, created_
 -- 0006: Bank-Direktkauf (type='bank_buy') + ausgeblendete Bestellungen pro User
 CREATE INDEX IF NOT EXISTS idx_orders_type ON mc_shop_orders_pending(type, status, created_at);
 CREATE TABLE IF NOT EXISTS mc_order_hidden (discord_id TEXT NOT NULL, order_id TEXT NOT NULL, hidden_at INTEGER NOT NULL, PRIMARY KEY (discord_id, order_id));
+-- Parkour-Bestzeiten (Migration 0005)
+CREATE TABLE IF NOT EXISTS mc_parkour (course TEXT NOT NULL, mc_uuid TEXT NOT NULL, mc_name TEXT, time_ms INTEGER NOT NULL, set_at TEXT NOT NULL, PRIMARY KEY (course, mc_uuid));
+CREATE INDEX IF NOT EXISTS idx_mc_parkour_course_time ON mc_parkour(course, time_ms);
