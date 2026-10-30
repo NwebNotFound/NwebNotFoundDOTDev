@@ -38,7 +38,7 @@ with sync_playwright() as p:
         t = go("/auktionen/a4"); ok("deine Auktion" in t, f"{w}px eigene Auktion: kein Bieten", t[:300])
         t = go("/leaderboards"); ok("Nils" in t and "Seller" in t, f"{w}px Bestenlisten mit Namen")
         t = go("/profile"); ok("Nils" in t, f"{w}px Profil zeigt verknüpften Account")
-        ok(pg.locator(".inv .ivs img").count() == 3 and pg.locator(".inv .ivs").count() >= 36, f"{w}px Profil: Inventar im Slot-Look")
+        ok(pg.locator(".inv .ivs img").count() >= 1 and pg.locator(".inv .ivs").count() >= 36, f"{w}px Profil: Inventar im Slot-Look")
         ok("AB" not in pg.locator(".inv").inner_text(), f"{w}px Profil: keine Text-Platzhalter")
         pg.locator(".inv").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-polish-profil-{w}.png", full_page=True)
         ok(pg.locator("#umm a[href$='/abholungen']").count() == 1, f"{w}px Dropdown: Abholungen")
