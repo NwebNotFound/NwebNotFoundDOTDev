@@ -221,3 +221,37 @@ html.mc .bigpct{white-space:nowrap}
 @media(max-width:600px){html.mc select{width:100%;min-height:44px}html.mc .wk code,html.mc .wk pre{overflow-wrap:anywhere;white-space:pre-wrap}html.mc .wk h2{scroll-margin-top:110px}html.mc .hub-h{overflow-wrap:anywhere}}
 html.mc .mrow .mch{background:none;border:0;padding:0;margin:0;box-shadow:none;border-radius:0;white-space:nowrap;text-align:right;flex:none}
 @media(max-width:600px){html.mc .mrow .msp svg{width:64px}html.mc .ictl{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}html.mc .fsel,html.mc .fsel select{width:100%;min-width:0}}
+/* Gesperrte Bank-Preise: dezent, einzeilig */
+html.mc .nb{display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap;font-size:.78rem;color:var(--c-mut);opacity:.75;cursor:help}
+html.mc .nb:not(:empty)::before{content:"";width:9px;height:10px;flex:none;background:currentColor;-webkit-mask:linear-gradient(#000,#000) 0 4px/9px 6px no-repeat,radial-gradient(circle at 50% 100%,transparent 2px,#000 2.5px,#000 3.5px,transparent 4px) 0 0/9px 5px no-repeat;mask:linear-gradient(#000,#000) 0 4px/9px 6px no-repeat,radial-gradient(circle at 50% 100%,transparent 2px,#000 2.5px,#000 3.5px,transparent 4px) 0 0/9px 5px no-repeat}
+html.mc .ir>*{min-width:0}
+@media (min-width:721px){html.mc .il .ih,html.mc .il .ir{grid-template-columns:minmax(0,2.4fr) minmax(118px,1fr) minmax(118px,1fr) minmax(90px,1fr) 92px}}
+/* Profil-Inventar im Slot-Look */
+html.mc .inv .ivg{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;max-width:430px;margin-top:.8rem;padding:6px;background:#1b1f1c;border:2px solid #000;box-shadow:inset 2px 2px 0 #3a403b,inset -2px -2px 0 #0a0c0a}
+html.mc .inv .ivg.hot{margin-top:8px}
+html.mc .inv .ivs{aspect-ratio:1;position:relative;display:grid;place-items:center;background:#8b8b8b;box-shadow:inset 2px 2px 0 #373737,inset -2px -2px 0 #fff3;min-width:0}
+html.mc .inv .ivs.e{background:#6f6f6f}
+html.mc .inv .ivs img{width:72%;height:72%;image-rendering:pixelated;object-fit:contain}
+html.mc .inv .ivs b{position:absolute;right:2px;bottom:0;font:700 .7rem var(--f-px,monospace);color:#fff;text-shadow:1px 1px 0 #3f3f3f}
+html.mc .inv .ivl{font-size:.75rem;color:var(--c-mut);margin:.8rem 0 0}
+html.mc .inv .iv-empty .ivg{opacity:.45}
+html.mc .inv .iv-empty p{margin:.8rem 0 0;font-size:.9rem}
+/* Abholungen */
+html.mc #pub .card{margin-top:var(--s4,1rem)}
+html.mc .pgrid{display:grid;grid-template-columns:repeat(9,minmax(0,44px));gap:3px;padding:6px;background:#1b1f1c;border:2px solid #000;width:max-content;max-width:100%}
+html.mc .pslot{aspect-ratio:1;position:relative;display:grid;place-items:center;background:#8b8b8b;box-shadow:inset 2px 2px 0 #373737,inset -2px -2px 0 #fff3}
+html.mc .pslot img{width:72%;height:72%;image-rendering:pixelated}
+html.mc .pslot b{position:absolute;right:2px;bottom:0;font:700 .7rem var(--f-px,monospace);color:#fff;text-shadow:1px 1px 0 #3f3f3f}
+html.mc .plist{list-style:none;margin:0;padding:0}
+html.mc .po{display:flex;gap:.8rem;padding:.9rem 0;border-top:1px solid var(--line,#2a2f2b)}
+html.mc .poi{width:36px;height:36px;flex:none;display:grid;place-items:center}
+html.mc .poi img{width:32px;height:32px;image-rendering:pixelated}
+html.mc .pom{display:flex;flex-direction:column;gap:.25rem;min-width:0;flex:1}
+html.mc .pom .pr{font-size:.8rem}
+html.mc .pst{display:flex;flex-wrap:wrap;gap:4px;margin:.3rem 0}
+html.mc .pst span{font-size:.72rem;padding:.15rem .45rem;border:1px solid var(--line,#2a2f2b);color:var(--c-mut);white-space:nowrap}
+html.mc .pst span.on{color:var(--c-green,#5fd35f);border-color:currentColor}
+html.mc .pst span.cur{background:rgba(95,211,95,.12);font-weight:700}
+html.mc .pst span.bad{color:#ff6b6b;background:rgba(255,107,107,.1)}
+html.mc .pue .btn{margin-top:.8rem}
+@media (max-width:480px){html.mc .pgrid{grid-template-columns:repeat(9,minmax(0,1fr));width:auto}}

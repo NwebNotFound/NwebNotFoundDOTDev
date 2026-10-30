@@ -63,7 +63,7 @@ try {
       { category: "cp", uuid: U1, value: 1500, rank: 1 }, { category: "cp", player: U2, score: 1200, rank: 2 }, { stat: "playtime", player_uuid: U2, name: "Seller", value: 3600 },
       { key: "kills", uuid: U1, value: 5, period: "weekly" }, { category: "cp", uuid: "99999999-8888-7777-6666-555555555555", value: 1 },
     ],
-    v_player_stats_ext: [{ uuid: U1, name: "Nils", cp: 900, playtime_s: 7200, deaths: 3, mined: '{"minecraft:stone":120,"dirt":5}', killed: { zombie: 12, creeper: 3 }, distance_m: { walk: 15300, sprint: 820 }, fished: 4 }, { player: U2, stat: "cp", value: 1200 }, { player: U2, stat: "deaths", value: 1 }],
+    v_player_stats_ext: [{ uuid: U1, name: "Nils", inv: '[{"id":"minecraft:diamond_sword","amount":1,"slot":0},{"type":"OAK_LOG","qty":32,"slot":9},{"item":"abandoned_camp_map","slot":40},{"item":"air","slot":5}]', abholfach: [{ material: "diamond", count: 2 }, "minecraft:bread"], cp: 900, playtime_s: 7200, deaths: 3, mined: '{"minecraft:stone":120,"dirt":5}', killed: { zombie: 12, creeper: 3 }, distance_m: { walk: 15300, sprint: 820 }, fished: 4 }, { player: U2, stat: "cp", value: 1200 }, { player: U2, stat: "deaths", value: 1 }],
   };
   const ing = await req("/api/mc-ingest", { method: "POST", body: payload, token: TOK });
   ok(ing.s === 200 && ing.j?.ok, "Ingest mit Token → 200", ing.t.slice(0, 200));
@@ -134,6 +134,20 @@ try {
   r = await req("/api/mc-shop-orders/ack", { method: "POST", token: TOK, body: { acks: [{ id: ordId, status: "rejected", reason: "PRICE_CHANGED" }] } }); ok(r.j?.updated === 1, "Bestellung ack ERR");
   r = await req("/api/mc-bids/ack", { method: "POST", token: TOK, body: { acks: [{ id: bidId, status: "rejected" }] } }); ok(r.j?.updated === 0, "doppeltes ack ändert nichts");
   ok((await req("/api/mc-bids/pending", { token: TOK })).j.items.length === 0, "nach ack keine offenen Gebote");
+  console.log("6c) Abholungen");
+  ok((await req("/api/mc-abholungen")).j.logged_in === false, "Abholungen ohne Login → logged_in false");
+  let ab = (await req("/api/mc-abholungen", { cookie: c1 })).j;
+  ok(ab.linked && ab.orders.length === 2 && ab.orders.some((o) => o.status === "rejected" && o.stage === "failed"), "Abholungen: Bestellungen mit Stufen", JSON.stringify(ab.orders));
+  ok(ab.pickup.length === 2 && ab.pickup[0].item === "diamond" && ab.pickup[0].count === 2 && ab.pickup[1].item === "bread", "Abholfach flexibel gemappt", JSON.stringify(ab.pickup));
+  const openO = ab.orders.find((o) => o.stage === "pending").id;
+  r = await req("/api/mc-shop-orders/ack", { method: "POST", token: TOK, body: { acks: [{ id: openO, status: "ready" }] } }); ok(r.j?.updated === 1, "ack 'ready' → abholbereit");
+  ok((await req("/api/mc-abholungen", { cookie: c1 })).j.orders.find((o) => o.id === openO).stage === "ready", "Stufe ready");
+  r = await req("/api/mc-shop-orders/ack", { method: "POST", token: TOK, body: { acks: [{ id: openO, status: "collected" }] } }); ok(r.j?.updated === 1, "ack 'collected'");
+  r = await req("/api/mc-shop-orders/ack", { method: "POST", token: TOK, body: { acks: [{ id: openO, status: "ready" }] } }); ok(r.j?.updated === 0, "abgeholt ist final");
+  r = await req("/api/mc-shop-orders/ack", { method: "POST", token: TOK, body: { acks: [{ id: openO, status: "accepted" }] } }); ok(r.j?.updated === 0, "accepted nur aus pending");
+  const pf = (await req("/api/profile", { cookie: c1 })).j.minecraft?.stats?.inventory || [];
+  ok(pf.length === 3 && pf[0].item === "diamond_sword" && pf[1].item === "oak_log" && pf[1].count === 32 && pf[1].slot === 9, "Inventar flexibel normalisiert (id/type/amount/qty, air raus)", JSON.stringify(pf));
+  ok(!JSON.stringify((await req("/api/mc-players/Nils")).j).includes("diamond_sword"), "Inventar/Abholfach nicht öffentlich");
   const mine = (await req("/api/mc-auctions/a1", { cookie: c1 })).j; ok(mine.mine[0]?.status === "accepted" && mine.viewer.can_bid === true, "Auktionsseite zeigt eigenes Gebot 'accepted'");
   const mine2 = (await req("/api/mc-auctions/a2", { cookie: c1 })).j; ok(mine2.mine[0]?.status === "rejected" && mine2.mine[0]?.reason === "OUTBID", "abgelehntes Gebot mit Grund");
   const own = (await req("/api/mc-auctions/a1", { cookie: c2 })).j; ok(own.viewer.own === true && own.viewer.can_bid === false, "Verkäufer sieht eigene Auktion, kein Bieten");
