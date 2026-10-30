@@ -140,8 +140,24 @@ try {
   r = await req("/api/mc-bid", { method: "POST", token: TOK, body: { discord_id: D2, auction_id: "a4", amount: 100 } }); ok(r.s === 202, "Bot-Gebot im Auftrag (Token + discord_id) → 202", r.t);
   ok((await req("/api/mc-bid", { method: "POST", token: "falsch", body: { discord_id: D2, auction_id: "a3", amount: 30000 } })).s === 401, "Bot-Gebot falscher Token → 401");
 
+  console.log("6b) Spielersuche");
+  sql(`INSERT INTO mc_links (discord_id, mc_name, mc_uuid, has_role, verified, updated_at) VALUES ('100000000000000009','Versteckt','aaaaaaaa-0000-0000-0000-00000000c0de',1,0,0)`);
+  const pl = (await req("/api/mc-players")).j?.players || [];
+  ok(pl.some((x) => x.name === "Nils") && pl.some((x) => x.name === "Seller"), "Spielerliste enthält verknüpfte Spieler", JSON.stringify(pl));
+  ok(!pl.some((x) => x.name === "Versteckt"), "Unbestätigte Verknüpfung nicht öffentlich");
+  ok((await req("/api/mc-players?q=nls")).j.players[0]?.name === "Nils", "Fuzzy: 'nls' → Nils");
+  ok((await req("/api/mc-players?q=Selr")).j.players[0]?.name === "Seller", "Fuzzy: Tippfehler 'Selr' → Seller");
+  ok((await req("/api/mc-players?q=zzzzqq")).j.players.length === 0, "Fuzzy: kein Treffer → leer");
+  const pn = (await req("/api/mc-players/nils")).j;
+  ok(pn?.name === "Nils" && pn.stats && !pn.details && pn.viewer.logged_in === false, "Spielerseite öffentlich ohne Details", JSON.stringify(pn));
+  const pd = (await req("/api/mc-players/Nils", { cookie: c1 })).j;
+  ok(pd?.details && pd.viewer.logged_in === true, "Details nur mit Discord-Login", JSON.stringify(pd));
+  ok((await req("/api/mc-players/Versteckt")).s === 404, "Unbestätigter Spieler → 404");
+  ok((await req("/spieler/bad%3Cname")).s === 404, "Ungültiger Name → 404");
+  ok((await req("/spieler/Nils")).t.includes("/api/mc-players/") && !(await req("/spieler/Nils")).t.includes("<script>alert"), "Spielerseite lädt API");
+
   console.log("7) Seiten");
-  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
+  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
   console.log("8) UI (Chromium 390/1440)");

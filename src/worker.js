@@ -1,6 +1,7 @@
 import { AV } from "./asset-version.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
+import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
 import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
@@ -684,6 +685,8 @@ export default {
     if (p === "/api/mc-ingest") return mcIngest(req, env);
     if (p === "/api/mc-data") return mcData(env);
     if (p === "/api/profile") return profileApi(req, env);
+    if (p === "/api/mc-players") return json({ players: await playersApi(env, url) });
+    if (p.startsWith("/api/mc-players/")) { const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, decodeURIComponent(p.slice(16)), u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
     if (p === "/api/mc-leaderboards") return mcLeaderboards(env);
     if (p === "/api/mc-market") return mcMarket(env);
     if (p.startsWith("/api/mc-market/")) return mcMarketItem(env, decodeURIComponent(p.slice(15)));
@@ -696,6 +699,8 @@ export default {
       if (p === "/") return html(MC_HOME);
       if (p === "/profile") return html(PROFILE_MC());
       if (p === "/leaderboards") return html(LEADERBOARDS_MC());
+      if (p === "/spieler") return html(mcPage("Spieler · NwebNotFound MC", "Spieler suchen: Skin, öffentliche Stats und Profil", playersBody()));
+      if (p.startsWith("/spieler/")) { const n = decodeURIComponent(p.slice(9)); if (!/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
       if (p === "/markt" && url.searchParams.has("item")) {
         const raw = String(url.searchParams.get("item") || "").trim(), it = cleanItem(raw);
         const known = it ? await env.DB.prepare("SELECT 1 FROM mc_market WHERE item = ?").bind(it).first().catch(() => null) : null;
