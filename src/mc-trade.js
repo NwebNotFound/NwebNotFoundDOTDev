@@ -7,6 +7,16 @@ const cents = (v) => { if (v == null || v === "") return null; const n = Number(
 const int = (v, max = 1e9) => { const n = Math.floor(Number(v)); return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0; };
 const ts = (v) => { if (v == null || v === "") return null; const n = typeof v === "number" ? (v < 1e12 ? v * 1000 : v) : Date.parse(v); return Number.isFinite(n) ? n : null; };
 const item = (v) => { const s = String(v ?? "").toLowerCase().replace(/^minecraft:/, ""); return ITEM_RE.test(s) ? s : null; };
+const ACK_OK = ["accepted", "rejected", "confirmed", "bought", "purchased", "ready", "ready_for_pickup", "in_pickup", "collected", "picked_up", "delivered", "failed", "refunded", "cancelled"];
+export function stageOf(st) {
+  const s = String(st || "pending").toLowerCase();
+  if (["pending", "queued", "new"].includes(s)) return "pending";
+  if (["accepted", "confirmed", "bought", "purchased", "paid"].includes(s)) return "bought";
+  if (["ready", "ready_for_pickup", "in_pickup", "stored"].includes(s)) return "ready";
+  if (["collected", "picked_up", "delivered", "done", "claimed"].includes(s)) return "collected";
+  if (["rejected", "failed", "refunded", "cancelled", "canceled", "error"].includes(s)) return "failed";
+  return "pending";
+}
 export const BID_INC = (cur) => Math.max(100, Math.ceil(cur * 0.05)); // TODO mit Craft abgleichen; Server entscheidet
 export const minNext = (a) => a.min_next_bid != null ? a.min_next_bid : (a.bid_count > 0 && a.current_bid != null ? a.current_bid + BID_INC(a.current_bid) : a.min_price);
 
@@ -133,13 +143,25 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
     if (!tokenOk(req, env)) return json({ error: "unauthorized" }, 401);
     let b; try { b = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
-    const acks = (Array.isArray(b?.acks) ? b.acks : []).slice(0, 200).filter((x) => typeof x?.id === "string" && ["accepted", "rejected"].includes(x.status));
+    const acks = (Array.isArray(b?.acks) ? b.acks : []).slice(0, 200).filter((x) => typeof x?.id === "string" && ACK_OK.includes(x.status));
     const now = Date.now();
-    const res = acks.length ? await env.DB.batch(acks.map((x) => env.DB.prepare(`UPDATE ${table} SET status = ?, reason = ?, acked_at = ? WHERE id = ? AND status = 'pending'`).bind(x.status, clip(x.reason, 120) || null, now, x.id))) : [];
+    const res = acks.length ? await env.DB.batch(acks.map((x) => env.DB.prepare(`UPDATE ${table} SET status = ?, reason = ?, acked_at = ? WHERE id = ? AND status != ? AND (status = 'pending' OR (? = 0 AND status NOT IN ('rejected','failed','refunded','collected','picked_up','cancelled')))`).bind(x.status, clip(x.reason, 120) || null, now, x.id, x.status, x.status === "accepted" || x.status === "rejected" ? 1 : 0))) : [];
     return json({ ok: true, updated: res.reduce((s, r) => s + (r.meta?.changes || 0), 0) });
   };
   const BID_COLS = "id, auction_id, bidder_uuid, bidder_name, amount, source, created_at", ORD_COLS = "id, listing_id, shop_id, item, qty, buyer_uuid, buyer_uuid AS uuid, buyer_name, unit_price, unit_price AS max_unit_price_cent, source, created_at";
 
+  // Abholungen: eigene Bestellungen + Abholfach (aus dem Sync), Status flexibel auf Stufen abgebildet
+  async function pickups(req, env) {
+    const m = await me(req, env);
+    if (!m.user) return json({ logged_in: false }, 200, { "cache-control": "private, no-store" });
+    if (!m.link) return json({ logged_in: true, linked: false, orders: [], pickup: [] }, 200, { "cache-control": "private, no-store" });
+    const rows = (await env.DB.prepare("SELECT id, shop_id, item, qty, unit_price, status, reason, created_at, acked_at FROM mc_shop_orders_pending WHERE discord_id = ? ORDER BY created_at DESC LIMIT 50").bind(m.user.id).all().catch(() => ({ results: [] }))).results || [];
+    const ps = await env.DB.prepare("SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = ?").bind(m.link.mc_uuid).first().catch(() => null);
+    let st = {}; try { st = JSON.parse(ps?.stats || "{}"); } catch {}
+    const pick = Array.isArray(st.pickup) ? st.pickup : [];
+    const orders = rows.map((r) => ({ ...r, stage: stageOf(r.status), created_at: iso(r.created_at), acked_at: r.acked_at ? iso(r.acked_at) : null }));
+    return json({ logged_in: true, linked: true, mc_name: m.link.mc_name, orders, pickup: pick, pickup_at: ps?.updated_at ? iso(ps.updated_at) : null }, 200, { "cache-control": "private, no-store" });
+  }
   async function me(req, env) { const u = await getUser(req, env); if (!u) return { user: null }; const l = await linkFor(env, u.id); return { user: u, link: l, can: !!(l && l.verified && l.has_role) }; }
   async function auctions(req, env) {
     const { list, updated_at } = await blob(env, "auctions"); const N = await nameMap(env, list.flatMap((a) => [a.seller_uuid, a.current_bidder_uuid]));
@@ -169,6 +191,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
       if (p === "/api/mc-shop-orders/ack") return ack("mc_shop_orders_pending")(req, env);
       if (p === "/api/mc-auctions") return auctions(req, env);
       if (p.startsWith("/api/mc-auctions/")) return auction(req, env, decodeURIComponent(p.slice(17)));
+      if (p === "/api/mc-abholungen") return pickups(req, env);
       if (p === "/api/mc-shops") return shops(req, env);
       if (p.startsWith("/api/mc-shops/")) return shop(req, env, decodeURIComponent(p.slice(14)));
       return null;

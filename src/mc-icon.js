@@ -6,7 +6,7 @@ const ALIAS = {
   short_grass: "block/short_grass", tall_grass: "block/tall_grass_top", sunflower: "block/sunflower_front", lilac: "block/lilac_top",
   rose_bush: "block/rose_bush_top", peony: "block/peony_top", large_fern: "block/large_fern_top", fire: "block/fire_0", soul_fire: "block/soul_fire_0",
   crafting_table: "block/crafting_table_front", furnace: "block/furnace_front", blast_furnace: "block/blast_furnace_front", smoker: "block/smoker_front",
-  tnt: "block/tnt_side", bookshelf: "block/bookshelf", chest: null, trapped_chest: null, ender_chest: "block/obsidian",
+  tnt: "block/tnt_side", bookshelf: "block/bookshelf", chest: "block/barrel_side", trapped_chest: "block/barrel_side", cinnabar: "block/red_terracotta", sulfur: "block/yellow_terracotta", ender_chest: "block/obsidian",
   snow_block: "block/snow", snow: "item/snowball", podzol: "block/podzol_side", mycelium: "block/mycelium_side", dirt_path: "block/dirt_path_side",
   farmland: "block/farmland", melon: "block/melon_side", pumpkin: "block/pumpkin_side", carved_pumpkin: "block/carved_pumpkin", jack_o_lantern: "block/jack_o_lantern",
   hay_block: "block/hay_block_side", bone_block: "block/bone_block_side", quartz_block: "block/quartz_block_side", smooth_quartz: "block/quartz_block_bottom",
@@ -38,7 +38,7 @@ export function resolveIcon(raw) {
   const id = String(raw || "").toLowerCase().replace(/^minecraft:/, "").replace(/[^a-z0-9_]/g, "");
   if (!id) return null;
   if (cache.has(id)) return cache.get(id);
-  const r = resolve(id, 0); cache.set(id, r); return r;
+  const r = /^(cave_|void_)?air$/.test(id) ? null : resolve(id, 0) || FALLBACK; cache.set(id, r); return r;
 }
 function resolve(id, depth) {
   if (depth > 3) return null;
@@ -52,7 +52,7 @@ function resolve(id, depth) {
   if ((m = id.match(/^potted_(.+)$/))) return resolve(m[1], depth + 1);
   if ((m = id.match(/^(.+)_(slab|stairs|wall|pressure_plate|button)$/))) {
     const b = m[1], w = WOODS.find((x) => b === x);
-    return first(w && `block/${w}_planks`, MAT[b] && `block/${MAT[b]}`, `block/${b}`, `block/${b}s`, `block/${b}_block`, `block/${b}_planks`, `block/${b}_top`) || null;
+    return first(w && `block/${w}_planks`, MAT[b] && `block/${MAT[b]}`, `block/${b}`, `block/${b}s`, `block/${b}_block`, `block/${b}_planks`, `block/${b}_top`) || resolve(b.replace(/_(brick|tile)$/, ""), depth + 1);
   }
   if ((m = id.match(/^(.+)_(fence_gate|fence)$/))) { const w = WOODS.find((x) => m[1] === x); return first(w && `block/${w}_planks`, `block/${m[1]}`, `block/${m[1]}s`); }
   if ((m = id.match(/^(.+)_wood$/))) return first(`block/${m[1]}_log`);
@@ -65,6 +65,26 @@ function resolve(id, depth) {
   if ((m = id.match(/^(.+)_(head|skull)$/))) return first(`item/${m[1]}_head`);
   if ((m = id.match(/^(.+)_(crop|stem|plant)$/))) return resolve(m[1], depth + 1);
   if ((m = id.match(/^(.+)_spawn_egg$/))) return first("item/egg");
-  if (id.endsWith("s")) return resolve(id.slice(0, -1), depth + 1);
+  if (id.endsWith("s") && depth < 2) { const r = resolve(id.slice(0, -1), depth + 1); if (r) return r; }
+  return family(id) || (depth === 0 ? tokens(id) || FALLBACK : null);
+}
+// Item-Familien (neue/seltene IDs) auf ein passendes Vanilla-Icon abbilden
+const FAM = [
+  [/_map$|^map_/, ["item/filled_map", "item/map"]], [/_pottery_sherd$/, ["item/brick"]], [/_smithing_template$/, ["item/netherite_upgrade_smithing_template", "item/paper"]],
+  [/_banner_pattern$/, ["item/flower_banner_pattern", "item/paper"]], [/^music_disc_/, ["item/music_disc_13", "item/music_disc_cat"]], [/^disc_fragment/, ["item/disc_fragment_5"]],
+  [/_bundle$/, ["item/bundle"]], [/_harness$/, ["item/saddle", "item/lead"]], [/_egg$/, ["item/egg"]], [/_bucket$/, ["item/water_bucket", "item/bucket"]],
+  [/_nautilus_armor$|_horse_armor$/, ["item/iron_horse_armor", "item/leather_horse_armor"]], [/_spear$/, ["item/trident", "item/iron_sword"]], [/_golem_statue$/, ["block/copper_block"]],
+  [/_raft$/, ["item/bamboo_raft", "item/oak_boat"]], [/_boat$/, ["item/oak_boat"]], [/_shelf$/, ["block/oak_planks"]], [/_bars$/, ["block/iron_bars"]], [/_chain$/, ["item/chain", "block/chain"]],
+  [/_lantern$/, ["item/lantern", "block/lantern"]], [/_torch$/, ["block/torch"]], [/_ore$/, ["block/stone"]], [/_coral(_block|_fan)?$/, ["block/tube_coral_block"]],
+  [/potion|tipped_arrow/, ["item/potion", "item/glass_bottle"]], [/_sign$/, ["item/oak_sign"]], [/_door$/, ["item/oak_door"]], [/_trapdoor$/, ["block/oak_trapdoor"]],
+  [/_leaves$/, ["block/oak_leaves"]], [/_sapling$/, ["block/oak_sapling"]], [/_candle$/, ["item/candle"]], [/_dye$/, ["item/white_dye"]], [/_glass(_pane)?$/, ["block/glass"]],
+  [/_terracotta$/, ["block/terracotta"]], [/_concrete$/, ["block/white_concrete"]], [/_wool$/, ["block/white_wool"]], [/_cushion$/, ["block/white_wool"]], [/^chiseled_|^cut_|^polished_|^cracked_|^smooth_|^mossy_/, []],
+];
+function family(id) {
+  for (const [re, c] of FAM) if (re.test(id)) { const r = first(...c); if (r) return r; }
+  const m = id.match(/^(.+?)_(.+)$/); if (m && /_(axe|pickaxe|shovel|hoe|sword|helmet|chestplate|leggings|boots)$/.test(id)) return first(`item/iron_${id.split("_").pop()}`);
   return null;
 }
+// Letzter Ausweg: einzelne Wortteile (z. B. chiseled_cinnabar -> cinnabar -> stone)
+function tokens(id) { const t = id.split("_"); for (let i = 1; i < t.length; i++) { const r = resolve(t.slice(i).join("_"), 2); if (r) return r; } for (let i = t.length - 1; i > 0; i--) { const r = resolve(t.slice(0, i).join("_"), 2); if (r) return r; } return null; }
+const FALLBACK = "item/paper";

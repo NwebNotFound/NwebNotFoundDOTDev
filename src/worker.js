@@ -96,7 +96,7 @@ const REVEAL_JS = `<script>(()=>{const els=document.querySelectorAll('.reveal');
 
 // Account-Chip: lädt /api/me clientseitig (Seiten bleiben cachebar)
 const ACCT_JS = (loginBase) => `<script>(async()=>{const el=document.getElementById('acct');if(!el)return;try{const d=await(await fetch('/api/me',{credentials:'include'})).json();const nx=encodeURIComponent(location.href);
-if(d.user){const n=d.user.name.replace(/[<>&"']/g,''),un=(d.user.username||'').replace(/[<>&"']/g,'');el.innerHTML='<div class="um"><button type="button" id="umb" aria-haspopup="menu" aria-expanded="false" aria-controls="umm"><img alt="" src="'+d.user.avatar+'"><span class="hide-s">'+n+'</span><svg class="chev" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><div class="menu" id="umm" role="menu"><div class="hd"><b>'+n+'</b><span>@'+un+'</span></div><a role="menuitem" href="/profile">Profil</a><a role="menuitem" class="out" href="${loginBase}/auth/discord/logout?next='+nx+'">Abmelden</a></div></div>';
+if(d.user){const n=d.user.name.replace(/[<>&"']/g,''),un=(d.user.username||'').replace(/[<>&"']/g,'');el.innerHTML='<div class="um"><button type="button" id="umb" aria-haspopup="menu" aria-expanded="false" aria-controls="umm"><img alt="" src="'+d.user.avatar+'"><span class="hide-s">'+n+'</span><svg class="chev" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><div class="menu" id="umm" role="menu"><div class="hd"><b>'+n+'</b><span>@'+un+'</span></div><a role="menuitem" href="/profile">Profil</a><a role="menuitem" href="'+(/^mc\\./.test(location.hostname)||!/\\./.test(location.hostname)?'':'https://mc.'+location.hostname.replace(/^www\\./,''))+'/abholungen">Abholungen</a><a role="menuitem" class="out" href="${loginBase}/auth/discord/logout?next='+nx+'">Abmelden</a></div></div>';
 const b=document.getElementById('umb'),m=document.getElementById('umm'),it=()=>[...m.querySelectorAll('a')];const set=o=>{b.setAttribute('aria-expanded',o);m.classList.toggle('open',o);if(o)setTimeout(()=>it()[0].focus(),20)};
 b.onclick=e=>{e.stopPropagation();set(!m.classList.contains('open'))};document.addEventListener('click',e=>{if(!m.contains(e.target))set(false)});
 document.addEventListener('keydown',e=>{if(!m.classList.contains('open'))return;if(e.key==='Escape'){set(false);b.focus()}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const a=it(),i=a.indexOf(document.activeElement);a[(i+(e.key==='ArrowDown'?1:a.length-1))%a.length].focus()}});}
@@ -172,7 +172,7 @@ const mcPage = (title, desc, body) => shell({ title, desc, css: MC_CSS, nav: mNa
 const MC_HOME = mcPage("Minecraft-Server · NwebNotFound", "Status, Profil, Bestenlisten, Markt und Wiki für mc.nwebnotfound.dev", homeBody(MC_HOST));
 
 /* ---------- Detail-Stats (Profil) + Bestenlisten ---------- */
-const ICON_JS = `const ICO=id=>'<span class="ic"><img alt="" loading="lazy" src="/mc-icon/'+encodeURIComponent(id)+'" onerror="this.parentNode.textContent=\\''+String(id).slice(0,2).toUpperCase()+'\\'"></span>';
+const ICON_JS = `const ICO=id=>'<span class="ic"><img alt="" loading="lazy" src="/mc-icon/'+encodeURIComponent(id)+'" onerror="this.onerror=null;this.src=\\'/mc-icon/paper\\'"></span>';
 const NM=id=>String(id).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase());const NF=v=>(+v).toLocaleString('de-DE');const KM=m=>m>=1000?(m/1000).toLocaleString('de-DE',{maximumFractionDigits:1})+' km':NF(Math.round(m))+' m';`;
 const DET_CSS = `<style>
 .dg{display:grid;gap:1.2rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
@@ -217,7 +217,7 @@ const up=t=>{t=+t||0;const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Ma
 const T=[['money','CP',v=>NF(v)+' CP'],['playtime','Spielzeit',up],['blocks_mined','Blöcke',NF],['kills','Kills',NF],['kd','K/D',v=>(+v).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})],['distance','Distanz',KM]];
 let D={},tab=(location.hash.slice(1)||'money'),per='total';
 const av=n=>'https://mc-heads.net/avatar/'+encodeURIComponent(n)+'/72';
-function draw(){const X=Object.keys(Object.assign({},D.total&&D.total.lists,D.weekly&&D.weekly.lists)).filter(k=>!T.some(t=>t[0]===k));X.forEach(k=>T.push([k,k.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase()),NF]));if(location.hash.slice(1)===tab&&!T.some(t=>t[0]===tab))tab='money';document.getElementById('tabs').innerHTML=T.map(([k,t])=>'<button role="tab" data-k="'+k+'" aria-selected="'+(k===tab)+'">'+t+'</button>').join('');
+function draw(){const X=Object.keys(Object.assign({},D.total&&D.total.lists,D.weekly&&D.weekly.lists)).filter(k=>!T.some(t=>t[0]===k));X.forEach(k=>T.push([k,k.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase()),NF]));if(location.hash.slice(1)===tab&&!T.some(t=>t[0]===tab))tab='money';document.getElementById('tabs').innerHTML=T.map(([k,t])=>'<button role="tab" data-k="'+k+'" aria-selected="'+(k===tab)+'">'+(k==='money'?(per==='total'?'Kontostand':'CP diese Woche'):t)+'</button>').join('');
 document.querySelectorAll('#seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===per));
 const [,lbl,f]=T.find(t=>t[0]===tab),P=D[per],L=(P&&P.lists&&P.lists[tab])||[],O=document.getElementById('out');
 document.getElementById('upd').textContent=P&&P.updated_at?'Stand: '+new Date(P.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'';
@@ -229,6 +229,22 @@ document.getElementById('seg').onclick=e=>{const k=e.target.dataset.k;if(k){per=
 draw();fetch('/api/mc-leaderboards').then(r=>r.json()).then(d=>{D=d;draw()}).catch(()=>{});})();</script>` });
 
 /* ---------- Profil ---------- */
+const PICKUP_BODY = `<section class="sec"><div class="wrap" id="pu"><p class="eyebrow">Survival</p><h1 class="h-l">Abholungen</h1><p class="lead">Deine Shop-Bestellungen und was im Abholfach auf dich wartet. Im Spiel: <code>/abholen</code>.</p><div id="pub" aria-live="polite"><p class="mut">Lade …</p></div></div></section>
+<script src="/mc/common.js?v=${AV}"></script><script>addEventListener('DOMContentLoaded',async()=>{const{E,NF,CP,ICO,get}=MC;const B=document.getElementById('pub');
+const ST={pending:['wird bestätigt','Der Server prüft deine Bestellung.'],bought:['gekauft','Bezahlt, Items werden zugestellt.'],ready:['abholbereit','Liegt im Abholfach: /abholen'],collected:['abgeholt','Erledigt.'],failed:['fehlgeschlagen / erstattet','Nicht durchgeführt, CP wurden nicht abgebucht bzw. erstattet.']};
+const ORD=['pending','bought','ready','collected'];
+const MAP=s=>{s=String(s||'pending').toLowerCase();return /^(accepted|confirmed|bought|purchased|paid)$/.test(s)?'bought':/^(ready|ready_for_pickup|in_pickup|stored)$/.test(s)?'ready':/^(collected|picked_up|delivered|done|claimed)$/.test(s)?'collected':/^(rejected|failed|refunded|cancelled|canceled|error)$/.test(s)?'failed':'pending'};
+const NM=i=>String(i||'').replace(/^minecraft:/,'').replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase());
+const D=t=>t?new Date(t).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'';
+const steps=g=>g==='failed'?'<div class="pst"><span class="on bad">'+ST.failed[0]+'</span></div>':'<div class="pst">'+ORD.map((k,i)=>'<span class="'+(i<=ORD.indexOf(g)?'on':'')+(k===g?' cur':'')+'">'+ST[k][0]+'</span>').join('')+'</div>';
+let d;try{d=await get('/api/mc-abholungen')}catch(e){B.innerHTML='<div class="card"><p>Konnte Abholungen nicht laden.</p></div>';return}
+if(!d.logged_in){B.innerHTML='<div class="card pue"><h3>Bitte anmelden</h3><p class="mut">Melde dich mit Discord an, um deine Bestellungen zu sehen.</p><a class="btn" href="/auth/discord/login?next='+encodeURIComponent(location.href)+'">Mit Discord anmelden</a></div>';return}
+if(!d.linked){B.innerHTML='<div class="card pue"><h3>Minecraft noch nicht verknüpft</h3><p class="mut">Verknüpfe deinen Account im Profil, dann erscheinen hier deine Bestellungen.</p><a class="btn" href="/profile">Zum Profil</a></div>';return}
+const O=(d.orders||[]).map(o=>({...o,g:o.stage||MAP(o.status)}));
+const open=O.filter(o=>o.g!=='collected'&&o.g!=='failed').length;
+let h='<div class="card"><h3>Abholfach</h3>'+((d.pickup||[]).length?'<p class="mut" style="font-size:.8rem;margin-top:0">'+d.pickup.length+' Stapel warten'+(d.pickup_at?' · Stand '+E(D(d.pickup_at)):'')+'</p><div class="pgrid">'+d.pickup.map(i=>'<div class="pslot" title="'+E(NM(i.item))+'">'+ICO(i.item)+(i.count>1?'<b>'+NF(i.count)+'</b>':'')+'</div>').join('')+'</div>':'<p class="mut">Dein Abholfach ist leer.'+(d.pickup_at?' (Stand '+E(D(d.pickup_at))+')':'')+'</p>')+'</div>';
+h+='<div class="card"><h3>Bestellungen'+(open?' <span class="tag">'+open+' offen</span>':'')+'</h3>'+(O.length?'<ul class="plist">'+O.map(o=>'<li class="po g-'+o.g+'"><div class="poi">'+ICO(o.item)+'</div><div class="pom"><b>'+NF(o.qty)+'× '+E(NM(o.item))+'</b><span class="mut">'+(o.unit_price!=null?CP(o.unit_price*o.qty)+' · ':'')+E(D(o.created_at))+'</span>'+steps(o.g)+'<span class="mut pr">'+E(o.reason||ST[o.g][1])+'</span></div></li>').join('')+'</ul>':'<p class="mut">Noch keine Bestellungen. <a href="/shops">Zu den Shops ›</a></p>')+'</div>';
+B.innerHTML=h})</script>`;
 const PROFILE_BODY = (mc) => `
 <style>
 .mch{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:2rem;align-items:center;padding:2.2rem;border-radius:28px;border:1px solid var(--line);background:linear-gradient(160deg,color-mix(in srgb,var(--fg) 6%,transparent),color-mix(in srgb,var(--fg) 1%,transparent));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 30px 80px -40px var(--shadow,rgba(0,0,0,.5))}
@@ -278,18 +294,25 @@ tx=Math.max(-1,Math.min(1,(e.clientX-ox)/(innerWidth*.45)));ty=Math.max(-1,Math.
 addEventListener('pointerleave',()=>{tx=0;ty=0});
 const loop=()=>{cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;head.rotation.y=cx*.85;head.rotation.x=cy*.55;P.rotation.y=cx*.35;requestAnimationFrame(loop)};loop();
 }catch(err){console.warn('skinview3d',err)}}}
+const INV=inv=>{const L=Array.isArray(inv)?inv.filter(i=>i&&i.item):[];const IC=i=>'<img alt="" loading="lazy" src="/mc-icon/'+encodeURIComponent(i.item)+'" onerror="this.onerror=null;this.src=\\'/mc-icon/paper\\'">';
+const NMI=i=>i.name||String(i.item).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase());
+const S=i=>'<div class="ivs'+(i?'':' e')+'"'+(i?' title="'+E(NMI(i))+(i.count>1?' ×'+i.count:'')+'"':'')+'>'+(i?IC(i)+(i.count>1?'<b>'+i.count+'</b>':''):'')+'</div>';
+let body;if(!L.length)body='<div class="iv-empty"><div class="ivg">'+Array.from({length:9},()=>S(null)).join('')+'</div><p><b>Noch kein Inventar synchronisiert.</b><br><span class="mut">Sobald du auf dem Survival-Server warst, erscheint hier dein Inventar.</span></p></div>';
+else{const hasSlot=L.some(i=>i.slot!=null);let grid=[];if(hasSlot){const m={};L.forEach(i=>{if(i.slot!=null&&i.slot<36)m[i.slot]=i});const extra=L.filter(i=>i.slot==null||i.slot>=36);const main=Array.from({length:27},(_,k)=>S(m[k+9])).join(''),hot=Array.from({length:9},(_,k)=>S(m[k])).join('');body='<div class="ivg">'+main+'</div><div class="ivg hot">'+hot+'</div>'+(extra.length?'<p class="ivl">Rüstung &amp; Nebenhand</p><div class="ivg">'+extra.map(S).join('')+'</div>':'')}
+else{const n=Math.max(36,Math.ceil(L.length/9)*9);body='<div class="ivg">'+Array.from({length:n},(_,k)=>S(L[k])).join('')+'</div>'}}
+return '<div class="card inv"><h3>Inventar</h3><p class="mut" style="font-size:.8rem;margin-top:0">Nur für dich sichtbar'+(L.length?' · '+L.length+' Stapel':'')+'.</p>'+body+'</div>'};
 (async()=>{const H=document.getElementById('ph'),B=document.getElementById('pb');
 const r=await fetch('/api/profile',{credentials:'include'});const d=await r.json().catch(()=>({}));
 if(!d.user){H.innerHTML='<h1 class="h-l">Dein Profil.</h1><p class="lead">Melde dich mit Discord an, um dein Profil zu sehen.</p><p style="margin-top:2rem"><a class="btn discord" href="${mc ? `https://${MAIN}` : ""}/auth/discord/login?next='+encodeURIComponent(location.href)+'">${DISCORD_SVG} Mit Discord anmelden</a></p>';return}
 const u=d.user;H.innerHTML='<img alt="" src="'+E(u.avatar)+'" width="112" height="112" style="width:112px;height:112px;border-radius:50%;margin:0 auto 1.2rem;box-shadow:0 10px 40px -10px var(--shadow)"><h1 class="h-l">'+E(u.name)+'</h1><p class="mut" style="margin:.4rem 0 0">@'+E(u.username)+(u.member_since?' · Mitglied seit '+E(fd(u.member_since)):'')+'</p>';
 let h='';const m=d.minecraft;
-if(m&&m.visible){const st=m.stats||{};const ks=Object.keys(st).filter(k=>k!=='inventory');
+if(m&&m.visible){const st=m.stats||{};const ks=Object.keys(st).filter(k=>k!=='inventory'&&k!=='pickup');
 const SK=['money','playtime','kills','deaths','blocks_mined'].concat(ks.filter(k=>!LBL[k]));const id=encodeURIComponent(m.mc_uuid||m.mc_name);
 h+='<div class="mch"><div class="mch-model" id="mcm"><img class="mch-fb" alt="Skin von '+E(m.mc_name)+'" src="https://mc-heads.net/body/'+id+'/220" loading="lazy"></div><div class="mch-info"><p class="eyebrow" style="margin:0">Minecraft</p><h2 class="mch-name">'+E(m.mc_name)+'</h2><p class="mch-sub">Verifiziert · Survival</p>'+
 '<div class="mch-grid">'+SK.map((k,j)=>{const [t,f]=LBL[k]||[k.replace(/_/g,' '),v=>typeof v==='number'?v.toLocaleString('de-DE'):String(v)];const has=st[k]!=null&&st[k]!=='';return '<div class="mch-tile'+(j===0?' wide':'')+(has?'':' empty')+'"><div class="k">'+E(t)+'</div><div class="v">'+(has?E(f(st[k])):'–')+'</div>'+(has?'':'<div class="nd">noch keine Daten</div>')+'</div>'}).join('')+'</div>'+
 (m.updated_at?'<p class="mut" style="font-size:.78rem;margin:1rem 0 0">Stand: '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}))+'</p>':'')+'</div></div>';
 window.__skin='https://mc-heads.net/skin/'+id;
-h+='<div class="card"><h3>Inventar</h3><p class="mut" style="font-size:.8rem;margin-top:0">Nur für dich sichtbar.</p>'+(Array.isArray(st.inventory)&&st.inventory.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:.5rem;margin-top:1rem">'+st.inventory.map(i=>'<div title="'+E(i.item)+'" style="aspect-ratio:1;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;font-size:.62rem;text-align:center;padding:.3rem;position:relative">'+E(String(i.item||'').replace(/^minecraft:/,'').replace(/_/g,' '))+'<b style="position:absolute;right:5px;bottom:3px;font-size:.7rem">'+(i.count>1?i.count:'')+'</b></div>').join('')+'</div>':'<p class="mut">Inventar-Anzeige kommt bald.</p>')+'</div>';}
+h+=INV(st.inventory);}
 else if(m){h+='<div class="card" style="text-align:center"><p class="eyebrow">Minecraft</p><h3>Noch nicht verknüpft</h3><p>'+E(m.hint)+'</p></div>';}
 const g=d.guestbook||[];h+='<div class="card"><h3 style="margin-bottom:.6rem">Deine Gästebuch-Einträge</h3>'+(g.length?g.map(x=>'<div style="padding:.9rem 0;border-top:1px solid var(--line)"><span class="mut" style="font-size:.8rem">'+E(fd(x.created_at))+'</span><p style="margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word;color:var(--fg)">'+E(x.message)+'</p></div>').join(''):'<p>Noch keine Einträge. <a href="https://${MAIN}/guestbook">Jetzt einen schreiben ›</a></p>')+'</div>';
 B.innerHTML=h;document.dispatchEvent(new CustomEvent('mcprofile',{detail:d}));if(window.__skin)sv3d(window.__skin);})();
@@ -315,9 +338,27 @@ async function profileApi(req, env) {
 }
 
 /* ---------- Status-API ---------- */
-async function mcStatus(ctx) {
+// Live-Zahl: Bot-Ingest (frisch) schlägt den Ping-Dienst (der cacht 1–5 Min). Proxy-Zahl bevorzugt, sonst Summe der Backends.
+const srvCount = (v) => { if (!v) return 0; const n = [v.online_count, v.players_online, v.player_count, v.count].find((x) => Number.isFinite(+x) && x !== null && x !== "" && typeof x !== "boolean"); return n != null ? +n : Array.isArray(v.players) ? v.players.length : Number.isFinite(+v.players) ? +v.players : 0; };
+const srvNames = (v) => (Array.isArray(v?.players) ? v.players : []).map((x) => typeof x === "string" ? x : x?.name).filter(Boolean);
+async function mergeLive(res, env) {
+  const out = await res.clone().json().catch(() => null); if (!out || !env?.DB) return res;
+  const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
+  const d = row ? JSON.parse(row.data) : {}, at = d.servers_at || (d.servers ? row?.updated_at : null);
+  if (at && Date.now() - at <= FRESH_MS && d.servers && Object.keys(d.servers).length) {
+    const S = d.servers, px = S.proxy || S.velocity || null, be = Object.entries(S).filter(([k]) => k !== "proxy" && k !== "velocity").map(([, v]) => v);
+    const names = [...new Set([...(px ? srvNames(px) : []), ...be.flatMap(srvNames)])];
+    const live = px ? srvCount(px) : be.reduce((a, v) => a + srvCount(v), 0);
+    out.players.online = Math.max(live, names.length); out.players.list = names.slice(0, 50);
+    if (be.some((v) => v.online)) out.online = true;
+    if (!out.players.max) out.players.max = Math.max(0, ...be.map((v) => +v.max || 0));
+    out.live_source = "ingest"; out.live_at = new Date(at).toISOString();
+  }
+  return new Response(JSON.stringify(out), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=15" } });
+}
+async function mcStatus(ctx, env) {
   const cache = caches.default, key = new Request("https://nwebnotfound.dev/__cache/mc-status");
-  const hit = await cache.match(key); if (hit) return withCors(hit);
+  const hit = await cache.match(key); if (hit) return withCors(await mergeLive(hit, env));
   let out = null;
   try {
     const r = await fetch(`https://api.mcsrvstat.us/3/${MC_HOST}`, { headers: { "user-agent": "nwebnotfound.dev status page" } });
@@ -329,9 +370,9 @@ async function mcStatus(ctx) {
   } catch {}
   if (!out) out = { online: false, players: { online: 0, max: 0, list: [] }, version: null, motd: null, error: "Status-APIs nicht erreichbar" };
   out.host = MC_HOST; out.checked_at = new Date().toISOString();
-  const res = new Response(JSON.stringify(out), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=60" } });
+  const res = new Response(JSON.stringify(out), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=20" } });
   ctx.waitUntil(cache.put(key, res.clone()));
-  return withCors(res);
+  return withCors(await mergeLive(res, env));
 }
 const withCors = (r) => { r = new Response(r.body, r); r.headers.set("access-control-allow-origin", "*"); return r; };
 
@@ -467,12 +508,32 @@ function cleanIngest(b) {
     if (v.details !== undefined) { const d = cleanDetails(v.details); if (d) details[normU(k)] = d; }
     for (const [sk, sv] of Object.entries(v).filter(([x]) => x !== "details").slice(0, 24)) {
       if (!/^[a-z0-9_]{1,24}$/i.test(sk)) continue;
-      if (sk === "inventory") { if (Array.isArray(sv)) o.inventory = sv.slice(0, 41).map(i => ({ item: clip(i?.item, 48), count: Math.max(0, Math.min(999, Math.floor(+i?.count || 0))) })).filter(i => i.item); continue; }
+      if (/^(inventory|inv|inventar|items)$/i.test(sk)) { const inv = normInv(sv); if (inv) o.inventory = inv; continue; }
+      if (/^(pickup|pickups|abholfach|abholungen|claims|claim_chest|pickup_chest)$/i.test(sk)) { const inv = normInv(sv); if (inv) o.pickup = inv; continue; }
       if (Number.isFinite(+sv) && typeof sv !== "boolean") o[sk] = +sv; else if (typeof sv === "string") o[sk] = clip(sv, 40);
     }
     players_stats[normU(k)] = o;
   }
   return { servers, leaderboards, links, players_stats, details, leaderboards_weekly };
+}
+// Inventar robust normalisieren: Array, {slot:item}, {items|contents|slots:[…]}; Feldnamen item/id/type/material/name, count/amount/qty
+function normInv(v) {
+  if (v && !Array.isArray(v) && typeof v === "object") { const inner = v.items ?? v.contents ?? v.slots ?? v.inventory; v = Array.isArray(inner) ? inner : Object.entries(inner && typeof inner === "object" ? inner : v).map(([k, x]) => (x && typeof x === "object" ? { slot: k, ...x } : { slot: k, item: x })); }
+  if (!Array.isArray(v)) return null;
+  const out = [];
+  for (const [n, i] of v.slice(0, 64).entries()) {
+    if (i == null) continue;
+    const raw = typeof i === "string" ? i : i.item ?? i.id ?? i.type ?? i.material ?? i.name;
+    const item = clip(String(raw ?? "").toLowerCase().replace(/^minecraft:/, ""), 48);
+    if (!item || /^(cave_|void_)?air$/.test(item)) continue;
+    const c = typeof i === "object" ? +(i.count ?? i.amount ?? i.qty ?? i.quantity ?? 1) : 1;
+    const sl = typeof i === "object" ? +(i.slot ?? i.index ?? NaN) : NaN;
+    const e = { item, count: Math.max(1, Math.min(999, Math.floor(Number.isFinite(c) ? c : 1))) };
+    if (Number.isInteger(sl) && sl >= 0 && sl < 64) e.slot = sl;
+    const dn = typeof i === "object" ? i.display_name ?? i.custom_name : null; if (typeof dn === "string" && dn) e.name = clip(dn, 40);
+    out.push(e); if (out.length >= 41) break;
+  }
+  return out;
 }
 /* Erweiterung Detail-Stats + Wochen-Bestenlisten */
 function cleanLb(o) {
@@ -553,7 +614,7 @@ async function mcData(env) {
   const sAt = d.servers_at || (d.servers ? row.updated_at : null), lAt = d.leaderboards_at || (d.leaderboards ? row.updated_at : null);
   const sF = !!sAt && now - sAt <= FRESH_MS, lF = !!lAt && now - lAt <= FRESH_MS;
   return json({ fresh: sF || lF, updated_at: iso(row?.updated_at), servers_fresh: sF, servers_at: iso(sAt), leaderboards_fresh: lF, leaderboards_at: iso(lAt),
-    servers: d.servers || {}, leaderboards: lF ? d.leaderboards || {} : {} }, 200, { "cache-control": "public, max-age=30" });
+    servers: d.servers || {}, leaderboards: lF ? d.leaderboards || {} : {} }, 200, { "cache-control": "public, max-age=15" });
 }
 
 /* ---------- Markt ---------- */
@@ -680,7 +741,7 @@ export default {
     const isMc = url.hostname === MCD;
 
     if (p.startsWith("/api/mc-")) { const r = TRADE().route(p, req, env, url); if (r) return r; }
-    if (p === "/api/mc-status") return mcStatus(ctx);
+    if (p === "/api/mc-status") return mcStatus(ctx, env);
     if (p === "/api/me") return me(req, env);
     if (p === "/api/mc-ingest") return mcIngest(req, env);
     if (p === "/api/mc-data") return mcData(env);
@@ -699,6 +760,7 @@ export default {
       if (p === "/") return html(MC_HOME);
       if (p === "/profile") return html(PROFILE_MC());
       if (p === "/leaderboards") return html(LEADERBOARDS_MC());
+      if (p === "/abholungen") return html(mcPage("Abholungen · NwebNotFound MC", "Deine Bestellungen und dein Abholfach", PICKUP_BODY));
       if (p === "/spieler") return html(mcPage("Spieler · NwebNotFound MC", "Spieler suchen: Skin, öffentliche Stats und Profil", playersBody()));
       if (p.startsWith("/spieler/")) { const n = decodeURIComponent(p.slice(9)); if (!/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
       if (p === "/markt" && url.searchParams.has("item")) {
