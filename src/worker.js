@@ -344,7 +344,8 @@ const srvNames = (v) => (Array.isArray(v?.players) ? v.players : []).map((x) => 
 async function mergeLive(res, env) {
   const out = await res.clone().json().catch(() => null); if (!out || !env?.DB) return res;
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
-  const d = row ? JSON.parse(row.data) : {}, at = d.servers_at || (d.servers ? row?.updated_at : null);
+  let d = {}; try { d = row ? JSON.parse(row.data) || {} : {}; } catch { d = {}; }
+  const at = d.servers_at || (d.servers ? row?.updated_at : null);
   if (at && Date.now() - at <= FRESH_MS && d.servers && Object.keys(d.servers).length) {
     const S = d.servers, px = S.proxy || S.velocity || null, be = Object.entries(S).filter(([k]) => k !== "proxy" && k !== "velocity").map(([, v]) => v);
     const names = [...new Set([...(px ? srvNames(px) : []), ...be.flatMap(srvNames)])];

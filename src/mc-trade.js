@@ -145,7 +145,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     let b; try { b = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
     const acks = (Array.isArray(b?.acks) ? b.acks : []).slice(0, 200).filter((x) => typeof x?.id === "string" && ACK_OK.includes(x.status));
     const now = Date.now();
-    const res = acks.length ? await env.DB.batch(acks.map((x) => env.DB.prepare(`UPDATE ${table} SET status = ?, reason = ?, acked_at = ? WHERE id = ? AND status != ? AND (status = 'pending' OR (? = 0 AND status NOT IN ('rejected','failed','refunded','collected','picked_up','cancelled')))`).bind(x.status, clip(x.reason, 120) || null, now, x.id, x.status, x.status === "accepted" || x.status === "rejected" ? 1 : 0))) : [];
+    const res = acks.length ? await env.DB.batch(acks.map((x) => env.DB.prepare(`UPDATE ${table} SET status = ?, reason = ?, acked_at = ? WHERE id = ? AND status != ? AND (status = 'pending' OR (? = 0 AND status NOT IN ('rejected','failed','refunded','collected','picked_up','delivered','cancelled')))`).bind(x.status, clip(x.reason, 120) || null, now, x.id, x.status, x.status === "accepted" || x.status === "rejected" ? 1 : 0))) : [];
     return json({ ok: true, updated: res.reduce((s, r) => s + (r.meta?.changes || 0), 0) });
   };
   const BID_COLS = "id, auction_id, bidder_uuid, bidder_name, amount, source, created_at", ORD_COLS = "id, listing_id, shop_id, item, qty, buyer_uuid, buyer_uuid AS uuid, buyer_name, unit_price, unit_price AS max_unit_price_cent, source, created_at";
