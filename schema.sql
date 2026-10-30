@@ -32,3 +32,8 @@ CREATE TABLE IF NOT EXISTS mc_leaderboards (kind TEXT PRIMARY KEY, data TEXT NOT
 -- (Migration bestehender DBs, in CREATE enthalten) ALTER TABLE mc_shop_orders_pending ADD COLUMN listing_id TEXT;
 -- (Migration bestehender DBs, in CREATE enthalten) ALTER TABLE mc_market ADD COLUMN buy_locked INTEGER NOT NULL DEFAULT 0;
 -- (Migration bestehender DBs, in CREATE enthalten) ALTER TABLE mc_market ADD COLUMN sell_locked INTEGER NOT NULL DEFAULT 0;
+-- Feedback (siehe migrations/0001_feedback.sql)
+CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL CHECK (type IN ('bug','idea')), title TEXT NOT NULL, body TEXT NOT NULL, location TEXT, discord_id TEXT, mc_name TEXT, mc_uuid TEXT, ip_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','done')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_feedback_ip ON feedback(ip_hash, created_at);
+CREATE INDEX IF NOT EXISTS idx_feedback_discord ON feedback(discord_id, created_at);
