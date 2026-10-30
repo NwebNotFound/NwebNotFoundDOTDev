@@ -1,6 +1,8 @@
 import { AV } from "./asset-version.js";
 // Spielersuche /spieler: öffentliche Basis-Stats, Details nur mit Discord-Login
 const PUB = { money: ["money", "cp", "balance"], playtime: ["playtime", "playtime_s", "play_time"], kills: ["kills", "player_kills", "mob_kills"], deaths: ["deaths"], blocks_mined: ["blocks_mined", "mined_total", "blocks"], distance: ["distance", "distance_m"] };
+const ALL_OK = new Set(["money", "cp", "balance", "playtime", "playtime_s", "play_time", "kills", "player_kills", "mob_kills", "mobs_killed", "deaths", "blocks_mined", "mined_total", "blocks", "blocks_placed", "distance", "distance_m", "fished", "traded", "jumps", "damage_dealt", "damage_taken", "cp_earned", "shop_sales", "level", "xp"]);
+const allowed = (s) => { const o = {}; for (const [k, v] of Object.entries(s || {})) if (ALL_OK.has(k) && typeof v !== "boolean" && v !== null && v !== "" && Number.isFinite(+v)) o[k] = +v; return o; };
 const pick = (s) => { const o = {}; for (const [k, ks] of Object.entries(PUB)) for (const x of ks) { const v = s?.[x]; if (v != null && v !== "" && Number.isFinite(+v)) { o[k] = +v; break; } } return o; };
 const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
 // Fuzzy: exakt > Präfix > Teilstring > Subsequenz > Levenshtein ≤ 2
@@ -27,7 +29,12 @@ export async function playerApi(env, name, user) {
   if (!r) return null;
   let s = {}, d = null; try { s = JSON.parse(r.stats || "{}"); } catch {} try { d = r.details ? JSON.parse(r.details) : null; } catch {}
   const o = { name: r.mc_name, uuid: r.mc_uuid, stats: pick(s), updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : null, viewer: { logged_in: !!user } };
-  if (user) o.details = { all: s, extra: d }; // Details nur mit Discord-Login
+  // Details nur für eingeloggte, verifizierte Mitspieler mit Server-Rolle; nur Whitelist numerischer Stats (nie inventory/pickup)
+  if (user) {
+    const l = await env.DB.prepare("SELECT verified, has_role FROM mc_links WHERE discord_id = ?").bind(String(user.id)).first().catch(() => null);
+    o.viewer.can_details = !!(l && l.verified && l.has_role);
+    if (o.viewer.can_details) o.details = { all: allowed(s), extra: d };
+  }
   return o;
 }
 const SEARCH_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
@@ -83,5 +90,5 @@ h+='<div id="det"><h2 class="hub-h2" style="font-size:1.2rem;margin-top:2rem">De
 +'<div class="dgr">'+card('Top-Blöcke','abgebaut',list(d.mined,ICO,10))+card('Mob-Kills','',list(d.killed,k=>ICO(MOB[k]||'iron_sword'),8,k=>MN[k]||MC.NM(k)))
 +card('Distanzen',tot?KM(tot)+' gesamt':'',dk.length?'<div class="dmini">'+dk.map(k=>'<div class="slotbox"><div class="k">'+E(DL[k]||MC.NM(k))+'</div><div class="v tnum">'+KM(dd[k])+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')
 +card('Todesursachen','',list(d.deaths_by,k=>ICO(MOB[k]||'bone'),8,k=>MN[k]||MC.NM(k)))+'</div></div>'}
-else h+='<div class="g lock" style="margin-top:1.2rem" id="det"><img alt="" width="40" height="40" class="mi" style="margin:0 auto" src="/mc-icon/barrel"><h2 class="hub-h2" style="font-size:1.2rem;margin-top:.6rem">Details nur für Mitspieler</h2><p class="mut">Melde dich mit Discord an, um alle Stats von '+E(p.name)+' zu sehen.</p><a class="btn discord" href="https://${MAIN}/auth/discord/login?next='+encodeURIComponent(location.href)+'">Mit Discord anmelden</a></div>';
+else h+='<div class="g lock" style="margin-top:1.2rem" id="det"><img alt="" width="40" height="40" class="mi" style="margin:0 auto" src="/mc-icon/barrel"><h2 class="hub-h2" style="font-size:1.2rem;margin-top:.6rem">Details nur für Mitspieler</h2><p class="mut">'+(p.viewer&&p.viewer.logged_in?'Details sehen nur verifizierte Spieler mit Server-Rolle. Verknüpfe deinen Minecraft-Account im <a href="/profile">Profil</a>.':'Melde dich mit Discord an, um alle Stats von '+E(p.name)+' zu sehen.')+'</p>'+(p.viewer&&p.viewer.logged_in?'':'<a class="btn discord" href="https://${MAIN}/auth/discord/login?next='+encodeURIComponent(location.href)+'">Mit Discord anmelden</a>')+'</div>';
 R.innerHTML=h})()})();</script>`;

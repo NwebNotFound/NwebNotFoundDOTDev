@@ -154,6 +154,14 @@ try {
   ok(pd?.details && pd.viewer.logged_in === true, "Details nur mit Discord-Login", JSON.stringify(pd));
   ok(pd?.details?.extra?.killed?.zombie === 12 && pd.details.extra.distance_m?.walk === 15300, "Details enthalten Mob-Kills + Distanzen", JSON.stringify(pd?.details));
   ok((await req("/api/mc-players/Versteckt")).s === 404, "Unbestätigter Spieler → 404");
+  sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.inventory', json('[{"item":"diamond_sword","count":1}]'), '$.pickup', json('[{"item":"diamond","count":2}]'), '$.secret_note', 'x') WHERE mc_uuid = '${U1}'`);
+  sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('s3','100000000000000009','versteckt','Versteckt',datetime('now','+1 day'))`);
+  const c3 = await cookieFor("s3");
+  const fo = await req("/api/mc-players/Nils", { cookie: c2 });
+  ok(fo.j?.details && fo.j.viewer.can_details === true && !/inventory|pickup|diamond_sword|secret_note/.test(fo.t), "eingeloggt, fremdes Profil: Details ohne Inventar/Pickup", fo.t.slice(0, 300));
+  ok(fo.j?.details?.all && Object.values(fo.j.details.all).every((v) => typeof v === "number"), "details.all nur numerische Whitelist-Stats");
+  const nr = (await req("/api/mc-players/Nils", { cookie: c3 })).j;
+  ok(nr && !nr.details && nr.viewer.logged_in === true && nr.viewer.can_details === false, "eingeloggt ohne Rolle/Verifizierung → keine Details", JSON.stringify(nr));
   ok((await req("/spieler/bad%3Cname")).s === 404, "Ungültiger Name → 404");
   ok((await req("/spieler/Nils")).t.includes("/api/mc-players/") && !(await req("/spieler/Nils")).t.includes("<script>alert"), "Spielerseite lädt API");
 
