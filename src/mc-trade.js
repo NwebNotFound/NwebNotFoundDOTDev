@@ -65,21 +65,16 @@ export const blobStatement = (env, kind, data, now) => env.DB.prepare("INSERT IN
 const blob = async (env, kind) => { const r = await env.DB.prepare("SELECT data, updated_at FROM mc_blobs WHERE kind = ?").bind(kind).first().catch(() => null); return r ? { list: JSON.parse(r.data), updated_at: r.updated_at } : { list: [], updated_at: null }; };
 const iso = (t) => (t ? new Date(t).toISOString() : null);
 
-export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
+export function makeTrade({ verifyTurnstile, ipHash, json, getUser, safeEq, MAIN, MCD }) {
   const tokenOk = (req, env) => { const t = req.headers.get("x-ingest-token") || ""; return !!env.MC_INGEST_TOKEN && t.length > 0 && safeEq(t, env.MC_INGEST_TOKEN); };
   const originOk = (req) => { const o = req.headers.get("origin"); if (!o) return false; try { const h = new URL(o).hostname; return h === MAIN || h === MCD; } catch { return false; } };
   const linkFor = (env, discordId) => env.DB.prepare("SELECT mc_name, mc_uuid, has_role, verified FROM mc_links WHERE discord_id = ?").bind(discordId).first().catch(() => null);
-  // Rate-Limit über beide Warteschlangen: pro Discord-ID 5/min, 30/h; pro IP 10/min, 60/h
+  // Rate-Limit über beide Warteschlangen: pro Discord-ID 5/min, 30/h; pro IP-Hash (SHA-256 mit Tagessalz) 10/min, 60/h
   async function limited(env, discordId, ip) {
     const now = Date.now(), m = now - 60000, h = now - 3600000;
     const q = (col) => `SELECT SUM(c1) AS m, SUM(c2) AS h FROM (SELECT SUM(created_at > ?2) AS c1, COUNT(*) AS c2 FROM mc_bids_pending WHERE ${col} = ?1 AND created_at > ?3 UNION ALL SELECT SUM(created_at > ?2), COUNT(*) FROM mc_shop_orders_pending WHERE ${col} = ?1 AND created_at > ?3)`;
-    const [d, i] = await Promise.all([env.DB.prepare(q("discord_id")).bind(discordId, m, h).first(), ip ? env.DB.prepare(q("ip")).bind(ip, m, h).first() : { m: 0, h: 0 }]);
+    const [d, i] = await Promise.all([env.DB.prepare(q("discord_id")).bind(discordId, m, h).first(), ip ? env.DB.prepare(q("ip_hash")).bind(ip, m, h).first() : { m: 0, h: 0 }]);
     return (d?.m || 0) >= 5 || (d?.h || 0) >= 30 || (i?.m || 0) >= 10 || (i?.h || 0) >= 60;
-  }
-  async function turnstileOk(env, req, token) {
-    if (!env.TURNSTILE_SECRET || !token) return true; // optional: nur geprüft, wenn mitgeschickt
-    const fd = new FormData(); fd.append("secret", env.TURNSTILE_SECRET); fd.append("response", String(token)); fd.append("remoteip", req.headers.get("CF-Connecting-IP") || "");
-    try { return !!(await (await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: fd })).json()).success; } catch { return false; }
   }
   // Wer handelt? Website: nur Discord-Session (+ Origin). Bot: nur Ingest-Token + discord_id. UUID immer aus mc_links.
   async function actor(req, env, b) {
@@ -87,7 +82,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (viaBot) { if (!tokenOk(req, env)) return { err: [401, "unauthorized"] }; const did = String(b?.discord_id ?? ""); if (!/^\d{15,21}$/.test(did)) return { err: [400, "discord_id fehlt"] }; return { discordId: did, source: "discord" }; }
     if (!originOk(req)) return { err: [403, "Ungültige Herkunft"] };
     const u = await getUser(req, env); if (!u) return { err: [401, "Bitte mit Discord anmelden"] };
-    if (!(await turnstileOk(env, req, b?.turnstile))) return { err: [403, "Captcha fehlgeschlagen"] };
+    if (!(await verifyTurnstile(env, req, b?.turnstile, [MCD])).ok) return { err: [403, "Captcha fehlgeschlagen"] }; // Pflicht für Web-Trades
     return { discordId: u.id, source: "web" };
   }
   async function prep(req, env) {
@@ -98,7 +93,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const l = await linkFor(env, a.discordId);
     if (!l) return { err: json({ error: "Kein verknüpfter Minecraft-Account. Nutze /link im Discord." }, 403) };
     if (!l.verified || !l.has_role) return { err: json({ error: "Account nicht bestätigt oder Rolle fehlt" }, 403) };
-    const ip = a.source === "web" ? req.headers.get("CF-Connecting-IP") || "" : null;
+    const ip = a.source === "web" ? await ipHash(env, req.headers.get("CF-Connecting-IP") || "") : null; // nur gesalzener Hash, keine Klartext-IP
     if (await limited(env, a.discordId, ip)) return { err: json({ error: "Zu viele Aktionen, bitte kurz warten" }, 429, { "retry-after": "60" }) };
     return { b, a, l, ip };
   }
@@ -115,7 +110,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const need = Math.max(minNext(au), own?.m ? own.m + 1 : 0);
     if (amount < need) return json({ error: "Mindestgebot ist " + (need / 100).toFixed(2) + " CP", min_next: need }, 409);
     const id = crypto.randomUUID(), now = Date.now();
-    await env.DB.prepare("INSERT INTO mc_bids_pending (id, auction_id, bidder_uuid, bidder_name, discord_id, amount, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, au.id, l.mc_uuid, l.mc_name, a.discordId, amount, a.source, now, ip).run();
+    await env.DB.prepare("INSERT INTO mc_bids_pending (id, auction_id, bidder_uuid, bidder_name, discord_id, amount, source, created_at, status, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, au.id, l.mc_uuid, l.mc_name, a.discordId, amount, a.source, now, ip).run();
     return json({ ok: true, request_id: id, status: "pending", amount }, 202);
   }
   async function order(req, env) {
@@ -129,7 +124,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (!off) off = sh.items.filter((x) => x.item === it && x.mode === "sell").sort((x, y) => y.stock - x.stock)[0]; if (!off) return json({ error: "Item wird hier nicht verkauft" }, 404);
     if (off.stock < qty) return json({ error: "Nur noch " + off.stock + " auf Lager" }, 409);
     const id = crypto.randomUUID(), now = Date.now();
-    await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ip).run();
+    await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ip).run();
     return json({ ok: true, request_id: id, status: "pending", qty, unit_price: off.price, total: off.price * qty }, 202);
   }
   // Pull + Ack für Server/Bot (nur Ingest-Token)

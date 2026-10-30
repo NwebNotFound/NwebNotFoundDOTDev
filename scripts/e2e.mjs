@@ -4,6 +4,7 @@ import { spawn, execSync } from "node:child_process";
 import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
 import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
+import { verifyTurnstile, ipHash, withSecurityHeaders } from "../src/security.js";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = 8799, BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
@@ -18,10 +19,10 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   if (token) h["x-ingest-token"] = token;
   if (cookie) h.cookie = cookie;
   if (origin) h.origin = origin;
-  const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t };
+  const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
 };
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
-const now = Date.now(), H = 3600;
+const now = Date.now(), H = 3600, TT = "XXXX.DUMMY.TOKEN.XXXX";
 
 // --- Setup
 fs.rmSync(PERSIST, { recursive: true, force: true });
@@ -106,30 +107,30 @@ try {
   ok(A.a1.created_at === Math.floor(now / 1000) * 1000, "created_at Sekunden → ms");
   const d2 = (await req("/api/mc-auctions/a2")).j.auction; ok(d2.bids.length === 2 && d2.bids[0].name === "Seller" && d2.bids[1].name === "99999999…", "Gebotsverlauf mit Namen / Kurz-UUID", JSON.stringify(d2.bids));
   ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, origin: O })).s === 401, "Gebot ohne Session → 401");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1, origin: "https://evil.example" })).s === 403, "falscher Origin → 403");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1 })).s === 403, "kein Origin → 403");
-  let r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 4999 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5000, "unter min_price → 409");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000, bidder_uuid: U2 }, cookie: c1, origin: O }); ok(r.s === 202, "Gebot = min_price → 202", r.t);
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a1", amount: 5000 }, cookie: c1, origin: "https://evil.example" })).s === 403, "falscher Origin → 403");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a1", amount: 5000 }, cookie: c1 })).s === 403, "kein Origin → 403");
+  let r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a1", amount: 4999 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5000, "unter min_price → 409");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a1", amount: 5000, bidder_uuid: U2 }, cookie: c1, origin: O }); ok(r.s === 202, "Gebot = min_price → 202", r.t);
   const bidId = r.j?.request_id;
   ok(sqlRows(`SELECT bidder_uuid FROM mc_bids_pending WHERE id='${bidId}'`)[0]?.bidder_uuid === U1, "bidder_uuid serverseitig aus mc_links (Client-UUID ignoriert)");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5001, "eigenes offenes Gebot hebt Minimum");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a2", amount: 21499 }, cookie: c1, origin: O })).s === 409, "a2 21499 < min_next_bid → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a2", amount: 21500 }, cookie: c1, origin: O })).s === 202, "a2 21500 → 202");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a3", amount: 20999 }, cookie: c1, origin: O })).s === 409, "a3 20999 → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a4", amount: 500 }, cookie: c1, origin: O })).s === 403, "eigene Auktion → 403");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a5", amount: 500 }, cookie: c1, origin: O })).s === 409, "beendete Auktion → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 50.5 }, cookie: c1, origin: O })).s === 400, "Kommabetrag → 400");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a1", amount: 5000 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5001, "eigenes offenes Gebot hebt Minimum");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a2", amount: 21499 }, cookie: c1, origin: O })).s === 409, "a2 21499 < min_next_bid → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a2", amount: 21500 }, cookie: c1, origin: O })).s === 202, "a2 21500 → 202");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a3", amount: 20999 }, cookie: c1, origin: O })).s === 409, "a3 20999 → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a4", amount: 500 }, cookie: c1, origin: O })).s === 403, "eigene Auktion → 403");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a5", amount: 500 }, cookie: c1, origin: O })).s === 409, "beendete Auktion → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a1", amount: 50.5 }, cookie: c1, origin: O })).s === 400, "Kommabetrag → 400");
 
   console.log("5) Shop-Bestellungen");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 11 }, cookie: c1, origin: O })).s === 409, "Menge > Lager → 409");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L2", qty: 1 }, cookie: c1, origin: O })).s === 404, "Angebot mit Preis null wird verworfen → 404");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L3", qty: 1 }, cookie: c1, origin: O })).s === 403, "eigener Shop → 403");
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 2 }, cookie: c1, origin: O }); ok(r.s === 202 && r.j.total === 3000, "Bestellung per listing_id → 202, total 3000", r.t);
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TT, listing_id: "L1", qty: 11 }, cookie: c1, origin: O })).s === 409, "Menge > Lager → 409");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TT, listing_id: "L2", qty: 1 }, cookie: c1, origin: O })).s === 404, "Angebot mit Preis null wird verworfen → 404");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TT, listing_id: "L3", qty: 1 }, cookie: c1, origin: O })).s === 403, "eigener Shop → 403");
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TT, listing_id: "L1", qty: 2 }, cookie: c1, origin: O }); ok(r.s === 202 && r.j.total === 3000, "Bestellung per listing_id → 202, total 3000", r.t);
   const ordId = r.j?.request_id;
-  r = await req("/api/mc-shop-order", { method: "POST", body: { shop_id: "s1", item: "diamond", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 202, "Legacy shop_id+item → 202 (4. Aktion)");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a3", amount: 21000 }, cookie: c1, origin: O }); ok(r.s === 202, "a3 21000 → 202 (5. Aktion)", r.t);
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 429, "6. Aktion in 1 min → 429 Rate-Limit", r.s);
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1 }, cookie: c2, origin: O, ip: "10.0.0.1" }); ok(r.s === 403, "anderer User, eigener Shop → 403 (nicht vom Limit des ersten Users betroffen)", r.s);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TT, shop_id: "s1", item: "diamond", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 202, "Legacy shop_id+item → 202 (4. Aktion)");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TT, auction_id: "a3", amount: 21000 }, cookie: c1, origin: O }); ok(r.s === 202, "a3 21000 → 202 (5. Aktion)", r.t);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TT, listing_id: "L1", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 429, "6. Aktion in 1 min → 429 Rate-Limit", r.s);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TT, listing_id: "L1", qty: 1 }, cookie: c2, origin: O, ip: "10.0.0.1" }); ok(r.s === 403, "anderer User, eigener Shop → 403 (nicht vom Limit des ersten Users betroffen)", r.s);
 
   console.log("6) Bot: pending + ack");
   ok((await req("/api/mc-bids/pending")).s === 401, "pending ohne Token → 401");
@@ -218,6 +219,39 @@ try {
   ok((await req("/api/feedback/admin/" + fid, { method: "PATCH", body: { status: "kaputt" }, headers: AH })).s === 400, "Admin PATCH ungültiger Status → 400");
   ok((await req("/api/feedback/admin/99999", { method: "PATCH", body: { status: "done" }, headers: AH })).s === 404, "Admin PATCH unbekannt → 404");
   ok((await req("/api/feedback/admin?status=done", { headers: AH })).j.items.length === 1, "Admin GET Filter done");
+  console.log("6e) Turnstile, IP-Hash, Gästebuch-Limit");
+  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 999999 }, cookie: c2, origin: O, ip: "10.7.7.7" }); ok(r.s === 403 && /Captcha/.test(r.j?.error || ""), "Web-Gebot ohne Turnstile → 403", r.t);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1, turnstile: "" }, cookie: c2, origin: O, ip: "10.7.7.7" }); ok(r.s === 403, "Web-Bestellung mit leerem Turnstile → 403", r.t);
+  { const rows = sqlRows(`SELECT ip, ip_hash FROM mc_bids_pending WHERE source='web' UNION ALL SELECT ip, ip_hash FROM mc_shop_orders_pending WHERE source='web'`);
+    ok(rows.length > 0 && rows.every((x) => x.ip === null && /^[0-9a-f]{64}$/.test(x.ip_hash || "")), "Trades speichern nur gesalzenen IP-Hash, keine Klartext-IP", JSON.stringify(rows.slice(0, 2)));
+    ok(rows[0]?.ip_hash === (await ipHash({ SESSION_SECRET: SECRET }, "10.0.0.1")), "IP-Hash = SHA-256(Tagessalz|IP)"); }
+  { const E = { TURNSTILE_SECRET: "real-secret" }, Rq = new Request("https://mc.nwebnotfound.dev/x", { headers: { "CF-Connecting-IP": "1.2.3.4" } });
+    const mock = (o) => async () => new Response(JSON.stringify(o));
+    ok((await verifyTurnstile(E, Rq, "t", ["mc.nwebnotfound.dev"], mock({ success: true, hostname: "mc.nwebnotfound.dev" }))).ok === true, "Siteverify: success + richtiger Hostname → ok");
+    ok((await verifyTurnstile(E, Rq, "t", ["mc.nwebnotfound.dev"], mock({ success: true, hostname: "evil.example" }))).reason === "hostname-mismatch", "Siteverify: falscher Hostname → abgelehnt");
+    ok((await verifyTurnstile(E, Rq, "t", ["mc.nwebnotfound.dev"], mock({ success: true, hostname: "example.com" }))).ok === false, "Siteverify: example.com nur mit Test-Secret");
+    ok((await verifyTurnstile(E, Rq, "t", ["mc.nwebnotfound.dev"], mock({ success: false, hostname: "mc.nwebnotfound.dev" }))).ok === false, "Siteverify: success false → abgelehnt");
+    ok((await verifyTurnstile(E, Rq, "t", ["mc.nwebnotfound.dev"], mock({ success: "true", hostname: "mc.nwebnotfound.dev" }))).ok === false, "Siteverify: success muss exakt true sein");
+    ok((await verifyTurnstile(E, Rq, "", ["mc.nwebnotfound.dev"], mock({ success: true, hostname: "mc.nwebnotfound.dev" }))).ok === false, "Siteverify: ohne Token → abgelehnt");
+    ok((await verifyTurnstile({}, Rq, "t", ["mc.nwebnotfound.dev"], mock({ success: true, hostname: "mc.nwebnotfound.dev" }))).ok === false, "Siteverify: ohne Secret → abgelehnt");
+    ok((await verifyTurnstile(E, Rq, "t", ["mc.nwebnotfound.dev"], async () => { throw new Error("net"); })).ok === false, "Siteverify: Netzfehler → abgelehnt"); }
+  { const gb = (cookie, ip, token = TT) => req("/api/guestbook", { method: "POST", body: { message: "Hallo c0de", token }, cookie, ip, testHost: "nwebnotfound.dev", host: "nwebnotfound.dev" });
+    ok((await gb(c1, "10.9.9.9", "")).s === 403, "Gästebuch ohne Turnstile → 403");
+    for (let i = 0; i < 5; i++) { const x = await gb(c1, "10.9.9.9"); ok(x.s === 201, "Gästebuch-Eintrag " + (i + 1) + " → 201", x.t); }
+    let x = await gb(c1, "10.9.9.9"); ok(x.s === 429, "6. Eintrag in 1 h → 429", x.s);
+    x = await gb(c2, "10.9.9.9"); ok(x.s === 429, "anderer Account, gleiche IP → 429 (pro IP-Hash)", x.s);
+    x = await gb(c1, "10.9.9.8"); ok(x.s === 429, "gleicher Account, andere IP → 429 (pro Discord-ID)", x.s);
+    x = await gb(c2, "10.9.9.7"); ok(x.s === 201, "anderer Account + andere IP → 201", x.t);
+    const gr = sqlRows("SELECT ip_hash, discord_id FROM gb_rate"); ok(gr.length === 6 && gr.every((y) => /^[0-9a-f]{64}$/.test(y.ip_hash)) && !JSON.stringify(gr).includes("10.9.9"), "gb_rate ohne Klartext-IP", JSON.stringify(gr[0]));
+    const old = Date.now() - 2 * 3600000; sql(`INSERT INTO gb_rate (ip_hash, discord_id, created_at) VALUES ${Array.from({ length: 19 }, () => `(NULL,'${D2}',${old})`).join(",")}`);
+    x = await gb(c2, "10.9.9.6"); ok(x.s === 429, "Tageslimit 20 → 429", x.s); }
+  { const hp = await req("/", { testHost: "nwebnotfound.dev", host: "nwebnotfound.dev" }), csp = hp.h.get("content-security-policy-report-only") || "";
+    ok(/challenges\.cloudflare\.com/.test(csp) && /frame-ancestors 'none'/.test(csp) && /cdn\.discordapp\.com/.test(csp) && !hp.h.has("content-security-policy"), "HTML: CSP Report-Only (Turnstile, Discord-Avatare)", csp);
+    ok(hp.h.get("x-frame-options") === "DENY" && hp.h.get("referrer-policy") === "strict-origin-when-cross-origin" && /camera=\(\)/.test(hp.h.get("permissions-policy") || ""), "HTML: X-Frame-Options DENY, Referrer-Policy, Permissions-Policy");
+    const mp = await req("/auktionen/a1"); ok(mp.h.has("content-security-policy-report-only") && mp.t.includes("cf-turnstile"), "MC-Auktionsseite: CSP-RO + Turnstile-Widget");
+    ok(!(await req("/api/mc-auctions")).h.has("content-security-policy-report-only"), "JSON-API ohne CSP");
+    const keep = withSecurityHeaders(new Response("<p>", { headers: { "content-type": "text/html", "x-frame-options": "SAMEORIGIN" } }));
+    ok(keep.headers.get("x-frame-options") === "SAMEORIGIN", "vorhandene Security-Header werden nicht überschrieben"); }
   console.log("7) Seiten");
   for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");

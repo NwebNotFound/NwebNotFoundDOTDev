@@ -10,7 +10,7 @@ return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden=
 const C2=c=>NF((+c||0)/100,2)+' CP';
 const LEFT=ms=>{if(ms<=0)return 'beendet';const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;return d?d+'T '+h+'h':h?h+'h '+m+'m':m+'m '+String(x).padStart(2,'0')+'s'};
 const LOC=l=>!l?'':typeof l==='string'?l:[l.world,[l.x,l.y,l.z].filter(v=>v!=null).join(' / ')].filter(Boolean).join(' · ');
-const post=(u,b)=>fetch(u,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(b)}).then(async r=>({ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}));
+const post=(u,b)=>{const w=document.querySelector('.cf-turnstile [name="cf-turnstile-response"]');if(w&&b&&b.turnstile==null)b=Object.assign({},b,{turnstile:w.value});return fetch(u,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(b)}).then(async r=>{const o={ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))};if(w&&window.turnstile)try{turnstile.reset()}catch(_){}return o})};
 const get=u=>fetch(u,{credentials:'include'}).then(r=>{if(!r.ok)throw 0;return r.json()});
 function SCORE(x,q){q=q.toLowerCase().trim().replace(/[_\s]+/g,' ');if(!q)return 0;const n=NM(x.item).toLowerCase(),id=x.item.replace(/_/g,' ');let best=0;
 for(const h of [n,id]){const w=h.split(' ');if(h===q)return 1000;if(h.startsWith(q))best=Math.max(best,800-h.length);

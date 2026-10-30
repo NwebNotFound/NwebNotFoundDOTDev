@@ -5,6 +5,7 @@ import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js"
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
 import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
 import { normInv, renderInventoryCard } from "./mc-inventory.js";
+import { verifyTurnstile, ipHash, ipHashes, withSecurityHeaders, SEC_HEADERS } from "./security.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -594,7 +595,7 @@ async function mcIngest(req, env) {
   return json({ ok: true, views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0 });
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
-let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
+let _trade; const TRADE = () => _trade || (_trade = makeTrade({ verifyTurnstile, ipHash, json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
   const d = row ? JSON.parse(row.data) : {}, now = Date.now(), iso = (t) => t ? new Date(t).toISOString() : null;
@@ -685,7 +686,6 @@ async function mcMarketItem(env, raw) {
 }
 
 /* ---------- Helfer ---------- */
-const SEC_HEADERS = { "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
 const json = (o, s = 200, extra = {}) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
 const html = (h, s = 200) => new Response(h.replaceAll("{{Y}}", String(new Date().getUTCFullYear())), { status: s, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...SEC_HEADERS } });
 const notFound = (mc) => html(mc
@@ -710,9 +710,16 @@ async function guestbookApi(req, env) {
     let b; try { b = await req.json(); } catch { return json({ error: "Ungültige Anfrage" }, 400); }
     const message = String(b.message || "").trim();
     if (!message || message.length > 500) return json({ error: "Nachricht 1–500 Zeichen" }, 400);
-    const fd = new FormData(); fd.append("secret", env.TURNSTILE_SECRET); fd.append("response", String(b.token || "")); fd.append("remoteip", req.headers.get("CF-Connecting-IP") || "");
-    const v = await (await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: fd })).json();
-    if (!v.success) return json({ error: "Captcha fehlgeschlagen" }, 403);
+    const v = await verifyTurnstile(env, req, b.token, [MAIN]);
+    if (!v.ok) return json({ error: "Captcha fehlgeschlagen" }, 403);
+    // Rate-Limit pro Person: max. 5/h und 20/Tag, Schlüssel = SHA-256(Tagessalz|IP) (heute+gestern) oder Discord-ID
+    const now = Date.now(), ip = req.headers.get("CF-Connecting-IP") || "", hs = await ipHashes(env, ip, now), h0 = hs[0] || null;
+    const hA = hs[0] || "-", hB = hs[1] || "-";
+    const rl = await env.DB.prepare(`INSERT INTO gb_rate (ip_hash, discord_id, created_at) SELECT ?1, ?2, ?3 WHERE
+      (SELECT COUNT(*) FROM gb_rate WHERE created_at > ?3 - 3600000 AND (ip_hash IN (?4, ?5) OR discord_id = ?2)) < 5 AND
+      (SELECT COUNT(*) FROM gb_rate WHERE created_at > ?3 - 86400000 AND (ip_hash IN (?4, ?5) OR discord_id = ?2)) < 20`).bind(h0, user.id, now, hA, hB).run();
+    if (!rl.meta?.changes) return json({ error: "Zu viele Einträge. Maximal 5 pro Stunde und 20 pro Tag." }, 429, { "retry-after": "3600" });
+    await env.DB.prepare("DELETE FROM gb_rate WHERE created_at < ?").bind(now - 2 * 86400000).run().catch(() => {});
     const row = await env.DB.prepare("SELECT avatar FROM sessions WHERE id = ?").bind(user.sid).first();
     await env.DB.prepare("INSERT INTO entries (name, message, discord_id, avatar) VALUES (?, ?, ?, ?)").bind(user.name.slice(0, 50), message, user.id, row?.avatar || null).run();
     return json({ ok: true }, 201);
@@ -727,7 +734,7 @@ async function me(req, env) {
   return json({ available: authReady(env), user: u ? { id: u.id, name: u.name, username: u.username, avatar: u.avatar } : null }, 200, cors);
 }
 
-export default {
+const app = {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     const hostH = req.headers.get("host")?.replace(/:\d+$/, "") || "";
@@ -787,3 +794,6 @@ export default {
     return assetOrNotFound(req, env, false);
   },
 };
+
+// Security-Header (inkl. CSP Report-Only) auf alle HTML-Antworten, ohne gesetzte Werte zu überschreiben
+export default { async fetch(req, env, ctx) { return withSecurityHeaders(await app.fetch(req, env, ctx)); } };

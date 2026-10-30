@@ -35,3 +35,12 @@ CREATE TABLE IF NOT EXISTS mc_leaderboards (kind TEXT PRIMARY KEY, data TEXT NOT
 CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL CHECK (type IN ('bug','idea')), title TEXT NOT NULL, body TEXT NOT NULL, location TEXT, discord_id TEXT NOT NULL, mc_name TEXT, mc_uuid TEXT, status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','in_progress','done','rejected')), admin_note TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_discord ON feedback(discord_id, created_at);
+
+CREATE TABLE IF NOT EXISTS gb_rate (id INTEGER PRIMARY KEY AUTOINCREMENT, ip_hash TEXT, discord_id TEXT, created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_gb_rate_ip ON gb_rate(ip_hash, created_at);
+CREATE INDEX IF NOT EXISTS idx_gb_rate_discord ON gb_rate(discord_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_gb_rate_created ON gb_rate(created_at);
+ALTER TABLE mc_bids_pending ADD COLUMN ip_hash TEXT;
+ALTER TABLE mc_shop_orders_pending ADD COLUMN ip_hash TEXT;
+CREATE INDEX IF NOT EXISTS idx_bids_iphash ON mc_bids_pending(ip_hash, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_iphash ON mc_shop_orders_pending(ip_hash, created_at);
