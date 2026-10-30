@@ -5,11 +5,12 @@ Bug melden oder Idee einreichen.
 ## Wer darf senden
 - Nur mit dem bestehenden Discord-Login der Website (Session-Cookie).
 - Der Discord-Account muss mit einem **verifizierten** MC-Account verknüpft sein und die **Server-Rolle** haben (`mc_links.verified = 1 AND has_role = 1`).
-- Keine neuen Secrets und keine signierten Links.
+- Keine signierten Links. Einziges neues Secret: `FEEDBACK_ADMIN_TOKEN` (nur für die Admin-API; als Worker-Secret setzen, nie ausgeben).
 
 ## Schutz
 - Cloudflare Turnstile (`TURNSTILE_SECRET`, bereits vorhanden); Origin muss die Website sein.
-- Limit: **3 Einreichungen pro 24 h pro Discord-Account** (429 danach).
+- Limit: **3 Einreichungen pro 24 h pro Discord-Account** (429 danach). Atomar per `INSERT … SELECT … WHERE count < 3`, daher auch bei parallelen Anfragen exakt.
+- Turnstile-Antwort muss `success` sein **und** `hostname` = `nwebnotfound.dev` bzw. `mc.nwebnotfound.dev`.
 - **Keine IP-Speicherung.** Gespeichert werden: Typ, Titel, Text, optional Ort, Discord-ID, MC-Name/UUID, Status, Zeitstempel.
 
 ## API

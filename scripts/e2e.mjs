@@ -187,7 +187,9 @@ try {
   ok((await fb(good, { origin: "https://evil.example" })).s === 403, "Feedback falscher Origin → 403");
   ok((await fb({ ...good, type: "x" })).s === 400 && (await fb({ ...good, body: "kurz" })).s === 400, "Feedback Validierung → 400");
   ok((await fb({ ...good, token: "" })).s === 403, "Feedback ohne Captcha-Token → 403");
-  for (let i = 0; i < 3; i++) { const r2 = await fb({ ...good, title: "Testbug c0de " + i }); ok(r2.s === 201, "Feedback " + (i + 1) + " → 201", r2.t); }
+  for (let i = 0; i < 2; i++) { const r2 = await fb({ ...good, title: "Testbug c0de " + i }); ok(r2.s === 201, "Feedback " + (i + 1) + " → 201", r2.t); }
+  const par = await Promise.all([fb({ ...good, title: "Testbug c0de p1" }), fb({ ...good, title: "Testbug c0de p2" })]);
+  ok(par.filter((x) => x.s === 201).length === 1 && par.filter((x) => x.s === 429).length === 1, "2 parallele Submits bei 2/3 → genau einer ok", par.map((x) => x.s).join(","));
   ok((await fb(good)).s === 429, "4. Feedback am Tag → 429");
   const fm = (await req("/api/feedback", { cookie: c1 })).j; ok(fm.can && fm.remaining === 0 && fm.mine.length === 3, "Feedback GET: eigene Einreichungen + Rest 0", JSON.stringify(fm));
   ok((await req("/api/feedback/admin")).s === 401 && (await req("/api/feedback/admin", { headers: { authorization: "Bearer falsch" } })).s === 401, "Admin ohne/mit falschem Bearer → 401");

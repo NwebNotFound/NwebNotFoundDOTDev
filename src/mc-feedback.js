@@ -1,6 +1,7 @@
 // Feedback (Bug/Idee): nur eingeloggte Discord-User mit verifiziertem MC-Account + Server-Rolle.
 // Schutz: Turnstile, Origin-Check, 3 Einreichungen/Tag pro Discord-Account. Keine IP-Speicherung.
 // Admin: GET/PATCH mit "Authorization: Bearer <FEEDBACK_ADMIN_TOKEN>" (nur aus env, wird nie ausgegeben).
+const TEST_SECRET = "1x0000000000000000000000000000000AA";
 const TYPES = ["bug", "idea"], STATUS = ["open", "in_progress", "done", "rejected"], DAY = 864e5, LIMIT = 3;
 const clip = (v, n) => String(v ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, n);
 const iso = (t) => (t ? new Date(t).toISOString() : null);
@@ -35,13 +36,17 @@ export function makeFeedback({ json, getUser, safeEq, MAIN, MCD }) {
     if (!TYPES.includes(type)) return json({ error: "Typ muss bug oder idea sein" }, 400);
     if (title.length < 3) return json({ error: "Titel: 3–100 Zeichen" }, 400);
     if (body.length < 10) return json({ error: "Beschreibung: 10–2000 Zeichen" }, 400);
-    if ((await used(env, w.user.id)) >= LIMIT) return json({ error: "Limit erreicht: 3 Einreichungen pro Tag" }, 429);
+    if ((await used(env, w.user.id)) >= LIMIT) return json({ error: "Limit erreicht: 3 Einreichungen pro Tag" }, 429); // Vorabprüfung spart Captcha-Call; verbindlich ist das atomare INSERT unten
     if (!env.TURNSTILE_SECRET) return json({ error: "Captcha nicht konfiguriert" }, 503);
     const fd = new FormData(); fd.append("secret", env.TURNSTILE_SECRET); fd.append("response", String(b?.token || ""));
     let v = {}; try { v = await (await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: fd })).json(); } catch {}
-    if (!v.success) return json({ error: "Captcha fehlgeschlagen" }, 403);
+    // Hostname muss unsere Seite sein (Cloudflares öffentlicher Test-Secret liefert immer "example.com" – nur für lokale Tests)
+    const hostOk = v.hostname === MAIN || v.hostname === MCD || (env.TURNSTILE_SECRET === TEST_SECRET && v.hostname === "example.com");
+    if (!v.success || !hostOk) return json({ error: "Captcha fehlgeschlagen" }, 403);
     const now = Date.now();
-    const r = await env.DB.prepare("INSERT INTO feedback (type, title, body, location, discord_id, mc_name, mc_uuid, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)").bind(type, title, body, location, w.user.id, w.link.mc_name, w.link.mc_uuid, now, now).run();
+    // Atomar: nur einfügen, solange < LIMIT in den letzten 24 h (kein Race bei parallelen Submits)
+    const r = await env.DB.prepare("INSERT INTO feedback (type, title, body, location, discord_id, mc_name, mc_uuid, status, created_at, updated_at) SELECT ?, ?, ?, ?, ?, ?, ?, 'open', ?, ? WHERE (SELECT COUNT(*) FROM feedback WHERE discord_id = ? AND created_at > ?) < ?").bind(type, title, body, location, w.user.id, w.link.mc_name, w.link.mc_uuid, now, now, w.user.id, now - DAY, LIMIT).run();
+    if (!r.meta?.changes) return json({ error: "Limit erreicht: 3 Einreichungen pro Tag" }, 429);
     return json({ ok: true, id: r.meta?.last_row_id ?? null, remaining: Math.max(0, LIMIT - (await used(env, w.user.id))) }, 201);
   }
 
