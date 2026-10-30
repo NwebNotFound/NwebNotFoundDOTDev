@@ -215,22 +215,41 @@ try {
 
   console.log("6d) Feedback");
   const fb = (body, o = {}) => req("/api/feedback", { method: "POST", body, cookie: c1, origin: O, ...o });
-  const good = { type: "bug", title: "Testbug c0de", body: "Beschreibung mit genug Text", location: "Spawn", token: "XXXX.DUMMY.TOKEN.XXXX" };
-  ok((await req("/api/feedback")).j.logged_in === false, "Feedback GET ohne Login");
-  ok((await fb(good, { cookie: undefined })).s === 401, "Feedback ohne Login → 401");
-  ok((await fb(good, { origin: "https://evil.example" })).s === 403, "Feedback falscher Origin → 403");
-  ok((await fb({ ...good, type: "x" })).s === 400 && (await fb({ ...good, body: "kurz" })).s === 400, "Feedback Validierung → 400");
-  ok((await fb({ ...good, token: "" })).s === 403, "Feedback ohne Captcha-Token → 403");
-  for (let i = 0; i < 2; i++) { const r2 = await fb({ ...good, title: "Testbug c0de " + i }); ok(r2.s === 201, "Feedback " + (i + 1) + " → 201", r2.t); }
-  const par = await Promise.all([fb({ ...good, title: "Testbug c0de p1" }), fb({ ...good, title: "Testbug c0de p2" })]);
-  ok(par.filter((x) => x.s === 201).length === 1 && par.filter((x) => x.s === 429).length === 1, "2 parallele Submits bei 2/3 → genau einer ok", par.map((x) => x.s).join(","));
-  ok((await fb(good)).s === 429, "4. Feedback am Tag → 429");
-  const fm = (await req("/api/feedback", { cookie: c1 })).j; ok(fm.can && fm.remaining === 0 && fm.mine.length === 3, "Feedback GET: eigene Einreichungen + Rest 0", JSON.stringify(fm));
+  const good = { category: "bug", text: "Beschreibung mit genug Text c0de", location: "Spawn", token: "XXXX.DUMMY.TOKEN.XXXX" };
+  for (const h of [HOST, "nwebnotfound.dev"]) { const pg = await req("/feedback", { testHost: h }); ok(pg.s === 200 && pg.t.includes("/api/feedback") && pg.t.includes("challenges.cloudflare.com/turnstile") && /mc\/ds\.css|ds\.css\?v=/.test(pg.t), "GET /feedback auf " + h + " → 200 (MC-Design)", pg.s); }
+  ok((await req("/feedback", { testHost: "nwebnotfound.dev" })).t.includes('href="https://mc.nwebnotfound.dev/markt"'), "Hauptdomain: MC-Navigation absolut");
+  // Login-Gate
+  ok((await req("/api/feedback")).j.logged_in === false, "Login-Gate: GET ohne Login → logged_in false (Seite zeigt Login-Button)");
+  ok((await req("/feedback")).t.includes("/auth/discord/login"), "Seite enthält Discord-Login-Button");
+  ok((await fb(good, { cookie: undefined })).s === 401, "Login-Gate: POST ohne Login → 401");
+  // Rollen-Gate (s3 = eingeloggt, aber kein verifizierter Link/keine Rolle)
+  ok((await fb(good, { cookie: c3 })).s === 403, "Rollen-Gate: ohne Link/Rolle → 403");
+  const g3 = (await req("/api/feedback", { cookie: c3 })).j; ok(g3.logged_in && g3.can === false, "Rollen-Gate: GET can=false", JSON.stringify(g3));
+  sql(`UPDATE mc_links SET has_role = 0 WHERE discord_id = '${D2}'`);
+  ok((await fb(good, { cookie: c2 })).s === 403, "Rollen-Gate: verknüpft, Rolle entzogen → 403");
+  sql(`UPDATE mc_links SET has_role = 1 WHERE discord_id = '${D2}'`);
+  ok((await fb(good, { origin: "https://evil.example" })).s === 403, "Falscher Origin → 403");
+  ok((await fb({ ...good, category: "x" })).s === 400 && (await fb({ ...good, text: "kurz" })).s === 400, "Validierung Kategorie/Text → 400");
+  // Turnstile
+  ok((await fb({ ...good, token: "" })).s === 403, "Turnstile: ohne Token → 403");
+  for (let i = 0; i < 2; i++) { const r2 = await fb({ ...good, category: ["bug", "other"][i], text: good.text + " " + i }); ok(r2.s === 201, "Feedback " + (i + 1) + " → 201 (Turnstile ok)", r2.t); }
+  ok((await fb({ ...good, text: "x".repeat(2500) })).s === 201, "Feedback 3 mit Überlänge → 201 (wird gekürzt)");
+  // Rate-Limit (3/Tag): der lange Text war Nr. 3 → gekürzt gespeichert
+  ok((await fb(good)).s === 429, "Rate-Limit: 4. Feedback am Tag → 429");
+  ok((await fb(good, { cookie: c2, ip: "10.9.9.9" })).s === 201, "Rate-Limit pro Discord-ID (anderer Account ok)");
+  const fm = (await req("/api/feedback", { cookie: c1 })).j; ok(fm.can && fm.remaining === 0 && fm.mine.length === 3, "GET: eigene Einreichungen + Rest 0", JSON.stringify(fm));
+  const row = sqlRows(`SELECT * FROM feedback WHERE discord_id = '${D1}' ORDER BY id`);
+  ok(row.length === 3 && row[0].mc_name === "Nils" && row[0].mc_uuid && row[0].category === "bug" && row[1].category === "other" && row[2].text.length === 2000, "D1: Felder gespeichert, Text auf 2000 gekürzt", JSON.stringify(row[0]));
+  ok(!JSON.stringify(sqlRows("SELECT * FROM feedback")).includes("10.0.0") && !Object.keys(row[0]).some((k) => /ip/i.test(k)), "Keine IP gespeichert");
+  // Admin
   ok((await req("/api/feedback/admin")).s === 401 && (await req("/api/feedback/admin", { headers: { authorization: "Bearer falsch" } })).s === 401, "Admin ohne/mit falschem Bearer → 401");
+  ok((await req("/api/feedback/admin/1", { method: "PATCH", body: { status: "done" } })).s === 401, "Admin PATCH ohne Bearer → 401");
+  ok((await req("/api/feedback/admin", { cookie: c1 })).s === 401, "Admin mit Session statt Bearer → 401");
   const AH = { authorization: "Bearer e2e-admin" };
-  const al = await req("/api/feedback/admin?status=open", { headers: AH }); ok(al.s === 200 && al.j.items.length === 3 && al.j.items[0].mc_name === "Nils" && !("discord_id" in al.j.items[0]) && !al.t.includes("10.0.0"), "Admin GET: Liste ohne IP/Discord-ID", al.t.slice(0, 200));
+  const al = await req("/api/feedback/admin?status=open", { headers: AH }); ok(al.s === 200 && al.j.items.length === 4 && al.j.items.some((x) => x.mc_name === "Nils") && !("discord_id" in al.j.items[0]), "Admin GET → 200, Liste ohne Discord-ID", al.t.slice(0, 200));
+  ok((await req("/api/feedback/admin?category=other", { headers: AH })).j.items.length === 1, "Admin GET Filter Kategorie");
   const fid = al.j.items[0].id;
-  ok((await req("/api/feedback/admin/" + fid, { method: "PATCH", body: { status: "done", admin_note: "gefixt" }, headers: AH })).s === 200, "Admin PATCH status done");
+  ok((await req("/api/feedback/admin/" + fid, { method: "PATCH", body: { status: "done" }, headers: AH })).s === 200, "Admin PATCH status done → 200");
   ok((await req("/api/feedback/admin/" + fid, { method: "PATCH", body: { status: "kaputt" }, headers: AH })).s === 400, "Admin PATCH ungültiger Status → 400");
   ok((await req("/api/feedback/admin/99999", { method: "PATCH", body: { status: "done" }, headers: AH })).s === 404, "Admin PATCH unbekannt → 404");
   ok((await req("/api/feedback/admin?status=done", { headers: AH })).j.items.length === 1, "Admin GET Filter done");

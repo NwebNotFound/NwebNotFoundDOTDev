@@ -1,6 +1,6 @@
-# Feedback (mc.nwebnotfound.dev/feedback)
+# Feedback (nwebnotfound.dev/feedback und mc.nwebnotfound.dev/feedback)
 
-Bug melden oder Idee einreichen.
+Bug melden, Idee oder Sonstiges einreichen. Gleiches MC-Design auf beiden Domains.
 
 ## Wer darf senden
 - Nur mit dem bestehenden Discord-Login der Website (Session-Cookie).
@@ -11,15 +11,15 @@ Bug melden oder Idee einreichen.
 - Cloudflare Turnstile (`TURNSTILE_SECRET`, bereits vorhanden); Origin muss die Website sein.
 - Limit: **3 Einreichungen pro 24 h pro Discord-Account** (429 danach). Atomar per `INSERT … SELECT … WHERE count < 3`, daher auch bei parallelen Anfragen exakt.
 - Turnstile-Antwort muss `success` sein **und** `hostname` = `nwebnotfound.dev` bzw. `mc.nwebnotfound.dev`.
-- **Keine IP-Speicherung.** Gespeichert werden: Typ, Titel, Text, optional Ort, Discord-ID, MC-Name/UUID, Status, Zeitstempel.
+- **Keine IP-Speicherung.** Gespeichert werden: Kategorie, Text, optional Item/Ort, Discord-ID, MC-Name/UUID, Status, Zeitstempel.
 
 ## API
 | Methode | Pfad | Auth | Zweck |
 |---|---|---|---|
 | GET | `/api/feedback` | Session | eigener Status, Restkontingent, letzte 10 Einreichungen |
-| POST | `/api/feedback` | Session + Origin + Turnstile | `{type: "bug"\|"idea", title (3–100), body (10–2000), location?, token}` |
-| GET | `/api/feedback/admin?status=&type=&limit=` | `Authorization: Bearer $FEEDBACK_ADMIN_TOKEN` | Liste (ohne Discord-ID) |
-| PATCH | `/api/feedback/admin/<id>` | Bearer | `{status: open\|in_progress\|done\|rejected, admin_note?}` |
+| POST | `/api/feedback` | Session + Origin + Turnstile | `{category: "bug"\|"idea"\|"other", text (10–2000), location?, token}` |
+| GET | `/api/feedback/admin?status=&category=&limit=` | `Authorization: Bearer $FEEDBACK_ADMIN_TOKEN` | Liste (ohne Discord-ID) |
+| PATCH | `/api/feedback/admin/<id>` | Bearer | `{status: open\|in_progress\|done\|rejected}` |
 
 Beispiel (Token nie in Logs/Chats posten):
 ```sh
@@ -27,8 +27,8 @@ curl -H "Authorization: Bearer $FEEDBACK_ADMIN_TOKEN" https://mc.nwebnotfound.de
 ```
 
 ## Live schalten (nur nach Freigabe)
-1. `npx wrangler secret put FEEDBACK_ADMIN_TOKEN` (zufälliger Wert, nur im Passwortmanager)
-2. `npx wrangler d1 execute DB --remote --file migrations/0001_feedback.sql`
+1. `npx wrangler secret put FEEDBACK_ADMIN_TOKEN` (Wert liegt auf der Box in `/workspace/.secrets/feedback_admin_token`, nie ins Repo/Chat)
+2. `npx wrangler d1 execute DB --remote --file migrations/0004_feedback.sql`
 3. Deploy über `./scripts/deploy.sh`
 
 Lokal: `node scripts/e2e.mjs` (Schema inkl. `feedback`-Tabelle, Turnstile-Testschlüssel, Abschnitt 6d).
