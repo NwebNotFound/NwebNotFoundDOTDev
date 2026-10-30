@@ -216,3 +216,8 @@ html.mc table.cmd th[aria-sort=descending] button::after{content:"▼";font-size
 }
 html.mc .hero:has(.srch){overflow:visible;z-index:50}
 html.mc .hero:has(.srch) .pixbg{overflow:hidden}
+/* Mobile-Politur Markt + Wiki (390px) */
+html.mc .bigpct{white-space:nowrap}
+@media(max-width:600px){html.mc select{width:100%;min-height:44px}html.mc .wk code,html.mc .wk pre{overflow-wrap:anywhere;white-space:pre-wrap}html.mc .wk h2{scroll-margin-top:110px}html.mc .hub-h{overflow-wrap:anywhere}}
+html.mc .mrow .mch{background:none;border:0;padding:0;margin:0;box-shadow:none;border-radius:0;white-space:nowrap;text-align:right;flex:none}
+@media(max-width:600px){html.mc .mrow .msp svg{width:64px}html.mc .ictl{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}html.mc .fsel,html.mc .fsel select{width:100%;min-width:0}}

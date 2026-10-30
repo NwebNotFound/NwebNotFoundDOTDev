@@ -63,7 +63,7 @@ try {
       { category: "cp", uuid: U1, value: 1500, rank: 1 }, { category: "cp", player: U2, score: 1200, rank: 2 }, { stat: "playtime", player_uuid: U2, name: "Seller", value: 3600 },
       { key: "kills", uuid: U1, value: 5, period: "weekly" }, { category: "cp", uuid: "99999999-8888-7777-6666-555555555555", value: 1 },
     ],
-    v_player_stats_ext: [{ uuid: U1, name: "Nils", cp: 900, playtime_s: 7200, deaths: 3, mined: '{"minecraft:stone":120,"dirt":5}', fished: 4 }, { player: U2, stat: "cp", value: 1200 }, { player: U2, stat: "deaths", value: 1 }],
+    v_player_stats_ext: [{ uuid: U1, name: "Nils", cp: 900, playtime_s: 7200, deaths: 3, mined: '{"minecraft:stone":120,"dirt":5}', killed: { zombie: 12, creeper: 3 }, distance_m: { walk: 15300, sprint: 820 }, fished: 4 }, { player: U2, stat: "cp", value: 1200 }, { player: U2, stat: "deaths", value: 1 }],
   };
   const ing = await req("/api/mc-ingest", { method: "POST", body: payload, token: TOK });
   ok(ing.s === 200 && ing.j?.ok, "Ingest mit Token → 200", ing.t.slice(0, 200));
@@ -140,8 +140,33 @@ try {
   r = await req("/api/mc-bid", { method: "POST", token: TOK, body: { discord_id: D2, auction_id: "a4", amount: 100 } }); ok(r.s === 202, "Bot-Gebot im Auftrag (Token + discord_id) → 202", r.t);
   ok((await req("/api/mc-bid", { method: "POST", token: "falsch", body: { discord_id: D2, auction_id: "a3", amount: 30000 } })).s === 401, "Bot-Gebot falscher Token → 401");
 
+  console.log("6b) Spielersuche");
+  sql(`INSERT INTO mc_links (discord_id, mc_name, mc_uuid, has_role, verified, updated_at) VALUES ('100000000000000009','Versteckt','aaaaaaaa-0000-0000-0000-00000000c0de',1,0,0)`);
+  const pl = (await req("/api/mc-players")).j?.players || [];
+  ok(pl.some((x) => x.name === "Nils") && pl.some((x) => x.name === "Seller"), "Spielerliste enthält verknüpfte Spieler", JSON.stringify(pl));
+  ok(!pl.some((x) => x.name === "Versteckt"), "Unbestätigte Verknüpfung nicht öffentlich");
+  ok((await req("/api/mc-players?q=nls")).j.players[0]?.name === "Nils", "Fuzzy: 'nls' → Nils");
+  ok((await req("/api/mc-players?q=Selr")).j.players[0]?.name === "Seller", "Fuzzy: Tippfehler 'Selr' → Seller");
+  ok((await req("/api/mc-players?q=zzzzqq")).j.players.length === 0, "Fuzzy: kein Treffer → leer");
+  const pn = (await req("/api/mc-players/nils")).j;
+  ok(pn?.name === "Nils" && pn.stats && !pn.details && pn.viewer.logged_in === false, "Spielerseite öffentlich ohne Details", JSON.stringify(pn));
+  const pd = (await req("/api/mc-players/Nils", { cookie: c1 })).j;
+  ok(pd?.details && pd.viewer.logged_in === true, "Details nur mit Discord-Login", JSON.stringify(pd));
+  ok(pd?.details?.extra?.killed?.zombie === 12 && pd.details.extra.distance_m?.walk === 15300, "Details enthalten Mob-Kills + Distanzen", JSON.stringify(pd?.details));
+  ok((await req("/api/mc-players/Versteckt")).s === 404, "Unbestätigter Spieler → 404");
+  sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.inventory', json('[{"item":"diamond_sword","count":1}]'), '$.pickup', json('[{"item":"diamond","count":2}]'), '$.secret_note', 'x') WHERE mc_uuid = '${U1}'`);
+  sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('s3','100000000000000009','versteckt','Versteckt',datetime('now','+1 day'))`);
+  const c3 = await cookieFor("s3");
+  const fo = await req("/api/mc-players/Nils", { cookie: c2 });
+  ok(fo.j?.details && fo.j.viewer.can_details === true && !/inventory|pickup|diamond_sword|secret_note/.test(fo.t), "eingeloggt, fremdes Profil: Details ohne Inventar/Pickup", fo.t.slice(0, 300));
+  ok(fo.j?.details?.all && Object.values(fo.j.details.all).every((v) => typeof v === "number"), "details.all nur numerische Whitelist-Stats");
+  const nr = (await req("/api/mc-players/Nils", { cookie: c3 })).j;
+  ok(nr && !nr.details && nr.viewer.logged_in === true && nr.viewer.can_details === false, "eingeloggt ohne Rolle/Verifizierung → keine Details", JSON.stringify(nr));
+  ok((await req("/spieler/bad%3Cname")).s === 404, "Ungültiger Name → 404");
+  ok((await req("/spieler/Nils")).t.includes("/api/mc-players/") && !(await req("/spieler/Nils")).t.includes("<script>alert"), "Spielerseite lädt API");
+
   console.log("7) Seiten");
-  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
+  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
   console.log("8) UI (Chromium 390/1440)");
