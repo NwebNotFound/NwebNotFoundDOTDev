@@ -20,7 +20,7 @@ with sync_playwright() as p:
         ctx = br.new_context(viewport={"width": w, "height": 900})
         ctx.add_cookies([{"name": COOKIE.split("=")[0], "value": COOKIE.split("=", 1)[1], "domain": H, "path": "/", "secure": True, "httpOnly": True}])
         pg = ctx.new_page(); pg.route("**/*", route); errs = []
-        pg.on("pageerror", lambda e: errs.append(str(e))); pg.on("console", lambda m: errs.append(m.text) if m.type == "error" and "mc-heads" not in m.text and "Failed to load resource" not in m.text else None)
+        pg.on("pageerror", lambda e: errs.append(str(e))); pg.on("console", lambda m: errs.append(m.text) if m.type == "error" and "mc-heads" not in m.text and "Failed to load resource" not in m.text and "challenges.cloudflare.com" not in (m.location or {}).get("url", "") and "challenges.cloudflare.com" not in m.text and "font-size:0;color:transparent" not in m.text else None)
         def go(path):
             pg.goto("https://" + H + path, wait_until="networkidle"); pg.wait_for_timeout(300)
             ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px {path}: kein horizontales Scrollen")
@@ -50,6 +50,8 @@ with sync_playwright() as p:
         ok(pg.evaluate("document.documentElement.scrollWidth<=innerWidth+1"), f"{w}px Abholungen: kein Overflow")
         pg.screenshot(path=f"{SH}/local-polish-abholungen-{w}.png", full_page=True)
         t = go("/shops/s1"); ok("15,00" in t, f"{w}px Shop: Preis 15,00 CP")
+        t = go("/feedback"); ok("Feedback" in t and ("Limit" in t or "0 von 3" in t or "Deine Einreichungen" in t) and pg.locator("#fbf textarea").count() == 1, f"{w}px Feedback: Formular + eigene Einreichungen", t[:300])
+        pg.screenshot(path=f"{SH}/local-feedback-{w}.png", full_page=True)
         t = go("/spieler"); ok("Nils" in t and "Seller" in t, f"{w}px Spieler: Liste")
         pg.fill("#q", "nls"); pg.wait_for_timeout(600); ok(pg.locator("a.plc").first.inner_text().startswith("Nils"), f"{w}px Spieler: Fuzzy 'nls'")
         pg.screenshot(path=f"{SH}/local-spieler-{w}.png", full_page=True)

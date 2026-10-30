@@ -10,8 +10,8 @@ const sql = (q) => execSync(`npx wrangler d1 execute DB --local --persist-to ${P
 const sqlRows = (q) => JSON.parse(sql(q))[0].results;
 const b64u = (b) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 async function cookieFor(sid) { const k = await C.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return "nnf_session=" + encodeURIComponent(sid + "." + b64u(await C.subtle.sign("HMAC", k, new TextEncoder().encode(sid)))); }
-const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1" } = {}) => {
-  const h = { host: HOST, "cf-connecting-ip": ip }; if (body) h["content-type"] = "application/json"; if (token) h["x-ingest-token"] = token; if (cookie) h.cookie = cookie; if (origin) h.origin = origin;
+const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1", headers = {} } = {}) => {
+  const h = { host: HOST, "cf-connecting-ip": ip, ...headers }; if (body) h["content-type"] = "application/json"; if (token) h["x-ingest-token"] = token; if (cookie) h.cookie = cookie; if (origin) h.origin = origin;
   const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t };
 };
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
@@ -20,7 +20,7 @@ const now = Date.now(), H = 3600;
 // --- Setup
 fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
-fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\n`);
+fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\n`);
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
 const wd = spawn("npx", ["wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: true });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
@@ -179,6 +179,25 @@ try {
   ok((await req("/spieler/bad%3Cname")).s === 404, "Ungültiger Name → 404");
   ok((await req("/spieler/Nils")).t.includes("/api/mc-players/") && !(await req("/spieler/Nils")).t.includes("<script>alert"), "Spielerseite lädt API");
 
+  console.log("6d) Feedback");
+  const fb = (body, o = {}) => req("/api/feedback", { method: "POST", body, cookie: c1, origin: O, ...o });
+  const good = { type: "bug", title: "Testbug c0de", body: "Beschreibung mit genug Text", location: "Spawn", token: "XXXX.DUMMY.TOKEN.XXXX" };
+  ok((await req("/api/feedback")).j.logged_in === false, "Feedback GET ohne Login");
+  ok((await fb(good, { cookie: undefined })).s === 401, "Feedback ohne Login → 401");
+  ok((await fb(good, { origin: "https://evil.example" })).s === 403, "Feedback falscher Origin → 403");
+  ok((await fb({ ...good, type: "x" })).s === 400 && (await fb({ ...good, body: "kurz" })).s === 400, "Feedback Validierung → 400");
+  ok((await fb({ ...good, token: "" })).s === 403, "Feedback ohne Captcha-Token → 403");
+  for (let i = 0; i < 3; i++) { const r2 = await fb({ ...good, title: "Testbug c0de " + i }); ok(r2.s === 201, "Feedback " + (i + 1) + " → 201", r2.t); }
+  ok((await fb(good)).s === 429, "4. Feedback am Tag → 429");
+  const fm = (await req("/api/feedback", { cookie: c1 })).j; ok(fm.can && fm.remaining === 0 && fm.mine.length === 3, "Feedback GET: eigene Einreichungen + Rest 0", JSON.stringify(fm));
+  ok((await req("/api/feedback/admin")).s === 401 && (await req("/api/feedback/admin", { headers: { authorization: "Bearer falsch" } })).s === 401, "Admin ohne/mit falschem Bearer → 401");
+  const AH = { authorization: "Bearer e2e-admin" };
+  const al = await req("/api/feedback/admin?status=open", { headers: AH }); ok(al.s === 200 && al.j.items.length === 3 && al.j.items[0].mc_name === "Nils" && !("discord_id" in al.j.items[0]) && !al.t.includes("10.0.0"), "Admin GET: Liste ohne IP/Discord-ID", al.t.slice(0, 200));
+  const fid = al.j.items[0].id;
+  ok((await req("/api/feedback/admin/" + fid, { method: "PATCH", body: { status: "done", admin_note: "gefixt" }, headers: AH })).s === 200, "Admin PATCH status done");
+  ok((await req("/api/feedback/admin/" + fid, { method: "PATCH", body: { status: "kaputt" }, headers: AH })).s === 400, "Admin PATCH ungültiger Status → 400");
+  ok((await req("/api/feedback/admin/99999", { method: "PATCH", body: { status: "done" }, headers: AH })).s === 404, "Admin PATCH unbekannt → 404");
+  ok((await req("/api/feedback/admin?status=done", { headers: AH })).j.items.length === 1, "Admin GET Filter done");
   console.log("7) Seiten");
   for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");

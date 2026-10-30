@@ -255,3 +255,15 @@ html.mc .pst span.cur{background:rgba(95,211,95,.12);font-weight:700}
 html.mc .pst span.bad{color:#ff6b6b;background:rgba(255,107,107,.1)}
 html.mc .pue .btn{margin-top:.8rem}
 @media (max-width:480px){html.mc .pgrid{grid-template-columns:repeat(9,minmax(0,1fr));width:auto}}
+/* Feedback */
+html.mc #fbc .card{margin-top:var(--s4,1rem)}
+html.mc .fbf{display:flex;flex-direction:column;gap:.9rem}
+html.mc .fbf label{display:flex;flex-direction:column;gap:.35rem;font-size:.9rem}
+html.mc .fbf input:not([type=radio]),html.mc .fbf textarea{width:100%;box-sizing:border-box;padding:.6rem .7rem;background:#0f1310;color:inherit;border:2px solid #000;box-shadow:inset 2px 2px 0 #0a0c0a,inset -2px -2px 0 #2a302b;font:inherit}
+html.mc .fbf textarea{resize:vertical;min-height:7rem}
+html.mc .fbt{border:0;padding:0;margin:0;display:flex;gap:1.2rem;flex-wrap:wrap}
+html.mc .fbt legend{font-size:.9rem;margin-bottom:.35rem}
+html.mc .fbt label{flex-direction:row;align-items:center;gap:.4rem}
+html.mc #fbc .plist{list-style:none;margin:0;padding:0}
+html.mc #fbc .po{padding:.7rem 0;border-top:1px solid var(--line,#2a2f2b)}
+html.mc #fbc .pom{display:flex;flex-direction:column;gap:.2rem}

@@ -2,6 +2,7 @@ import { AV } from "./asset-version.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
 import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
+import { makeFeedback, feedbackBody } from "./mc-feedback.js";
 import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
@@ -166,7 +167,7 @@ load();
 /* ---------- Minecraft-Bereich ---------- */
 const BLOCK_SVG = `<svg class="block" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect width="8" height="8" fill="#6b4a2b"/><rect width="8" height="3" fill="#4ade80"/><rect y="3" width="1" height="1" fill="#4ade80"/><rect x="3" y="3" width="1" height="2" fill="#4ade80"/><rect x="6" y="3" width="1" height="1" fill="#4ade80"/><rect x="1" y="1" width="1" height="1" fill="#22c55e"/><rect x="5" y="0" width="1" height="1" fill="#86efac"/><rect x="2" y="5" width="1" height="1" fill="#5a3c22"/><rect x="5" y="6" width="1" height="1" fill="#7c5a37"/></svg>`;
 const mNav = hubNav(MAIN);
-const mFoot = `<span>© {{Y}} Nils Weberruß · Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt oder mit ihnen verbunden.</span><span><a href="https://${MAIN}/">Hauptseite</a></span>`;
+const mFoot = `<span>© {{Y}} Nils Weberruß · Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt oder mit ihnen verbunden.</span><span><a href="/feedback">Feedback</a> · <a href="https://${MAIN}/">Hauptseite</a></span>`;
 
 const mcPage = (title, desc, body) => shell({ title, desc, css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body });
 const MC_HOME = mcPage("Minecraft-Server · NwebNotFound", "Status, Profil, Bestenlisten, Markt und Wiki für mc.nwebnotfound.dev", homeBody(MC_HOST));
@@ -608,6 +609,7 @@ async function mcIngest(req, env) {
   if (st.length) await env.DB.batch(st);
   return json({ ok: true, views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0 });
 }
+let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
@@ -741,6 +743,7 @@ export default {
     const p = url.pathname.replace(/\/$/, "") || "/";
     const isMc = url.hostname === MCD;
 
+    if (p.startsWith("/api/feedback")) { const r = FB().route(p, req, env, url); if (r) return r; }
     if (p.startsWith("/api/mc-")) { const r = TRADE().route(p, req, env, url); if (r) return r; }
     if (p === "/api/mc-status") return mcStatus(ctx, env);
     if (p === "/api/me") return me(req, env);
@@ -762,6 +765,7 @@ export default {
       if (p === "/profile") return html(PROFILE_MC());
       if (p === "/leaderboards") return html(LEADERBOARDS_MC());
       if (p === "/abholungen") return html(mcPage("Abholungen · NwebNotFound MC", "Deine Bestellungen und dein Abholfach", PICKUP_BODY));
+      if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
       if (p === "/spieler") return html(mcPage("Spieler · NwebNotFound MC", "Spieler suchen: Skin, öffentliche Stats und Profil", playersBody()));
       if (p.startsWith("/spieler/")) { const n = decodeURIComponent(p.slice(9)); if (!/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
       if (p === "/markt" && url.searchParams.has("item")) {
