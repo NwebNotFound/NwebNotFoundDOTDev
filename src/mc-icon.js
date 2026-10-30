@@ -1,5 +1,5 @@
 import { TEX_BLOCK, TEX_ITEM } from "./mc-textures.js";
-export const TEX_BASE = "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.1/assets/minecraft/textures/";
+export const TEX_BASE = "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/";
 // IDs, deren Texturname abweicht
 const ALIAS = {
   grass_block: "block/grass_block_side", water: "block/water_still", lava: "block/lava_still", water_bucket: "item/water_bucket",
@@ -24,6 +24,9 @@ const ALIAS = {
   deepslate: "block/deepslate", basalt: "block/basalt_side", polished_basalt: "block/polished_basalt_side", ancient_debris: "block/ancient_debris_side",
   crimson_nylium: "block/crimson_nylium_side", warped_nylium: "block/warped_nylium_side", sculk_sensor: "block/sculk_sensor_side", sculk_catalyst: "block/sculk_catalyst_side",
   sculk_shrieker: "block/sculk_shrieker_side", reinforced_deepslate: "block/reinforced_deepslate_side", dried_kelp_block: "block/dried_kelp_side",
+  crossbow: "item/crossbow_standby", decorated_pot: "item/brick", dried_ghast: "block/dried_ghast_hydration_0_north", moss_carpet: "block/moss_block", pale_moss_carpet: "block/pale_moss_block",
+  heavy_weighted_pressure_plate: "block/iron_block", light_weighted_pressure_plate: "block/gold_block", shield: "block/spruce_planks", test_block: "block/test_block_start",
+  copper_chest: "block/copper_block", exposed_copper_chest: "block/exposed_copper", weathered_copper_chest: "block/weathered_copper", oxidized_copper_chest: "block/oxidized_copper",
   air: null, cave_air: null, void_air: null,
 };
 const MAT = { brick: "bricks", stone_brick: "stone_bricks", nether_brick: "nether_bricks", red_nether_brick: "red_nether_bricks", mud_brick: "mud_bricks",
@@ -34,6 +37,9 @@ const WOODS = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangro
 const has = (p) => (p.startsWith("block/") ? TEX_BLOCK : TEX_ITEM).has(p.slice(p.indexOf("/") + 1));
 const first = (...c) => c.find((p) => p && has(p)) || null;
 const cache = new Map();
+// Mob-/Spielerköpfe haben keine Item-Textur (3D-Modell aus Entity-Skin) -> isometrischer Kopf über mc-heads (MHF_-Skins)
+export const HEAD_URL = "https://mc-heads.net/head/";
+const HEADS = { zombie: "MHF_Zombie", skeleton: "MHF_Skeleton", wither_skeleton: "MHF_WSkeleton", creeper: "MHF_Creeper", piglin: "MHF_Piglin", dragon: "MHF_Enderdragon", ender_dragon: "MHF_Enderdragon", player: "MHF_Steve" };
 export function resolveIcon(raw) {
   const id = String(raw || "").toLowerCase().replace(/^minecraft:/, "").replace(/[^a-z0-9_]/g, "");
   if (!id) return null;
@@ -62,9 +68,10 @@ function resolve(id, depth) {
   if ((m = id.match(/^(.+)_(shulker_box)$/))) return first(`block/${m[1]}_shulker_box`, "block/shulker_box");
   if ((m = id.match(/^(.+)_(banner)$/))) return first(`block/${m[1]}_wool`);
   if ((m = id.match(/^(.+)_concrete_powder$/))) return first(`block/${m[1]}_concrete_powder`);
-  if ((m = id.match(/^(.+)_(head|skull)$/))) return first(`item/${m[1]}_head`);
+  if ((m = id.match(/^(.+?)_?(wall_)?(head|skull)$/)) && HEADS[m[1]]) return HEAD_URL + HEADS[m[1]] + "/64";
+  if (id === "player_head" || id === "player_wall_head") return HEAD_URL + "MHF_Steve/64";
   if ((m = id.match(/^(.+)_(crop|stem|plant)$/))) return resolve(m[1], depth + 1);
-  if ((m = id.match(/^(.+)_spawn_egg$/))) return first("item/egg");
+  if ((m = id.match(/^(.+)_spawn_egg$/))) return first(`item/${id}`, "item/spawn_egg", "item/egg");
   if (id.endsWith("s") && depth < 2) { const r = resolve(id.slice(0, -1), depth + 1); if (r) return r; }
   return family(id) || (depth === 0 ? tokens(id) || FALLBACK : null);
 }
@@ -73,7 +80,7 @@ const FAM = [
   [/_map$|^map_/, ["item/filled_map", "item/map"]], [/_pottery_sherd$/, ["item/brick"]], [/_smithing_template$/, ["item/netherite_upgrade_smithing_template", "item/paper"]],
   [/_banner_pattern$/, ["item/flower_banner_pattern", "item/paper"]], [/^music_disc_/, ["item/music_disc_13", "item/music_disc_cat"]], [/^disc_fragment/, ["item/disc_fragment_5"]],
   [/_bundle$/, ["item/bundle"]], [/_harness$/, ["item/saddle", "item/lead"]], [/_egg$/, ["item/egg"]], [/_bucket$/, ["item/water_bucket", "item/bucket"]],
-  [/_nautilus_armor$|_horse_armor$/, ["item/iron_horse_armor", "item/leather_horse_armor"]], [/_spear$/, ["item/trident", "item/iron_sword"]], [/_golem_statue$/, ["block/copper_block"]],
+  [/_nautilus_armor$|_horse_armor$/, ["item/iron_horse_armor", "item/leather_horse_armor"]], [/_spear$/, ["item/iron_spear", "item/wooden_spear"]], [/_golem_statue$/, ["block/copper_block"]],
   [/_raft$/, ["item/bamboo_raft", "item/oak_boat"]], [/_boat$/, ["item/oak_boat"]], [/_shelf$/, ["block/oak_planks"]], [/_bars$/, ["block/iron_bars"]], [/_chain$/, ["item/chain", "block/chain"]],
   [/_lantern$/, ["item/lantern", "block/lantern"]], [/_torch$/, ["block/torch"]], [/_ore$/, ["block/stone"]], [/_coral(_block|_fan)?$/, ["block/tube_coral_block"]],
   [/potion|tipped_arrow/, ["item/potion", "item/glass_bottle"]], [/_sign$/, ["item/oak_sign"]], [/_door$/, ["item/oak_door"]], [/_trapdoor$/, ["block/oak_trapdoor"]],

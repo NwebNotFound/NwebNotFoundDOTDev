@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS mc_bids_pending (id TEXT PRIMARY KEY, auction_id TEXT
 CREATE INDEX IF NOT EXISTS idx_bids_status ON mc_bids_pending(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_bids_auction ON mc_bids_pending(auction_id);
 CREATE INDEX IF NOT EXISTS idx_bids_discord ON mc_bids_pending(discord_id, created_at);
-CREATE TABLE IF NOT EXISTS mc_shop_orders_pending (id TEXT PRIMARY KEY, shop_id TEXT NOT NULL, item TEXT NOT NULL, qty INTEGER NOT NULL, buyer_uuid TEXT NOT NULL, buyer_name TEXT, discord_id TEXT, unit_price INTEGER, source TEXT NOT NULL, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT, acked_at INTEGER, ip TEXT, listing_id TEXT);
+CREATE TABLE IF NOT EXISTS mc_shop_orders_pending (id TEXT PRIMARY KEY, shop_id TEXT, item TEXT NOT NULL, qty INTEGER NOT NULL, buyer_uuid TEXT NOT NULL, buyer_name TEXT, discord_id TEXT, unit_price INTEGER, source TEXT NOT NULL, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT, acked_at INTEGER, ip TEXT, listing_id TEXT, type TEXT NOT NULL DEFAULT 'shop');
 CREATE INDEX IF NOT EXISTS idx_orders_status ON mc_shop_orders_pending(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_discord ON mc_shop_orders_pending(discord_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_bids_ip ON mc_bids_pending(ip, created_at);
@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS mc_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL, u
 CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, discord_id TEXT NOT NULL, mc_uuid TEXT, mc_name TEXT, category TEXT NOT NULL CHECK (category IN ('bug','idea','other')), text TEXT NOT NULL CHECK (length(text) <= 2000), location TEXT, status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','in_progress','done','rejected')), created_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_discord ON feedback(discord_id, created_at);
+
+-- 0006: Bank-Direktkauf (type='bank_buy') + ausgeblendete Bestellungen pro User
+CREATE INDEX IF NOT EXISTS idx_orders_type ON mc_shop_orders_pending(type, status, created_at);
+CREATE TABLE IF NOT EXISTS mc_order_hidden (discord_id TEXT NOT NULL, order_id TEXT NOT NULL, hidden_at INTEGER NOT NULL, PRIMARY KEY (discord_id, order_id));
 -- Parkour-Bestzeiten (Migration 0005)
 CREATE TABLE IF NOT EXISTS mc_parkour (course TEXT NOT NULL, mc_uuid TEXT NOT NULL, mc_name TEXT, time_ms INTEGER NOT NULL, set_at TEXT NOT NULL, PRIMARY KEY (course, mc_uuid));
 CREATE INDEX IF NOT EXISTS idx_mc_parkour_course_time ON mc_parkour(course, time_ms);

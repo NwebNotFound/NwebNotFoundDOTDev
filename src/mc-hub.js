@@ -53,7 +53,7 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 .mctip{display:inline-block;max-width:100%;background:rgba(16,0,16,.95);border:2px solid #100010;box-shadow:inset 0 0 0 2px #3a0f8f;padding:.6rem .8rem;font-family:var(--pf);font-size:.85rem;color:#c9a8ff}.mctip b{color:#fff}
 `;
 
-export const hubNav = (MAIN) => `<a class="brand" href="/"><img class="mi" alt="" width="22" height="22" src="/mc-icon/grass_block"> NwebNotFound MC</a><nav class="nl" aria-label="Bereiche"><a class="l" href="/">Start</a><a class="l" href="/leaderboards">Bestenlisten</a><a class="l" href="/parkour">Parkour</a><a class="l" href="/spieler">Spieler</a><a class="l" href="/markt">Markt</a><a class="l" href="/shops">Shops</a><a class="l" href="/auktionen">Auktionen</a><a class="l" href="/wiki">Wiki</a><a class="l" href="/profile">Profil</a></nav><script>(()=>{const p=location.pathname.replace(/\\/$/,'')||'/';document.querySelectorAll('.nav .l').forEach(a=>{const h=a.getAttribute('href');if(h===p||(h!=='/'&&p.startsWith(h+'/')))a.setAttribute('aria-current','page')})})()</script>`;
+export const hubNav = (MAIN) => `<a class="brand" href="/"><img class="mi" alt="" width="22" height="22" src="/mc-icon/grass_block"> NwebNotFound MC</a><nav class="nl" aria-label="Bereiche"><a class="l" href="/">Start</a><a class="l" href="/leaderboards">Bestenlisten</a><a class="l" href="/parkour">Parkour</a><a class="l" href="/spieler">Spieler</a><a class="l" href="/markt">Markt</a><a class="l" href="/shops">Shops</a><a class="l" href="/auktionen">Auktionen</a><a class="l" href="/wiki">Wiki</a></nav><script>(()=>{const p=location.pathname.replace(/\\/$/,'')||'/';document.querySelectorAll('.nav .l').forEach(a=>{const h=a.getAttribute('href');if(h===p||(h!=='/'&&p.startsWith(h+'/')))a.setAttribute('aria-current','page')})})()</script>`;
 
 export const MI = (id, px = 26) => `<img class="mi" alt="" width="${px}" height="${px}" loading="lazy" src="/mc-icon/${id}">`;
 const SEARCH_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
@@ -100,11 +100,15 @@ export const marketBody = () => `
 </div></section>
 <section class="sec" style="padding-top:1.2rem"><div class="hub-wrap" id="mroot"><div class="g pad mut">Lade Marktdaten…</div></div></section>
 <script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/market.js?v=${AV}" defer></script>`;
+// Öffentlicher Turnstile-Sitekey (gleich wie SITEKEY in worker.js)
+const TS_SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 export const marketItemBody = (item) => `
 <section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap">
 <p style="margin:0 0 1rem"><a href="/markt">‹ Markt</a></p><div id="ihd" data-item="${item}"><h1 class="hub-h">…</h1></div></div></section>
 <section class="sec" style="padding-top:.6rem"><div class="hub-wrap" id="iroot"><div class="g pad mut">Lade…</div></div></section>
-<script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/item.js?v=${AV}" defer></script>`;
+<section class="sec" style="padding-top:0"><div class="hub-wrap"><div class="g pad" id="bbuy" data-item="${item}" data-sitekey="${TS_SITEKEY}" hidden></div></div></section>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/item.js?v=${AV}" defer></script><script src="/mc/bankbuy.js?v=${AV}" defer></script>`;
 
 /* ---------- Wiki ---------- */
 const T = (s = "") => `<span class="todo" title="Noch offen">TODO${s ? ": " + s : ""}</span>`;
