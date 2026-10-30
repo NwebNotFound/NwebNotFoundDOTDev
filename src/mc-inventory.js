@@ -25,24 +25,30 @@ export function normInv(v) {
   return out;
 }
 
-/** Slot-Index → Item (null = leer). Legacy ohne slot: füllt 0,1,2,… */
+const SLOT_FILL_ORDER = (() => {
+  const o = [];
+  for (let s = 0; s <= 8; s++) o.push(s);
+  for (let s = 9; s <= 35; s++) o.push(s);
+  for (let s = 36; s <= 40; s++) o.push(s);
+  return o;
+})();
+
+/** Slot-Index → Item (null = leer). Mit slot zuerst; Rest in freie Slots 0–40. Legacy ohne slot: füllt der Reihe nach. */
 export function inventorySlotMap(items) {
   const L = Array.isArray(items) ? items.filter((i) => i && i.item) : [];
   const m = {};
-  const hasSlot = L.some((i) => i.slot != null);
-  if (hasSlot) {
-    for (const i of L) {
-      if (i.slot != null && i.slot >= 0 && i.slot <= 40) m[i.slot] = i;
-    }
-    return m;
+  const loose = [];
+  for (const i of L) {
+    const sl = i.slot;
+    if (Number.isInteger(sl) && sl >= 0 && sl <= 40) m[sl] = i;
+    else loose.push(i);
   }
-  const order = [];
-  for (let s = 0; s <= 8; s++) order.push(s);
-  for (let s = 9; s <= 35; s++) order.push(s);
-  for (let s = 36; s <= 40; s++) order.push(s);
-  L.forEach((item, idx) => {
-    if (order[idx] != null) m[order[idx]] = item;
-  });
+  let idx = 0;
+  for (const item of loose) {
+    while (idx < SLOT_FILL_ORDER.length && m[SLOT_FILL_ORDER[idx]] != null) idx++;
+    if (idx >= SLOT_FILL_ORDER.length) break;
+    m[SLOT_FILL_ORDER[idx++]] = item;
+  }
   return m;
 }
 
@@ -62,7 +68,7 @@ export function renderInventoryCard(inv) {
     { s: 37, label: "Beine" },
     { s: 36, label: "Stiefel" },
   ]
-    .map(({ s, label }) => slot(map[s] ?? null, " iv-arm", label))
+    .map(({ s, label }) => slot(map[s] ?? null, "", label))
     .join("");
   const offInner = slot(map[40] ?? null, "", "Nebenhand");
   const pane = `<div class="iv-pane"><div class="iv-arm">${armor}</div><div class="iv-stack"><div class="ivg">${main}</div><div class="ivg hot">${hot}</div></div><div class="iv-off">${offInner}</div></div>`;

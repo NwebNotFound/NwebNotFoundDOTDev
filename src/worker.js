@@ -247,7 +247,37 @@ const open=O.filter(o=>o.g!=='collected'&&o.g!=='failed').length;
 let h='<div class="card"><h3>Abholfach</h3>'+((d.pickup||[]).length?'<p class="mut" style="font-size:.8rem;margin-top:0">'+d.pickup.length+' Stapel warten'+(d.pickup_at?' · Stand '+E(D(d.pickup_at)):'')+'</p><div class="pgrid">'+d.pickup.map(i=>'<div class="pslot" title="'+E(NM(i.item))+'">'+ICO(i.item)+(i.count>1?'<b>'+NF(i.count)+'</b>':'')+'</div>').join('')+'</div>':'<p class="mut">Dein Abholfach ist leer.'+(d.pickup_at?' (Stand '+E(D(d.pickup_at))+')':'')+'</p>')+'</div>';
 h+='<div class="card"><h3>Bestellungen'+(open?' <span class="tag">'+open+' offen</span>':'')+'</h3>'+(O.length?'<ul class="plist">'+O.map(o=>'<li class="po g-'+o.g+'"><div class="poi">'+ICO(o.item)+'</div><div class="pom"><b>'+NF(o.qty)+'× '+E(NM(o.item))+'</b><span class="mut">'+(o.unit_price!=null?CP(o.unit_price*o.qty)+' · ':'')+E(D(o.created_at))+'</span>'+steps(o.g)+'<span class="mut pr">'+E(o.reason||ST[o.g][1])+'</span></div></li>').join('')+'</ul>':'<p class="mut">Noch keine Bestellungen. <a href="/shops">Zu den Shops ›</a></p>')+'</div>';
 B.innerHTML=h})</script>`;
+const PROFILE_PB_CSS = `<style>
+#pb .mch{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:1.5rem;align-items:center;padding:clamp(1.2rem,3vw,1.6rem);background:var(--card);border:1px solid var(--line);border-radius:22px}
+#pb .mch-model{position:relative;height:min(400px,55vw);display:grid;place-items:center}
+#pb .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchInMain .8s ease forwards}
+#pb .mch-model.ready .mch-fb{opacity:0;transition:opacity .4s}
+#pb .mch-fb{max-height:280px;image-rendering:pixelated;filter:drop-shadow(0 12px 24px rgba(0,0,0,.2))}
+#pb .mch-info{min-width:0}
+#pb .mch-name{font-size:clamp(1.5rem,5vw,2.2rem);margin:.2rem 0;line-height:1.15;overflow-wrap:anywhere}
+#pb .mch-sub{margin:0 0 1rem;font-size:.85rem;color:var(--mut)}
+#pb .mch-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+#pb .mch-tile{padding:.85rem 1rem;background:color-mix(in srgb,var(--fg) 4%,transparent);border:1px solid var(--line);border-radius:14px}
+#pb .mch-tile.wide{grid-column:1/-1}
+#pb .mch-tile .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+#pb .mch-tile .v{font-size:clamp(1.1rem,4vw,1.45rem);font-weight:650;margin-top:.2rem;font-variant-numeric:tabular-nums}
+#pb .mch-tile.empty .v{opacity:.35}#pb .mch-tile .nd{font-size:.7rem;color:var(--mut);margin-top:.15rem;opacity:.75}
+#pb .inv .iv-pane{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:start;max-width:min(100%,520px);margin-top:.8rem}
+#pb .inv .iv-arm{display:grid;gap:3px;grid-template-columns:1fr;padding:6px 4px;background:color-mix(in srgb,var(--fg) 5%,transparent);border:1px solid var(--line);border-radius:12px}
+#pb .inv .iv-stack{display:grid;gap:8px;min-width:0}
+#pb .inv .iv-off{align-self:end;padding:6px 4px;background:color-mix(in srgb,var(--fg) 5%,transparent);border:1px solid var(--line);border-radius:12px}
+#pb .inv .ivg{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;max-width:100%;padding:6px;background:color-mix(in srgb,var(--fg) 5%,transparent);border:1px solid var(--line);border-radius:12px}
+#pb .inv .ivs{aspect-ratio:1;position:relative;display:grid;place-items:center;background:color-mix(in srgb,var(--fg) 7%,transparent);min-width:0;border:1px solid var(--line);border-radius:6px}
+#pb .inv .ivs img{width:72%;height:72%;image-rendering:pixelated;object-fit:contain}
+#pb .inv .ivs b{position:absolute;right:2px;bottom:0;font:700 .7rem ui-monospace,monospace;text-shadow:0 0 2px var(--card)}
+#pb .inv .iv-empty .iv-pane{opacity:.45}
+@keyframes mchInMain{to{opacity:1}}
+@media(max-width:760px){#pb .mch{grid-template-columns:1fr;text-align:center}#pb .mch-grid{text-align:left}}
+@media(max-width:480px){#pb .inv .iv-pane{grid-template-columns:1fr}#pb .inv .iv-arm{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){#pb .mch-model canvas{animation:none;opacity:1}}
+</style>`;
 const PROFILE_BODY = (mc) => `
+${mc ? "" : PROFILE_PB_CSS}
 <section class="hero center" style="padding-bottom:2rem">${mc ? '<div class="pixbg"></div>' : ""}<div class="wrap" id="ph"><p class="mut">Lade Profil…</p></div></section>
 <section style="padding-top:0"><div class="wrap" style="max-width:860px;display:grid;gap:1.2rem" id="pb"></div></section>
 <script src="/mc/inventory.js?v=${AV}"></script><script>
@@ -286,7 +316,7 @@ h+='<div class="mch"><div class="mch-model" id="mcm"><img class="mch-fb" alt="Sk
 '<div class="mch-grid">'+SK.map((k,j)=>{const [t,f]=LBL[k]||[k.replace(/_/g,' '),v=>typeof v==='number'?v.toLocaleString('de-DE'):String(v)];const has=st[k]!=null&&st[k]!=='';return '<div class="mch-tile'+(j===0?' wide':'')+(has?'':' empty')+'"><div class="k">'+E(t)+'</div><div class="v">'+(has?E(f(st[k])):'–')+'</div>'+(has?'':'<div class="nd">noch keine Daten</div>')+'</div>'}).join('')+'</div>'+
 (m.updated_at?'<p class="mut" style="font-size:.78rem;margin:1rem 0 0">Stand: '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}))+'</p>':'')+'</div></div>';
 window.__skin='https://mc-heads.net/skin/'+id;
-h+=window.MCInv(st.inventory);}
+h+=typeof window.MCInv==='function'?window.MCInv(st.inventory):'';}
 else if(m){h+='<div class="card" style="text-align:center"><p class="eyebrow">Minecraft</p><h3>Noch nicht verknüpft</h3><p>'+E(m.hint)+'</p></div>';}
 const g=d.guestbook||[];h+='<div class="card"><h3 style="margin-bottom:.6rem">Deine Gästebuch-Einträge</h3>'+(g.length?g.map(x=>'<div style="padding:.9rem 0;border-top:1px solid var(--line)"><span class="mut" style="font-size:.8rem">'+E(fd(x.created_at))+'</span><p style="margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word;color:var(--fg)">'+E(x.message)+'</p></div>').join(''):'<p>Noch keine Einträge. <a href="https://${MAIN}/guestbook">Jetzt einen schreiben ›</a></p>')+'</div>';
 B.innerHTML=h;document.dispatchEvent(new CustomEvent('mcprofile',{detail:d}));if(window.__skin)sv3d(window.__skin);})();
@@ -661,6 +691,13 @@ const html = (h, s = 200) => new Response(h.replaceAll("{{Y}}", String(new Date(
 const notFound = (mc) => html(mc
   ? shell({ title: "404 · NwebNotFound MC", desc: "", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Diesen Chunk gibt es nicht.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` })
   : portfolio({ title: "404 · NwebNotFound", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Not Found. Passend zum Namen.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` }), 404);
+async function assetOrNotFound(req, env, mc) {
+  if (env.ASSETS) {
+    const ar = await env.ASSETS.fetch(req);
+    if (ar.status !== 404) return ar;
+  }
+  return notFound(mc);
+}
 
 async function guestbookApi(req, env) {
   if (req.method === "GET") {
@@ -693,9 +730,13 @@ async function me(req, env) {
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
-    if (url.hostname === `www.${MAIN}`) { url.hostname = MAIN; return Response.redirect(url.toString(), 301); }
+    const hostH = req.headers.get("host")?.replace(/:\d+$/, "") || "";
+    const allowTestHost = env.MC_INGEST_TOKEN === "e2e-token";
+    const testHostHdr = allowTestHost ? req.headers.get("x-nnf-test-host")?.replace(/:\d+$/, "") || "" : "";
+    const siteHost = testHostHdr || hostH || url.hostname;
+    if (siteHost === `www.${MAIN}`) { url.hostname = MAIN; return Response.redirect(url.toString(), 301); }
     const p = url.pathname.replace(/\/$/, "") || "/";
-    const isMc = url.hostname === MCD;
+    const isMc = siteHost === MCD;
 
     if (p.startsWith("/api/feedback")) { const r = FB().route(p, req, env, url); if (r) return r; }
     if (p.startsWith("/api/mc-")) { const r = TRADE().route(p, req, env, url); if (r) return r; }
@@ -736,13 +777,13 @@ export default {
       if (p.startsWith("/markt/")) { const it = cleanItem(decodeURIComponent(p.slice(7))); if (!it) return notFound(true); return html(mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
       if (p === "/wiki") return html(mcPage("Wiki · NwebNotFound MC", "Anleitungen, Regeln und FAQ zum Minecraft-Server", wikiIndexBody(MC_HOST)));
       if (p.startsWith("/wiki/")) { const a = WIKI.find((x) => x.slug === p.slice(6)); if (!a) return notFound(true); return html(mcPage(a.title + " · Wiki · NwebNotFound MC", a.sum, wikiArticleBody(a, MC_HOST))); }
-      return notFound(true);
+      return assetOrNotFound(req, env, true);
     }
     if (p === "/api/guestbook") return guestbookApi(req, env);
     if (p === "/") return html(HOME);
     if (p === "/guestbook") return html(GUEST);
     if (p === "/profile") return html(PROFILE_MAIN());
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
-    return notFound(false);
+    return assetOrNotFound(req, env, false);
   },
 };
