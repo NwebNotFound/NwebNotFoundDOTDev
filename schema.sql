@@ -37,3 +37,6 @@ CREATE TABLE IF NOT EXISTS mc_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL, u
 CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, discord_id TEXT NOT NULL, mc_uuid TEXT, mc_name TEXT, category TEXT NOT NULL CHECK (category IN ('bug','idea','other')), text TEXT NOT NULL CHECK (length(text) <= 2000), location TEXT, status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','in_progress','done','rejected')), created_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_discord ON feedback(discord_id, created_at);
+-- Parkour-Bestzeiten (Migration 0005)
+CREATE TABLE IF NOT EXISTS mc_parkour (course TEXT NOT NULL, mc_uuid TEXT NOT NULL, mc_name TEXT, time_ms INTEGER NOT NULL, set_at TEXT NOT NULL, PRIMARY KEY (course, mc_uuid));
+CREATE INDEX IF NOT EXISTS idx_mc_parkour_course_time ON mc_parkour(course, time_ms);

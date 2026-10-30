@@ -38,6 +38,8 @@ try {
   sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('s1','${D1}','nils','Nils',datetime('now','+1 day')),('s2','${D2}','seller','Seller',datetime('now','+1 day'))`);
   const c1 = await cookieFor("s1"), c2 = await cookieFor("s2");
 
+  console.log("0) Parkour leer");
+  { const r = await req("/api/mc-parkour"); ok(r.s === 200 && r.j && Object.keys(r.j.courses).length === 0, "Parkour-API leer → courses {}", r.t); const pg = await req("/parkour"); ok(pg.s === 200 && pg.t.includes("/api/mc-parkour") && pg.t.includes("Noch keine Zeiten"), "GET /parkour leer → 200 mit Leerzustand"); }
   console.log("1) Ingest");
   ok((await req("/api/mc-ingest", { method: "POST", body: {} })).s === 401, "Ingest ohne Token → 401");
   ok((await req("/api/mc-ingest", { method: "POST", body: {}, token: "falsch" })).s === 401, "Ingest falscher Token → 401");
@@ -253,8 +255,31 @@ try {
   ok((await req("/api/feedback/admin/" + fid, { method: "PATCH", body: { status: "kaputt" }, headers: AH })).s === 400, "Admin PATCH ungültiger Status → 400");
   ok((await req("/api/feedback/admin/99999", { method: "PATCH", body: { status: "done" }, headers: AH })).s === 404, "Admin PATCH unbekannt → 404");
   ok((await req("/api/feedback/admin?status=done", { headers: AH })).j.items.length === 1, "Admin GET Filter done");
+  console.log("6b) Parkour");
+  {
+    const PU = (i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, ing = (parkour) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { parkour } });
+    const e0 = (o = {}) => ({ course: "test", mc_uuid: PU(1), mc_name: "Nils", time_ms: 42123, set_at: "2026-10-30T11:00:00.000Z", ...o });
+    ok((await req("/api/mc-ingest", { method: "POST", body: { parkour: [e0()] } })).s === 401, "Parkour-Ingest ohne Token → 401");
+    let r = await ing([e0(), e0({ course: "Test" }), e0({ course: "a b" }), e0({ course: "x".repeat(33) }), e0({ time_ms: 0 }), e0({ time_ms: -5 }), e0({ time_ms: 1.5 }), e0({ time_ms: "100" }), e0({ time_ms: 86400001 }), e0({ mc_uuid: "kaputt" }), e0({ mc_name: "<b>x</b>" }), e0({ set_at: "gestern" }), e0({ set_at: "2099-01-01T00:00:00Z" })]);
+    ok(r.s === 200 && r.j.parkour === 1 && r.j.parkour_rejected === 12, "Validierung: 1 gültig, 12 abgelehnt", r.t);
+    ok(sqlRows("SELECT COUNT(*) n FROM mc_parkour")[0].n === 1, "Nur gültiger Eintrag gespeichert");
+    r = await ing([e0({ mc_uuid: PU(1).replace(/-/g, "").toUpperCase(), time_ms: 50000, set_at: "2026-10-30T12:00:00Z" })]);
+    let row = sqlRows(`SELECT * FROM mc_parkour WHERE mc_uuid='${PU(1)}'`); ok(r.s === 200 && row.length === 1 && row[0].time_ms === 42123 && row[0].set_at === "2026-10-30T11:00:00.000Z", "Schlechtere Zeit überschreibt nicht (UUID normalisiert)", JSON.stringify(row));
+    await ing([e0({ time_ms: 40000, set_at: "2026-10-30T12:30:00Z" })]); row = sqlRows(`SELECT * FROM mc_parkour WHERE mc_uuid='${PU(1)}'`); ok(row[0].time_ms === 40000 && row[0].set_at === "2026-10-30T12:30:00.000Z", "Bessere Zeit ersetzt", JSON.stringify(row));
+    await ing([e0({ time_ms: 39000 }), e0({ time_ms: 45000 })]); ok(sqlRows(`SELECT time_ms FROM mc_parkour WHERE mc_uuid='${PU(1)}'`)[0].time_ms === 39000, "Duplikat im Payload: beste zählt");
+    ok((await req("/api/mc-ingest", { method: "POST", token: TOK, body: { servers: {} } })).j.parkour === undefined && sqlRows("SELECT COUNT(*) n FROM mc_parkour")[0].n === 1, "Feld fehlt → keine Änderung");
+    ok((await ing("kaputt")).j.parkour_rejected === 1, "parkour kein Array → abgelehnt, kein Fehler");
+    const many = Array.from({ length: 12 }, (_, i) => e0({ mc_uuid: PU(10 + i), mc_name: "Spieler" + i, time_ms: 60000 + ((i * 7919) % 12) * 1000 + i }));
+    many.push(e0({ course: "nether_run", mc_uuid: PU(2), mc_name: "Seller", time_ms: 61234, set_at: undefined }));
+    r = await ing(many); ok(r.j.parkour === 13, "13 Einträge (Spieler ohne set_at ok)", r.t);
+    const api = (await req("/api/mc-parkour")).j, L = api.courses.test;
+    ok(L.length === 10 && L.every((x, i) => x.rank === i + 1 && (i === 0 || L[i - 1].time_ms <= x.time_ms)) && L[0].mc_name === "Nils" && L[0].time_ms === 39000, "Top 10 aufsteigend sortiert, max 10", JSON.stringify(L.map((x) => x.time_ms)));
+    ok(api.courses.nether_run?.length === 1 && api.courses.nether_run[0].mc_uuid === PU(2), "Zweiter Kurs separat");
+    const pg = await req("/parkour"); ok(pg.s === 200 && /ds\.css\?v=/.test(pg.t) && pg.t.includes('href="/parkour"'), "GET /parkour → 200, im MC-Nav");
+    { const m = await req("/parkour", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes("/api/mc-parkour")), "/parkour nur auf mc-Domain", m.s); }
+  }
   console.log("7) Seiten");
-  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
+  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle", "/parkour"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
   console.log("8) UI (Chromium 390/1440)");
