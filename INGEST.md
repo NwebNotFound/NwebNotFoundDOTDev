@@ -32,7 +32,9 @@ Alle Felder sind optional; alte Payloads (`servers` + `leaderboards`) funktionie
 ```
 - Key = MC-UUID. Max. 200 Spieler, max. 24 Felder pro Spieler, Feldnamen `[a-z0-9_]{1,24}`.
 - Werte: Zahlen (oder Strings ≤ 40 Zeichen). `playtime` in Sekunden, `money` in CP.
-- `inventory` (optional): max. 41 Slots `{item (≤48), count 0–999}`. Wird nur dem eingeloggten Besitzer angezeigt.
+- `inventory` (optional): max. 41 belegte Slots `{item (≤48), count 1–999, slot? (0–40)}`. Wird nur dem eingeloggten Besitzer angezeigt.
+  - **Slots (Paper/Bukkit):** `0–8` Hotbar, `9–35` Hauptinventar (3×9), `36` Stiefel, `37` Hose, `38` Brust, `39` Helm, `40` Nebenhand. Fehlt `slot`, füllt die Website sequentiell ab Hotbar.
+  - Beispiel vollständig: `"inventory": [{"item":"diamond_sword","count":1,"slot":0},{"item":"oak_log","count":32,"slot":9},{"item":"elytra","count":1,"slot":38},{"item":"shield","count":1,"slot":40}]`
 - Pro Spieler wird der Datensatz komplett ersetzt (immer alle Felder senden). Push z. B. alle 5 Min. oder bei Logout.
 
 ### Antwort

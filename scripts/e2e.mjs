@@ -3,6 +3,7 @@
 import { spawn, execSync } from "node:child_process";
 import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
+import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = 8799, BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
@@ -147,6 +148,11 @@ try {
   r = await req("/api/mc-shop-orders/ack", { method: "POST", token: TOK, body: { acks: [{ id: openO, status: "accepted" }] } }); ok(r.j?.updated === 0, "accepted nur aus pending");
   const pf = (await req("/api/profile", { cookie: c1 })).j.minecraft?.stats?.inventory || [];
   ok(pf.length === 3 && pf[0].item === "diamond_sword" && pf[1].item === "oak_log" && pf[1].count === 32 && pf[1].slot === 9, "Inventar flexibel normalisiert (id/type/amount/qty, air raus)", JSON.stringify(pf));
+  ok((await req("/profile", { cookie: c1 })).t.includes("/mc/inventory.js"), "Profil lädt Inventar-Renderer");
+  const invHtml = renderInventoryCard(pf);
+  ok((invHtml.match(/class="ivs/g) || []).length >= 41 && invHtml.includes("iv-pane") && invHtml.includes("iv-arm"), "Inventar-HTML: volles Layout (41+ Slots)", invHtml.slice(0, 120));
+  const legacy = normInv([{ item: "bread", count: 5 }, { item: "diamond", count: 1 }]);
+  ok(inventorySlotMap(legacy)[0]?.item === "bread" && inventorySlotMap(legacy)[1]?.item === "diamond", "Legacy-Inventar ohne slot → Hotbar 0,1", JSON.stringify(legacy));
   ok(!JSON.stringify((await req("/api/mc-players/Nils")).j).includes("diamond_sword"), "Inventar/Abholfach nicht öffentlich");
   const mine = (await req("/api/mc-auctions/a1", { cookie: c1 })).j; ok(mine.mine[0]?.status === "accepted" && mine.viewer.can_bid === true, "Auktionsseite zeigt eigenes Gebot 'accepted'");
   const mine2 = (await req("/api/mc-auctions/a2", { cookie: c1 })).j; ok(mine2.mine[0]?.status === "rejected" && mine2.mine[0]?.reason === "OUTBID", "abgelehntes Gebot mit Grund");
