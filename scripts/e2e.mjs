@@ -63,7 +63,7 @@ try {
       { category: "cp", uuid: U1, value: 1500, rank: 1 }, { category: "cp", player: U2, score: 1200, rank: 2 }, { stat: "playtime", player_uuid: U2, name: "Seller", value: 3600 },
       { key: "kills", uuid: U1, value: 5, period: "weekly" }, { category: "cp", uuid: "99999999-8888-7777-6666-555555555555", value: 1 },
     ],
-    v_player_stats_ext: [{ uuid: U1, name: "Nils", cp: 900, playtime_s: 7200, deaths: 3, mined: '{"minecraft:stone":120,"dirt":5}', fished: 4 }, { player: U2, stat: "cp", value: 1200 }, { player: U2, stat: "deaths", value: 1 }],
+    v_player_stats_ext: [{ uuid: U1, name: "Nils", cp: 900, playtime_s: 7200, deaths: 3, mined: '{"minecraft:stone":120,"dirt":5}', killed: { zombie: 12, creeper: 3 }, distance_m: { walk: 15300, sprint: 820 }, fished: 4 }, { player: U2, stat: "cp", value: 1200 }, { player: U2, stat: "deaths", value: 1 }],
   };
   const ing = await req("/api/mc-ingest", { method: "POST", body: payload, token: TOK });
   ok(ing.s === 200 && ing.j?.ok, "Ingest mit Token → 200", ing.t.slice(0, 200));
@@ -152,6 +152,7 @@ try {
   ok(pn?.name === "Nils" && pn.stats && !pn.details && pn.viewer.logged_in === false, "Spielerseite öffentlich ohne Details", JSON.stringify(pn));
   const pd = (await req("/api/mc-players/Nils", { cookie: c1 })).j;
   ok(pd?.details && pd.viewer.logged_in === true, "Details nur mit Discord-Login", JSON.stringify(pd));
+  ok(pd?.details?.extra?.killed?.zombie === 12 && pd.details.extra.distance_m?.walk === 15300, "Details enthalten Mob-Kills + Distanzen", JSON.stringify(pd?.details));
   ok((await req("/api/mc-players/Versteckt")).s === 404, "Unbestätigter Spieler → 404");
   ok((await req("/spieler/bad%3Cname")).s === 404, "Ungültiger Name → 404");
   ok((await req("/spieler/Nils")).t.includes("/api/mc-players/") && !(await req("/spieler/Nils")).t.includes("<script>alert"), "Spielerseite lädt API");

@@ -40,6 +40,8 @@ with sync_playwright() as p:
         pg.fill("#q", "nls"); pg.wait_for_timeout(600); ok(pg.locator("a.plc").first.inner_text().startswith("Nils"), f"{w}px Spieler: Fuzzy 'nls'")
         pg.screenshot(path=f"{SH}/local-spieler-{w}.png", full_page=True)
         t = go("/spieler/Nils"); ok("Öffentliche Stats" in t and "Details" in t and "nur für Mitspieler" not in t, f"{w}px Spielerseite eingeloggt: Details", t[:300])
+        ok(all(x in t for x in ("Top-Blöcke", "Mob-Kills", "Distanzen", "Zombie", "Stone", "15,3 km", "Gefischt", "Spielzeit")) and "Playtime S" not in t, f"{w}px Details: Diagramme + deutsche Labels", t[-600:])
+        ok("7.200" not in t.split("Details",1)[-1], f"{w}px Details: Spielzeit formatiert statt Sekunden")
         pg.screenshot(path=f"{SH}/local-spieler-nils-{w}.png", full_page=True)
         for path in ("/markt", "/wiki", "/wiki/befehle"): go(path); pg.screenshot(path=f"{SH}/local{path.replace('/','-')}-{w}.png", full_page=True)
         ok(not errs, f"{w}px keine Konsolen-/JS-Fehler", errs[:3])
