@@ -376,13 +376,16 @@ try {
     ok(r.j.parkour === 4 && r.j.parkour_rejected === 0, "course_icon optional, Zeiten zählen", r.t);
     ok(ic.icon_ok?.course_icon === "golden_boots", "course_icon gültig gespeichert", JSON.stringify(ic));
     ok(ic.icon_mc?.course_icon === "golden_boots", "minecraft:GOLDEN_BOOTS → golden_boots", JSON.stringify(ic));
-    ok(ic.icon_bad?.course_icon === "paper", "Ungültiges Icon 'bad icon!' → paper", JSON.stringify(ic));
+    ok(ic.icon_bad?.course_icon == null, "Ungültiges Icon 'bad icon!' bei neuem Kurs → nichts gespeichert (Anzeige paper)", JSON.stringify(ic));
     ok(!("icon_none" in ic), "Ohne Icon/Name → kein Kurs-Eintrag", JSON.stringify(ic));
     a2 = (await req("/api/mc-parkour")).j;
     ok(a2.course_icons.icon_ok === "golden_boots" && a2.course_icons.icon_bad === "paper" && a2.course_icons.icon_none === "paper" && a2.courses.icon_mc[0].course_icon === "golden_boots" && a2.course_names.icon_ok === "Icon Ok" && !Object.values(a2.course_names).some((n) => n.includes("_")), "API: course_icons + Fallback-Namen ohne Unterstrich", JSON.stringify(a2.course_names));
     await ing([e0({ course: "icon_ok", mc_uuid: PU(40), time_ms: 59000, course_name: "Icon Kurs" })]);
     ic = sqlRows("SELECT course_icon, course_name FROM mc_parkour_courses WHERE course='icon_ok'")[0];
     ok(ic.course_icon === "golden_boots" && ic.course_name === "Icon Kurs", "Nur Name gesendet → Icon bleibt", JSON.stringify(ic));
+    r = await ing([e0({ course: "icon_ok", mc_uuid: PU(40), time_ms: 59000, course_icon: "bad icon!" })]);
+    ic = sqlRows("SELECT course_icon FROM mc_parkour_courses WHERE course='icon_ok'")[0];
+    ok(r.j?.parkour === 1 && ic.course_icon === "golden_boots", "Ungültiges Icon 'bad icon!' → gespeichertes golden_boots bleibt", JSON.stringify(ic) + r.t);
     await ing([e0({ course: "cave_rush", mc_uuid: PU(3), time_ms: 35000, course_icon: "feather" })]);
     ok((await req("/api/mc-parkour")).j.course_names.cave_rush === "Cave Rush II", "Nur Icon gesendet → Name bleibt");
     { const q = await req("/parkour?course=cave_rush"); ok(q.s === 200 && q.t.includes("/api/mc-parkour") && !q.t.includes("onerror=alert"), "GET /parkour?course=… → 200, Name nicht im Server-HTML"); }
