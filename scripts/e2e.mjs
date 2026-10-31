@@ -324,6 +324,16 @@ try {
     const row = sqlRows(`SELECT details FROM mc_player_stats WHERE mc_uuid='${U3}'`)[0], db = row && JSON.parse(row.details || "{}").deaths_by;
     ok(r.s === 200 && db && db.fall === 1 && db.player === 1 && db.some_unknown_cause === 1 && db.entity_explosion === 2 && !("bad key!" in db), "deaths_by: unbekannte/DamageCause-Keys gespeichert, nur ungültige verworfen", row && row.details);
   }
+  console.log("6d) Todesursachen zusammenfassen");
+  {
+    const dbIn = { explosion: 1, block_explosion: 2, entity_explosion: 3, fire: 4, fire_tick: 1, fall: 2 };
+    for (const [path, mapName, lab] of [["/spieler/Nils", "MN", "k=>MN[k]||k"], ["/profile", "DB", "k=>DB[k]||k"]]) {
+      const h = (await req(path, { cookie: c1 })).t || "";
+      const mg = (h.match(/const MG=\(o,L\)=>\{.*?return r\};/) || [])[0], mp = (h.match(new RegExp("const " + mapName + "=\\{[^}]*\\};")) || [])[0];
+      let out = null; try { out = new Function(mp + mg + "return MG(" + JSON.stringify(dbIn) + "," + lab + ")")(); } catch (e) { out = String(e); }
+      ok(out && out.explosion === 6 && out.fire === 5 && out.fall === 2 && Object.keys(out).length === 3, "deaths_by gleiche Namen zusammengefasst (" + path + ")", JSON.stringify(out) + " mg=" + !!mg + " map=" + !!mp);
+    }
+  }
   console.log("6b) Parkour");
   {
     const PU = (i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, ing = (parkour) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { parkour } });
