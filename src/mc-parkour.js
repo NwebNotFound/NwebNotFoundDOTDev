@@ -69,7 +69,7 @@ export const parkourBody = () => `${CSS}<section class="hero" style="padding-bot
 <section class="sec" style="padding-top:1.2rem"><div class="hub-wrap" style="max-width:760px" id="root" aria-live="polite"><div class="g pad mut">Lade Zeiten…</div></div></section>
 <script src="/mc/common.js?v=${AV}"></script><script>(()=>{const E=MC.E,R=document.getElementById('root');
 const F=ms=>{ms=Math.max(0,Math.round(+ms||0));const m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000),x=ms%1000;return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(x).padStart(3,'0')};
-const HEAD=(n,s)=>'<img alt="" width="'+s+'" height="'+s+'" loading="lazy" src="https://mc-heads.net/avatar/'+encodeURIComponent(n)+'/'+s+'" onerror="this.src=\\'https://mc-heads.net/avatar/MHF_Steve/'+s+'\\'">';
+const HEAD=(n,s)=>'<img alt="" width="'+s+'" height="'+s+'" loading="lazy" src="/mc-head/'+encodeURIComponent(n)+'/'+s+'" onerror="this.src=\\'/mc-head/MHF_Steve/'+s+'\\'">';
 const MI=(id,s)=>'<img class="mi" alt="" width="'+s+'" height="'+s+'" style="image-rendering:pixelated" src="/mc-icon/v2/'+encodeURIComponent(id)+'" onerror="this.onerror=null;this.src=\\'/mc-icon/v2/paper\\'">';
 let D={},NM={},IC={};const P=k=>String(k).split('_').filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')||k,T=k=>NM[k]||P(k),I=k=>/^[a-z0-9_]{1,48}$/.test(IC[k]||'')?IC[k]:'paper';
 const Q=()=>{let q=new URLSearchParams(location.search).get('course');if(!q){q=location.hash.slice(1);try{q=decodeURIComponent(q)}catch(e){}}return q?q.trim().toLowerCase().replace(/[\\s-]+/g,'_').replace(/^_+|_+$/g,''):''};

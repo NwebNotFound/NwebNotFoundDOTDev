@@ -1,5 +1,5 @@
 window.MC=(()=>{const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const NM=id=>String(id).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+const NM=id=>(window.MC_DE&&MC_DE[String(id).replace(/^minecraft:/,'')])||String(id).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 const NF=(v,d=0)=>(+v||0).toLocaleString('de-DE',{maximumFractionDigits:d,minimumFractionDigits:d});
 const CP=v=>{v=+v||0;return (v>=100?NF(v):NF(v,v<10?2:1))+' CP'};
 const BIG=v=>{v=+v||0;return v>=1e6?NF(v/1e6,1)+' Mio':v>=1e4?NF(v/1e3,1)+' Tsd':NF(v)};
