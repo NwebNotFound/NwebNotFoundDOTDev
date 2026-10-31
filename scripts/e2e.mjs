@@ -488,7 +488,7 @@ try {
     const C = { uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", name: "Gast", wins: 1, losses: 0, draws: 0, matches: 1, winrate_pct: 100, extra: "x" };
     ok((await req("/api/mc-ingest", { method: "POST", body: { pvp_stats: [] } })).s === 401, "pvp_stats ohne Token → 401");
     { const r = await req("/api/mc-pvp"); ok(r.s === 200 && Array.isArray(r.j?.players) && r.j.players.length === 0, "PvP-API leer → []", r.t); }
-    const bad = [["kein Array", { a: 1 }], ["wins negativ", [{ ...A, wins: -1 }]], ["matches kein Int", [{ ...A, matches: 1.5 }]], ["winrate > 100", [{ ...A, winrate_pct: 101 }]], ["winrate String", [{ ...A, winrate_pct: "50" }]], ["Kit zu lang", [{ ...A, favorite_kit: "x".repeat(33) }]], ["Kit Zahl", [{ ...A, favorite_kit: 5 }]], ["UUID doppelt", [A, { ...A, name: "X" }]], ["Name ungültig", [{ ...A, name: "a b" }]]];
+    const bad = [["kein Array", { a: 1 }], ["wins negativ", [{ ...A, wins: -1 }]], ["matches kein Int", [{ ...A, matches: 1.5 }]], ["winrate > 100", [{ ...A, winrate_pct: 101 }]], ["winrate 100.1", [{ ...A, winrate_pct: 100.1 }]], ["winrate -1", [{ ...A, winrate_pct: -1 }]], ["winrate String", [{ ...A, winrate_pct: "50" }]], ["Kit zu lang", [{ ...A, favorite_kit: "x".repeat(33) }]], ["Kit Zahl", [{ ...A, favorite_kit: 5 }]], ["UUID doppelt", [A, { ...A, name: "X" }]], ["Name ungültig", [{ ...A, name: "a b" }]]];
     for (const [m, rows] of bad) { const r = await PV(rows); ok(r.s === 200 && r.j?.pvp_stats === 0 && r.j?.pvp_stats_dropped === true, "pvp_stats " + m + " → verworfen, 200", r.s + " " + r.t); }
     ok(sqlRows("SELECT COUNT(*) AS n FROM mc_pvp_stats")[0].n === 0, "pvp_stats: ungültig → nichts geschrieben");
     { const r = await PV([{ ...A, wins: -5 }], { economy_daily: [{ day: "2026-03-01", money_supply_cp: 7 }] }); ok(r.s === 200 && r.j?.economy_daily === 1, "ungültige pvp_stats: Rest wird gespeichert", r.t); sql("DELETE FROM mc_economy_daily WHERE day='2026-03-01'"); }
@@ -501,6 +501,8 @@ try {
     ok(L[0].rank?.rank === "vip" && L[0].rank.color === "6" && L[1].rank === null, "PvP-API mit Rang-Badge aus mc_player_ranks");
     ok(L[1].favorite_kit === A.favorite_kit && L[0].favorite_kit === null && L[2].favorite_kit === null, "favorite_kit gespeichert / null");
     { const r = await req("/api/mc-pvp/nils"); ok(r.s === 200 && r.j?.wins === 10 && r.j?.name === "Nils", "PvP-Spieler-API → 200"); ok((await req("/api/mc-pvp/Niemand")).s === 404, "PvP-Spieler-API unbekannt → 404"); }
+    { const r = await PV([{ ...A, winrate_pct: 71.4 }, { ...B, winrate_pct: 99.5 }, C]); const w = Object.fromEntries(sqlRows("SELECT name, winrate_pct FROM mc_pvp_stats").map((x) => [x.name, x.winrate_pct]));
+      ok(r.s === 200 && r.j?.pvp_stats === 3 && w.Nils === 71 && w.Seller === 100, "winrate_pct Float gerundet (71.4→71, 99.5→100)", r.t + " " + JSON.stringify(w)); }
     await PV([B]); ok(sqlRows("SELECT COUNT(*) AS n FROM mc_pvp_stats")[0].n === 1, "pvp_stats Snapshot entfernt fehlende UUIDs");
     await PV([A, B, C]);
     { const pg = await req("/pvp"); const sec = pg.t.slice(pg.t.indexOf('id="pvp"'));

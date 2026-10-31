@@ -17,8 +17,8 @@ export function cleanPvp(a) {
     if (seen.has(uuid)) return { error: `pvp_stats[${i}].uuid: duplicate` }; seen.add(uuid);
     if (typeof r.name !== "string" || !/^[A-Za-z0-9_]{1,16}$/.test(r.name)) return { error: `pvp_stats[${i}].name: minecraft name expected` };
     for (const k of ["wins", "losses", "draws", "matches"]) if (!nn(r[k])) return { error: `pvp_stats[${i}].${k}: non-negative integer expected` };
-    const wr = r.winrate_pct === undefined ? null : r.winrate_pct;
-    if (wr !== null && !(Number.isSafeInteger(wr) && wr >= 0 && wr <= 100)) return { error: `pvp_stats[${i}].winrate_pct: integer 0-100 or null expected` };
+    let wr = r.winrate_pct === undefined ? null : r.winrate_pct;
+    if (wr !== null) { if (!(typeof wr === "number" && Number.isFinite(wr) && wr >= 0 && wr <= 100)) return { error: `pvp_stats[${i}].winrate_pct: number 0-100 or null expected` }; wr = Math.round(wr); }
     let kit = r.favorite_kit === undefined ? null : r.favorite_kit;
     if (kit !== null) { if (typeof kit !== "string") return { error: `pvp_stats[${i}].favorite_kit: string or null expected` }; kit = kit.replace(/[\u0000-\u001f\u007f]/g, "").trim(); if (kit.length > 32) return { error: `pvp_stats[${i}].favorite_kit: max 32 chars` }; if (!kit) kit = null; }
     rows.push({ uuid, name: r.name, wins: r.wins, losses: r.losses, draws: r.draws, matches: r.matches, winrate_pct: wr, favorite_kit: kit });
