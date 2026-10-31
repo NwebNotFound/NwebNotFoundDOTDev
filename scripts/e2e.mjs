@@ -39,6 +39,7 @@ try {
   const c1 = await cookieFor("s1"), c2 = await cookieFor("s2");
 
   console.log("0) Parkour leer");
+  { const g = fs.readFileSync(ROOT + "src/generated/changelog.js", "utf8"); ok(g.includes("Für Spieler") && !/## Admin|creepy_ro|PR #\d|v_economy_daily|--profile/.test(g), "Gebündelter Changelog enthält nur den Spieler-Teil"); }
   { const r = await req("/changelog"); ok(r.s === 200 && r.t.includes("Changelog.") && r.t.includes("Stack für Stack") && r.t.includes("/mc/changelog.css"), "GET /changelog → 200 mit Spieler-Einträgen", r.t.slice(0, 200));
     ok(!r.t.includes("creepy_ro") && !r.t.includes("PR #28") && !r.t.includes("Admin"), "Changelog zeigt keinen Admin-Teil");
     const body = r.t.slice(r.t.indexOf('id="changelog"')); ok(!/<script|<style| style=/.test(body.slice(0, body.indexOf("</section>"))), "Changelog-Inhalt ohne Inline-Script/-Style");
