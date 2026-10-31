@@ -590,9 +590,9 @@ async function mcIngest(req, env) {
   const shops = cleanShops(b?.shops), auctions = cleanAuctions(b?.auctions ?? b?.v_auctions, b?.auction_bids ?? b?.v_auction_bids);
   if (shops) st.push(blobStatement(env, "shops", shops, now));
   if (auctions) st.push(blobStatement(env, "auctions", auctions, now));
-  const parkour = cleanParkour(b?.parkour, now); if (parkour) st.push(...parkourStatements(env, parkour.rows));
+  const parkour = cleanParkour(b?.parkour, now); if (parkour) st.push(...parkourStatements(env, parkour.rows, parkour.names, now));
   if (st.length) await env.DB.batch(st);
-  return json({ ok: true, ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
+  return json({ ok: true, ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));

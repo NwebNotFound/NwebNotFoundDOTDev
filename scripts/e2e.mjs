@@ -322,7 +322,7 @@ try {
     const PU = (i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, ing = (parkour) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { parkour } });
     const e0 = (o = {}) => ({ course: "test", mc_uuid: PU(1), mc_name: "Nils", time_ms: 42123, set_at: "2026-10-30T11:00:00.000Z", ...o });
     ok((await req("/api/mc-ingest", { method: "POST", body: { parkour: [e0()] } })).s === 401, "Parkour-Ingest ohne Token → 401");
-    let r = await ing([e0(), e0({ course: "Test" }), e0({ course: "a b" }), e0({ course: "x".repeat(33) }), e0({ time_ms: 0 }), e0({ time_ms: -5 }), e0({ time_ms: 1.5 }), e0({ time_ms: "100" }), e0({ time_ms: 86400001 }), e0({ mc_uuid: "kaputt" }), e0({ mc_name: "<b>x</b>" }), e0({ set_at: "gestern" }), e0({ set_at: "2099-01-01T00:00:00Z" })]);
+    let r = await ing([e0(), e0({ course: "tést" }), e0({ course: "a/b" }), e0({ course: "x".repeat(33) }), e0({ time_ms: 0 }), e0({ time_ms: -5 }), e0({ time_ms: 1.5 }), e0({ time_ms: "100" }), e0({ time_ms: 86400001 }), e0({ mc_uuid: "kaputt" }), e0({ mc_name: "<b>x</b>" }), e0({ set_at: "gestern" }), e0({ set_at: "2099-01-01T00:00:00Z" })]);
     ok(r.s === 200 && r.j.parkour === 1 && r.j.parkour_rejected === 12, "Validierung: 1 gültig, 12 abgelehnt", r.t);
     ok(sqlRows("SELECT COUNT(*) n FROM mc_parkour")[0].n === 1, "Nur gültiger Eintrag gespeichert");
     r = await ing([e0({ mc_uuid: PU(1).replace(/-/g, "").toUpperCase(), time_ms: 50000, set_at: "2026-10-30T12:00:00Z" })]);
@@ -338,6 +338,19 @@ try {
     ok(L.length === 10 && L.every((x, i) => x.rank === i + 1 && (i === 0 || L[i - 1].time_ms <= x.time_ms)) && L[0].mc_name === "Nils" && L[0].time_ms === 39000, "Top 10 aufsteigend sortiert, max 10", JSON.stringify(L.map((x) => x.time_ms)));
     ok(api.courses.nether_run?.length === 1 && api.courses.nether_run[0].mc_uuid === PU(2), "Zweiter Kurs separat");
     const pg = await req("/parkour"); ok(pg.s === 200 && /ds\.css\?v=/.test(pg.t) && pg.t.includes('href="/parkour"'), "GET /parkour → 200, im MC-Nav");
+    ok(api.course_names?.test === "test" && L[0].course_name === "test", "Ohne course_name → Fallback Kurs-ID", JSON.stringify(api.course_names));
+    r = await ing([e0({ course: "cave_rush", mc_uuid: PU(3), mc_name: "Cave", time_ms: 30000, course_name: "  Cave\u0000  Rush  " }), e0({ course: "kurs1", mc_uuid: PU(4), time_ms: 31000, course_name: "<img src=x onerror=alert(1)>" }), e0({ course: "lang", mc_uuid: PU(5), time_ms: 32000, course_name: "x".repeat(60) }), e0({ course: "leer", mc_uuid: PU(6), time_ms: 33000, course_name: "   " }), e0({ course: "zahl", mc_uuid: PU(7), time_ms: 34000, course_name: 5 })]);
+    ok(r.j.parkour === 5 && r.j.parkour_rejected === 0 && r.j.parkour_course_names === 3, "course_name optional, ungültig → Zeit zählt trotzdem", r.t);
+    let cn = Object.fromEntries(sqlRows("SELECT course, course_name FROM mc_parkour_courses").map((x) => [x.course, x.course_name]));
+    ok(cn.cave_rush === "Cave Rush" && cn.lang === "x".repeat(48) && !("leer" in cn) && !("zahl" in cn), "course_name getrimmt, Steuerzeichen raus, max 48", JSON.stringify(cn));
+    await ing([e0({ course: "cave_rush", mc_uuid: PU(3), time_ms: 35000, course_name: "Cave Rush II" })]);
+    let a2 = (await req("/api/mc-parkour")).j;
+    ok(a2.course_names.cave_rush === "Cave Rush II" && a2.courses.cave_rush[0].course_name === "Cave Rush II" && a2.courses.cave_rush[0].time_ms === 30000 && a2.course_names.kurs1 === "<img src=x onerror=alert(1)>" && a2.course_names.leer === "leer", "API: course_name aktualisierbar, Fallback ID, Rohtext (Escape erst beim Rendern)", JSON.stringify(a2.course_names));
+    r = await ing([e0({ course: "Cave Rush", mc_uuid: PU(8), time_ms: 29000 }), e0({ course: " cave-rush ", mc_uuid: PU(9), time_ms: 28000 }), e0({ course: "CAVE_RUSH", mc_uuid: PU(8), time_ms: 27000 })]);
+    a2 = (await req("/api/mc-parkour")).j;
+    ok(r.j.parkour === 2 && Object.keys(a2.courses).filter((k) => k.includes("cave")).join() === "cave_rush" && a2.courses.cave_rush[0].time_ms === 27000 && a2.courses.cave_rush.length === 3, "Kurs-ID normalisiert: 'Cave Rush'/'cave-rush'/'CAVE_RUSH' → cave_rush", JSON.stringify(Object.keys(a2.courses)));
+    ok(a2.courses.kurs1?.length === 1 && a2.courses.test.length === 10, "Alte IDs (kurs1, test) funktionieren weiter");
+    { const q = await req("/parkour?course=cave_rush"); ok(q.s === 200 && q.t.includes("/api/mc-parkour") && !q.t.includes("onerror=alert"), "GET /parkour?course=… → 200, Name nicht im Server-HTML"); }
     { const m = await req("/parkour", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes("/api/mc-parkour")), "/parkour nur auf mc-Domain", m.s); }
   }
   console.log("7) Seiten");

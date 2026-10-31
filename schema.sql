@@ -44,3 +44,5 @@ CREATE TABLE IF NOT EXISTS mc_order_hidden (discord_id TEXT NOT NULL, order_id T
 -- Parkour-Bestzeiten (Migration 0005)
 CREATE TABLE IF NOT EXISTS mc_parkour (course TEXT NOT NULL, mc_uuid TEXT NOT NULL, mc_name TEXT, time_ms INTEGER NOT NULL, set_at TEXT NOT NULL, PRIMARY KEY (course, mc_uuid));
 CREATE INDEX IF NOT EXISTS idx_mc_parkour_course_time ON mc_parkour(course, time_ms);
+-- Parkour-Anzeigenamen (Migration 0007)
+CREATE TABLE IF NOT EXISTS mc_parkour_courses (course TEXT PRIMARY KEY, course_name TEXT NOT NULL, updated_at TEXT NOT NULL);
