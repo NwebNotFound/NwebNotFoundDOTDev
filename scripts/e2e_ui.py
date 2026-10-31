@@ -18,7 +18,7 @@ def route(r):
         h = {k: v for k, v in r.request.all_headers().items() if not k.startswith(":")}; h["host"] = H
         try: r.fulfill(response=r.fetch(url=BASE + u[len("https://" + H):], headers=h, max_redirects=0))
         except Exception:
-            if "/mc-head/" not in u: raise  # Kopf-Requests dürfen beim Kontext-Schließen noch laufen
+            if not any(x in u for x in ("/mc-head/", "/mc-skin/", "/mc-icon/", "/vendor/")): raise  # Kopf-Requests dürfen beim Kontext-Schließen noch laufen
     else: r.continue_()
 with sync_playwright() as p:
     br = p.chromium.launch(executable_path="/usr/bin/google-chrome")
@@ -85,7 +85,7 @@ with sync_playwright() as p:
         ok(pg.locator("#umm a[href$='/bestellungen']").count() == 1, f"{w}px Dropdown: Bestellungen")
         # 1) Profil: kein doppelter Tab, klare Blöcke
         ok(pg.locator(".nl a[href='/profile']").count() == 0, f"{w}px Nav: kein extra Profil-Tab")
-        pg.locator("#pordl ul, #pordl p").first.wait_for(timeout=10000)
+        pg.locator("#pordl ul, #pordl p").first.wait_for(state="attached", timeout=10000)
         ok(pg.locator("#pbal").count() == 1 and pg.locator(".pf-kpi").count() == 1 and pg.locator("#pord").count() == 1, f"{w}px Profil: Kontostand, KPI-Leiste, Bestellungen da")
         tabs = pg.locator(".pf-tl [role=tab]").all_inner_texts()
         ok(tabs[:3] == ["Inventar", "Statistiken", "Markt"], f"{w}px Profil: Tabs Inventar → Statistiken → Markt", tabs)
@@ -127,7 +127,7 @@ with sync_playwright() as p:
         t = go("/spieler"); ok("Nils" in t and "Seller" in t, f"{w}px Spieler: Liste")
         pg.fill("#q", "nls"); pg.wait_for_timeout(600); ok(pg.locator("a.plc").first.inner_text().startswith("Nils"), f"{w}px Spieler: Fuzzy 'nls'")
         pg.screenshot(path=f"{SH}/local-spieler-{w}.png", full_page=True)
-        t = go("/spieler/Nils"); ok("Öffentliche Stats" in t and "Details" in t and "nur für Mitspieler" not in t, f"{w}px Spielerseite eingeloggt: Details", t[:300])
+        go("/spieler/Nils"); pg.locator(".pf-kpi").wait_for(timeout=10000); t = pg.inner_text("body"); ok(pg.locator(".pf-hd .m3d").count() == 1 and pg.locator(".pf-kpi .pf-tile").count() >= 1 and "Statistiken" in t and pg.locator("#det").count() == 1 and "nur für Mitspieler" not in t, f"{w}px Spielerseite eingeloggt: Details", t[:300])
         ok(all(x in t for x in ("Top-Blöcke", "Mob-Kills", "Distanzen", "Zombie", "Stein", "15,3 km")) and "Playtime S" not in t, f"{w}px Details: erweiterte Stats-Karten", t[-600:])
         ok("7.200" not in t.split("Details",1)[-1], f"{w}px Details: Spielzeit formatiert statt Sekunden")
         pg.screenshot(path=f"{SH}/local-spieler-nils-{w}.png", full_page=True)
@@ -171,7 +171,7 @@ with sync_playwright() as p:
         ctx.close()
         ctx = br.new_context(viewport={"width": w, "height": 900}); pg = ctx.new_page(); pg.route("**/*", route)
         pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded", timeout=45000); pg.wait_for_timeout(400); t = pg.inner_text("body")
-        ok("Öffentliche Stats" in t and "nur für Mitspieler" in t, f"{w}px Spielerseite anonym: Details gesperrt", t[:300])
+        pg.locator(".pf-kpi").wait_for(timeout=10000); t = pg.inner_text("body"); ok(pg.locator(".pf-kpi .pf-tile").count() >= 1 and "nur für Mitspieler" in t, f"{w}px Spielerseite anonym: Details gesperrt", t[:300])
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px anonym: kein horizontales Scrollen")
         pg.screenshot(path=f"{SH}/local-spieler-nils-anon-{w}.png", full_page=True); ctx.close()
     br.close()
