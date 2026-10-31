@@ -266,8 +266,9 @@ html.mc .inv .ivs.e{background:var(--mc-slot-dim)}
 html.mc .inv .ivs img{width:72%;height:72%;image-rendering:pixelated;object-fit:contain}
 html.mc .inv .ivs b{position:absolute;right:2px;bottom:0;font:700 .7rem var(--f-px,monospace);color:#fff;text-shadow:1px 1px 0 #3f3f3f}
 html.mc .inv .iv-empty .iv-pane{opacity:.45}
+html.mc .inv .iv-arm,html.mc .inv .iv-off{grid-template-columns:var(--ivw,40px)}html.mc .inv .iv-arm .ivs,html.mc .inv .iv-off .ivs{width:var(--ivw,40px);height:var(--ivw,40px);aspect-ratio:1/1;box-sizing:border-box}html.mc .inv .iv-arm .ivs img,html.mc .inv .iv-off .ivs img{width:72%;height:72%;object-fit:contain;image-rendering:pixelated}
 html.mc .inv .iv-empty p{margin:.8rem 0 0;font-size:.9rem}
-@media(max-width:480px){html.mc .inv .iv-pane{grid-template-columns:1fr;max-width:100%}html.mc .inv .iv-arm{grid-template-columns:repeat(4,minmax(0,1fr))}html.mc .inv .iv-off{justify-self:start}}
+@media(max-width:480px){html.mc .inv .iv-pane{grid-template-columns:1fr;max-width:100%}html.mc .inv .iv-arm{grid-template-columns:repeat(4,var(--ivw,40px))}html.mc .inv .iv-off{justify-self:start}}
 /* Abholungen */
 html.mc #pub .card{margin-top:var(--s4,1rem)}
 html.mc .pgrid{display:grid;grid-template-columns:repeat(9,minmax(0,44px));gap:3px;padding:6px;background:var(--mc-frame);border:2px solid var(--mc-edge);width:max-content;max-width:100%;box-shadow:var(--mc-inset-panel)}

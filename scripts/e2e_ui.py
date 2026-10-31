@@ -16,7 +16,9 @@ def route(r):
     u = r.request.url
     if u.startswith("https://" + H):
         h = {k: v for k, v in r.request.all_headers().items() if not k.startswith(":")}; h["host"] = H
-        r.fulfill(response=r.fetch(url=BASE + u[len("https://" + H):], headers=h, max_redirects=0))
+        try: r.fulfill(response=r.fetch(url=BASE + u[len("https://" + H):], headers=h, max_redirects=0))
+        except Exception:
+            if "/mc-head/" not in u: raise  # Kopf-Requests dürfen beim Kontext-Schließen noch laufen
     else: r.continue_()
 with sync_playwright() as p:
     br = p.chromium.launch(executable_path="/usr/bin/google-chrome")
@@ -100,7 +102,7 @@ with sync_playwright() as p:
             hov.append(el.evaluate("e=>{const c=getComputedStyle(e);return c.backgroundColor+'|'+c.boxShadow}"))
         pg.keyboard.press("Escape")
         ok(len(set(hov)) == 1, f"{w}px Hover: Menüeintrag = Button (gleiches Token)", hov)
-        t = go("/abholungen"); ok("Abholfach" in t and "abgelehnt" in t and "erledigt" in t and "Diamond" in t, f"{w}px Bestellungen: Stufen + Abholfach in einer Liste", t[:400])
+        t = go("/abholungen"); ok("Abholfach" in t and "abgelehnt" in t and "erledigt" in t and "Diamant" in t, f"{w}px Bestellungen: Stufen + Abholfach in einer Liste", t[:400])
         ok(pg.locator("#olist").count() == 1 and pg.locator(".card").count() == 1, f"{w}px Bestellungen: genau eine Liste")
         if pg.locator("[data-hide]").count():
             a = pg.locator("[data-hide]").first.bounding_box(); ok(a and a["height"] >= 32, f"{w}px Ausblenden-Button tippbar")
@@ -123,14 +125,14 @@ with sync_playwright() as p:
         pg.fill("#q", "nls"); pg.wait_for_timeout(600); ok(pg.locator("a.plc").first.inner_text().startswith("Nils"), f"{w}px Spieler: Fuzzy 'nls'")
         pg.screenshot(path=f"{SH}/local-spieler-{w}.png", full_page=True)
         t = go("/spieler/Nils"); ok("Öffentliche Stats" in t and "Details" in t and "nur für Mitspieler" not in t, f"{w}px Spielerseite eingeloggt: Details", t[:300])
-        ok(all(x in t for x in ("Top-Blöcke", "Mob-Kills", "Distanzen", "Zombie", "Stone", "15,3 km")) and "Playtime S" not in t, f"{w}px Details: erweiterte Stats-Karten", t[-600:])
+        ok(all(x in t for x in ("Top-Blöcke", "Mob-Kills", "Distanzen", "Zombie", "Stein", "15,3 km")) and "Playtime S" not in t, f"{w}px Details: erweiterte Stats-Karten", t[-600:])
         ok("7.200" not in t.split("Details",1)[-1], f"{w}px Details: Spielzeit formatiert statt Sekunden")
         pg.screenshot(path=f"{SH}/local-spieler-nils-{w}.png", full_page=True)
         for nm, path in (("start", "/"), ("markt", "/markt"), ("bestenlisten", "/leaderboards")): go(path); pg.wait_for_timeout(400); pg.screenshot(path=f"{SH}/local-polish-{nm}-{w}.png", full_page=True)
         for path in ("/markt", "/wiki", "/wiki/befehle"): go(path); pg.screenshot(path=f"{SH}/local{path.replace('/','-')}-{w}.png", full_page=True)
         go("/parkour?course=test"); pg.locator(".pkr").first.wait_for(timeout=10000); t = pg.inner_text("body")
         ok(pg.locator(".pkg").count() == 1 and pg.locator(".pkr").count() == 10 and "00:39.000" in t, f"{w}px Parkour ?course=test: nur ein Board, Top 10, Zeit mm:ss.mmm", t[:300])
-        ok(pg.locator(".pkr img[src*='mc-heads.net']").count() == 10 and pg.locator(".pkh img[src*='/mc-icon/v2/']").count() == 1, f"{w}px Parkour: Köpfe + Item-Icon")
+        ok(pg.locator(".pkr img[src^='/mc-head/']").count() == 10 and pg.locator(".pkh img[src*='/mc-icon/v2/']").count() == 1, f"{w}px Parkour: Köpfe + Item-Icon")
         ok(pg.locator(".pkt .btn").count() >= 3 and pg.locator('.pkt .btn[aria-selected=true][data-k="test"]').count() == 1 and pg.locator('.nl a[href="/parkour"][aria-current=page]').count() == 1, f"{w}px Parkour: Kurs-Auswahl + Nav aktiv")
         hs = pg.eval_on_selector_all(".pkr", "els=>els.map(e=>e.getBoundingClientRect().height)"); ok(max(hs) < 70, f"{w}px Parkour: Zeilen einzeilig", hs)
         pg.screenshot(path=f"{SH}/local-parkour-{w}.png", full_page=True)
