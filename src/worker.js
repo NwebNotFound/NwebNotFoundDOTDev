@@ -705,7 +705,9 @@ async function mcMarketItem(env, raw) {
 }
 
 /* ---------- Helfer ---------- */
-const SEC_HEADERS = { "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
+// CSP erst nur als Report-Only (Verstöße landen in der Browser-Konsole, kein report-uri → keine IP-Logs). Inline-Skripte/-Styles sind noch nötig.
+const CSP_RO = "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mc-heads.net https://cdn.jsdelivr.net https://cdn.discordapp.com; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://discord.com; object-src 'none'";
+const SEC_HEADERS = { "content-security-policy-report-only": CSP_RO, "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
 const json = (o, s = 200, extra = {}) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
 const html = (h, s = 200) => new Response(h.replaceAll("{{Y}}", String(new Date().getUTCFullYear())), { status: s, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...SEC_HEADERS } });
 const notFound = (mc) => html(mc
