@@ -3,7 +3,7 @@ import { AV } from "./asset-version.js";
 export const PK_MAX_MS = 24 * 3600 * 1000, PK_MAX = 1000;
 const COURSE = /^[a-z0-9_]{1,32}$/, UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i, NAME = /^[A-Za-z0-9_]{1,16}$/;
 // Kurs-ID normalisieren: "Cave Rush" / "cave-rush" / "cave_rush" → cave_rush (kurs1 bleibt kurs1)
-export const normCourse = (c) => typeof c === "string" ? c.trim().toLowerCase().replace(/[\s-]/g, "_") : "";
+export const normCourse = (c) => typeof c === "string" ? c.trim().toLowerCase().replace(/[\s-]+/g, "_").replace(/^_+|_+$/g, "") : "";
 const normU = (x) => String(x).toLowerCase().replace(/-/g, "").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
 // Anzeigename: getrimmt, Steuerzeichen raus, Whitespace zusammengefasst, max. 48 Zeichen; leer/ungültig → null (Zeit zählt trotzdem)
 export const PK_NAME_MAX = 48;
@@ -54,7 +54,7 @@ const F=ms=>{ms=Math.max(0,Math.round(+ms||0));const m=Math.floor(ms/60000),s=Ma
 const HEAD=(n,s)=>'<img alt="" width="'+s+'" height="'+s+'" loading="lazy" src="https://mc-heads.net/avatar/'+encodeURIComponent(n)+'/'+s+'" onerror="this.src=\\'https://mc-heads.net/avatar/MHF_Steve/'+s+'\\'">';
 const MI=(id,s)=>'<img class="mi" alt="" width="'+s+'" height="'+s+'" style="image-rendering:pixelated" src="/mc-icon/'+id+'">';
 let D={},NM={};const T=k=>NM[k]||k;
-const Q=()=>{let q=new URLSearchParams(location.search).get('course');if(!q){q=location.hash.slice(1);try{q=decodeURIComponent(q)}catch(e){}}return q?q.trim().toLowerCase().replace(/[\\s-]/g,'_'):''};
+const Q=()=>{let q=new URLSearchParams(location.search).get('course');if(!q){q=location.hash.slice(1);try{q=decodeURIComponent(q)}catch(e){}}return q?q.trim().toLowerCase().replace(/[\\s-]+/g,'_').replace(/^_+|_+$/g,''):''};
 const BOARD=k=>'<div class="g pkg" id="pk-'+E(k)+'" data-course="'+E(k)+'"><div class="pkh"><span class="slot">'+MI('golden_boots',26)+'</span><h2><a href="/parkour?course='+encodeURIComponent(k)+'">'+E(T(k))+'</a></h2><small>Top '+D[k].length+'</small></div>'+D[k].map(x=>{const n=x.mc_name||'Unbekannt';return '<div class="pkr p'+x.rank+'"><span class="rk">'+x.rank+'</span><span class="slot">'+HEAD(x.mc_name||'MHF_Steve',32)+'</span><span class="n">'+(x.mc_name?'<a href="/spieler/'+encodeURIComponent(n)+'">'+E(n)+'</a>':E(n))+'<small>'+E(new Date(x.set_at).toLocaleDateString('de-DE',{dateStyle:'medium'}))+'</small></span><b class="tm">'+F(x.time_ms)+'</b></div>'}).join('')+'</div>';
 function draw(){const K=Object.keys(D).sort((a,b)=>T(a).localeCompare(T(b),'de')||a.localeCompare(b));if(!K.length){R.innerHTML='<div class="g empty-st" id="pk-empty"><div class="big">'+MI('feather',56)+'</div><h2 class="hub-h2">Noch keine Zeiten</h2><p class="mut">Lauf in der Lobby einen Parkour-Kurs und hol dir Platz 1.</p></div>';return}
 const q=Q(),one=K.includes(q)?q:'';if(q&&!one){R.innerHTML='<div class="g empty-st" id="pk-unknown"><div class="big">'+MI('feather',56)+'</div><h2 class="hub-h2">Kurs nicht gefunden</h2><p class="mut">Für „'+E(q)+'“ gibt es noch keine Zeiten.</p><p><a class="btn" href="/parkour">Alle Kurse</a></p></div>';return}

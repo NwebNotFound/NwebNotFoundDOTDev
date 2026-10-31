@@ -134,6 +134,7 @@ with sync_playwright() as p:
         go("/parkour#kurs1"); pg.locator(".pkg").first.wait_for(timeout=10000); ok(pg.locator(".pkg").count() == 1 and pg.locator("#pk-kurs1").count() == 1, f"{w}px Parkour: alter #kurs1-Link geht weiter")
         go("/parkour?course=Cave%20Rush"); pg.locator("#pk-cave_rush").wait_for(timeout=10000); ok(pg.locator(".pkg").count() == 1, f"{w}px Parkour: ?course=Cave Rush → cave_rush")
         go("/parkour?course=cave-rush"); pg.locator("#pk-cave_rush").wait_for(timeout=10000); ok(pg.locator(".pkg").count() == 1, f"{w}px Parkour: ?course=cave-rush → cave_rush")
+        go("/parkour?course=_cave%20%20rush_"); pg.locator("#pk-cave_rush").wait_for(timeout=10000); ok(pg.locator(".pkg").count() == 1, f"{w}px Parkour: ?course=_cave  rush_ → cave_rush")
         go("/parkour?course=gibtsnicht"); pg.locator("#pk-unknown").wait_for(timeout=10000); ok("Kurs nicht gefunden" in pg.inner_text("#root"), f"{w}px Parkour: unbekannter Kurs")
         pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body='{"courses":{}}'))
         t = go("/parkour"); pg.locator("#pk-empty").wait_for(timeout=10000); ok("Noch keine Zeiten" in t or "Noch keine Zeiten" in pg.inner_text("body"), f"{w}px Parkour: Leerzustand")

@@ -349,6 +349,9 @@ try {
     r = await ing([e0({ course: "Cave Rush", mc_uuid: PU(8), time_ms: 29000 }), e0({ course: " cave-rush ", mc_uuid: PU(9), time_ms: 28000 }), e0({ course: "CAVE_RUSH", mc_uuid: PU(8), time_ms: 27000 })]);
     a2 = (await req("/api/mc-parkour")).j;
     ok(r.j.parkour === 2 && Object.keys(a2.courses).filter((k) => k.includes("cave")).join() === "cave_rush" && a2.courses.cave_rush[0].time_ms === 27000 && a2.courses.cave_rush.length === 3, "Kurs-ID normalisiert: 'Cave Rush'/'cave-rush'/'CAVE_RUSH' → cave_rush", JSON.stringify(Object.keys(a2.courses)));
+    r = await ing([e0({ course: "cave  rush", mc_uuid: PU(30), time_ms: 50000 }), e0({ course: "_cave_rush_", mc_uuid: PU(31), time_ms: 51000 })]);
+    a2 = (await req("/api/mc-parkour")).j;
+    ok(r.j.parkour === 2 && r.j.parkour_rejected === 0 && Object.keys(a2.courses).filter((k) => k.includes("cave")).join() === "cave_rush" && a2.courses.cave_rush.length === 5, "'cave  rush' und '_cave_rush_' → cave_rush", JSON.stringify(Object.keys(a2.courses)));
     ok(a2.courses.kurs1?.length === 1 && a2.courses.test.length === 10, "Alte IDs (kurs1, test) funktionieren weiter");
     { const q = await req("/parkour?course=cave_rush"); ok(q.s === 200 && q.t.includes("/api/mc-parkour") && !q.t.includes("onerror=alert"), "GET /parkour?course=… → 200, Name nicht im Server-HTML"); }
     { const m = await req("/parkour", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes("/api/mc-parkour")), "/parkour nur auf mc-Domain", m.s); }
