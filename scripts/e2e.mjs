@@ -355,14 +355,14 @@ try {
     ok(L.length === 10 && L.every((x, i) => x.rank === i + 1 && (i === 0 || L[i - 1].time_ms <= x.time_ms)) && L[0].mc_name === "Nils" && L[0].time_ms === 39000, "Top 10 aufsteigend sortiert, max 10", JSON.stringify(L.map((x) => x.time_ms)));
     ok(api.courses.nether_run?.length === 1 && api.courses.nether_run[0].mc_uuid === PU(2), "Zweiter Kurs separat");
     const pg = await req("/parkour"); ok(pg.s === 200 && /ds\.css\?v=/.test(pg.t) && pg.t.includes('href="/parkour"'), "GET /parkour → 200, im MC-Nav");
-    ok(api.course_names?.test === "test" && L[0].course_name === "test", "Ohne course_name → Fallback Kurs-ID", JSON.stringify(api.course_names));
+    ok(api.course_names?.test === "Test" && L[0].course_name === "Test" && api.course_icons?.test === "paper" && L[0].course_icon === "paper", "Ohne course_name/icon → Fallback hübsche Kurs-ID + paper", JSON.stringify(api.course_names));
     r = await ing([e0({ course: "cave_rush", mc_uuid: PU(3), mc_name: "Cave", time_ms: 30000, course_name: "  Cave\u0000  Rush  " }), e0({ course: "kurs1", mc_uuid: PU(4), time_ms: 31000, course_name: "<img src=x onerror=alert(1)>" }), e0({ course: "lang", mc_uuid: PU(5), time_ms: 32000, course_name: "x".repeat(60) }), e0({ course: "leer", mc_uuid: PU(6), time_ms: 33000, course_name: "   " }), e0({ course: "zahl", mc_uuid: PU(7), time_ms: 34000, course_name: 5 })]);
     ok(r.j.parkour === 5 && r.j.parkour_rejected === 0 && r.j.parkour_course_names === 3, "course_name optional, ungültig → Zeit zählt trotzdem", r.t);
     let cn = Object.fromEntries(sqlRows("SELECT course, course_name FROM mc_parkour_courses").map((x) => [x.course, x.course_name]));
     ok(cn.cave_rush === "Cave Rush" && cn.lang === "x".repeat(48) && !("leer" in cn) && !("zahl" in cn), "course_name getrimmt, Steuerzeichen raus, max 48", JSON.stringify(cn));
     await ing([e0({ course: "cave_rush", mc_uuid: PU(3), time_ms: 35000, course_name: "Cave Rush II" })]);
     let a2 = (await req("/api/mc-parkour")).j;
-    ok(a2.course_names.cave_rush === "Cave Rush II" && a2.courses.cave_rush[0].course_name === "Cave Rush II" && a2.courses.cave_rush[0].time_ms === 30000 && a2.course_names.kurs1 === "<img src=x onerror=alert(1)>" && a2.course_names.leer === "leer", "API: course_name aktualisierbar, Fallback ID, Rohtext (Escape erst beim Rendern)", JSON.stringify(a2.course_names));
+    ok(a2.course_names.cave_rush === "Cave Rush II" && a2.courses.cave_rush[0].course_name === "Cave Rush II" && a2.courses.cave_rush[0].time_ms === 30000 && a2.course_names.kurs1 === "<img src=x onerror=alert(1)>" && a2.course_names.leer === "Leer", "API: course_name aktualisierbar, Fallback hübsche ID, Rohtext (Escape erst beim Rendern)", JSON.stringify(a2.course_names));
     r = await ing([e0({ course: "Cave Rush", mc_uuid: PU(8), time_ms: 29000 }), e0({ course: " cave-rush ", mc_uuid: PU(9), time_ms: 28000 }), e0({ course: "CAVE_RUSH", mc_uuid: PU(8), time_ms: 27000 })]);
     a2 = (await req("/api/mc-parkour")).j;
     ok(r.j.parkour === 2 && Object.keys(a2.courses).filter((k) => k.includes("cave")).join() === "cave_rush" && a2.courses.cave_rush[0].time_ms === 27000 && a2.courses.cave_rush.length === 3, "Kurs-ID normalisiert: 'Cave Rush'/'cave-rush'/'CAVE_RUSH' → cave_rush", JSON.stringify(Object.keys(a2.courses)));
@@ -370,6 +370,21 @@ try {
     a2 = (await req("/api/mc-parkour")).j;
     ok(r.j.parkour === 2 && r.j.parkour_rejected === 0 && Object.keys(a2.courses).filter((k) => k.includes("cave")).join() === "cave_rush" && a2.courses.cave_rush.length === 5, "'cave  rush' und '_cave_rush_' → cave_rush", JSON.stringify(Object.keys(a2.courses)));
     ok(a2.courses.kurs1?.length === 1 && a2.courses.test.length === 10, "Alte IDs (kurs1, test) funktionieren weiter");
+    // course_icon
+    r = await ing([e0({ course: "icon_ok", mc_uuid: PU(40), time_ms: 60000, course_icon: "golden_boots" }), e0({ course: "icon_mc", mc_uuid: PU(41), time_ms: 60000, course_icon: " minecraft:GOLDEN_BOOTS " }), e0({ course: "icon_bad", mc_uuid: PU(42), time_ms: 60000, course_icon: "bad icon!" }), e0({ course: "icon_none", mc_uuid: PU(43), time_ms: 60000 })]);
+    let ic = Object.fromEntries(sqlRows("SELECT course, course_icon, course_name FROM mc_parkour_courses WHERE course LIKE 'icon_%'").map((x) => [x.course, x]));
+    ok(r.j.parkour === 4 && r.j.parkour_rejected === 0, "course_icon optional, Zeiten zählen", r.t);
+    ok(ic.icon_ok?.course_icon === "golden_boots", "course_icon gültig gespeichert", JSON.stringify(ic));
+    ok(ic.icon_mc?.course_icon === "golden_boots", "minecraft:GOLDEN_BOOTS → golden_boots", JSON.stringify(ic));
+    ok(ic.icon_bad?.course_icon === "paper", "Ungültiges Icon 'bad icon!' → paper", JSON.stringify(ic));
+    ok(!("icon_none" in ic), "Ohne Icon/Name → kein Kurs-Eintrag", JSON.stringify(ic));
+    a2 = (await req("/api/mc-parkour")).j;
+    ok(a2.course_icons.icon_ok === "golden_boots" && a2.course_icons.icon_bad === "paper" && a2.course_icons.icon_none === "paper" && a2.courses.icon_mc[0].course_icon === "golden_boots" && a2.course_names.icon_ok === "Icon Ok" && !Object.values(a2.course_names).some((n) => n.includes("_")), "API: course_icons + Fallback-Namen ohne Unterstrich", JSON.stringify(a2.course_names));
+    await ing([e0({ course: "icon_ok", mc_uuid: PU(40), time_ms: 59000, course_name: "Icon Kurs" })]);
+    ic = sqlRows("SELECT course_icon, course_name FROM mc_parkour_courses WHERE course='icon_ok'")[0];
+    ok(ic.course_icon === "golden_boots" && ic.course_name === "Icon Kurs", "Nur Name gesendet → Icon bleibt", JSON.stringify(ic));
+    await ing([e0({ course: "cave_rush", mc_uuid: PU(3), time_ms: 35000, course_icon: "feather" })]);
+    ok((await req("/api/mc-parkour")).j.course_names.cave_rush === "Cave Rush II", "Nur Icon gesendet → Name bleibt");
     { const q = await req("/parkour?course=cave_rush"); ok(q.s === 200 && q.t.includes("/api/mc-parkour") && !q.t.includes("onerror=alert"), "GET /parkour?course=… → 200, Name nicht im Server-HTML"); }
     { const m = await req("/parkour", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes("/api/mc-parkour")), "/parkour nur auf mc-Domain", m.s); }
   }
