@@ -85,7 +85,7 @@ html.mc #pb .mch-grid{gap:var(--s3)}
 /* ---------- Hero ---------- */
 html.mc .hero{position:relative;isolation:isolate;padding-top:clamp(2.5rem,8vw,5rem)!important;padding-bottom:clamp(2rem,5vw,3rem)!important;overflow:hidden}
 html.mc .pixbg{position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 80% at 15% 0%,rgba(83,226,223,.10),transparent 70%),radial-gradient(55% 70% at 90% 10%,rgba(95,227,109,.10),transparent 70%),linear-gradient(180deg,#121624 0%,var(--c-bg) 100%);-webkit-mask:none;mask:none;background-attachment:scroll}
-html.mc .pixbg::before{content:"";position:absolute;inset:0;background:url(/mc-icon/deepslate) 0 0/48px 48px,url(/mc-icon/stone) 24px 24px/48px 48px;image-rendering:pixelated;opacity:.09;filter:none;-webkit-mask:linear-gradient(180deg,#000,transparent 88%);mask:linear-gradient(180deg,#000,transparent 88%)}
+html.mc .pixbg::before{content:"";position:absolute;inset:0;background:url(/mc-icon/v2/deepslate) 0 0/48px 48px,url(/mc-icon/v2/stone) 24px 24px/48px 48px;image-rendering:pixelated;opacity:.09;filter:none;-webkit-mask:linear-gradient(180deg,#000,transparent 88%);mask:linear-gradient(180deg,#000,transparent 88%)}
 html.mc .pixbg::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,var(--c-line2),transparent);top:auto;width:auto;image-rendering:auto}
 
 /* ---------- Buttons ---------- */

@@ -29,7 +29,7 @@
   function renderInventoryCard(inv) {
     const L = Array.isArray(inv) ? inv.filter((i) => i && i.item) : [];
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-    const ic = (i) => `<img alt="" loading="lazy" src="/mc-icon/${encodeURIComponent(i.item)}" onerror="this.onerror=null;this.src='/mc-icon/paper'">`;
+    const ic = (i) => `<img alt="" loading="lazy" src="/mc-icon/v2/${encodeURIComponent(i.item)}" onerror="this.onerror=null;this.src='/mc-icon/v2/paper'">`;
     const nmi = (i) => i.name || String(i.item).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     const slot = (i, extraClass = "", aria = "") =>
       `<div class="ivs${i ? "" : " e"}${extraClass}"${aria ? ` aria-label="${esc(aria)}"` : ""}${i ? ` title="${esc(nmi(i))}${i.count > 1 ? " ×" + i.count : ""}"` : ""}>${i ? ic(i) + (i.count > 1 ? `<b>${i.count}</b>` : "") : ""}</div>`;

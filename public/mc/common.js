@@ -3,7 +3,7 @@ const NM=id=>String(id).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 const NF=(v,d=0)=>(+v||0).toLocaleString('de-DE',{maximumFractionDigits:d,minimumFractionDigits:d});
 const CP=v=>{v=+v||0;return (v>=100?NF(v):NF(v,v<10?2:1))+' CP'};
 const BIG=v=>{v=+v||0;return v>=1e6?NF(v/1e6,1)+' Mio':v>=1e4?NF(v/1e3,1)+' Tsd':NF(v)};
-const ICO=id=>'<span class="ic"><img alt="" loading="lazy" src="/mc-icon/'+encodeURIComponent(id)+'" onerror="this.onerror=null;this.src=\'/mc-icon/paper\'"></span>';
+const ICO=id=>'<span class="ic"><img alt="" loading="lazy" src="/mc-icon/v2/'+encodeURIComponent(id)+'" onerror="this.onerror=null;this.src=\'/mc-icon/v2/paper\'"></span>';
 const PCT=p=>{p=+p||0;const c=p>0.005?'up':p<-0.005?'dn':'flat';return '<span class="'+c+' tnum">'+(p>0?'+':'')+NF(p,2)+' %</span>'};
 const spark=(pts,w=120,h=36,ri=0)=>{if(!pts||pts.length<2)return '<svg width="'+w+'" height="'+h+'"></svg>';const mn=Math.min(...pts),mx=Math.max(...pts),r=mx-mn||1;const P=pts.map((v,i)=>[(i/(pts.length-1)*w).toFixed(1),(h-2-(v-mn)/r*(h-4)).toFixed(1)]);ri=+ri||0;const RM=ri>0&&ri<pts.length;const c=pts[pts.length-1]>=pts[RM?ri:0]?'#4ade80':'#f87171';const id='s'+Math.random().toString(36).slice(2,8);
 return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true"><defs><linearGradient id="'+id+'" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="'+c+'" stop-opacity=".35"/><stop offset="1" stop-color="'+c+'" stop-opacity="0"/></linearGradient></defs><path d="M'+P.join('L')+'L'+w+','+h+'L0,'+h+'Z" fill="url(#'+id+')"/><path d="M'+P.join('L')+'" fill="none" stroke="'+c+'" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>'+(RM?RMARK(((ri-.5)/(pts.length-1)*w).toFixed(1),0,h,1,w):'')+'</svg>'};

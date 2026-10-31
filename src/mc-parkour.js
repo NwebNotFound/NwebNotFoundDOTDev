@@ -12,7 +12,7 @@ export function cleanCourseName(v) {
   const t = [...v.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/g, "").replace(/\s+/g, " ").trim()].slice(0, PK_NAME_MAX).join("").trim();
   return t || null;
 }
-// Kurs-Icon: Minecraft-Item-ID (wie /mc-icon/<id>); trimmen, klein, "minecraft:" weg; ungültig → paper
+// Kurs-Icon: Minecraft-Item-ID (wie /mc-icon/v2/<id>); trimmen, klein, "minecraft:" weg; ungültig → paper
 export const PK_ICON_DEFAULT = "paper";
 const ICON = /^[a-z0-9_]{1,48}$/;
 // Gültiges Icon oder null (ungültig/fehlend → gespeichertes Icon bleibt).
@@ -70,7 +70,7 @@ export const parkourBody = () => `${CSS}<section class="hero" style="padding-bot
 <script src="/mc/common.js?v=${AV}"></script><script>(()=>{const E=MC.E,R=document.getElementById('root');
 const F=ms=>{ms=Math.max(0,Math.round(+ms||0));const m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000),x=ms%1000;return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(x).padStart(3,'0')};
 const HEAD=(n,s)=>'<img alt="" width="'+s+'" height="'+s+'" loading="lazy" src="https://mc-heads.net/avatar/'+encodeURIComponent(n)+'/'+s+'" onerror="this.src=\\'https://mc-heads.net/avatar/MHF_Steve/'+s+'\\'">';
-const MI=(id,s)=>'<img class="mi" alt="" width="'+s+'" height="'+s+'" style="image-rendering:pixelated" src="/mc-icon/'+encodeURIComponent(id)+'" onerror="this.onerror=null;this.src=\\'/mc-icon/paper\\'">';
+const MI=(id,s)=>'<img class="mi" alt="" width="'+s+'" height="'+s+'" style="image-rendering:pixelated" src="/mc-icon/v2/'+encodeURIComponent(id)+'" onerror="this.onerror=null;this.src=\\'/mc-icon/v2/paper\\'">';
 let D={},NM={},IC={};const P=k=>String(k).split('_').filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')||k,T=k=>NM[k]||P(k),I=k=>/^[a-z0-9_]{1,48}$/.test(IC[k]||'')?IC[k]:'paper';
 const Q=()=>{let q=new URLSearchParams(location.search).get('course');if(!q){q=location.hash.slice(1);try{q=decodeURIComponent(q)}catch(e){}}return q?q.trim().toLowerCase().replace(/[\\s-]+/g,'_').replace(/^_+|_+$/g,''):''};
 const BOARD=k=>'<div class="g pkg" id="pk-'+E(k)+'" data-course="'+E(k)+'"><div class="pkh"><span class="slot">'+MI(I(k),26)+'</span><h2><a href="/parkour?course='+encodeURIComponent(k)+'">'+E(T(k))+'</a></h2><small>Top '+D[k].length+'</small></div>'+D[k].map(x=>{const n=x.mc_name||'Unbekannt';return '<div class="pkr p'+x.rank+'"><span class="rk">'+x.rank+'</span><span class="slot">'+HEAD(x.mc_name||'MHF_Steve',32)+'</span><span class="n">'+(x.mc_name?'<a href="/spieler/'+encodeURIComponent(n)+'">'+E(n)+'</a>':E(n))+'<small>'+E(new Date(x.set_at).toLocaleDateString('de-DE',{dateStyle:'medium'}))+'</small></span><b class="tm">'+F(x.time_ms)+'</b></div>'}).join('')+'</div>';
