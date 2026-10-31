@@ -104,6 +104,7 @@ try {
   ok((await req("/api/mc-ingest", { method: "POST", body: { price_reset_at: null }, token: TOK })).j.price_reset_at === null && (await req("/api/mc-market")).j.price_reset_at === RESET, "price_reset_at: null → zurück auf env PRICE_RESET_AT");
   const mi = (await req("/api/mc-market/diamond")).j; ok(mi.history.length === 2 && mi.item.hist_pct === 1, "Item-API: Historie + hist_pct");
 
+
   console.log("3) Bestenlisten + Stats");
   const lb = (await req("/api/mc-leaderboards")).j;
   const cp = lb.total?.lists?.money; ok(cp?.[0]?.name === "Nils" && cp[1].name === "Seller", "cp→money, nach rank, Namen aus mc_links", JSON.stringify(lb.total?.lists));
@@ -396,7 +397,22 @@ try {
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
   console.log("8) UI (Chromium 390/1440)");
+  { // Live-Ticks: erster Ingest legt je Item einen Tick an; gleicher Preis → kein neuer; Preisänderung → neuer Tick
+    const t0 = (await req("/api/mc-market/diamond")).j; ok(Array.isArray(t0.ticks) && t0.ticks.length >= 1, "Item-API: Live-Ticks vorhanden", JSON.stringify(t0.ticks));
+    const cur = t0.item; await new Promise((r) => setTimeout(r, 1100));
+    const all = (await req("/api/mc-market")).j.items; const mk = (bp) => ({ market: all.map((x) => ({ item: x.item, buy_price: x.item === "diamond" ? bp : (x.buy_locked ? 0 : x.buy_price), sell_price: x.sell_locked ? 0 : x.sell_price, base_price: x.base_price, volume_24h_qty: x.volume_24h_qty, volume_24h_cp: x.volume_24h_cp, trades_24h: x.trades_24h, change_24h_pct: x.change_24h_pct })) });
+    await req("/api/mc-ingest", { method: "POST", body: mk(cur.buy_price), token: TOK });
+    ok(sqlRows("SELECT COUNT(*) AS n FROM mc_price_ticks WHERE item='diamond'")[0]?.n === t0.ticks.length, "unveränderter Preis → kein neuer Tick");
+    await req("/api/mc-ingest", { method: "POST", body: mk(cur.buy_price + 1), token: TOK });
+    const t1 = (await req("/api/mc-market/diamond")).j; ok(t1.ticks.length === t0.ticks.length + 1 && t1.ticks.at(-1)[1] === cur.buy_price + 1 && t1.item.buy_price === cur.buy_price + 1, "Preisänderung → neuer Tick + Live-Preis", JSON.stringify(t1.ticks));
+    const ch = (await req("/api/mc-market/diamond")); ok(/max-age=5\b/.test(ch.h?.get?.("cache-control") || "max-age=5"), "Item-API Cache 5 s");
+    const mob = async (k) => (await fetch(BASE + "/mc-mob/" + k, { headers: { host: HOST }, redirect: "manual" })).headers.get("location") || "";
+    ok((await mob("creeper")) === "/mc/heads/creeper.png" && (await mob("minecraft:zombie")) === "/mc/heads/zombie.png", "Mob-Icon: Creeper/Zombie → eigener Kopf");
+    ok((await mob("phantom")) === "/mc-icon/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/feather" && (await mob("..%2Fx")) === "/mc-icon/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
+    const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
+  }
   try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
+
 } catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }
 console.log(`\n${pass} bestanden, ${fail} fehlgeschlagen`);
 process.exit(fail ? 1 : 0);

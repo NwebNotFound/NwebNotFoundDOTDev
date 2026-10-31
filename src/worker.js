@@ -1,5 +1,6 @@
 import { AV } from "./asset-version.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
+import { mobIcon } from "./mc-mob.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
 import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
@@ -189,16 +190,16 @@ const DET_CSS = `<style>
 .emp{padding:1.4rem 0 .4rem;text-align:center;opacity:.55;font-size:.9rem}
 </style>`;
 const PROFILE_DETAILS = `${DET_CSS}<script>(()=>{${ICON_JS}const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const MOB={zombie:'rotten_flesh',skeleton:'bone',creeper:'gunpowder',spider:'string',enderman:'ender_pearl',cow:'leather',pig:'porkchop',sheep:'white_wool',chicken:'feather',witch:'glass_bottle',slime:'slime_ball',drowned:'trident',blaze:'blaze_rod',ender_dragon:'dragon_egg',wither:'nether_star',phantom:'phantom_membrane',pillager:'bow',villager:'emerald'};const MIC=id=>'<span class="ic"><img alt="" width="22" height="22" style="image-rendering:pixelated" src="/mc-icon/'+id+'"></span>';
+const MIC=id=>'<span class="ic"><img alt="" width="22" height="22" style="image-rendering:pixelated" src="/mc-mob/'+encodeURIComponent(id)+'"></span>';
 const DB={fall:'Fallschaden',lava:'Lava',fire:'Feuer',fire_tick:'Feuer',drowning:'Ertrinken',drown:'Ertrunken',on_fire:'Verbrannt',starve:'Verhungert',void:'Void',suffocation:'Erstickt',starvation:'Verhungert',explosion:'Explosion',block_explosion:'Explosion',entity_explosion:'Explosion',projectile:'Geschoss',magic:'Magie',freeze:'Erfroren',lightning:'Blitz',contact:'Kaktus/Beere',wither:'Wither',player:'Spieler',sonstige:'Sonstige',zombie:'Zombie',skeleton:'Skelett',creeper:'Creeper'};const MG=(o,L)=>{const r={},f={};for(const[k,v]of Object.entries(o||{})){const l=String(L(k)).toLowerCase();const c=f[l]??=k;r[c]=(r[c]||0)+(+v||0)}return r};const OTH=(o,tot,n)=>{const e=Object.entries(o||{}).map(([k,v])=>[k,+v||0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);const s=e.reduce((a,x)=>a+x[1],0);let r=Math.max(0,(+tot||0)-s);let k=e;if(e.length+(r>0?1:0)>n){k=e.slice(0,n-1);r+=e.slice(n-1).reduce((a,x)=>a+x[1],0)}const out=Object.fromEntries(k);if(r>0)out.sonstige=(out.sonstige||0)+r;return out};
 const list=(o,f,n=10)=>{const e=Object.entries(o||{}).sort((a,b)=>b[1]-a[1]).slice(0,n);if(!e.length)return '<div class="emp">Noch keine Daten. Spiel eine Runde auf Survival.</div>';const mx=e[0][1]||1;return e.map(([k,v])=>'<div class="row">'+f(k)+'<div class="n">'+E(NM(k))+'<div class="meter"><i style="width:'+Math.max(4,v/mx*100)+'%"></i></div></div><b>'+NF(v)+'</b></div>').join('')};
 const card=(t,sub,body)=>'<div class="dc"><h3>'+t+(sub?'<small>'+sub+'</small>':'')+'</h3>'+body+'</div>';
 document.addEventListener('mcprofile',ev=>{const m=ev.detail.minecraft;if(!m||!m.visible)return;const d=m.details||{},B=document.getElementById('pb');
-const emo=k=>MIC(MOB[k]||'iron_sword');const dd=d.distance_m||{};const DL={walk:'Gelaufen',sprint:'Gesprintet',fly:'Geflogen',swim:'Geschwommen',boat:'Boot',horse:'Pferd'};
+const emo=k=>MIC(k);const dd=d.distance_m||{};const DL={walk:'Gelaufen',sprint:'Gesprintet',fly:'Geflogen',swim:'Geschwommen',boat:'Boot',horse:'Pferd'};
 const dist=Object.keys(DL).filter(k=>dd[k]!=null);const tot=dist.reduce((a,k)=>a+dd[k],0);
 const MS=[['fished','Gefischt'],['traded','Gehandelt'],['jumps','Sprünge'],['damage_dealt','Schaden ausgeteilt'],['damage_taken','Schaden erlitten'],['cp_earned','CP verdient'],['shop_sales','Shop-Verkäufe']].filter(([k])=>d[k]!=null);
 const h='<div class="dg">'+card('Top-Blöcke','abgebaut',list(d.mined,ICO))+card('Mob-Kills','',list(d.killed,emo,8))+card('Distanzen',tot?KM(tot)+' gesamt':'',dist.length?'<div class="mini">'+dist.map(k=>'<div><div class="k">'+DL[k]+'</div><div class="v">'+KM(dd[k])+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')
-+card('Todesursachen','',list(OTH(MG(d.deaths_by,k=>DB[k]||k),(m.stats||{}).deaths,8),k=>MIC(k==='sonstige'?'bone':(MOB[k]||'bone')),8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)}))
++card('Todesursachen','',list(OTH(MG(d.deaths_by,k=>DB[k]||k),(m.stats||{}).deaths,8),k=>MIC(k),8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)}))
 +card('Gesetzt & gecraftet','',list(Object.assign({},d.placed),ICO,5)+(d.crafted?'<div style="height:.8rem"></div>'+list(d.crafted,ICO,5):''))
 +card('Sonstiges','',MS.length?'<div class="mini">'+MS.map(([k,t])=>'<div><div class="k">'+t+'</div><div class="v">'+NF(Math.round(d[k]))+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')+'</div>';
 const w=document.createElement('div');w.innerHTML=h;const mch=B.querySelector('.mch');if(mch)mch.after(w.firstChild);else B.prepend(w.firstChild);});})();</script>`;
@@ -640,6 +641,11 @@ function cleanHistory(a) {
 function marketStatements(env, market, hist) {
   const st = [];
   if (market) {
+    // Live-Preispunkte: bei jeder Änderung von Kauf-/Verkaufspreis (gegenüber mc_market) einen Tick speichern – vor dem Upsert.
+    st.push(env.DB.prepare(`INSERT OR IGNORE INTO mc_price_ticks (item, ts, buy_price, sell_price, buy_locked)
+      SELECT json_extract(j.value,'$.item'), ?, json_extract(j.value,'$.buy_price'), json_extract(j.value,'$.sell_price'), json_extract(j.value,'$.buy_locked') FROM json_each(?) j LEFT JOIN mc_market m ON m.item = json_extract(j.value,'$.item')
+      WHERE m.item IS NULL OR m.buy_price IS NOT json_extract(j.value,'$.buy_price') OR m.sell_price IS NOT json_extract(j.value,'$.sell_price')`).bind(Math.floor(Date.now() / 1000), JSON.stringify(market)));
+    st.push(env.DB.prepare("DELETE FROM mc_price_ticks WHERE ts < ?").bind(Math.floor(Date.now() / 1000) - HIST_DAYS * 86400));
     // Nur geänderte Zeilen schreiben (Push jede Minute): Upsert mit WHERE, danach verschwundene Items löschen
     for (let i = 0; i < market.length; i += HIST_CHUNK) st.push(env.DB.prepare(`INSERT INTO mc_market (item, buy_locked, sell_locked, buy_price, sell_price, base_price, volume_24h_qty, volume_24h_cp, trades_24h, change_24h_pct, updated_at)
       SELECT json_extract(value,'$.item'), json_extract(value,'$.buy_locked'), json_extract(value,'$.sell_locked'), json_extract(value,'$.buy_price'), json_extract(value,'$.sell_price'), json_extract(value,'$.base_price'), json_extract(value,'$.volume_24h_qty'), json_extract(value,'$.volume_24h_cp'), json_extract(value,'$.trades_24h'), json_extract(value,'$.change_24h_pct'), json_extract(value,'$.updated_at') FROM json_each(?) WHERE 1
@@ -685,7 +691,7 @@ async function mcMarket(env) {
     for (const r of results) { (spark[r.item] ||= []).push(r.avg_price); if (rs && r.hour_ts < rs) spark_reset[r.item] = spark[r.item].length; }
   }
   const at = items.reduce((m, x) => Math.max(m, x.updated_at || 0), 0);
-  return json({ updated_at: at ? new Date(at * 1000).toISOString() : null, price_reset_at: rs ? new Date(rs * 1000).toISOString() : null, items, spark, spark_reset }, 200, { "cache-control": "public, max-age=60" });
+  return json({ updated_at: at ? new Date(at * 1000).toISOString() : null, price_reset_at: rs ? new Date(rs * 1000).toISOString() : null, items, spark, spark_reset }, 200, { "cache-control": "public, max-age=5" });
 }
 async function mcMarketItem(env, raw) {
   const id = cleanItem(raw); if (!id) return json({ error: "invalid item" }, 400);
@@ -693,7 +699,9 @@ async function mcMarketItem(env, raw) {
   if (item) await histPct(env, [item]);
   const { results } = await env.DB.prepare("SELECT hour_ts, avg_price, min_price, max_price, volume_qty FROM mc_market_history WHERE item = ? AND hour_ts >= ? ORDER BY hour_ts").bind(id, Math.floor(Date.now() / 1000) - HIST_DAYS * 86400).all().catch(() => ({ results: [] }));
   const rs = await resetAt(env);
-  return json({ item: item || null, price_reset_at: rs ? new Date(rs * 1000).toISOString() : null, history: results.map((r) => [r.hour_ts, r.avg_price, r.min_price, r.max_price, r.volume_qty]) }, 200, { "cache-control": "public, max-age=60" });
+  const { results: tk } = await env.DB.prepare("SELECT ts, buy_price, sell_price, buy_locked FROM mc_price_ticks WHERE item = ? AND ts >= ? ORDER BY ts DESC LIMIT 5000").bind(id, Math.floor(Date.now() / 1000) - HIST_DAYS * 86400).all().catch(() => ({ results: [] }));
+  return json({ item: item || null, price_reset_at: rs ? new Date(rs * 1000).toISOString() : null, history: results.map((r) => [r.hour_ts, r.avg_price, r.min_price, r.max_price, r.volume_qty]),
+    ticks: tk.reverse().map((r) => [r.ts, r.buy_price, r.sell_price, r.buy_locked ? 1 : 0]) }, 200, { "cache-control": "public, max-age=5" });
 }
 
 /* ---------- Helfer ---------- */
@@ -763,6 +771,7 @@ export default {
     if (p === "/api/mc-parkour") return json(await parkourApi(env), 200, { "cache-control": "public, max-age=30" });
     if (p === "/api/mc-market") return mcMarket(env);
     if (p.startsWith("/api/mc-market/")) return mcMarketItem(env, decodeURIComponent(p.slice(15)));
+    if (p.startsWith("/mc-mob/")) return new Response(null, { status: 302, headers: { location: mobIcon(decodeURIComponent(p.slice(8)).replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } });
     if (p.startsWith("/mc-icon/")) { const r = resolveIcon(decodeURIComponent(p.slice(9)).replace(/\.png$/, "")); return r ? new Response(null, { status: 302, headers: { location: /^https:/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=604800" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${decodeURIComponent(p.slice(9)).replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
     if (p.startsWith("/auth/")) {
       if (isMc) { url.hostname = MAIN; return redirect(url.toString()); }
