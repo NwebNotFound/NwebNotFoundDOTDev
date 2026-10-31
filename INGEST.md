@@ -250,3 +250,9 @@ Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, 
 **POST `/api/mc-shop-orders/ack`**: unverändert, gleiche Stati wie Shop-Orders; Status landet über `v_order_fulfillment` in der Liste `/bestellungen`.
 
 **POST `/api/mc-orders/hide`** `{id}` oder `{ids:[]}` (Session): blendet eigene erledigte/abgelehnte Einträge nur für den User aus (`mc_order_hidden`), nichts wird gelöscht.
+
+## economy_daily (eigener POST, Discord-Bot, alle 5 Min.)
+`POST /api/mc-ingest` (Header `x-ingest-token`) mit `{"economy_daily":[{"day":"YYYY-MM-DD","money_supply_cp":int,"minted_cp":int|null,"burned_cp":int|null,"net_cp":int|null}]}`.
+Höchstens 90 Zeilen, älteste zuerst (streng aufsteigend, kein Tag doppelt). Upsert pro Tag in `mc_economy_daily` (Migration `0010_economy_daily.sql`).
+Strikt: ungültiges Datum, Nicht-Integer, unbekannte Felder oder mehr als 90 Zeilen → `400`, dann wird nichts geschrieben. Fehlende minted/burned/net zählen als `null`.
+Lesen: `GET /api/mc-economy` → `{updated_at, days:[…]}` (letzte 90 Tage, älteste zuerst). Anzeige auf `/markt` (Stufen-Graph der Geldmenge, `–` bei null).

@@ -415,6 +415,37 @@ try {
     const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
   }
   { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy-report-only") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && !r.headers.get("content-security-policy"), "CSP Report-Only gesetzt (nicht erzwingend)", c); }
+  console.log("E) economy_daily");
+  { const ED = (rows) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { economy_daily: rows } });
+    const e0 = await req("/api/mc-economy"); ok(e0.s === 200 && Array.isArray(e0.j?.days) && e0.j.days.length === 0, "Economy-API leer → days []", e0.t);
+    ok((await req("/api/mc-ingest", { method: "POST", body: { economy_daily: [] } })).s === 401, "economy_daily ohne Token → 401");
+    const bad = [
+      ["kein Array", { day: "2026-10-01", money_supply_cp: 1 }],
+      ["Datum falsch", [{ day: "2026-13-01", money_supply_cp: 1 }]],
+      ["Datum 30.02.", [{ day: "2026-02-30", money_supply_cp: 1 }]],
+      ["Datum-Format", [{ day: "2026-1-01", money_supply_cp: 1 }]],
+      ["Supply Float", [{ day: "2026-10-01", money_supply_cp: 1.5 }]],
+      ["Supply null", [{ day: "2026-10-01", money_supply_cp: null }]],
+      ["Supply String", [{ day: "2026-10-01", money_supply_cp: "5" }]],
+      ["minted String", [{ day: "2026-10-01", money_supply_cp: 1, minted_cp: "1" }]],
+      ["net Float", [{ day: "2026-10-01", money_supply_cp: 1, net_cp: 0.5 }]],
+      ["unbekanntes Feld", [{ day: "2026-10-01", money_supply_cp: 1, foo: 1 }]],
+      ["nicht aufsteigend", [{ day: "2026-10-02", money_supply_cp: 1 }, { day: "2026-10-01", money_supply_cp: 1 }]],
+      ["doppelter Tag", [{ day: "2026-10-01", money_supply_cp: 1 }, { day: "2026-10-01", money_supply_cp: 2 }]],
+      ["91 Zeilen", Array.from({ length: 91 }, (_, i) => ({ day: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10), money_supply_cp: i }))],
+    ];
+    for (const [m, rows] of bad) { const r = await ED(rows); ok(r.s === 400 && r.j?.error, "economy_daily " + m + " → 400", r.s + " " + r.t); }
+    ok(sqlRows("SELECT COUNT(*) AS n FROM mc_economy_daily")[0].n === 0, "economy_daily: nach 400 nichts geschrieben");
+    const rows = Array.from({ length: 90 }, (_, i) => ({ day: new Date(Date.UTC(2026, 7, 3 + i)).toISOString().slice(0, 10), money_supply_cp: 100000 + Math.floor(i / 7) * 5000, minted_cp: null, burned_cp: null, net_cp: null }));
+    const r1 = await ED(rows); ok(r1.s === 200 && r1.j?.economy_daily === 90, "economy_daily 90 Zeilen → 200", r1.t);
+    const r2 = await ED([{ day: rows[89].day, money_supply_cp: 777777, minted_cp: 1200, burned_cp: 300, net_cp: -900 }]); ok(r2.s === 200 && r2.j?.economy_daily === 1, "economy_daily Upsert letzter Tag → 200", r2.t);
+    ok(sqlRows("SELECT COUNT(*) AS n FROM mc_economy_daily")[0].n === 90, "economy_daily: Upsert ohne Duplikat");
+    const e1 = await req("/api/mc-economy"), dd = e1.j?.days || [];
+    ok(e1.s === 200 && dd.length === 90 && dd[0].day === rows[0].day && dd[89].day === rows[89].day, "Economy-API: 90 Tage, älteste zuerst", e1.t.slice(0, 200));
+    ok(dd[89].money_supply_cp === 777777 && dd[89].net_cp === -900 && dd[0].minted_cp === null && dd[0].burned_cp === null && dd[0].net_cp === null, "Economy-API: Upsert-Werte und null erhalten");
+    const pg = await req("/markt"); ok(pg.s === 200 && pg.t.includes('id="econ"') && pg.t.includes("/mc/economy.js") && pg.t.includes("/mc/economy.css"), "GET /markt bindet Economy-Block extern ein");
+    const js = await req("/mc/economy.js"); ok(js.s === 200 && !/style=|\.style\./.test(js.t), "economy.js ohne Inline-Styles");
+  }
   try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
 
 } catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }
