@@ -190,7 +190,7 @@ const DET_CSS = `<style>
 </style>`;
 const PROFILE_DETAILS = `${DET_CSS}<script>(()=>{${ICON_JS}const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const MOB={zombie:'rotten_flesh',skeleton:'bone',creeper:'gunpowder',spider:'string',enderman:'ender_pearl',cow:'leather',pig:'porkchop',sheep:'white_wool',chicken:'feather',witch:'glass_bottle',slime:'slime_ball',drowned:'trident',blaze:'blaze_rod',ender_dragon:'dragon_egg',wither:'nether_star',phantom:'phantom_membrane',pillager:'bow',villager:'emerald'};const MIC=id=>'<span class="ic"><img alt="" width="22" height="22" style="image-rendering:pixelated" src="/mc-icon/'+id+'"></span>';
-const DB={fall:'Fallschaden',lava:'Lava',drown:'Ertrunken',fire:'Feuer',on_fire:'Verbrannt',starve:'Verhungert',void:'Void',explosion:'Explosion',suffocation:'Erstickt',zombie:'Zombie',skeleton:'Skelett',creeper:'Creeper',player:'Spieler'};
+const DB={fall:'Fallschaden',lava:'Lava',fire:'Feuer',fire_tick:'Feuer',drowning:'Ertrinken',drown:'Ertrunken',on_fire:'Verbrannt',starve:'Verhungert',void:'Void',suffocation:'Erstickt',starvation:'Verhungert',explosion:'Explosion',block_explosion:'Explosion',entity_explosion:'Explosion',projectile:'Geschoss',magic:'Magie',freeze:'Erfroren',lightning:'Blitz',contact:'Kaktus/Beere',wither:'Wither',player:'Spieler',sonstige:'Sonstige',zombie:'Zombie',skeleton:'Skelett',creeper:'Creeper'};const OTH=(o,tot,n)=>{const e=Object.entries(o||{}).map(([k,v])=>[k,+v||0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);const s=e.reduce((a,x)=>a+x[1],0);let r=Math.max(0,(+tot||0)-s);let k=e;if(e.length+(r>0?1:0)>n){k=e.slice(0,n-1);r+=e.slice(n-1).reduce((a,x)=>a+x[1],0)}const out=Object.fromEntries(k);if(r>0)out.sonstige=(out.sonstige||0)+r;return out};
 const list=(o,f,n=10)=>{const e=Object.entries(o||{}).sort((a,b)=>b[1]-a[1]).slice(0,n);if(!e.length)return '<div class="emp">Noch keine Daten. Spiel eine Runde auf Survival.</div>';const mx=e[0][1]||1;return e.map(([k,v])=>'<div class="row">'+f(k)+'<div class="n">'+E(NM(k))+'<div class="meter"><i style="width:'+Math.max(4,v/mx*100)+'%"></i></div></div><b>'+NF(v)+'</b></div>').join('')};
 const card=(t,sub,body)=>'<div class="dc"><h3>'+t+(sub?'<small>'+sub+'</small>':'')+'</h3>'+body+'</div>';
 document.addEventListener('mcprofile',ev=>{const m=ev.detail.minecraft;if(!m||!m.visible)return;const d=m.details||{},B=document.getElementById('pb');
@@ -198,7 +198,7 @@ const emo=k=>MIC(MOB[k]||'iron_sword');const dd=d.distance_m||{};const DL={walk:
 const dist=Object.keys(DL).filter(k=>dd[k]!=null);const tot=dist.reduce((a,k)=>a+dd[k],0);
 const MS=[['fished','Gefischt'],['traded','Gehandelt'],['jumps','Sprünge'],['damage_dealt','Schaden ausgeteilt'],['damage_taken','Schaden erlitten'],['cp_earned','CP verdient'],['shop_sales','Shop-Verkäufe']].filter(([k])=>d[k]!=null);
 const h='<div class="dg">'+card('Top-Blöcke','abgebaut',list(d.mined,ICO))+card('Mob-Kills','',list(d.killed,emo,8))+card('Distanzen',tot?KM(tot)+' gesamt':'',dist.length?'<div class="mini">'+dist.map(k=>'<div><div class="k">'+DL[k]+'</div><div class="v">'+KM(dd[k])+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')
-+card('Todesursachen','',list(d.deaths_by,k=>MIC(MOB[k]||'bone'),8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)}))
++card('Todesursachen','',list(OTH(d.deaths_by,(m.stats||{}).deaths,8),k=>MIC(k==='sonstige'?'bone':(MOB[k]||'bone')),8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)}))
 +card('Gesetzt & gecraftet','',list(Object.assign({},d.placed),ICO,5)+(d.crafted?'<div style="height:.8rem"></div>'+list(d.crafted,ICO,5):''))
 +card('Sonstiges','',MS.length?'<div class="mini">'+MS.map(([k,t])=>'<div><div class="k">'+t+'</div><div class="v">'+NF(Math.round(d[k]))+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')+'</div>';
 const w=document.createElement('div');w.innerHTML=h;const mch=B.querySelector('.mch');if(mch)mch.after(w.firstChild);else B.prepend(w.firstChild);});})();</script>`;
@@ -549,7 +549,7 @@ async function mcLeaderboards(env) {
   const out = { total: null, weekly: null };
   for (const r of results) if (r.kind in out) out[r.kind] = { updated_at: new Date(r.updated_at).toISOString(), lists: JSON.parse(r.data) };
   if (!out.total) { const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null); const lb = row ? JSON.parse(row.data).leaderboards : null; if (lb && Object.keys(lb).length) out.total = { updated_at: new Date(row.updated_at).toISOString(), lists: lb }; }
-  return json(out, 200, { "cache-control": "public, max-age=30" });
+  return json(out, 200, { "cache-control": "public, max-age=5" });
 }
 async function mcIngest(req, env) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -602,7 +602,7 @@ async function mcData(env) {
   const sAt = d.servers_at || (d.servers ? row.updated_at : null), lAt = d.leaderboards_at || (d.leaderboards ? row.updated_at : null);
   const sF = !!sAt && now - sAt <= FRESH_MS, lF = !!lAt && now - lAt <= FRESH_MS;
   return json({ fresh: sF || lF, updated_at: iso(row?.updated_at), servers_fresh: sF, servers_at: iso(sAt), leaderboards_fresh: lF, leaderboards_at: iso(lAt),
-    servers: d.servers || {}, leaderboards: lF ? d.leaderboards || {} : {} }, 200, { "cache-control": "public, max-age=15" });
+    servers: d.servers || {}, leaderboards: lF ? d.leaderboards || {} : {} }, 200, { "cache-control": "public, max-age=5" });
 }
 
 /* ---------- Markt ---------- */

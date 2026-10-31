@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # UI-Prüfung gegen das lokale wrangler dev aus e2e.mjs (wird von dort aufgerufen). argv: BASE COOKIE
+import json
 import sys, re
 from urllib.parse import unquote
 from playwright.sync_api import sync_playwright
@@ -136,6 +137,13 @@ with sync_playwright() as p:
         go("/parkour?course=cave-rush"); pg.locator("#pk-cave_rush").wait_for(timeout=10000); ok(pg.locator(".pkg").count() == 1, f"{w}px Parkour: ?course=cave-rush → cave_rush")
         go("/parkour?course=_cave%20%20rush_"); pg.locator("#pk-cave_rush").wait_for(timeout=10000); ok(pg.locator(".pkg").count() == 1, f"{w}px Parkour: ?course=_cave  rush_ → cave_rush")
         go("/parkour?course=gibtsnicht"); pg.locator("#pk-unknown").wait_for(timeout=10000); ok("Kurs nicht gefunden" in pg.inner_text("#root"), f"{w}px Parkour: unbekannter Kurs")
+        for dby, exp in (({"fall": 1, "player": 1, "some_unknown_cause": 1}, {"Fallschaden": "1", "Spieler": "1", "Some Unknown Cause": "1"}), ({"player": 1}, {"Spieler": "1", "Sonstige": "2"})):
+            body = json.dumps({"name": "Tod1", "uuid": "33333333-4444-4555-8666-777777777777", "stats": {"deaths": 3}, "viewer": {"logged_in": True, "can_details": True}, "details": {"all": {"deaths": 3}, "extra": {"deaths_by": dby}}})
+            pg.route("**/api/mc-players/Tod1", (lambda b: lambda r: r.fulfill(status=200, content_type="application/json", body=b))(body))
+            go("/spieler/Tod1"); pg.locator("#det").wait_for(timeout=10000)
+            rows = pg.evaluate("""()=>{const c=[...document.querySelectorAll('.dcard')].find(x=>x.querySelector('h3')?.textContent.startsWith('Todesursachen'));return c?[...c.querySelectorAll('.prow')].map(r=>[r.querySelector('.n span').textContent,r.querySelector('b').textContent]):null}""")
+            got = dict(rows or []); ok(got == exp and sum(int(v) for v in got.values()) == 3, f"{w}px Todesursachen {list(dby)} → {exp}", rows)
+            pg.unroute("**/api/mc-players/Tod1")
         pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body='{"courses":{}}'))
         t = go("/parkour"); pg.locator("#pk-empty").wait_for(timeout=10000); ok("Noch keine Zeiten" in t or "Noch keine Zeiten" in pg.inner_text("body"), f"{w}px Parkour: Leerzustand")
         pg.screenshot(path=f"{SH}/local-parkour-leer-{w}.png", full_page=True); pg.unroute("**/api/mc-parkour")
