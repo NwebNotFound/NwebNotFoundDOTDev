@@ -39,6 +39,11 @@ try {
   const c1 = await cookieFor("s1"), c2 = await cookieFor("s2");
 
   console.log("0) Parkour leer");
+  { const g = fs.readFileSync(ROOT + "src/generated/changelog.js", "utf8"); ok(g.includes("Für Spieler") && !/## Admin|creepy_ro|PR #\d|v_economy_daily|--profile/.test(g), "Gebündelter Changelog enthält nur den Spieler-Teil"); }
+  { const r = await req("/changelog"); ok(r.s === 200 && r.t.includes("Changelog.") && r.t.includes("Stack für Stack") && r.t.includes("/mc/changelog.css"), "GET /changelog → 200 mit Spieler-Einträgen", r.t.slice(0, 200));
+    ok(!r.t.includes("creepy_ro") && !r.t.includes("PR #28") && !r.t.includes("Admin"), "Changelog zeigt keinen Admin-Teil");
+    const body = r.t.slice(r.t.indexOf('id="changelog"')); ok(!/<script|<style| style=/.test(body.slice(0, body.indexOf("</section>"))), "Changelog-Inhalt ohne Inline-Script/-Style");
+    { const m = await req("/changelog", { testHost: "nwebnotfound.dev" }); ok(!m.t.includes("Stack für Stack"), "Changelog nicht auf der persönlichen Seite", String(m.s)); } }
   { const r = await req("/api/mc-parkour"); ok(r.s === 200 && r.j && Object.keys(r.j.courses).length === 0, "Parkour-API leer → courses {}", r.t); const pg = await req("/parkour"); ok(pg.s === 200 && pg.t.includes("/api/mc-parkour") && pg.t.includes("Noch keine Zeiten"), "GET /parkour leer → 200 mit Leerzustand"); }
   console.log("1) Ingest");
   ok((await req("/api/mc-ingest", { method: "POST", body: {} })).s === 401, "Ingest ohne Token → 401");

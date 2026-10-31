@@ -6,6 +6,7 @@ import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js"
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
 import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
 import { normInv, renderInventoryCard } from "./mc-inventory.js";
+import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
@@ -783,6 +784,7 @@ export default {
       if (p === "/") return html(MC_HOME);
       if (p === "/profile") return html(PROFILE_MC());
       if (p === "/leaderboards") return html(LEADERBOARDS_MC());
+      if (p === "/changelog") return html(mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", changelogBody()));
       if (p === "/parkour") return html(mcPage("Parkour · NwebNotFound MC", "Parkour-Bestzeiten aus der Lobby: Top 10 pro Kurs", parkourBody()));
       if (p === "/bestellungen" || p === "/abholungen") return html(mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));
       if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
