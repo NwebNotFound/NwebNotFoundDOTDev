@@ -1,4 +1,5 @@
 import { AV } from "./asset-version.js";
+import { cleanEconomy, economyStatements, economyApi } from "./mc-economy.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
@@ -560,6 +561,8 @@ async function mcIngest(req, env) {
   const raw = await req.text(); if (raw.length > 8388608) return json({ error: "too large" }, 413);
   let b; try { b = JSON.parse(raw); } catch { return json({ error: "invalid json" }, 400); }
   if (!b || typeof b !== "object") return json({ error: "invalid json" }, 400);
+  let econ;
+  if ("economy_daily" in b) { econ = cleanEconomy(b.economy_daily); if (econ.error) return json({ error: econ.error }, 400); }
   const vinfo = await normalizeViews(env, b);
   const { links, players_stats, details, leaderboards_weekly, ...data } = cleanIngest(b), now = Date.now();
   const st = [], market = cleanMarket(b?.market), market_history = cleanHistory(b?.market_history);
@@ -593,8 +596,9 @@ async function mcIngest(req, env) {
   if (shops) st.push(blobStatement(env, "shops", shops, now));
   if (auctions) st.push(blobStatement(env, "auctions", auctions, now));
   const parkour = cleanParkour(b?.parkour, now); if (parkour) st.push(...parkourStatements(env, parkour.rows, parkour.names, now));
+  if (econ) st.push(...economyStatements(env, econ.rows, now));
   if (st.length) await env.DB.batch(st);
-  return json({ ok: true, ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
+  return json({ ok: true, ...(econ ? { economy_daily: econ.rows.length } : {}), ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
@@ -772,6 +776,7 @@ export default {
     if (p.startsWith("/api/mc-players/")) { const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, decodeURIComponent(p.slice(16)), u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
     if (p === "/api/mc-leaderboards") return mcLeaderboards(env);
     if (p === "/api/mc-parkour") return json(await parkourApi(env), 200, { "cache-control": "public, max-age=30" });
+    if (p === "/api/mc-economy") return json(await economyApi(env), 200, { "cache-control": "public, max-age=60" });
     if (p === "/api/mc-market") return mcMarket(env);
     if (p.startsWith("/api/mc-market/")) return mcMarketItem(env, decodeURIComponent(p.slice(15)));
     if (p.startsWith("/mc-mob/")) return new Response(null, { status: 302, headers: { location: mobIcon(decodeURIComponent(p.slice(8)).replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } });

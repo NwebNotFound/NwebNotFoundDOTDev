@@ -30,6 +30,13 @@ with sync_playwright() as p:
             ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px {path}: kein horizontales Scrollen")
             return pg.inner_text("body")
         t = go("/markt")
+        pg.wait_for_selector("#econ-card", timeout=10000)
+        et = pg.inner_text("#econ")
+        ok(pg.locator("#econ .econ-line").count() == 1, f"{w}px Markt: Economy-Stufengraph da")
+        dpath = pg.get_attribute("#econ .econ-line", "d") or ""
+        ok("V" in dpath and "H" in dpath and "L" not in dpath, f"{w}px Markt: Graph ist Stufen-Pfad (H/V)", dpath[:80])
+        ok("777.777 CP" in et and "–" in et and "-900 CP" in et, f"{w}px Markt: Economy-Werte und '–' bei null", et[:300])
+        ok(pg.locator("#econ [style]").count() == 0, f"{w}px Markt: Economy ohne style-Attribute")
         ok("nur Verkauf" in t and "Nicht bei der Bank kaufbar" not in t, f"{w}px Markt: dezentes 'nur Verkauf'")
         hs = pg.eval_on_selector_all(".nb:not(:empty)", "els=>els.map(e=>e.getBoundingClientRect().height)")
         ok(hs and max(hs) < 24, f"{w}px Markt: 'nur Verkauf' einzeilig", hs[:5])

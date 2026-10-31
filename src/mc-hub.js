@@ -99,7 +99,9 @@ export const marketBody = () => `
 <div class="srch" style="margin-top:1.4rem;max-width:560px">${SEARCH_SVG}<input name="mc-q-find" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" data-form-type="other" data-lpignore="true" class="inp" id="q" type="search" placeholder="Item suchen, z. B. Diamant" role="combobox" aria-expanded="false" aria-controls="ac" aria-label="Item suchen"><div class="ac" id="ac" role="listbox" hidden></div></div>
 </div></section>
 <section class="sec" style="padding-top:1.2rem"><div class="hub-wrap" id="mroot"><div class="g pad mut">Lade Marktdaten…</div></div></section>
-<script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/market.js?v=${AV}" defer></script>`;
+<section class="sec econ-sec"><div class="hub-wrap" id="econ" aria-live="polite"><div class="g pad mut">Lade Economy-Daten…</div></div></section>
+<link rel="stylesheet" href="/mc/economy.css?v=${AV}">
+<script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/market.js?v=${AV}" defer></script><script src="/mc/economy.js?v=${AV}" defer></script>`;
 // Öffentlicher Turnstile-Sitekey (gleich wie SITEKEY in worker.js)
 const TS_SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 export const marketItemBody = (item) => `
