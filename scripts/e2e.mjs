@@ -303,7 +303,7 @@ try {
   bo = (await req("/api/mc-bestellungen", { cookie: c9 })).j; ok(bo.orders.length === 0, "ausgeblendete fehlen in der Liste");
   ok(sqlRows(`SELECT COUNT(*) AS n FROM mc_shop_orders_pending WHERE id IN ('${RID1}','${RID2}')`)[0].n === 2, "nichts gelöscht (Soft-Hide)");
   console.log("9b) Icons (1.21.11)");
-  const IC = async (id) => (await fetch(BASE + "/mc-icon/" + id, { headers: { host: HOST }, redirect: "manual" })).headers.get("location") || "";
+  const IC = async (id) => (await fetch(BASE + "/mc-icon/v2/" + id, { headers: { host: HOST }, redirect: "manual" })).headers.get("location") || "";
   ok(/@1\.21\.11\/.*item\/diamond_spear\.png$/.test(await IC("diamond_spear")), "diamond_spear → echte Speer-Textur (kein Dreizack)");
   ok(/item\/acacia_hanging_sign\.png$/.test(await IC("acacia_hanging_sign")), "acacia_hanging_sign → eigene Textur");
   ok(/item\/creeper_spawn_egg\.png$/.test(await IC("creeper_spawn_egg")), "Spawn-Ei → eigenes Ei");
@@ -408,7 +408,7 @@ try {
     const ch = (await req("/api/mc-market/diamond")); ok(/max-age=5\b/.test(ch.h?.get?.("cache-control") || "max-age=5"), "Item-API Cache 5 s");
     const mob = async (k) => (await fetch(BASE + "/mc-mob/" + k, { headers: { host: HOST }, redirect: "manual" })).headers.get("location") || "";
     ok((await mob("creeper")) === "/mc/heads/creeper.png" && (await mob("minecraft:zombie")) === "/mc/heads/zombie.png", "Mob-Icon: Creeper/Zombie → eigener Kopf");
-    ok((await mob("phantom")) === "/mc-icon/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/feather" && (await mob("..%2Fx")) === "/mc-icon/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
+    ok((await mob("phantom")) === "/mc-icon/v2/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/v2/feather" && (await mob("..%2Fx")) === "/mc-icon/v2/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
     const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
   }
   { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy-report-only") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && !r.headers.get("content-security-policy"), "CSP Report-Only gesetzt (nicht erzwingend)", c); }

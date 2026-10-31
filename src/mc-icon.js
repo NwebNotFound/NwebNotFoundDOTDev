@@ -1,4 +1,5 @@
 import { TEX_BLOCK, TEX_ITEM } from "./mc-textures.js";
+import { NEW_BASE, NEW_BLOCK, NEW_ITEM } from "./mc-textures-new.js";
 export const TEX_BASE = "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/";
 // IDs, deren Texturname abweicht
 const ALIAS = {
@@ -6,7 +7,7 @@ const ALIAS = {
   short_grass: "block/short_grass", tall_grass: "block/tall_grass_top", sunflower: "block/sunflower_front", lilac: "block/lilac_top",
   rose_bush: "block/rose_bush_top", peony: "block/peony_top", large_fern: "block/large_fern_top", fire: "block/fire_0", soul_fire: "block/soul_fire_0",
   crafting_table: "block/crafting_table_front", furnace: "block/furnace_front", blast_furnace: "block/blast_furnace_front", smoker: "block/smoker_front",
-  tnt: "block/tnt_side", bookshelf: "block/bookshelf", chest: "block/barrel_side", trapped_chest: "block/barrel_side", cinnabar: "block/red_terracotta", sulfur: "block/yellow_terracotta", ender_chest: "block/obsidian",
+  tnt: "block/tnt_side", bookshelf: "block/bookshelf", chest: "block/barrel_side", trapped_chest: "block/barrel_side", ender_chest: "block/obsidian",
   snow_block: "block/snow", snow: "item/snowball", podzol: "block/podzol_side", mycelium: "block/mycelium_side", dirt_path: "block/dirt_path_side",
   farmland: "block/farmland", melon: "block/melon_side", pumpkin: "block/pumpkin_side", carved_pumpkin: "block/carved_pumpkin", jack_o_lantern: "block/jack_o_lantern",
   hay_block: "block/hay_block_side", bone_block: "block/bone_block_side", quartz_block: "block/quartz_block_side", smooth_quartz: "block/quartz_block_bottom",
@@ -33,8 +34,11 @@ const MAT = { brick: "bricks", stone_brick: "stone_bricks", nether_brick: "nethe
   end_stone_brick: "end_stone_bricks", deepslate_brick: "deepslate_bricks", deepslate_tile: "deepslate_tiles", polished_blackstone_brick: "polished_blackstone_bricks",
   prismarine_brick: "prismarine_bricks", tuff_brick: "tuff_bricks", quartz: "quartz_block_side", purpur: "purpur_block", smooth_quartz: "quartz_block_bottom",
   smooth_sandstone: "sandstone_top", smooth_red_sandstone: "red_sandstone_top", petrified_oak: "oak_planks", bamboo_mosaic: "bamboo_mosaic", cut_copper: "cut_copper" };
-const WOODS = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "bamboo", "crimson", "warped", "pale_oak"];
-const has = (p) => (p.startsWith("block/") ? TEX_BLOCK : TEX_ITEM).has(p.slice(p.indexOf("/") + 1));
+const WOODS = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "bamboo", "crimson", "warped", "pale_oak", "poplar"];
+const isNew = (p) => (p.startsWith("block/") ? NEW_BLOCK : NEW_ITEM).has(p.slice(p.indexOf("/") + 1));
+const has = (p) => (p.startsWith("block/") ? TEX_BLOCK : TEX_ITEM).has(p.slice(p.indexOf("/") + 1)) || isNew(p);
+// Texturen, die nur in der neueren Version existieren (26.x): selbst gehostet unter /mc/icons/tex/ (aus misode/mcmeta)
+const abs = (r) => (typeof r === "string" && !/^(https:|\/)/.test(r) && isNew(r) ? NEW_BASE + r + ".png" : r);
 const first = (...c) => c.find((p) => p && has(p)) || null;
 const cache = new Map();
 // Mob-/Spielerköpfe haben keine Item-Textur (3D-Modell aus Entity-Skin) -> isometrischer Kopf über mc-heads (MHF_-Skins)
@@ -44,7 +48,7 @@ export function resolveIcon(raw) {
   const id = String(raw || "").toLowerCase().replace(/^minecraft:/, "").replace(/[^a-z0-9_]/g, "");
   if (!id) return null;
   if (cache.has(id)) return cache.get(id);
-  const r = /^(cave_|void_)?air$/.test(id) ? null : resolve(id, 0) || FALLBACK; cache.set(id, r); return r;
+  const r = /^(cave_|void_)?air$/.test(id) ? null : abs(resolve(id, 0) || FALLBACK); cache.set(id, r); return r;
 }
 function resolve(id, depth) {
   if (depth > 3) return null;
