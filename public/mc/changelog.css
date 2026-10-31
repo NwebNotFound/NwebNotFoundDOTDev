@@ -1,0 +1,9 @@
+.cl-hero{padding-bottom:.5rem}.cl-sec{padding-top:1.2rem}.cl-wrap{max-width:760px}
+.clg{padding:1rem}.clg+.clg{margin-top:1rem}
+.clh{margin:0 0 .8rem;font-family:var(--pf);font-size:1.25rem;font-weight:400}
+.cll{list-style:none;margin:0;padding:0}
+.cll li{display:flex;align-items:flex-start;gap:.75rem;padding:.5rem .3rem;line-height:1.45}
+.cll li+li{border-top:2px solid #000;box-shadow:inset 0 2px 0 #333}
+.cll .slot{flex:none}.cll .slot img{image-rendering:pixelated}
+.cll code{font-family:var(--pf);font-size:.9em}
+.cl-src{margin-top:1rem;font-size:.8rem}
