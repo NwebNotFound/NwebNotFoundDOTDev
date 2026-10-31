@@ -209,14 +209,15 @@ Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, 
 
 ## Parkour – `POST /api/mc-ingest`, Feld `parkour`
 ```json
-{"parkour":[{"course":"cave_rush","course_name":"Cave Rush","mc_uuid":"…","mc_name":"NwebNotFound","time_ms":42123,"set_at":"2026-10-30T11:00:00Z"}]}
+{"parkour":[{"course":"cave_rush","course_name":"Cave Rush","course_icon":"golden_boots","mc_uuid":"…","mc_name":"NwebNotFound","time_ms":42123,"set_at":"2026-10-30T11:00:00Z"}]}
 ```
 - `course` (Pflicht): Kurs-ID. Wird vor der Prüfung normalisiert: trimmen, klein schreiben, Leerzeichen und `-` → `_` (`"Cave Rush"`, `"cave-rush"`, `"cave_rush"` → `cave_rush`). Danach muss sie `^[a-z0-9_]{1,32}$` erfüllen. Alte IDs wie `kurs1` bleiben unverändert.
-- `course_name` (optional, neu): Anzeigename des Kurses, z. B. „Cave Rush“. Klartext, wird getrimmt, Steuerzeichen entfernt, max. 48 Zeichen (Rest abgeschnitten). Gespeichert pro Kurs in `mc_parkour_courses` (Migration 0007); der zuletzt gesendete Name gewinnt. Fehlt er oder ist er leer/kein String, zählt die Zeit trotzdem und die Website zeigt die Kurs-ID.
+- `course_name` (optional, neu): Anzeigename des Kurses, z. B. „Cave Rush“. Klartext, wird getrimmt, Steuerzeichen entfernt, max. 48 Zeichen (Rest abgeschnitten). Gespeichert pro Kurs in `mc_parkour_courses` (Migration 0007); der zuletzt gesendete Name gewinnt. Fehlt er oder ist er leer/kein String, zählt die Zeit trotzdem und die Website zeigt die Kurs-ID hübsch formatiert (`cave_rush` → „Cave Rush“; Unterstriche werden nie angezeigt). Die Kurs-ID bleibt nur interne ID.
+- `course_icon` (optional, neu): Minecraft-Item-ID als Kurs-Icon, z. B. `golden_boots`. Wird getrimmt, klein geschrieben und `minecraft:` entfernt (`minecraft:GOLDEN_BOOTS` → `golden_boots`), danach muss es `^[a-z0-9_]{1,48}$` erfüllen. Ungültig (z. B. `bad icon!`) → Standard `paper`; die Zeit zählt trotzdem. Gespeichert in `mc_parkour_courses.course_icon` (Migration 0008); fehlt das Feld, bleibt ein vorhandenes Icon erhalten, ohne Icon zeigt die Website `paper`. Gerendert über `/mc-icon/<id>` (wie Items), unbekannte Icons fallen im Browser auf `paper` zurück. Name und Icon sind unabhängig: nur eines zu senden lässt das andere unverändert.
 - `mc_uuid`, `time_ms` (1 ms – 24 h), optional `mc_name`, `set_at` (ISO, UTC). Pro Kurs und Spieler zählt nur die Bestzeit. Max. 1000 Einträge pro Push.
-- Antwort: `parkour`, `parkour_rejected`, `parkour_course_names`.
-- `GET /api/mc-parkour` → `{"courses":{"cave_rush":[{rank,course_name,mc_uuid,mc_name,time_ms,set_at}]},"course_names":{"cave_rush":"Cave Rush","kurs1":"kurs1"}}` (Top 10 pro Kurs, `course_name` fällt auf die ID zurück).
-- Seite `/parkour` zeigt ein Top-10-Board pro Kurs mit Anzeigenamen; `/parkour?course=cave_rush` (auch `Cave Rush`/`cave-rush`) zeigt nur diesen Kurs.
+- Antwort: `parkour`, `parkour_rejected`, `parkour_course_names` (Anzahl Kurse mit neuem Namen und/oder Icon).
+- `GET /api/mc-parkour` → `{"courses":{"cave_rush":[{rank,course_name,mc_uuid,mc_name,time_ms,set_at}]},"course_names":{"cave_rush":"Cave Rush","kurs1":"Kurs1"},"course_icons":{"cave_rush":"golden_boots","kurs1":"paper"}}` (Top 10 pro Kurs, jeder Eintrag zusätzlich mit `course_icon`; `course_name` fällt auf die hübsch formatierte ID zurück, `course_icon` auf `paper`). `course_name` ist Rohtext und wird erst beim Rendern HTML-escaped.
+- Seite `/parkour` zeigt ein Top-10-Board pro Kurs mit Anzeigenamen und Kurs-Icon (Buttons und Titel); `/parkour?course=cave_rush` (auch `Cave Rush`/`cave-rush`) zeigt nur diesen Kurs.
 
 ## Todesursachen (`deaths_by`)
 - `deaths_by` (in `v_player_stats_ext`/Details) darf neben Entity-IDs (`zombie`, `player`, `minecraft:creeper` …) auch Bukkit-**DamageCause**-Keys in Kleinbuchstaben enthalten, z. B. `fall`, `lava`, `fire`, `fire_tick`, `drowning`, `void`, `suffocation`, `starvation`, `explosion`, `block_explosion`, `entity_explosion`, `projectile`, `magic`, `freeze`, `lightning`, `contact`, `wither`.
