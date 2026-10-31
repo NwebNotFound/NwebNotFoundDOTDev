@@ -23,3 +23,5 @@ document.getElementById('inone').hidden=!!f.length;MB.hidden=f.length<=LIM;MB.te
 R.querySelectorAll('.ih button').forEach(b=>b.setAttribute('aria-sort',b.dataset.k===K?(DIR>0?'ascending':'descending'):'none'));ks.value=K};
 const setK=k=>{if(k===K)DIR=-DIR;else{K=k;DIR=k==='name'?1:-1}draw()};
 R.querySelectorAll('.ih button').forEach(b=>b.onclick=()=>setK(b.dataset.k));ks.onchange=()=>{K=ks.value;DIR=K==='name'?1:-1;draw()};kf.onchange=()=>{LIM=100;draw()};MB.onclick=()=>{LIM=1e9;draw()};draw()})();
+// Live: alle 20 s prüfen; bei neuen Preisen neu laden (nicht während Eingabe/verstecktem Tab)
+(()=>{let last=null;setInterval(async()=>{if(document.hidden||document.activeElement&&/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;try{const r=await fetch('/api/mc-market');const n=await r.json();const k=JSON.stringify((n.items||[]).map(x=>[x.item,x.buy_price,x.sell_price]));if(last!==null&&k!==last){sessionStorage.setItem('mkY',scrollY);location.reload()}last=k}catch(_){}},20000);const y=sessionStorage.getItem('mkY');if(y){sessionStorage.removeItem('mkY');setTimeout(()=>scrollTo(0,+y),300)}})();
