@@ -254,5 +254,5 @@ Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, 
 ## economy_daily (eigener POST, Discord-Bot, alle 5 Min.)
 `POST /api/mc-ingest` (Header `x-ingest-token`) mit `{"economy_daily":[{"day":"YYYY-MM-DD","money_supply_cp":int,"minted_cp":int|null,"burned_cp":int|null,"net_cp":int|null}]}`.
 Höchstens 90 Zeilen, älteste zuerst (streng aufsteigend, kein Tag doppelt). Upsert pro Tag in `mc_economy_daily` (Migration `0010_economy_daily.sql`).
-Strikt: ungültiges Datum, Nicht-Integer, unbekannte Felder oder mehr als 90 Zeilen → `400`, dann wird nichts geschrieben. Fehlende minted/burned/net zählen als `null`.
+Strikt: ungültiges Datum, Nicht-Integer, fehlendes `money_supply_cp`, falsche Reihenfolge oder mehr als 90 Zeilen → `400`, dann wird nichts geschrieben. Unbekannte Felder in Zeilen werden ignoriert (einmal pro Request `console.warn`, ohne Werte). Fehlende minted/burned/net zählen als `null`.
 Lesen: `GET /api/mc-economy` → `{updated_at, days:[…]}` (letzte 90 Tage, älteste zuerst). Anzeige auf `/markt` (Stufen-Graph der Geldmenge, `–` bei null).

@@ -429,13 +429,15 @@ try {
       ["Supply String", [{ day: "2026-10-01", money_supply_cp: "5" }]],
       ["minted String", [{ day: "2026-10-01", money_supply_cp: 1, minted_cp: "1" }]],
       ["net Float", [{ day: "2026-10-01", money_supply_cp: 1, net_cp: 0.5 }]],
-      ["unbekanntes Feld", [{ day: "2026-10-01", money_supply_cp: 1, foo: 1 }]],
       ["nicht aufsteigend", [{ day: "2026-10-02", money_supply_cp: 1 }, { day: "2026-10-01", money_supply_cp: 1 }]],
       ["doppelter Tag", [{ day: "2026-10-01", money_supply_cp: 1 }, { day: "2026-10-01", money_supply_cp: 2 }]],
       ["91 Zeilen", Array.from({ length: 91 }, (_, i) => ({ day: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10), money_supply_cp: i }))],
     ];
     for (const [m, rows] of bad) { const r = await ED(rows); ok(r.s === 400 && r.j?.error, "economy_daily " + m + " → 400", r.s + " " + r.t); }
     ok(sqlRows("SELECT COUNT(*) AS n FROM mc_economy_daily")[0].n === 0, "economy_daily: nach 400 nichts geschrieben");
+    { const r = await ED([{ day: "2026-01-01", money_supply_cp: 5, foo: "x", extra: { a: 1 } }]); ok(r.s === 200 && r.j?.economy_daily === 1, "economy_daily unbekannte Felder ignoriert → 200", r.t);
+      ok(JSON.stringify(sqlRows("SELECT * FROM mc_economy_daily WHERE day='2026-01-01'").map(({ updated_at, ...x }) => x)) === JSON.stringify([{ day: "2026-01-01", money_supply_cp: 5, minted_cp: null, burned_cp: null, net_cp: null }]), "economy_daily: nur bekannte Felder gespeichert");
+      sql("DELETE FROM mc_economy_daily"); }
     const rows = Array.from({ length: 90 }, (_, i) => ({ day: new Date(Date.UTC(2026, 7, 3 + i)).toISOString().slice(0, 10), money_supply_cp: 100000 + Math.floor(i / 7) * 5000, minted_cp: null, burned_cp: null, net_cp: null }));
     const r1 = await ED(rows); ok(r1.s === 200 && r1.j?.economy_daily === 90, "economy_daily 90 Zeilen → 200", r1.t);
     const r2 = await ED([{ day: rows[89].day, money_supply_cp: 777777, minted_cp: 1200, burned_cp: 300, net_cp: -900 }]); ok(r2.s === 200 && r2.j?.economy_daily === 1, "economy_daily Upsert letzter Tag → 200", r2.t);

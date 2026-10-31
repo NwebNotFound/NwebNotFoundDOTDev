@@ -11,11 +11,11 @@ function validDay(s) {
 export function cleanEconomy(a) {
   if (!Array.isArray(a)) return { error: "economy_daily must be an array" };
   if (a.length > ECON_MAX) return { error: `economy_daily: max ${ECON_MAX} rows` };
-  const rows = [];
+  const rows = []; let unknown = false;
   for (let i = 0; i < a.length; i++) {
     const r = a[i];
     if (!r || typeof r !== "object" || Array.isArray(r)) return { error: `economy_daily[${i}]: object expected` };
-    for (const k of Object.keys(r)) if (!KEYS.has(k)) return { error: `economy_daily[${i}]: unknown field ${k}` };
+    if (!unknown && Object.keys(r).some((k) => !KEYS.has(k))) unknown = true;
     if (!validDay(r.day)) return { error: `economy_daily[${i}].day: YYYY-MM-DD expected` };
     if (!isInt(r.money_supply_cp)) return { error: `economy_daily[${i}].money_supply_cp: integer expected` };
     const o = { day: r.day, money_supply_cp: r.money_supply_cp };
@@ -27,6 +27,8 @@ export function cleanEconomy(a) {
     if (rows.length && rows[rows.length - 1].day >= o.day) return { error: `economy_daily[${i}].day: strictly ascending (oldest first) expected` };
     rows.push(o);
   }
+  // Unbekannte Felder werden ignoriert; einmal pro Request warnen, ohne Werte
+  if (unknown) console.warn("mc-ingest: economy_daily rows contain unknown fields (ignored)");
   return { rows };
 }
 export const economyStatements = (env, rows, now) => rows.map((r) => env.DB.prepare(
