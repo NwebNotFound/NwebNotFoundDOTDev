@@ -162,7 +162,9 @@ Sicherheitsregeln, alle serverseitig geprüft:
 - `GET /api/mc-bids/pending?since=<ms>` liefert `{"now":…, "items":[{"id","request_id","auction_id","bidder_uuid","bidder_name","amount","source","created_at"}]}`.
 - `GET /api/mc-shop-orders/pending?since=<ms>` liefert `{"now":…, "items":[{"id","request_id","idem_key","listing_id","uuid","qty","max_unit_price_cent","shop_id","item","buyer_uuid","buyer_name","unit_price","source","created_at"}]}`.
 - `POST /api/mc-bids/ack` bzw. `/api/mc-shop-orders/ack` mit Body `{"acks":[{"id":"<request_id>","status":"accepted"|"rejected","reason":"…"}]}`.
-  - Es werden nur Zeilen aktualisiert, die noch `pending` sind. Ein doppelter Ack ist also harmlos (`updated:0`).
+  - Weitere Stati: `confirmed`, `bought`, `purchased`, `ready`, `ready_for_pickup`, `in_pickup`, `collected`, `picked_up`, `delivered`, `failed`, `refunded`, `cancelled`.
+  - `reason` (max. 120 Zeichen) wird bei **jedem** Status gespeichert, auch bei `failed`, und auf der Website angezeigt.
+  - `accepted`/`rejected` aktualisieren nur Zeilen, die noch `pending` sind. Bei Endstati (`rejected`, `failed`, `refunded`, `collected`, `picked_up`, `delivered`, `cancelled`) zählt nur der **erste** Ack; spätere Acks (auch mit anderem `reason`) ändern nichts. Ein doppelter Ack ist also harmlos (`updated:0`).
   - Die Website zeigt dann „bestätigt“ oder „abgelehnt“ mit Grund an.
 
 Ausführung im Spiel, idempotent über `request_id`:
@@ -204,6 +206,17 @@ Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, 
 - `item` | `material` | `item_id`; Zeit: `hour_ts` | `hour` | `bucket` | `ts` | `time` | `timestamp` | `created_at` (s, ms oder ISO; auf die Stunde gerundet, 90 Tage)
 - Preis: `avg_price` | `avg` | `price` | `close` | `buy_price` | `value`; optional `min_price`|`min`|`low`, `max_price`|`max`|`high`, `volume_qty`|`volume`|`qty`|`amount`|`menge`.
 - Sobald Historie da ist, berechnet die Website die 24h-Änderung selbst (letzter Stundenwert vs. letzter Wert ≥ 24 h davor) und zeichnet Charts daraus; ohne Historie und ohne Trades zeigt sie „—“.
+
+## Parkour – `POST /api/mc-ingest`, Feld `parkour`
+```json
+{"parkour":[{"course":"cave_rush","course_name":"Cave Rush","mc_uuid":"…","mc_name":"NwebNotFound","time_ms":42123,"set_at":"2026-10-30T11:00:00Z"}]}
+```
+- `course` (Pflicht): Kurs-ID. Wird vor der Prüfung normalisiert: trimmen, klein schreiben, Leerzeichen und `-` → `_` (`"Cave Rush"`, `"cave-rush"`, `"cave_rush"` → `cave_rush`). Danach muss sie `^[a-z0-9_]{1,32}$` erfüllen. Alte IDs wie `kurs1` bleiben unverändert.
+- `course_name` (optional, neu): Anzeigename des Kurses, z. B. „Cave Rush“. Klartext, wird getrimmt, Steuerzeichen entfernt, max. 48 Zeichen (Rest abgeschnitten). Gespeichert pro Kurs in `mc_parkour_courses` (Migration 0007); der zuletzt gesendete Name gewinnt. Fehlt er oder ist er leer/kein String, zählt die Zeit trotzdem und die Website zeigt die Kurs-ID.
+- `mc_uuid`, `time_ms` (1 ms – 24 h), optional `mc_name`, `set_at` (ISO, UTC). Pro Kurs und Spieler zählt nur die Bestzeit. Max. 1000 Einträge pro Push.
+- Antwort: `parkour`, `parkour_rejected`, `parkour_course_names`.
+- `GET /api/mc-parkour` → `{"courses":{"cave_rush":[{rank,course_name,mc_uuid,mc_name,time_ms,set_at}]},"course_names":{"cave_rush":"Cave Rush","kurs1":"kurs1"}}` (Top 10 pro Kurs, `course_name` fällt auf die ID zurück).
+- Seite `/parkour` zeigt ein Top-10-Board pro Kurs mit Anzeigenamen; `/parkour?course=cave_rush` (auch `Cave Rush`/`cave-rush`) zeigt nur diesen Kurs.
 
 ## Tests
 `node scripts/e2e.mjs` – startet `wrangler dev` mit frischer lokaler D1 (`.wrangler/e2e`), spielt Ingest/Gebote/Bestellungen/Bot-Ack/Rate-Limits durch und prüft die UI (Chromium 390/1440, `scripts/e2e_ui.py`). Berührt keine Produktionsdaten.
