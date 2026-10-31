@@ -411,6 +411,7 @@ try {
     ok((await mob("phantom")) === "/mc-icon/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/feather" && (await mob("..%2Fx")) === "/mc-icon/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
     const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
   }
+  { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy-report-only") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && !r.headers.get("content-security-policy"), "CSP Report-Only gesetzt (nicht erzwingend)", c); }
   try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
 
 } catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }
