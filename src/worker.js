@@ -565,7 +565,11 @@ async function mcIngest(req, env) {
   let econ;
   if ("economy_daily" in b) { econ = cleanEconomy(b.economy_daily); if (econ.error) return json({ error: econ.error }, 400); }
   let ranks;
-  if ("player_ranks" in b) { ranks = cleanRanks(b.player_ranks); if (ranks.error) return json({ error: ranks.error }, 400); }
+  if ("player_ranks" in b) {
+    // Ungültig → nur dieses Feld verwerfen (ein warn), Rest des Ingests läuft weiter. Leeres Array → ignorieren, nichts löschen.
+    ranks = cleanRanks(b.player_ranks);
+    if (ranks.error) { console.warn("mc-ingest: player_ranks dropped: " + ranks.error); ranks = { rows: [], dropped: ranks.error }; }
+  }
   const vinfo = await normalizeViews(env, b);
   const { links, players_stats, details, leaderboards_weekly, ...data } = cleanIngest(b), now = Date.now();
   const st = [], market = cleanMarket(b?.market), market_history = cleanHistory(b?.market_history);
@@ -600,9 +604,9 @@ async function mcIngest(req, env) {
   if (auctions) st.push(blobStatement(env, "auctions", auctions, now));
   const parkour = cleanParkour(b?.parkour, now); if (parkour) st.push(...parkourStatements(env, parkour.rows, parkour.names, now));
   if (econ) st.push(...economyStatements(env, econ.rows, now));
-  if (ranks) st.push(...rankStatements(env, ranks.rows, now));
+  if (ranks && ranks.rows.length) st.push(...rankStatements(env, ranks.rows, now));
   if (st.length) await env.DB.batch(st);
-  return json({ ok: true, ...(econ ? { economy_daily: econ.rows.length } : {}), ...(ranks ? { player_ranks: ranks.rows.length } : {}), ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
+  return json({ ok: true, ...(econ ? { economy_daily: econ.rows.length } : {}), ...(ranks ? { player_ranks: ranks.rows.length, ...(ranks.dropped ? { player_ranks_dropped: true } : {}) } : {}), ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));

@@ -458,8 +458,11 @@ try {
     const R1 = { uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }, R2 = { uuid: U2.replace(/-/g, "").toUpperCase(), name: "Seller", rank: "vip", color: "&6", weight: 40 };
     ok((await req("/api/mc-ingest", { method: "POST", body: { player_ranks: [] } })).s === 401, "player_ranks ohne Token → 401");
     const bad = [["kein Array", { a: 1 }], ["Rang unbekannt", [{ ...R1, rank: "owner" }]], ["Farbe ungültig", [{ ...R1, color: "#ff0000" }]], ["Farbe Format-Code", [{ ...R1, color: "&l" }]], ["Weight kein Int", [{ ...R1, weight: 1.5 }]], ["Weight String", [{ ...R1, weight: "100" }]], ["UUID ungültig", [{ ...R1, uuid: "xyz" }]], ["Name ungültig", [{ ...R1, name: "<b>" }]], ["UUID doppelt", [R1, { ...R1, name: "Nils2" }]], ["kein Objekt", [5]]];
-    for (const [m, rows] of bad) { const r = await PR(rows); ok(r.s === 400 && r.j?.error, "player_ranks " + m + " → 400", r.s + " " + r.t); }
-    ok(sqlRows("SELECT COUNT(*) AS n FROM mc_player_ranks")[0].n === 0, "player_ranks: nach 400 nichts geschrieben");
+    for (const [m, rows] of bad) { const r = await PR(rows); ok(r.s === 200 && r.j?.player_ranks === 0 && r.j?.player_ranks_dropped === true, "player_ranks " + m + " → verworfen, 200", r.s + " " + r.t); }
+    ok(sqlRows("SELECT COUNT(*) AS n FROM mc_player_ranks")[0].n === 0, "player_ranks: ungültig → nichts geschrieben");
+    { const r = await PR([{ ...R1, rank: "owner" }], { economy_daily: [{ day: "2026-02-01", money_supply_cp: 42 }] });
+      ok(r.s === 200 && r.j?.economy_daily === 1 && sqlRows("SELECT money_supply_cp AS m FROM mc_economy_daily WHERE day='2026-02-01'")[0]?.m === 42, "ungültige player_ranks: Rest (economy) wird trotzdem gespeichert", r.t);
+      sql("DELETE FROM mc_economy_daily WHERE day='2026-02-01'"); }
     const r1 = await PR([R1, R2, { uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", name: "Gast", rank: "player", color: "&7", weight: 0, secret: "x" }]);
     ok(r1.s === 200 && r1.j?.player_ranks === 3, "player_ranks 3 Zeilen (inkl. unbekanntes Feld) → 200", r1.t);
     ok(sqlRows("SELECT rank FROM mc_player_ranks WHERE name='Gast'")[0]?.rank === "default", "player_ranks: player → default");
@@ -467,6 +470,8 @@ try {
     const r2 = await PR([{ ...R1 }, { ...R2, rank: "mvp", color: "&d", weight: 60 }]);
     ok(r2.s === 200 && sqlRows("SELECT COUNT(*) AS n FROM mc_player_ranks")[0].n === 2, "player_ranks Snapshot entfernt fehlende UUIDs", r2.t);
     ok(sqlRows("SELECT rank FROM mc_player_ranks WHERE name='Seller'")[0]?.rank === "mvp", "player_ranks Upsert ändert Rang");
+    { const r = await PR([]); ok(r.s === 200 && sqlRows("SELECT COUNT(*) AS n FROM mc_player_ranks")[0].n === 2, "player_ranks [] ignoriert, nichts gelöscht", r.t); }
+    { const r = await PR([{ ...R1, weight: "x" }]); ok(r.s === 200 && sqlRows("SELECT COUNT(*) AS n FROM mc_player_ranks")[0].n === 2, "ungültige player_ranks löschen nichts", r.t); }
     const L = (await req("/api/mc-players")).j?.players || [], n = L.find((x) => x.name === "Nils"), s = L.find((x) => x.name === "Seller");
     ok(n?.rank?.rank === "admin" && n.rank.color === "c" && s?.rank?.rank === "mvp" && s.rank.color === "d", "Spieler-API liefert Rang + Farbe", JSON.stringify(L).slice(0, 300));
     ok(!JSON.stringify(L).includes("weight"), "Spieler-API ohne weight/interne Felder");
