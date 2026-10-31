@@ -1,0 +1,23 @@
+name: e2e
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install wrangler
+        run: npm i -g wrangler
+      - name: Icon-Referenzcheck
+        run: node scripts/icon-check.mjs
+      - name: e2e
+        run: node scripts/e2e.mjs
