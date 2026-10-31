@@ -1,0 +1,5 @@
+/* Rang-Badges neben Spielernamen (Minecraft-Legacy-Farben) */
+html.mc .rk{display:inline-block;vertical-align:middle;font-family:var(--f-px,monospace);font-size:.68rem;font-weight:700;line-height:1;letter-spacing:.04em;text-transform:uppercase;padding:.22rem .4rem;margin-left:.45rem;border:1px solid currentColor;border-radius:3px;background:rgba(0,0,0,.25);white-space:nowrap}
+html.mc .hub-h .rk{font-size:.8rem;vertical-align:.35em}
+html.mc .rk-c{color:#ff5555}html.mc .rk-a{color:#55ff55}html.mc .rk-d{color:#ff55ff}html.mc .rk-6{color:#ffaa00}html.mc .rk-7{color:#aaaaaa}
+html.mc .rk-0{color:#7a7a7a}html.mc .rk-1{color:#5f5fd0}html.mc .rk-2{color:#00aa00}html.mc .rk-3{color:#00aaaa}html.mc .rk-4{color:#cc3333}html.mc .rk-5{color:#aa00aa}html.mc .rk-8{color:#8a8a8a}html.mc .rk-9{color:#5555ff}html.mc .rk-b{color:#55ffff}html.mc .rk-e{color:#ffff55}html.mc .rk-f{color:#ffffff}

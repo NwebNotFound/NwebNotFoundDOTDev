@@ -1,4 +1,5 @@
 import { AV } from "./asset-version.js";
+import { pubRank } from "./mc-ranks.js";
 // Spielersuche /spieler: öffentliche Basis-Stats, Details nur mit Discord-Login
 const PUB = { money: ["money", "cp", "balance"], playtime: ["playtime", "playtime_s", "play_time"], kills: ["kills", "player_kills", "mob_kills"], deaths: ["deaths"], blocks_mined: ["blocks_mined", "mined_total", "blocks"], distance: ["distance", "distance_m"] };
 const ALL_OK = new Set(["money", "cp", "balance", "playtime", "playtime_s", "play_time", "kills", "player_kills", "mob_kills", "mobs_killed", "deaths", "blocks_mined", "mined_total", "blocks", "blocks_placed", "distance", "distance_m", "fished", "traded", "jumps", "damage_dealt", "damage_taken", "cp_earned", "shop_sales", "level", "xp"]);
@@ -14,8 +15,8 @@ export function fuzzyScore(name, q) {
   const d = lev(n.slice(0, t.length + 1), t); const d2 = lev(n, t); const m = Math.min(d, d2); return m <= (t.length >= 5 ? 2 : 1) ? 200 - m * 50 : 0;
 }
 async function players(env) {
-  const { results } = await env.DB.prepare("SELECT l.mc_name, l.mc_uuid, s.stats, s.updated_at FROM mc_links l LEFT JOIN mc_player_stats s ON s.mc_uuid = l.mc_uuid WHERE l.verified = 1 AND l.has_role = 1 GROUP BY l.mc_uuid").all().catch(() => ({ results: [] }));
-  return results.map((r) => { let s = {}; try { s = JSON.parse(r.stats || "{}"); } catch {} return { name: r.mc_name, uuid: r.mc_uuid, stats: pick(s), updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : null }; });
+  const { results } = await env.DB.prepare("SELECT l.mc_name, l.mc_uuid, s.stats, s.updated_at, r.rank, r.color FROM mc_links l LEFT JOIN mc_player_stats s ON s.mc_uuid = l.mc_uuid LEFT JOIN mc_player_ranks r ON r.uuid = lower(replace(l.mc_uuid, '-', '')) WHERE l.verified = 1 AND l.has_role = 1 GROUP BY l.mc_uuid").all().catch(() => ({ results: [] }));
+  return results.map((r) => { let s = {}; try { s = JSON.parse(r.stats || "{}"); } catch {} return { name: r.mc_name, uuid: r.mc_uuid, stats: pick(s), updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : null, rank: pubRank(r.rank, r.color) }; });
 }
 export async function playersApi(env, url) {
   const q = String(url.searchParams.get("q") || "").slice(0, 32);
@@ -25,10 +26,10 @@ export async function playersApi(env, url) {
 }
 export async function playerApi(env, name, user) {
   if (!/^[A-Za-z0-9_]{1,16}$/.test(name)) return null;
-  const r = await env.DB.prepare("SELECT l.mc_name, l.mc_uuid, s.stats, s.details, s.updated_at FROM mc_links l LEFT JOIN mc_player_stats s ON s.mc_uuid = l.mc_uuid WHERE l.verified = 1 AND l.has_role = 1 AND lower(l.mc_name) = lower(?) LIMIT 1").bind(name).first().catch(() => null);
+  const r = await env.DB.prepare("SELECT l.mc_name, l.mc_uuid, s.stats, s.details, s.updated_at, r.rank, r.color FROM mc_links l LEFT JOIN mc_player_stats s ON s.mc_uuid = l.mc_uuid LEFT JOIN mc_player_ranks r ON r.uuid = lower(replace(l.mc_uuid, '-', '')) WHERE l.verified = 1 AND l.has_role = 1 AND lower(l.mc_name) = lower(?) LIMIT 1").bind(name).first().catch(() => null);
   if (!r) return null;
   let s = {}, d = null; try { s = JSON.parse(r.stats || "{}"); } catch {} try { d = r.details ? JSON.parse(r.details) : null; } catch {}
-  const o = { name: r.mc_name, uuid: r.mc_uuid, stats: pick(s), updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : null, viewer: { logged_in: !!user } };
+  const o = { name: r.mc_name, uuid: r.mc_uuid, stats: pick(s), updated_at: r.updated_at ? new Date(r.updated_at).toISOString() : null, rank: pubRank(r.rank, r.color), viewer: { logged_in: !!user } };
   // Details nur für eingeloggte, verifizierte Mitspieler mit Server-Rolle; nur Whitelist numerischer Stats (nie inventory/pickup)
   if (user) {
     const l = await env.DB.prepare("SELECT verified, has_role FROM mc_links WHERE discord_id = ?").bind(String(user.id)).first().catch(() => null);
@@ -58,24 +59,25 @@ export const PLAYER_CSS = `<style>
 .emp{padding:1.2rem 0 .4rem;text-align:center;color:var(--mut);font-size:.9rem}
 </style>`
 const FMT = `const E=MC.E,NF=MC.NF;const up=t=>{t=+t||0;const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+' T '+h+' Std':h?h+' Std '+m+' Min':m+' Min'};const KM=m=>m>=1000?NF(m/1000,1)+' km':NF(Math.round(m))+' m';
+const RL={vip:'VIP',mvp:'MVP',builder:'Builder',admin:'Admin'};const RB=p=>p.rank&&RL[p.rank.rank]&&/^[0-9a-f]$/.test(p.rank.color)?'<span class="rk rk-'+p.rank.color+'" title="Rang '+RL[p.rank.rank]+'">'+RL[p.rank.rank]+'</span>':'';
 const LB={money:['CP',v=>NF(v)+' CP'],playtime:['Spielzeit',up],blocks_mined:['Blöcke abgebaut',NF],kills:['Kills',NF],deaths:['Tode',NF],distance:['Distanz',KM]};
 const HEAD=(n,s)=>'<img alt="" width="'+s+'" height="'+s+'" loading="lazy" src="https://mc-heads.net/avatar/'+encodeURIComponent(n)+'/'+s+'" onerror="this.src=\\'https://mc-heads.net/avatar/MHF_Steve/'+s+'\\'">';`;
-export const playersBody = () => `${PLAYER_CSS}<section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Spieler</p><h1 class="hub-h">Spieler.</h1><p class="sub">Finde Mitspieler, auch wenn du den Namen nur ungefähr weißt.</p>
+export const playersBody = () => `${PLAYER_CSS}<link rel="stylesheet" href="/mc/ranks.css?v=${AV}"><section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Spieler</p><h1 class="hub-h">Spieler.</h1><p class="sub">Finde Mitspieler, auch wenn du den Namen nur ungefähr weißt.</p>
 <div class="srch" style="margin-top:1.4rem;max-width:560px">${SEARCH_SVG}<input name="mc-q-find" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" data-form-type="other" data-lpignore="true" class="inp" id="q" type="search" placeholder="Spielername suchen" aria-label="Spieler suchen"></div></div></section>
 <section class="sec" style="padding-top:1.2rem"><div class="hub-wrap" id="root" aria-live="polite"><div class="g pad mut">Lade Spieler…</div></div></section>
 <script src="/mc/common.js?v=${AV}"></script><script>(()=>{${FMT}
 const R=document.getElementById('root'),q=document.getElementById('q');const u=new URL(location.href);q.value=u.searchParams.get('q')||'';let tm,seq=0;
-const card=p=>'<a class="g plc" href="/spieler/'+encodeURIComponent(p.name)+'"><span class="slot">'+HEAD(p.name,40)+'</span><div><b>'+E(p.name)+'</b><small>'+(p.stats.playtime!=null?up(p.stats.playtime)+' gespielt':'Noch keine Stats')+(p.stats.money!=null?' · '+NF(p.stats.money)+' CP':'')+'</small></div><span class="chev" aria-hidden="true">›</span></a>';
+const card=p=>'<a class="g plc" href="/spieler/'+encodeURIComponent(p.name)+'"><span class="slot">'+HEAD(p.name,40)+'</span><div><b>'+E(p.name)+RB(p)+'</b><small>'+(p.stats.playtime!=null?up(p.stats.playtime)+' gespielt':'Noch keine Stats')+(p.stats.money!=null?' · '+NF(p.stats.money)+' CP':'')+'</small></div><span class="chev" aria-hidden="true">›</span></a>';
 async function load(){const s=++seq,t=q.value.trim();let d;try{d=await MC.get('/api/mc-players?q='+encodeURIComponent(t))}catch(_){d={players:[]}}if(s!==seq)return;const L=d.players||[];
 history.replaceState(null,'',t?'?q='+encodeURIComponent(t):location.pathname);
 R.innerHTML=L.length?'<p class="mut" style="font-size:.85rem;margin:0 0 .8rem">'+L.length+' Spieler'+(t?' für „'+E(t)+'“':'')+'</p><div class="plg">'+L.map(card).join('')+'</div>':'<div class="g empty-st"><div class="big"><img alt="" width="56" height="56" class="mi" style="margin:0 auto" src="/mc-icon/v2/player_head"></div><h2 class="hub-h2">'+(t?'Niemand gefunden':'Noch keine Spieler')+'</h2><p class="mut">'+(t?'Prüf die Schreibweise oder such nach einem Teil des Namens.':'Sobald Spieler ihren Account im Discord mit /link verknüpfen, tauchen sie hier auf.')+'</p></div>'}
 q.addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(load,160)});q.addEventListener('keydown',e=>{if(e.key==='Enter'){const a=R.querySelector('a.plc');if(a)location.href=a.href}});load()})();</script>`;
-export const playerBody = (name, MAIN) => `${PLAYER_CSS}<section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p style="margin:0 0 1rem"><a href="/spieler">‹ Spieler</a></p><div id="hd" class="plh"><h1 class="hub-h">${name.replace(/[^A-Za-z0-9_]/g, "")}</h1></div></div></section>
+export const playerBody = (name, MAIN) => `${PLAYER_CSS}<link rel="stylesheet" href="/mc/ranks.css?v=${AV}"><section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p style="margin:0 0 1rem"><a href="/spieler">‹ Spieler</a></p><div id="hd" class="plh"><h1 class="hub-h">${name.replace(/[^A-Za-z0-9_]/g, "")}</h1></div></div></section>
 <section class="sec" style="padding-top:.6rem"><div class="hub-wrap" id="root"><div class="g pad mut">Lade…</div></div></section>
 <script src="/mc/common.js?v=${AV}"></script><script>(()=>{${FMT}
 const N=${JSON.stringify(name)},H=document.getElementById('hd'),R=document.getElementById('root');
 (async()=>{const r=await fetch('/api/mc-players/'+encodeURIComponent(N),{credentials:'include'});if(!r.ok){R.innerHTML='<div class="g empty-st"><h2 class="hub-h2">Spieler nicht gefunden</h2><p class="mut">'+E(N)+' hat keinen verknüpften Account.</p><p style="margin-top:1rem"><a class="btn sec" href="/spieler">Zur Spielersuche</a></p></div>';return}const p=await r.json();
-H.innerHTML='<span class="slot">'+HEAD(p.name,80)+'</span><div style="min-width:0"><h1 class="hub-h" style="margin:0;overflow-wrap:anywhere">'+E(p.name)+'</h1><p class="mut" style="margin:.3rem 0 0;font-size:.85rem">'+(p.updated_at?'Stand '+new Date(p.updated_at).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}):'Noch keine Stats')+'</p></div>';
+H.innerHTML='<span class="slot">'+HEAD(p.name,80)+'</span><div style="min-width:0"><h1 class="hub-h" style="margin:0;overflow-wrap:anywhere">'+E(p.name)+RB(p)+'</h1><p class="mut" style="margin:.3rem 0 0;font-size:.85rem">'+(p.updated_at?'Stand '+new Date(p.updated_at).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}):'Noch keine Stats')+'</p></div>';
 const ks=Object.keys(LB).filter(k=>p.stats[k]!=null);let h='<h2 class="hub-h2" style="font-size:1.2rem">Öffentliche Stats</h2>'+(ks.length?'<div class="pstats">'+ks.map(k=>'<div class="g"><div class="k">'+LB[k][0]+'</div><div class="v tnum">'+E(LB[k][1](p.stats[k]))+'</div></div>').join('')+'</div>':'<div class="g pad mut">Noch keine Stats.</div>');
 if(p.details){const d=p.details.extra||{},A=p.details.all||{};const ST=k=>String(k).replace(/^minecraft:/,'');const NO=o=>{const r={};for(const[k,v]of Object.entries(o||{}))if(Number.isFinite(+v))r[ST(k)]=(r[ST(k)]||0)+ +v;return r};
 const ICO=id=>'<span class="slot ic"><img alt="" loading="lazy" width="22" height="22" src="/mc-icon/v2/'+encodeURIComponent(id)+'" onerror="this.onerror=null;this.src=\\'/mc-icon/v2/paper\\'"></span>';
