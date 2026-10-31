@@ -35,10 +35,11 @@ const MAT = { brick: "bricks", stone_brick: "stone_bricks", nether_brick: "nethe
   prismarine_brick: "prismarine_bricks", tuff_brick: "tuff_bricks", quartz: "quartz_block_side", purpur: "purpur_block", smooth_quartz: "quartz_block_bottom",
   smooth_sandstone: "sandstone_top", smooth_red_sandstone: "red_sandstone_top", petrified_oak: "oak_planks", bamboo_mosaic: "bamboo_mosaic", cut_copper: "cut_copper" };
 const WOODS = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "bamboo", "crimson", "warped", "pale_oak", "poplar"];
+const inOld = (p) => (p.startsWith("block/") ? TEX_BLOCK : TEX_ITEM).has(p.slice(p.indexOf("/") + 1));
 const isNew = (p) => (p.startsWith("block/") ? NEW_BLOCK : NEW_ITEM).has(p.slice(p.indexOf("/") + 1));
 const has = (p) => (p.startsWith("block/") ? TEX_BLOCK : TEX_ITEM).has(p.slice(p.indexOf("/") + 1)) || isNew(p);
 // Texturen, die nur in der neueren Version existieren (26.x): selbst gehostet unter /mc/icons/tex/ (aus misode/mcmeta)
-const abs = (r) => (typeof r === "string" && !/^(https:|\/)/.test(r) && isNew(r) ? NEW_BASE + r + ".png" : r);
+const abs = (r) => (typeof r === "string" && !/^(https:|\/)/.test(r) && isNew(r) && !inOld(r) ? NEW_BASE + r + ".png" : r);
 const first = (...c) => c.find((p) => p && has(p)) || null;
 const cache = new Map();
 // Mob-/Spielerköpfe haben keine Item-Textur (3D-Modell aus Entity-Skin) -> isometrischer Kopf über mc-heads (MHF_-Skins)

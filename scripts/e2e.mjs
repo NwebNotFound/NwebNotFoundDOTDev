@@ -303,6 +303,7 @@ try {
   bo = (await req("/api/mc-bestellungen", { cookie: c9 })).j; ok(bo.orders.length === 0, "ausgeblendete fehlen in der Liste");
   ok(sqlRows(`SELECT COUNT(*) AS n FROM mc_shop_orders_pending WHERE id IN ('${RID1}','${RID2}')`)[0].n === 2, "nichts gelöscht (Soft-Hide)");
   console.log("9b) Icons (1.21.11)");
+  { const r = await fetch(BASE + "/mc-icon/v2/cinnabar", { headers: { host: HOST } }); ok(r.status === 200 && /image\/png/.test(r.headers.get("content-type") || ""), "Icon v2/cinnabar: 200 image/png (selbst gehostet)"); }
   const IC = async (id) => (await fetch(BASE + "/mc-icon/v2/" + id, { headers: { host: HOST }, redirect: "manual" })).headers.get("location") || "";
   ok(/@1\.21\.11\/.*item\/diamond_spear\.png$/.test(await IC("diamond_spear")), "diamond_spear → echte Speer-Textur (kein Dreizack)");
   ok(/item\/acacia_hanging_sign\.png$/.test(await IC("acacia_hanging_sign")), "acacia_hanging_sign → eigene Textur");
