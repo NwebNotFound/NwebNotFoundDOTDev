@@ -453,6 +453,29 @@ try {
     const pg = await req("/markt"); ok(pg.s === 200 && pg.t.includes('id="econ"') && pg.t.includes("/mc/economy.js") && pg.t.includes("/mc/economy.css"), "GET /markt bindet Economy-Block extern ein");
     const js = await req("/mc/economy.js"); ok(js.s === 200 && !/style=|\.style\./.test(js.t), "economy.js ohne Inline-Styles");
   }
+  console.log("F) player_ranks");
+  { const PR = (rows, extra = {}) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: rows, ...extra } });
+    const R1 = { uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }, R2 = { uuid: U2.replace(/-/g, "").toUpperCase(), name: "Seller", rank: "vip", color: "&6", weight: 40 };
+    ok((await req("/api/mc-ingest", { method: "POST", body: { player_ranks: [] } })).s === 401, "player_ranks ohne Token → 401");
+    const bad = [["kein Array", { a: 1 }], ["Rang unbekannt", [{ ...R1, rank: "owner" }]], ["Farbe ungültig", [{ ...R1, color: "#ff0000" }]], ["Farbe Format-Code", [{ ...R1, color: "&l" }]], ["Weight kein Int", [{ ...R1, weight: 1.5 }]], ["Weight String", [{ ...R1, weight: "100" }]], ["UUID ungültig", [{ ...R1, uuid: "xyz" }]], ["Name ungültig", [{ ...R1, name: "<b>" }]], ["UUID doppelt", [R1, { ...R1, name: "Nils2" }]], ["kein Objekt", [5]]];
+    for (const [m, rows] of bad) { const r = await PR(rows); ok(r.s === 400 && r.j?.error, "player_ranks " + m + " → 400", r.s + " " + r.t); }
+    ok(sqlRows("SELECT COUNT(*) AS n FROM mc_player_ranks")[0].n === 0, "player_ranks: nach 400 nichts geschrieben");
+    const r1 = await PR([R1, R2, { uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", name: "Gast", rank: "player", color: "&7", weight: 0, secret: "x" }]);
+    ok(r1.s === 200 && r1.j?.player_ranks === 3, "player_ranks 3 Zeilen (inkl. unbekanntes Feld) → 200", r1.t);
+    ok(sqlRows("SELECT rank FROM mc_player_ranks WHERE name='Gast'")[0]?.rank === "default", "player_ranks: player → default");
+    ok(sqlRows("SELECT uuid FROM mc_player_ranks WHERE name='Seller'")[0]?.uuid === U2.replace(/-/g, ""), "player_ranks: UUID normalisiert");
+    const r2 = await PR([{ ...R1 }, { ...R2, rank: "mvp", color: "&d", weight: 60 }]);
+    ok(r2.s === 200 && sqlRows("SELECT COUNT(*) AS n FROM mc_player_ranks")[0].n === 2, "player_ranks Snapshot entfernt fehlende UUIDs", r2.t);
+    ok(sqlRows("SELECT rank FROM mc_player_ranks WHERE name='Seller'")[0]?.rank === "mvp", "player_ranks Upsert ändert Rang");
+    const L = (await req("/api/mc-players")).j?.players || [], n = L.find((x) => x.name === "Nils"), s = L.find((x) => x.name === "Seller");
+    ok(n?.rank?.rank === "admin" && n.rank.color === "c" && s?.rank?.rank === "mvp" && s.rank.color === "d", "Spieler-API liefert Rang + Farbe", JSON.stringify(L).slice(0, 300));
+    ok(!JSON.stringify(L).includes("weight"), "Spieler-API ohne weight/interne Felder");
+    const one = await req("/api/mc-players/Seller"); ok(one.s === 200 && one.j?.rank?.rank === "mvp", "Spieler-Detail-API liefert Rang", one.t.slice(0, 200));
+    await PR([{ ...R2, rank: "default", color: "&7", weight: 0 }]);
+    ok((await req("/api/mc-players/Seller")).j?.rank === null && (await req("/api/mc-players/Nils")).j?.rank === null, "default/kein Eintrag → kein Badge");
+    for (const pth of ["/spieler", "/spieler/Nils"]) { const pg = await req(pth); ok(pg.s === 200 && pg.t.includes("/mc/ranks.css") && pg.t.includes("rk rk-"), pth + " bindet Rang-Badges extern ein", String(pg.s)); }
+    const css = await req("/mc/ranks.css"); ok(css.s === 200 && css.t.includes(".rk-c") && css.t.includes(".rk-a") && css.t.includes(".rk-d") && css.t.includes(".rk-6"), "ranks.css mit Rangfarben");
+    sql("DELETE FROM mc_player_ranks"); }
   try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
 
 } catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }
