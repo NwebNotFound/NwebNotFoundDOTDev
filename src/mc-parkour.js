@@ -15,6 +15,12 @@ export function cleanCourseName(v) {
 // Kurs-Icon: Minecraft-Item-ID (wie /mc-icon/<id>); trimmen, klein, "minecraft:" weg; ungültig → paper
 export const PK_ICON_DEFAULT = "paper";
 const ICON = /^[a-z0-9_]{1,48}$/;
+// Gültiges Icon oder null (ungültig/fehlend → gespeichertes Icon bleibt).
+export function validCourseIcon(v) {
+  if (typeof v !== "string") return null;
+  const t = v.trim().toLowerCase().replace(/^minecraft:/, "");
+  return ICON.test(t) ? t : null;
+}
 export function cleanCourseIcon(v) {
   if (typeof v !== "string") return PK_ICON_DEFAULT;
   const t = v.trim().toLowerCase().replace(/^minecraft:/, "");
@@ -32,8 +38,8 @@ export function cleanParkour(a, now = Date.now()) {
     if (!COURSE.test(course) || !UUID.test(u) || !Number.isSafeInteger(t) || t <= 0 || t > PK_MAX_MS || (name != null && name !== "" && !NAME.test(String(name)))) { rejected++; continue; }
     let set = now;
     if (e.set_at != null) { const ms = typeof e.set_at === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d(:\d\d(\.\d{1,6})?)?(Z|[+-]00:?00)$/.test(e.set_at) ? Date.parse(e.set_at) : NaN; if (!Number.isFinite(ms) || ms > now + 600000 || ms < Date.UTC(2020, 0, 1)) { rejected++; continue; } set = ms; }
-    const cn = cleanCourseName(e.course_name), hasIcon = e.course_icon !== undefined && e.course_icon !== null;
-    if (cn || hasIcon) { const o = names.get(course) || { name: null, icon: null }; names.set(course, { name: cn || o.name, icon: hasIcon ? cleanCourseIcon(e.course_icon) : o.icon }); }
+    const cn = cleanCourseName(e.course_name), ci = validCourseIcon(e.course_icon), hasIcon = ci !== null;
+    if (cn || hasIcon) { const o = names.get(course) || { name: null, icon: null }; names.set(course, { name: cn || o.name, icon: hasIcon ? ci : o.icon }); }
     const r = { course, mc_uuid: normU(u), mc_name: name ? String(name) : null, time_ms: t, set_at: new Date(set).toISOString() };
     const k = course + "|" + r.mc_uuid, o = best.get(k); if (!o || r.time_ms < o.time_ms) best.set(k, r);
   }
