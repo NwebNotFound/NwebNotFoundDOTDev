@@ -317,6 +317,13 @@ try {
   const css = fs.readFileSync(ROOT + "public/mc/ds.css", "utf8");
   ok(/--hl-bg:/.test(css) && /--hl-ring:/.test(css), "ds.css: gemeinsames Hover-Token");
   ok(!/\.menu[^{]*\{[^}]*#(120d1f|2d1d5a)/.test(css.slice(css.indexOf("Profil-Dropdown im MC-Theme"))), "Dropdown ohne Lila");
+  console.log("6c) Todesursachen");
+  {
+    const U3 = "33333333-4444-4555-8666-777777777777";
+    const r = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { v_player_stats_ext: [{ uuid: U3, name: "Tod1", deaths: 3, deaths_by: { fall: 1, "minecraft:player": 1, some_unknown_cause: 1, ENTITY_EXPLOSION: 2, "bad key!": 5 } }] } });
+    const row = sqlRows(`SELECT details FROM mc_player_stats WHERE mc_uuid='${U3}'`)[0], db = row && JSON.parse(row.details || "{}").deaths_by;
+    ok(r.s === 200 && db && db.fall === 1 && db.player === 1 && db.some_unknown_cause === 1 && db.entity_explosion === 2 && !("bad key!" in db), "deaths_by: unbekannte/DamageCause-Keys gespeichert, nur ungültige verworfen", row && row.details);
+  }
   console.log("6b) Parkour");
   {
     const PU = (i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, ing = (parkour) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { parkour } });

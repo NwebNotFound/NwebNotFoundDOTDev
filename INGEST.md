@@ -218,6 +218,15 @@ Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, 
 - `GET /api/mc-parkour` → `{"courses":{"cave_rush":[{rank,course_name,mc_uuid,mc_name,time_ms,set_at}]},"course_names":{"cave_rush":"Cave Rush","kurs1":"kurs1"}}` (Top 10 pro Kurs, `course_name` fällt auf die ID zurück).
 - Seite `/parkour` zeigt ein Top-10-Board pro Kurs mit Anzeigenamen; `/parkour?course=cave_rush` (auch `Cave Rush`/`cave-rush`) zeigt nur diesen Kurs.
 
+## Todesursachen (`deaths_by`)
+- `deaths_by` (in `v_player_stats_ext`/Details) darf neben Entity-IDs (`zombie`, `player`, `minecraft:creeper` …) auch Bukkit-**DamageCause**-Keys in Kleinbuchstaben enthalten, z. B. `fall`, `lava`, `fire`, `fire_tick`, `drowning`, `void`, `suffocation`, `starvation`, `explosion`, `block_explosion`, `entity_explosion`, `projectile`, `magic`, `freeze`, `lightning`, `contact`, `wither`.
+- Gespeichert wird jeder Key, der nach Kleinschreibung und Entfernen von `minecraft:` auf `^[a-z0-9_./-]{1,48}$` passt (auch unbekannte); Werte müssen Zahlen ≥ 0 sein. Pro Map werden die 25 größten Einträge behalten.
+- Die Website zeigt bekannte Keys auf Deutsch (z. B. `fall` → Fallschaden), unbekannte als Klartext. Ist `deaths` größer als die Summe von `deaths_by`, erscheint der Rest als Zeile **Sonstige**, damit die Balken die Gesamtzahl ergeben.
+
+## Push-Frequenz & Cache
+- `POST /api/mc-ingest` hat **kein Rate-Limit** (nur Token und max. 8 MB). Pushes alle 3–10 s (Events) bzw. 30–60 s (Stats) sind ok; Pushes klein halten.
+- Caching der Lese-APIs: `/api/mc-players` und `/api/mc-players/<name>` (Profil) `no-store`; `/api/mc-data` und `/api/mc-leaderboards` 5 s; `/api/mc-status` 15–20 s; `/api/mc-parkour` 30 s. Änderungen sind also nach spätestens ~5 s (Stats/Profil) sichtbar.
+
 ## Tests
 `node scripts/e2e.mjs` – startet `wrangler dev` mit frischer lokaler D1 (`.wrangler/e2e`), spielt Ingest/Gebote/Bestellungen/Bot-Ack/Rate-Limits durch und prüft die UI (Chromium 390/1440, `scripts/e2e_ui.py`). Berührt keine Produktionsdaten.
 
