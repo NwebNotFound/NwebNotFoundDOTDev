@@ -1,6 +1,7 @@
 import { AV } from "./asset-version.js";
 import { cleanEconomy, economyStatements, economyApi } from "./mc-economy.js";
 import { cleanRanks, rankStatements } from "./mc-ranks.js";
+import { cleanPvp, pvpStatements, pvpApi, pvpPlayerApi, pvpBody } from "./mc-pvp.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
@@ -570,6 +571,11 @@ async function mcIngest(req, env) {
     ranks = cleanRanks(b.player_ranks);
     if (ranks.error) { console.warn("mc-ingest: player_ranks dropped: " + ranks.error); ranks = { rows: [], dropped: ranks.error }; }
   }
+  let pvp;
+  if ("pvp_stats" in b) {
+    pvp = cleanPvp(b.pvp_stats);
+    if (pvp.error) { console.warn("mc-ingest: pvp_stats dropped: " + pvp.error); pvp = { rows: [], dropped: pvp.error }; }
+  }
   const vinfo = await normalizeViews(env, b);
   const { links, players_stats, details, leaderboards_weekly, ...data } = cleanIngest(b), now = Date.now();
   const st = [], market = cleanMarket(b?.market), market_history = cleanHistory(b?.market_history);
@@ -605,8 +611,9 @@ async function mcIngest(req, env) {
   const parkour = cleanParkour(b?.parkour, now); if (parkour) st.push(...parkourStatements(env, parkour.rows, parkour.names, now));
   if (econ) st.push(...economyStatements(env, econ.rows, now));
   if (ranks && ranks.rows.length) st.push(...rankStatements(env, ranks.rows, now));
+  if (pvp && pvp.rows.length) st.push(...pvpStatements(env, pvp.rows, now));
   if (st.length) await env.DB.batch(st);
-  return json({ ok: true, ...(econ ? { economy_daily: econ.rows.length } : {}), ...(ranks ? { player_ranks: ranks.rows.length, ...(ranks.dropped ? { player_ranks_dropped: true } : {}) } : {}), ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
+  return json({ ok: true, ...(econ ? { economy_daily: econ.rows.length } : {}), ...(ranks ? { player_ranks: ranks.rows.length, ...(ranks.dropped ? { player_ranks_dropped: true } : {}) } : {}), ...(pvp ? { pvp_stats: pvp.rows.length, ...(pvp.dropped ? { pvp_stats_dropped: true } : {}) } : {}), ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
@@ -784,6 +791,8 @@ export default {
     if (p.startsWith("/api/mc-players/")) { const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, decodeURIComponent(p.slice(16)), u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
     if (p === "/api/mc-leaderboards") return mcLeaderboards(env);
     if (p === "/api/mc-parkour") return json(await parkourApi(env), 200, { "cache-control": "public, max-age=30" });
+    if (p === "/api/mc-pvp") return json(await pvpApi(env), 200, { "cache-control": "public, max-age=30" });
+    if (p.startsWith("/api/mc-pvp/")) { const o = await pvpPlayerApi(env, decodeURIComponent(p.slice(12))); return o ? json(o, 200, { "cache-control": "public, max-age=30" }) : json({ error: "keine PvP-Daten" }, 404); }
     if (p === "/api/mc-economy") return json(await economyApi(env), 200, { "cache-control": "public, max-age=60" });
     if (p === "/api/mc-market") return mcMarket(env);
     if (p.startsWith("/api/mc-market/")) return mcMarketItem(env, decodeURIComponent(p.slice(15)));
@@ -797,6 +806,7 @@ export default {
       if (p === "/") return html(MC_HOME);
       if (p === "/profile") return html(PROFILE_MC());
       if (p === "/leaderboards") return html(LEADERBOARDS_MC());
+      if (p === "/pvp") return html(mcPage("PvP · NwebNotFound MC", "PvP-Rangliste der Arena: Siege, Niederlagen und Siegquote", pvpBody()));
       if (p === "/changelog") return html(mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", changelogBody()));
       if (p === "/parkour") return html(mcPage("Parkour · NwebNotFound MC", "Parkour-Bestzeiten aus der Lobby: Top 10 pro Kurs", parkourBody()));
       if (p === "/bestellungen" || p === "/abholungen") return html(mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));

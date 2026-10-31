@@ -481,6 +481,37 @@ try {
     for (const pth of ["/spieler", "/spieler/Nils"]) { const pg = await req(pth); ok(pg.s === 200 && pg.t.includes("/mc/ranks.css") && pg.t.includes("rk rk-"), pth + " bindet Rang-Badges extern ein", String(pg.s)); }
     const css = await req("/mc/ranks.css"); ok(css.s === 200 && css.t.includes(".rk-c") && css.t.includes(".rk-a") && css.t.includes(".rk-d") && css.t.includes(".rk-6"), "ranks.css mit Rangfarben");
     sql("DELETE FROM mc_player_ranks"); }
+  console.log("G) pvp_stats");
+  { const PV = (rows, extra = {}) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { pvp_stats: rows, ...extra } });
+    const A = { uuid: U1, name: "Nils", wins: 10, losses: 2, draws: 1, matches: 13, winrate_pct: 77, favorite_kit: "<img src=x onerror=alert(1)>" };
+    const B = { uuid: U2, name: "Seller", wins: 10, losses: 1, draws: 0, matches: 11, winrate_pct: 91, favorite_kit: null };
+    const C = { uuid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", name: "Gast", wins: 1, losses: 0, draws: 0, matches: 1, winrate_pct: 100, extra: "x" };
+    ok((await req("/api/mc-ingest", { method: "POST", body: { pvp_stats: [] } })).s === 401, "pvp_stats ohne Token → 401");
+    { const r = await req("/api/mc-pvp"); ok(r.s === 200 && Array.isArray(r.j?.players) && r.j.players.length === 0, "PvP-API leer → []", r.t); }
+    const bad = [["kein Array", { a: 1 }], ["wins negativ", [{ ...A, wins: -1 }]], ["matches kein Int", [{ ...A, matches: 1.5 }]], ["winrate > 100", [{ ...A, winrate_pct: 101 }]], ["winrate 100.1", [{ ...A, winrate_pct: 100.1 }]], ["winrate -1", [{ ...A, winrate_pct: -1 }]], ["winrate String", [{ ...A, winrate_pct: "50" }]], ["Kit zu lang", [{ ...A, favorite_kit: "x".repeat(33) }]], ["Kit Zahl", [{ ...A, favorite_kit: 5 }]], ["UUID doppelt", [A, { ...A, name: "X" }]], ["Name ungültig", [{ ...A, name: "a b" }]]];
+    for (const [m, rows] of bad) { const r = await PV(rows); ok(r.s === 200 && r.j?.pvp_stats === 0 && r.j?.pvp_stats_dropped === true, "pvp_stats " + m + " → verworfen, 200", r.s + " " + r.t); }
+    ok(sqlRows("SELECT COUNT(*) AS n FROM mc_pvp_stats")[0].n === 0, "pvp_stats: ungültig → nichts geschrieben");
+    { const r = await PV([{ ...A, wins: -5 }], { economy_daily: [{ day: "2026-03-01", money_supply_cp: 7 }] }); ok(r.s === 200 && r.j?.economy_daily === 1, "ungültige pvp_stats: Rest wird gespeichert", r.t); sql("DELETE FROM mc_economy_daily WHERE day='2026-03-01'"); }
+    const r1 = await PV([A, B, C]); ok(r1.s === 200 && r1.j?.pvp_stats === 3, "pvp_stats 3 Zeilen (unbekanntes Feld ignoriert) → 200", r1.t);
+    { const r = await PV([]); ok(r.s === 200 && sqlRows("SELECT COUNT(*) AS n FROM mc_pvp_stats")[0].n === 3, "pvp_stats [] ignoriert, nichts gelöscht", r.t); }
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U2, name: "Seller", rank: "vip", color: "&6", weight: 40 }] } });
+    const a = await req("/api/mc-pvp"), L = a.j?.players || [];
+    ok(a.s === 200 && L.map((x) => x.name).join() === "Seller,Nils,Gast", "PvP-API sortiert nach Siegen, dann Quote", a.t.slice(0, 300));
+    ok(JSON.stringify(Object.keys(L[0]).sort()) === JSON.stringify(["draws", "favorite_kit", "losses", "matches", "name", "rank", "uuid", "winrate_pct", "wins"]), "PvP-API nur öffentliche Felder (kein weight/updated_at)", Object.keys(L[0] || {}).join());
+    ok(L[0].rank?.rank === "vip" && L[0].rank.color === "6" && L[1].rank === null, "PvP-API mit Rang-Badge aus mc_player_ranks");
+    ok(L[1].favorite_kit === A.favorite_kit && L[0].favorite_kit === null && L[2].favorite_kit === null, "favorite_kit gespeichert / null");
+    { const r = await req("/api/mc-pvp/nils"); ok(r.s === 200 && r.j?.wins === 10 && r.j?.name === "Nils", "PvP-Spieler-API → 200"); ok((await req("/api/mc-pvp/Niemand")).s === 404, "PvP-Spieler-API unbekannt → 404"); }
+    { const r = await PV([{ ...A, winrate_pct: 71.4 }, { ...B, winrate_pct: 99.5 }, C]); const w = Object.fromEntries(sqlRows("SELECT name, winrate_pct FROM mc_pvp_stats").map((x) => [x.name, x.winrate_pct]));
+      ok(r.s === 200 && r.j?.pvp_stats === 3 && w.Nils === 71 && w.Seller === 100, "winrate_pct Float gerundet (71.4→71, 99.5→100)", r.t + " " + JSON.stringify(w)); }
+    await PV([B]); ok(sqlRows("SELECT COUNT(*) AS n FROM mc_pvp_stats")[0].n === 1, "pvp_stats Snapshot entfernt fehlende UUIDs");
+    await PV([A, B, C]);
+    { const pg = await req("/pvp"); const sec = pg.t.slice(pg.t.indexOf('id="pvp"'));
+      ok(pg.s === 200 && pg.t.includes("/mc/pvp.js") && pg.t.includes("/mc/pvp.css") && pg.t.includes("/mc/ranks.css"), "GET /pvp bindet JS/CSS extern ein", String(pg.s));
+      ok(!/<script>|<style| style=/.test(sec.slice(0, sec.indexOf("</section>"))), "/pvp-Inhalt ohne Inline-Script/-Style");
+      ok(pg.t.includes('href="/pvp"'), "PvP in der MC-Navigation"); }
+    { const pg = await req("/spieler/Nils"); ok(pg.s === 200 && pg.t.includes('id="pvp-pl"') && pg.t.includes('data-name="Nils"') && pg.t.includes("/mc/pvp.js"), "Spielerseite hat PvP-Block (extern)"); }
+    { const js = await req("/mc/pvp.js"); ok(js.s === 200 && js.t.includes("E(p.favorite_kit)") && js.t.includes("p.matches<5") && !/style=|\.style\./.test(js.t), "pvp.js: Kit escaped, Quote erst ab 5 Kämpfen, keine Inline-Styles"); }
+    sql("DELETE FROM mc_pvp_stats"); sql("DELETE FROM mc_player_ranks"); }
   try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
 
 } catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }

@@ -50,3 +50,4 @@ CREATE TABLE IF NOT EXISTS mc_price_ticks (item TEXT NOT NULL, ts INTEGER NOT NU
 CREATE INDEX IF NOT EXISTS idx_mc_pt_ts ON mc_price_ticks(ts);
 CREATE TABLE IF NOT EXISTS mc_economy_daily (day TEXT PRIMARY KEY, money_supply_cp INTEGER NOT NULL, minted_cp INTEGER, burned_cp INTEGER, net_cp INTEGER, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS mc_player_ranks (uuid TEXT PRIMARY KEY, name TEXT NOT NULL, rank TEXT NOT NULL, color TEXT NOT NULL, weight INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS mc_pvp_stats (uuid TEXT PRIMARY KEY, name TEXT NOT NULL, wins INTEGER NOT NULL, losses INTEGER NOT NULL, draws INTEGER NOT NULL, matches INTEGER NOT NULL, winrate_pct INTEGER, favorite_kit TEXT, updated_at INTEGER NOT NULL);

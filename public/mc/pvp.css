@@ -1,0 +1,15 @@
+/* PvP-Rangliste /pvp + Block auf Spielerseite (Minecraft-Theme, ds.css-Variablen) */
+html.mc .pvp-hero{padding-bottom:.5rem}html.mc .pvp-sec{padding-top:1.2rem}
+html.mc .pvp-tw{overflow-x:auto;padding:.4rem .8rem}
+html.mc .pvp-t{width:100%;border-collapse:collapse;font-size:.92rem}
+html.mc .pvp-t th{font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:.6rem .5rem;border-bottom:1px solid var(--line);white-space:nowrap}
+html.mc .pvp-t td{padding:.55rem .5rem;border-bottom:1px solid var(--line);white-space:nowrap}
+html.mc .pvp-t tr:last-child td{border-bottom:0}
+html.mc .pvp-t .n{text-align:right;font-family:var(--f-px,monospace);font-variant-numeric:tabular-nums}
+html.mc .pvp-t .pos{font-family:var(--f-px,monospace);color:var(--mut);width:2.5rem}
+html.mc .pvp-t tbody tr:nth-child(1) .pos{color:#ffaa00}html.mc .pvp-t tbody tr:nth-child(2) .pos{color:#cfcfcf}html.mc .pvp-t tbody tr:nth-child(3) .pos{color:#c87533}
+html.mc .pvp-t .pl a{font-family:var(--f-px,monospace);color:var(--fg);text-decoration:none}html.mc .pvp-t .pl a:hover{text-decoration:underline}
+html.mc .pvp-t .kit{max-width:14rem;overflow:hidden;text-overflow:ellipsis;color:var(--mut)}
+html.mc .pvp-note{font-size:.8rem;margin:.6rem 0 0}
+html.mc .pvp-pl{margin-top:2rem}html.mc .pvp-ph{font-size:1.2rem;margin:0}
+html.mc .pvp-pl .v{overflow-wrap:anywhere}
