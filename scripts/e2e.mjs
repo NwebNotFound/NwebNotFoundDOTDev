@@ -333,6 +333,12 @@ try {
     const row = sqlRows(`SELECT details FROM mc_player_stats WHERE mc_uuid='${U3}'`)[0], db = row && JSON.parse(row.details || "{}").deaths_by;
     ok(r.s === 200 && db && db.fall === 1 && db.player === 1 && db.some_unknown_cause === 1 && db.entity_explosion === 2 && !("bad key!" in db), "deaths_by: unbekannte/DamageCause-Keys gespeichert, nur ungültige verworfen", row && row.details);
   }
+  {
+    const U4 = "44444444-4444-4555-8666-777777777777";
+    const r = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { v_player_stats_ext: [{ uuid: U4, name: "Tod2", deaths: 4, deaths_entity: { "minecraft:zombie": 2 }, deaths_by: { fall: 1, zombie: 1 } }] } });
+    const row = sqlRows(`SELECT details FROM mc_player_stats WHERE mc_uuid='${U4}'`)[0], d = row && JSON.parse(row.details || "{}");
+    ok(r.s === 200 && d && d.deaths_entity && d.deaths_entity.zombie === 2 && d.deaths_by && d.deaths_by.zombie === 1 && d.deaths_by.fall === 1, "deaths_entity und deaths_by bleiben getrennte Keys", row && row.details);
+  }
   console.log("6d) Todesursachen zusammenfassen");
   {
     const dbIn = { explosion: 1, block_explosion: 2, entity_explosion: 3, fire: 4, fire_tick: 1, fall: 2 };

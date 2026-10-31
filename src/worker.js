@@ -204,7 +204,7 @@ const emo=k=>MIC(k);const dd=d.distance_m||{};const DL={walk:'Gelaufen',sprint:'
 const dist=Object.keys(DL).filter(k=>dd[k]!=null);const tot=dist.reduce((a,k)=>a+dd[k],0);
 const MS=[['fished','Gefischt'],['traded','Gehandelt'],['jumps','Sprünge'],['damage_dealt','Schaden ausgeteilt'],['damage_taken','Schaden erlitten'],['cp_earned','CP verdient'],['shop_sales','Shop-Verkäufe']].filter(([k])=>d[k]!=null);
 const h='<div class="dg">'+card('Top-Blöcke','abgebaut',list(d.mined,ICO))+card('Mob-Kills','',list(d.killed,emo,8))+card('Distanzen',tot?KM(tot)+' gesamt':'',dist.length?'<div class="mini">'+dist.map(k=>'<div><div class="k">'+DL[k]+'</div><div class="v">'+KM(dd[k])+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')
-+card('Todesursachen','',list(OTH(MG(d.deaths_by,k=>DB[k]||k),(m.stats||{}).deaths,8),k=>MIC(k),8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)}))
++(d.deaths_entity&&Object.keys(d.deaths_entity).length?card('Getötet von','Mobs',list(d.deaths_entity,emo,8)):'')+(d.deaths_by&&Object.keys(d.deaths_by).length?card('Todesursachen','',list(OTH(MG(d.deaths_by,k=>DB[k]||k),((m.stats||{}).deaths)-Object.values(d.deaths_entity||{}).reduce((x,y)=>x+(+y||0),0),8),k=>MIC(k),8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)})):'')
 +card('Gesetzt & gecraftet','',list(Object.assign({},d.placed),ICO,5)+(d.crafted?'<div style="height:.8rem"></div>'+list(d.crafted,ICO,5):''))
 +card('Sonstiges','',MS.length?'<div class="mini">'+MS.map(([k,t])=>'<div><div class="k">'+t+'</div><div class="v">'+NF(Math.round(d[k]))+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')+'</div>';
 const w=document.createElement('div');w.innerHTML=h;const mch=B.querySelector('.mch');if(mch)mch.after(w.firstChild);else B.prepend(w.firstChild);});})();</script>`;
@@ -530,13 +530,13 @@ function cleanLb(o) {
   }
   return r;
 }
-const DETAIL_MAPS = ["mined", "placed", "killed", "deaths_by", "crafted", "playtime_by_world"];
+const DETAIL_MAPS = ["mined", "placed", "killed", "deaths_by", "deaths_entity", "crafted", "playtime_by_world"];
 const DETAIL_NUMS = ["fished", "traded", "jumps", "damage_dealt", "damage_taken", "cp_earned", "shop_sales"];
 const DIST_KEYS = ["walk", "sprint", "fly", "swim", "boat", "horse", "elytra", "minecart", "climb", "crouch"];
 // Vanilla minecraft:custom-Stats (Zentimeter / Zähler) → Website-Keys
 const CM_MAP = { walk_one_cm: "walk", sprint_one_cm: "sprint", fly_one_cm: "fly", aviate_one_cm: "elytra", swim_one_cm: "swim", walk_under_water_one_cm: "swim", walk_on_water_one_cm: "swim", boat_one_cm: "boat", horse_one_cm: "horse", minecart_one_cm: "minecart", climb_one_cm: "climb", crouch_one_cm: "crouch" };
 const CUSTOM_NUM = { fish_caught: "fished", traded_with_villager: "traded", jump: "jumps", damage_dealt: "damage_dealt", damage_taken: "damage_taken" };
-const DETAIL_ALIASES = ["distance_cm", "deaths_entity", "blocks_placed", "custom"];
+const DETAIL_ALIASES = ["distance_cm", "blocks_placed", "custom"];
 const keyOf = (k) => String(k).toLowerCase().replace(/^minecraft:/, "");
 const num = (v) => (typeof v === "number" || (typeof v === "string" && v.trim() !== "")) && Number.isFinite(+v) ? Math.max(0, +v) : null;
 function cleanDetails(d) {
@@ -562,7 +562,7 @@ const isObj = (x) => x && typeof x === "object" && !Array.isArray(x);
 export function normDetails(src) {
   const d = { ...src };
   if (isObj(d.blocks_placed) && !isObj(d.placed)) d.placed = d.blocks_placed;
-  if (isObj(d.deaths_entity)) { const m = { ...(isObj(d.deaths_by) ? d.deaths_by : {}) }; for (const [k, v] of Object.entries(d.deaths_entity)) { const n = num(v); if (n !== null) m[keyOf(k)] = (num(m[keyOf(k)]) || 0) + n; } d.deaths_by = m; }
+  // deaths_entity (Mobs) und deaths_by (sonstige Ursachen) bleiben getrennte Keys
   const cm = {};
   const addCm = (o) => { if (!isObj(o)) return; for (const [k0, v] of Object.entries(o)) { const k = keyOf(k0), t = CM_MAP[k] || (DIST_KEYS.includes(k) ? k : null), n = num(v); if (t && n !== null) cm[t] = (cm[t] || 0) + n; } };
   addCm(d.distance_cm); addCm(d.custom);

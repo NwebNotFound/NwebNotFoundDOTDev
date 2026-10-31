@@ -43,12 +43,23 @@ export function faceRgba(skin, size) {
   return out;
 }
 // Skin-URL direkt von Mojang (mc-heads liefert für manche Accounts falsche/verrauschte Köpfe)
+const MJ_TTL = 6 * 3600;
+// Mojang-Lookups (Name→UUID, UUID→Skin) im Cache API zwischenspeichern; 429/Fehler → null (Fallback mc-heads, dann Steve)
+async function mojangJson(url, fetcher) {
+  const cache = typeof caches !== "undefined" ? caches.default : null, key = new Request(url);
+  try { const hit = cache && (await cache.match(key)); if (hit) return hit.status === 204 ? null : await hit.json(); } catch {}
+  let r; try { r = await fetcher(url, { cf: { cacheTtl: MJ_TTL, cacheEverything: true } }); } catch { return null; }
+  if (r.status === 429 || r.status >= 500) return null; // nicht cachen, später neu versuchen
+  const body = r.ok ? await r.text().catch(() => null) : null;
+  let j = null; try { j = body ? JSON.parse(body) : null; } catch {}
+  if (cache) { try { await cache.put(key, j ? new Response(body, { headers: { "content-type": "application/json", "cache-control": "public, max-age=" + MJ_TTL } }) : new Response(null, { status: 204, headers: { "cache-control": "public, max-age=600" } })); } catch {} }
+  return j;
+}
 async function mojangSkin(id, fetcher) {
-  const o = { cf: { cacheTtl: 3600, cacheEverything: true } };
   let uuid = id.replace(/-/g, "");
-  if (!/^[0-9a-f]{32}$/i.test(uuid)) { const r = await fetcher("https://api.mojang.com/users/profiles/minecraft/" + encodeURIComponent(id), o); if (!r.ok) return null; uuid = (await r.json()).id; }
-  const r = await fetcher("https://sessionserver.mojang.com/session/minecraft/profile/" + uuid, o); if (!r.ok) return null;
-  const t = (await r.json()).properties?.find((x) => x.name === "textures"); if (!t) return null;
+  if (!/^[0-9a-f]{32}$/i.test(uuid)) { const j = await mojangJson("https://api.mojang.com/users/profiles/minecraft/" + encodeURIComponent(id.toLowerCase()), fetcher); uuid = j && j.id; if (!uuid) return null; }
+  const j = await mojangJson("https://sessionserver.mojang.com/session/minecraft/profile/" + uuid.toLowerCase(), fetcher); if (!j) return null;
+  const t = j.properties?.find((x) => x.name === "textures"); if (!t) return null;
   const u = JSON.parse(atob(t.value)).textures?.SKIN?.url; return u && /^https?:\/\/textures\.minecraft\.net\/texture\/[0-9a-f]+$/.test(u) ? u.replace(/^http:/, "https:") : null;
 }
 export async function renderHead(name, size, fetcher = fetch) {
