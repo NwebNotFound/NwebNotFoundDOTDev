@@ -70,7 +70,7 @@ export const homeBody = (HOST) => `
 <div class="addr" style="margin:0"><code class="px">${HOST}</code><button class="btn sm" id="cp">Kopieren</button></div></div>
 <div class="stats" style="margin:0"><div class="card stat"><div class="k">Spieler online</div><div class="v px tnum" id="pl">–</div><div class="bar"><i id="bar"></i></div></div>
 <div class="card stat"><div class="k">Version</div><div class="v px" id="ver">–</div></div><div class="card stat"><div class="k">Server</div><div class="v px" id="srvn">–</div></div></div>
-<p id="names" class="mut" style="margin:0;font-size:.9rem;min-height:1.2em"></p></div>
+<p id="names" class="mut" style="margin:0;font-size:.9rem;min-height:1.2em"></p><div id="onl" class="onl" aria-label="Gerade online" hidden></div></div>
 </div></section>
 <section class="sec" style="padding-top:1rem"><div class="hub-wrap"><div class="qgrid q6">
 <a class="g q" href="/profile"><div class="qi">${MI("name_tag", 40)}</div><div class="qt"><b>Profil</b><span>Deine Stats & dein 3D-Skin</span></div></a>
@@ -90,7 +90,7 @@ export const homeBody = (HOST) => `
 <li><h3>Hinzufügen</h3><p class="mut"><b>Server hinzufügen</b> mit der Adresse <code class="px">${HOST}</code>.</p></li>
 <li><h3>Freischalten</h3><p class="mut">Im Discord mit <code class="px">/link</code> verknüpfen und den Code im Spiel bestätigen. <a href="/wiki/erste-schritte">Anleitung ›</a></p></li></ol>
 </div></section>
-<script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/home.js?v=${AV}" defer></script>`;
+<link rel="stylesheet" href="/mc/profile.css?v=${AV}"><script src="/mc/player3d.js?v=${AV}" defer></script><script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/home.js?v=${AV}" defer></script>`;
 
 /* ---------- Markt ---------- */
 export const marketBody = () => `

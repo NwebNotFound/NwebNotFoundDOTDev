@@ -80,3 +80,18 @@ export async function headResponse(req, path, ctx) {
   if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
   return res;
 }
+// Roh-Skin same-origin für skinview3d (CSP: img/connect nur 'self'). Nur validierte PNGs (64x64/64x32/128x128), Fallback Steve.
+export async function skinResponse(req, path, ctx, fetcher = fetch) {
+  const m = path.match(/^\/mc-skin\/([A-Za-z0-9_]{1,16}|[0-9a-f-]{32,36})(?:\.png)?$/i);
+  if (!m) return new Response("Not found", { status: 404 });
+  const key = new Request(new URL("/mc-skin/" + m[1].toLowerCase(), req.url).toString());
+  const cache = typeof caches !== "undefined" ? caches.default : null;
+  const hit = cache && (await cache.match(key)); if (hit) return hit;
+  let mj = null; try { mj = await mojangSkin(m[1], fetcher); } catch {}
+  let png = null, fb = false;
+  for (const [n, src] of [[m[1], mj], [m[1], SKIN_SRC(m[1])], ["MHF_Steve", SKIN_SRC("MHF_Steve")]]) { if (!src) continue; try { const r = await fetcher(src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r.ok) continue; const b = await r.arrayBuffer(); const s = await decodePng(b); if (!((s.w === 64 && (s.h === 64 || s.h === 32)) || (s.w === 128 && s.h === 128))) continue; png = b; fb = n !== m[1]; break; } catch {} }
+  if (!png) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } });
+  const res = new Response(png, { headers: { "content-type": "image/png", "cache-control": "public, max-age=" + (fb ? 600 : 21600), "x-content-type-options": "nosniff" } });
+  if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
+  return res;
+}

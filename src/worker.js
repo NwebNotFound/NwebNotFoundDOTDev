@@ -4,7 +4,7 @@ import { cleanRanks, rankStatements } from "./mc-ranks.js";
 import { cleanPvp, pvpStatements, pvpApi, pvpPlayerApi, pvpBody } from "./mc-pvp.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
-import { headResponse } from "./mc-head.js";
+import { headResponse, skinResponse } from "./mc-head.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
 import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
@@ -198,7 +198,7 @@ const PROFILE_DETAILS = `${DET_CSS}<script>(()=>{${ICON_JS}const E=s=>String(s??
 const MIC=id=>'<span class="ic"><img alt="" width="22" height="22" style="image-rendering:pixelated" src="/mc-mob/'+encodeURIComponent(id)+'"></span>';
 const DB={fall:'Fallschaden',lava:'Lava',fire:'Feuer',fire_tick:'Feuer',drowning:'Ertrinken',drown:'Ertrunken',on_fire:'Verbrannt',starve:'Verhungert',void:'Void',suffocation:'Erstickt',starvation:'Verhungert',explosion:'Explosion',block_explosion:'Explosion',entity_explosion:'Explosion',projectile:'Geschoss',magic:'Magie',freeze:'Erfroren',lightning:'Blitz',contact:'Kaktus/Beere',wither:'Wither',player:'Spieler',sonstige:'Sonstige',zombie:'Zombie',skeleton:'Skelett',creeper:'Creeper'};const MG=(o,L)=>{const r={},f={};for(const[k,v]of Object.entries(o||{})){const l=String(L(k)).toLowerCase();const c=f[l]??=k;r[c]=(r[c]||0)+(+v||0)}return r};const OTH=(o,tot,n)=>{const e=Object.entries(o||{}).map(([k,v])=>[k,+v||0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);const s=e.reduce((a,x)=>a+x[1],0);let r=Math.max(0,(+tot||0)-s);let k=e;if(e.length+(r>0?1:0)>n){k=e.slice(0,n-1);r+=e.slice(n-1).reduce((a,x)=>a+x[1],0)}const out=Object.fromEntries(k);if(r>0)out.sonstige=(out.sonstige||0)+r;return out};
 const list=(o,f,n=10)=>{const e=Object.entries(o||{}).sort((a,b)=>b[1]-a[1]).slice(0,n);if(!e.length)return '<div class="emp">Noch keine Daten. Spiel eine Runde auf Survival.</div>';const mx=e[0][1]||1;return e.map(([k,v])=>'<div class="row">'+f(k)+'<div class="n">'+E(NM(k))+'<div class="meter"><i style="width:'+Math.max(4,v/mx*100)+'%"></i></div></div><b>'+NF(v)+'</b></div>').join('')};
-const card=(t,sub,body)=>'<div class="dc"><h3>'+t+(sub?'<small>'+sub+'</small>':'')+'</h3>'+body+'</div>';
+const card=(t,sub,body)=>body.includes('class="emp"')?'':'<div class="dc"><h3>'+t+(sub?'<small>'+sub+'</small>':'')+'</h3>'+body+'</div>';
 document.addEventListener('mcprofile',ev=>{const m=ev.detail.minecraft;if(!m||!m.visible)return;const d=m.details||{},B=document.getElementById('pb');
 const emo=k=>MIC(k);const dd=d.distance_m||{};const DL={walk:'Gelaufen',sprint:'Gesprintet',fly:'Geflogen',elytra:'Elytra',swim:'Geschwommen',boat:'Boot',horse:'Pferd',minecart:'Lore',climb:'Geklettert',crouch:'Geschlichen'};
 const dist=Object.keys(DL).filter(k=>dd[k]!=null);const tot=dist.reduce((a,k)=>a+dd[k],0);
@@ -207,7 +207,7 @@ const h='<div class="dg">'+card('Top-Blöcke','abgebaut',list(d.mined,ICO))+card
 +(d.deaths_entity&&Object.keys(d.deaths_entity).length?card('Getötet von','Mobs',list(d.deaths_entity,emo,8)):'')+(d.deaths_by&&Object.keys(d.deaths_by).length?card('Todesursachen','',list(OTH(MG(d.deaths_by,k=>DB[k]||k),((m.stats||{}).deaths)-Object.values(d.deaths_entity||{}).reduce((x,y)=>x+(+y||0),0),8),k=>MIC(k),8).replace(/<div class="n">([^<]*)/g,(a,x)=>{const k=x.toLowerCase().replace(/ /g,'_');return '<div class="n">'+E(DB[k]||x)})):'')
 +card('Gesetzt & gecraftet','',list(Object.assign({},d.placed),ICO,5)+(d.crafted?'<div style="height:.8rem"></div>'+list(d.crafted,ICO,5):''))
 +card('Sonstiges','',MS.length?'<div class="mini">'+MS.map(([k,t])=>'<div><div class="k">'+t+'</div><div class="v">'+NF(Math.round(d[k]))+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')+'</div>';
-const w=document.createElement('div');w.innerHTML=h;const mch=B.querySelector('.mch');if(mch)mch.after(w.firstChild);else B.prepend(w.firstChild);});})();</script>`;
+const w=document.createElement('div');w.innerHTML=h;const ps=document.getElementById('pstat');if(ps)ps.replaceWith(w.firstChild);else B.prepend(w.firstChild);});})();</script>`;
 const LEADERBOARDS_MC = () => shell({ title: "Bestenlisten · NwebNotFound MC", desc: "Bestenlisten des Minecraft-Servers", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `${DET_CSS}<style>
 .tabs{display:flex;gap:.35rem;overflow-x:auto;padding:.3rem;border-radius:99px;background:color-mix(in srgb,var(--fg) 6%,transparent);border:1px solid var(--line);scrollbar-width:none;max-width:100%}.tabs::-webkit-scrollbar{display:none}
 .tabs button{flex:none;border:0;background:transparent;color:var(--mut);font:inherit;font-size:.88rem;font-weight:500;padding:.5rem 1rem;border-radius:99px;cursor:pointer;transition:background .2s,color .2s}.tabs button[aria-selected=true]{background:var(--acc);color:var(--accfg)}
@@ -216,7 +216,7 @@ const LEADERBOARDS_MC = () => shell({ title: "Bestenlisten · NwebNotFound MC", 
 .pod img{width:56px;height:56px;margin:0 auto .6rem;border-radius:10px;image-rendering:pixelated}.pod .p1{padding-top:1.8rem;background:linear-gradient(180deg,rgba(74,222,128,.18),transparent);border-color:rgba(74,222,128,.35)}.pod .p1 img{width:72px;height:72px}
 .pod b{display:block;font-size:.95rem;overflow:hidden;text-overflow:ellipsis}.pod span{font-size:.8rem;opacity:.7;font-variant-numeric:tabular-nums}.pod .r{font-size:.7rem;font-weight:700;letter-spacing:.1em;color:var(--acc)}
 .lbr{display:flex;align-items:center;gap:.8rem;padding:.75rem .4rem}.lbr+.lbr{border-top:1px solid var(--line)}.lbr .px{width:1.6rem;opacity:.6}.lbr img{width:30px;height:30px;border-radius:6px;image-rendering:pixelated}.lbr .n{flex:1}.lbr b{font-variant-numeric:tabular-nums}
-</style>
+</style><link rel="stylesheet" href="/mc/profile.css?v=${AV}"><script src="/mc/player3d.js?v=${AV}"></script>
 <section class="hero center" style="padding-bottom:1.5rem"><div class="pixbg"></div><div class="wrap"><p class="eyebrow">Minecraft</p><h1 class="h-xl">Bestenlisten.</h1><p class="lead">Wer auf dem Server vorne liegt.</p></div></section>
 <section style="padding-top:0"><div class="wrap" style="max-width:760px">
 <div style="display:flex;flex-direction:column;align-items:center"><div class="tabs" role="tablist" id="tabs"></div><div class="seg" id="seg"><button data-k="weekly" aria-pressed="false">Woche</button><button data-k="total" aria-pressed="true">Gesamt</button></div></div>
@@ -231,8 +231,8 @@ document.querySelectorAll('#seg button').forEach(b=>b.setAttribute('aria-pressed
 const [,lbl,f]=T.find(t=>t[0]===tab),P=D[per],L=(P&&P.lists&&P.lists[tab])||[],O=document.getElementById('out');
 document.getElementById('upd').textContent=P&&P.updated_at?'Stand: '+new Date(P.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'';
 if(!L.length){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:3rem 1.5rem"><div style="font-size:2.4rem"><img alt="" width="48" height="48" style="image-rendering:pixelated;margin:0 auto" src="/mc-icon/v2/diamond"></div><h3 style="justify-content:center;margin:.6rem 0 .3rem">Noch niemand auf dem Treppchen</h3><p class="mut" style="margin:0">'+(per==='weekly'?'Diese Woche gibt es noch keine Werte für '+lbl+'.':'Für '+lbl+' gibt es noch keine Werte.')+' Spiel auf Survival und hol dir Platz 1.</p></div>';return}
-const pd=[L[1],L[0],L[2]];O.innerHTML='<div class="pod">'+pd.map((x,i)=>x?'<div class="'+(i===1?'p1':'')+'"><div class="r">#'+(i===1?1:i===0?2:3)+'</div><img alt="" src="'+av(x.name)+'"><b>'+E(x.name)+'</b><span>'+E(f(x.value))+'</span></div>':'<div style="opacity:0"></div>').join('')+'</div>'+
-(L.length>3?'<div class="dc">'+L.slice(3).map((x,i)=>'<div class="lbr"><span class="px">'+(i+4)+'</span><img alt="" src="'+av(x.name).replace('/72','/30')+'"><span class="n">'+E(x.name)+'</span><b>'+E(f(x.value))+'</b></div>').join('')+'</div>':'');}
+const pd=[L[1],L[0],L[2]];O.innerHTML='<div class="pod">'+pd.map((x,i)=>x?'<div class="'+(i===1?'p1':'')+'"><div class="r">#'+(i===1?1:i===0?2:3)+'</div>'+MC3D.html(x.name,'pod-model',i===1?72:56)+'<b><a href="/spieler/'+encodeURIComponent(x.name)+'" style="color:inherit">'+E(x.name)+'</a></b><span>'+E(f(x.value))+'</span></div>':'<div style="opacity:0"></div>').join('')+'</div>'+
+(L.length>3?'<div class="dc">'+L.slice(3).map((x,i)=>'<div class="lbr"><span class="px">'+(i+4)+'</span><img alt="" src="'+av(x.name).replace('/72','/30')+'"><span class="n">'+E(x.name)+'</span><b>'+E(f(x.value))+'</b></div>').join('')+'</div>':'');if(window.MC3D)MC3D.scan(O);}
 document.getElementById('tabs').onclick=e=>{const k=e.target.dataset.k;if(k){tab=k;history.replaceState(null,'','#'+k);draw()}};
 document.getElementById('seg').onclick=e=>{const k=e.target.dataset.k;if(k){per=k;draw()}};
 draw();fetch('/api/mc-leaderboards').then(r=>r.json()).then(d=>{D=d;draw()}).catch(()=>{});})();</script>` });
@@ -275,31 +275,12 @@ const PROFILE_BODY = (mc) => `
 ${mc ? "" : PROFILE_PB_CSS}
 <section class="hero center" style="padding-bottom:2rem">${mc ? '<div class="pixbg"></div>' : ""}<div class="wrap" id="ph"><p class="mut">Lade Profil…</p></div></section>
 <section style="padding-top:0"><div class="wrap" style="max-width:860px;display:grid;gap:1.2rem" id="pb"></div></section>
-<script src="/mc/inventory.js?v=${AV}"></script><script>
+<link rel="stylesheet" href="/mc/profile.css?v=${AV}"><script src="/mc/inventory.js?v=${AV}"></script><script src="/mc/player3d.js?v=${AV}"></script><script>
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fd=t=>{try{return new Date(t.replace(' ','T')+(t.includes('Z')?'':'Z')).toLocaleDateString('de-DE',{dateStyle:'long'})}catch(_){return t}};
 const up=t=>{t=+t||0;const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+' T '+h+' Std':h?h+' Std '+m+' Min':m+' Min'};
 const LBL={money:['Kontostand',v=>(+v).toLocaleString('de-DE')+' CP'],playtime:['Spielzeit',up],kills:['Spieler-Kills',v=>(+v).toLocaleString('de-DE')],deaths:['Tode',v=>(+v).toLocaleString('de-DE')],blocks_mined:['Abgebaute Blöcke',v=>(+v).toLocaleString('de-DE')]};
 
-function sv3d(url){const box=document.getElementById('mcm');if(!box)return;
-const ok=(()=>{try{const c=document.createElement('canvas');return !!(c.getContext('webgl2')||c.getContext('webgl'))}catch(_){return false}})();if(!ok)return;
-const go=()=>{const s=document.createElement('script');s.src='/vendor/skinview3d-3.4.2.min.js';s.async=true;s.onload=()=>init();document.head.appendChild(s)};
-const io=new IntersectionObserver(e=>{if(e[0].isIntersecting){io.disconnect();go()}},{rootMargin:'200px'});io.observe(box);
-function init(){try{const RM=matchMedia('(prefers-reduced-motion: reduce)').matches,fine=matchMedia('(hover: hover) and (pointer: fine)').matches;
-const cv=document.createElement('canvas');const w=box.clientWidth||300,hh=box.clientHeight||380;
-const v=new skinview3d.SkinViewer({canvas:cv,width:w,height:hh,skin:url,zoom:.82,fov:40});
-v.controls.enableRotate=false;v.controls.enableZoom=false;v.controls.enablePan=false;v.globalLight.intensity=2.6;v.cameraLight.intensity=.7;
-v.loadSkin(url).then(()=>{box.classList.add('ready');box.appendChild(cv)}).catch(()=>{try{v.dispose()}catch(_){}});
-new ResizeObserver(()=>{v.setSize(box.clientWidth,box.clientHeight)}).observe(box);
-const P=v.playerObject,head=P.skin.head;P.rotation.y=-.35;
-if(RM){v.renderPaused=false;return}
-if(!fine){const a=new skinview3d.IdleAnimation();v.animation=a;let t=0;const tick=()=>{t+=.012;P.rotation.y=Math.sin(t*.6)*.45-.1;head.rotation.y=Math.sin(t*.9)*.18;requestAnimationFrame(tick)};tick();return}
-v.animation=new skinview3d.IdleAnimation();v.animation.speed=.6;
-let tx=0,ty=0,cx=0,cy=0;addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect();const ox=r.left+r.width/2,oy=r.top+r.height*.22;
-tx=Math.max(-1,Math.min(1,(e.clientX-ox)/(innerWidth*.45)));ty=Math.max(-1,Math.min(1,(e.clientY-oy)/(innerHeight*.45)))},{passive:true});
-addEventListener('pointerleave',()=>{tx=0;ty=0});
-const loop=()=>{cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;head.rotation.y=cx*.85;head.rotation.x=cy*.55;P.rotation.y=cx*.35;requestAnimationFrame(loop)};loop();
-}catch(err){console.warn('skinview3d',err)}}}
 (async()=>{const H=document.getElementById('ph'),B=document.getElementById('pb');
 const r=await fetch('/api/profile',{credentials:'include'});const d=await r.json().catch(()=>({}));
 if(!d.user){H.innerHTML='<h1 class="h-l">Dein Profil.</h1><p class="lead">Melde dich mit Discord an, um dein Profil zu sehen.</p><p style="margin-top:2rem"><a class="btn discord" href="${mc ? `https://${MAIN}` : ""}/auth/discord/login?next='+encodeURIComponent(location.href)+'">${DISCORD_SVG} Mit Discord anmelden</a></p>';return}
@@ -307,18 +288,20 @@ const u=d.user;H.innerHTML='<img alt="" src="'+E(u.avatar)+'" width="112" height
 let h='';const m=d.minecraft;
 if(m&&m.visible){const st=m.stats||{};const ks=Object.keys(st).filter(k=>k!=='inventory'&&k!=='pickup');
 const SK=['playtime','kills','deaths','blocks_mined'].concat(ks.filter(k=>!LBL[k]&&k!=='money'));const bal=st.money!=null&&st.money!=='';const id=encodeURIComponent(m.mc_uuid||m.mc_name);
-h+='<section class="pblk" id="pbal" aria-labelledby="pbal-h"><header><h2 id="pbal-h">Kontostand</h2><span class="mut" style="font-size:.8rem">'+(m.updated_at?'Stand '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})):'')+'</span></header><div class="pbal"><img alt="" width="40" height="40" class="mi" src="/mc-icon/v2/gold_ingot" style="image-rendering:pixelated"><span class="v tnum">'+(bal?E(LBL.money[1](st.money)):'–')+'</span><div class="acts"><a class="btn sm sec" href="${mc ? "" : "https://mc." + MAIN}/markt">Markt & Bank</a><a class="btn sm sec" href="${mc ? "" : "https://mc." + MAIN}/bestellungen">Bestellungen</a></div></div></section>';
-h+='<div class="mch"><div class="mch-model" id="mcm"><img class="mch-fb" alt="Skin von '+E(m.mc_name)+'" src="https://mc-heads.net/body/'+id+'/220" loading="lazy"></div><div class="mch-info"><p class="eyebrow" style="margin:0">Minecraft</p><h2 class="mch-name">'+E(m.mc_name)+'</h2><p class="mch-sub">Verifiziert · Survival</p>'+
-'<section class="pstats" aria-labelledby="pst-h"><p class="eyebrow" id="pst-h" style="margin:0 0 .5rem">Stats</p><div class="mch-grid">'+SK.map((k,j)=>{const [t,f]=LBL[k]||[k.replace(/_/g,' '),v=>typeof v==='number'?v.toLocaleString('de-DE'):String(v)];const has=st[k]!=null&&st[k]!=='';return '<div class="mch-tile'+(j===0?' wide':'')+(has?'':' empty')+'"><div class="k">'+E(t)+'</div><div class="v">'+(has?E(f(st[k])):'–')+'</div>'+(has?'':'<div class="nd">noch keine Daten</div>')+'</div>'}).join('')+'</div></section>'+
-(m.updated_at?'<p class="mut" style="font-size:.78rem;margin:1rem 0 0">Stand: '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}))+'</p>':'')+'</div></div>';
-window.__skin='https://mc-heads.net/skin/'+id;
-h+=typeof window.MCInv==='function'?window.MCInv(st.inventory):'';
-h+='<section class="pblk" id="pord" aria-labelledby="pord-h"><header><h2 id="pord-h">Bestellungen</h2><a href="${mc ? "" : "https://mc." + MAIN}/bestellungen">Alle ansehen ›</a></header><div id="pordl"><p class="mut">Lade …</p></div></section>';}
+const PBAL='<section class="pblk" id="pbal" aria-labelledby="pbal-h"><header><h2 id="pbal-h">Kontostand</h2><span class="mut" style="font-size:.8rem">'+(m.updated_at?'Stand '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})):'')+'</span></header><div class="pbal"><img alt="" width="40" height="40" class="mi" src="/mc-icon/v2/gold_ingot" style="image-rendering:pixelated"><span class="v tnum">'+(bal?E(LBL.money[1](st.money)):'–')+'</span><div class="acts"><a class="btn sm sec" href="${mc ? "" : "https://mc." + MAIN}/markt">Markt & Bank</a><a class="btn sm sec" href="${mc ? "" : "https://mc." + MAIN}/bestellungen">Bestellungen</a></div></div></section>';
+const PORD='<section class="pblk" id="pord" aria-labelledby="pord-h"><header><h2 id="pord-h">Bestellungen</h2><a href="${mc ? "" : "https://mc." + MAIN}/bestellungen">Alle ansehen ›</a></header><div id="pordl"><p class="mut">Lade …</p></div></section>';
+const inv=(st.inventory||[]).length&&typeof window.MCInv==='function'?window.MCInv(st.inventory):'';
+const G=await MCP.games(m.mc_name).catch(()=>({}));const NFm=v=>(+v).toLocaleString('de-DE');const KMm=v=>v>=1000?(v/1000).toLocaleString('de-DE',{maximumFractionDigits:1})+' km':NFm(Math.round(v))+' m';const num=k=>st[k]!=null&&st[k]!==''&&Number.isFinite(+st[k])?+st[k]:null;
+const dist=num('distance')??num('distance_m'),blk=num('blocks_mined')??num('mined_total'),kil=num('kills')??num('player_kills');
+h+=MCP.header({name:m.mc_name,eyebrow:'Minecraft · Verifiziert',sub:m.updated_at?'Stats vom '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})):'Noch keine Stats',meta:[['Team',typeof st.team==='string'?st.team:null,'white_banner'],['CP',bal?LBL.money[1](st.money):null,'gold_ingot'],['Zuletzt online',st.online===true?'jetzt online':(st.last_seen??st.last_online)!=null?MCP.AGO(st.last_seen??st.last_online):null,'clock'],['Spielzeit',num('playtime')!=null?up(num('playtime')):null,'compass']],extra:'<p class="pf-sub"><a href="/spieler/'+encodeURIComponent(m.mc_name)+'">Öffentliches Profil ansehen ›</a></p>'})
++MCP.kpi([['Spieler-Kills',kil!=null?NFm(kil):null,'iron_sword'],['Tode',num('deaths')!=null?NFm(num('deaths')):null,'skeleton_skull'],['Distanz',dist!=null?KMm(dist):null,'leather_boots'],['Blöcke',blk!=null?NFm(blk):null,'iron_pickaxe'],['PvP-Winrate',G.winrate,'shield',G.pvp?NFm(G.pvp.matches)+' Kämpfe':''],['Beste Parkour-Zeit',G.best?MCP.MS(G.best.ms):null,'feather',G.best?G.best.name:'']]);
+const pvpc=G.pvp?'<div class="g pad dcard card"><h3>PvP-Arena<small>'+NFm(G.pvp.matches)+' Kämpfe</small></h3><div class="mini dmini">'+[['Siege',G.pvp.wins],['Niederlagen',G.pvp.losses],['Unentschieden',G.pvp.draws],['Quote',G.winrate||'–']].map(([k,v])=>'<div class="slotbox"><div class="k">'+k+'</div><div class="v tnum">'+(typeof v==='number'?NFm(v):E(v))+'</div></div>').join('')+'</div></div>':'';
+h+=MCP.tabs('ptabs',[['inventar','Inventar',inv,'chest'],['statistiken','Statistiken','<div id="pstat"></div>','book'],['markt','Markt',PBAL+PORD,'emerald'],['minispiele','Minispiele',pvpc+(G.parkourHtml||''),'golden_boots']]);}
 else if(m){h+='<div class="card" style="text-align:center"><p class="eyebrow">Minecraft</p><h3>Noch nicht verknüpft</h3><p>'+E(m.hint)+'</p></div>';}
 const g=d.guestbook||[];h+='<div class="card"><h3 style="margin-bottom:.6rem">Deine Gästebuch-Einträge</h3>'+(g.length?g.map(x=>'<div style="padding:.9rem 0;border-top:1px solid var(--line)"><span class="mut" style="font-size:.8rem">'+E(fd(x.created_at))+'</span><p style="margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word;color:var(--fg)">'+E(x.message)+'</p></div>').join(''):'<p>Noch keine Einträge. <a href="https://${MAIN}/guestbook">Jetzt einen schreiben ›</a></p>')+'</div>';
-B.innerHTML=h;document.dispatchEvent(new CustomEvent('mcprofile',{detail:d}));
+B.innerHTML=h;MC3D.scan(B);MCP.bindTabs(B);document.dispatchEvent(new CustomEvent('mcprofile',{detail:d}));
 {const L=document.getElementById('pordl');if(L)fetch('/api/mc-bestellungen',{credentials:'include'}).then(r=>r.json()).then(o=>{const S={pending:['wird bestätigt','tw'],bought:['gekauft','ts'],ready:['abholbereit','ts'],collected:['erledigt','ts'],failed:['abgelehnt','tr']};const O=(o.orders||[]).slice(0,5),P=(o.pickup||[]).length;
-L.innerHTML=(P?'<p class="mut" style="margin:0 0 .5rem">'+P+' Stapel im Abholfach · im Spiel <code>/abholen</code></p>':'')+(O.length?'<ul class="pord">'+O.map(x=>{const g=S[x.stage]||S.pending;return '<li class="hl"><span class="ic"><img alt="" loading="lazy" src="/mc-icon/v2/'+encodeURIComponent(x.item)+'"></span><span><b>'+(+x.qty).toLocaleString('de-DE')+'× '+E((window.MC_DE&&MC_DE[x.item])||String(x.item).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase()))+'</b> <span class="mut" style="font-size:.8rem">'+(x.order_type==='bank_buy'?'Bank':'Shop')+'</span></span><span class="tag '+g[1]+'">'+g[0]+'</span></li>'}).join('')+'</ul>':'<p class="mut" style="margin:0">Noch keine Bestellungen.</p>')}).catch(()=>{L.innerHTML='<p class="mut">Konnte Bestellungen nicht laden.</p>'})}if(window.__skin)sv3d(window.__skin);})();
+L.innerHTML=(P?'<p class="mut" style="margin:0 0 .5rem">'+P+' Stapel im Abholfach · im Spiel <code>/abholen</code></p>':'')+(O.length?'<ul class="pord">'+O.map(x=>{const g=S[x.stage]||S.pending;return '<li class="hl"><span class="ic"><img alt="" loading="lazy" src="/mc-icon/v2/'+encodeURIComponent(x.item)+'"></span><span><b>'+(+x.qty).toLocaleString('de-DE')+'× '+E((window.MC_DE&&MC_DE[x.item])||String(x.item).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase()))+'</b> <span class="mut" style="font-size:.8rem">'+(x.order_type==='bank_buy'?'Bank':'Shop')+'</span></span><span class="tag '+g[1]+'">'+g[0]+'</span></li>'}).join('')+'</ul>':'<p class="mut" style="margin:0">Noch keine Bestellungen.</p>')}).catch(()=>{L.innerHTML='<p class="mut">Konnte Bestellungen nicht laden.</p>'})}})();
 </script>${PROFILE_DETAILS}`;
 const PROFILE_MAIN = () => portfolio({ title: "Profil · NwebNotFound", desc: "Dein Profil", nav: pNav("profile"), body: PROFILE_BODY(false) });
 const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein Profil", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: PROFILE_BODY(true) });
@@ -819,6 +802,7 @@ export default {
     if (p === "/api/mc-market") return mcMarket(env);
     if (p.startsWith("/api/mc-market/")) return mcMarketItem(env, decodeURIComponent(p.slice(15)));
     if (p.startsWith("/mc-head/")) return headResponse(req, p, ctx);
+    if (p.startsWith("/mc-skin/")) return skinResponse(req, p, ctx);
     if (p.startsWith("/mc-mob/")) return new Response(null, { status: 302, headers: { location: mobIcon(decodeURIComponent(p.slice(8)).replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } });
     if (p.startsWith("/mc-icon/")) { const q = p.slice(9).replace(/^v2\//, ""); let dq; try { dq = decodeURIComponent(q); } catch { return new Response("Not found", { status: 404 }); } const r = resolveIcon(dq.replace(/\.png$/, "")); return r ? new Response(null, { status: 302, headers: { location: /^(https:|\/)/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=86400" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${dq.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
     if (p.startsWith("/auth/")) {
