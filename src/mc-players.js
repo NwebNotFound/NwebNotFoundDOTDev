@@ -53,9 +53,6 @@ export const PLAYER_CSS = `<style>
 .lock{text-align:center;padding:2rem 1.2rem}.lock p{max-width:28rem;margin:.4rem auto 1.2rem}
 .kvl{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:.2rem 1.2rem}.kvl div{display:flex;justify-content:space-between;gap:.6rem;padding:.45rem 0;border-bottom:1px solid var(--line);font-size:.9rem}.kvl span{color:var(--mut);overflow:hidden;text-overflow:ellipsis}
 .dgr{display:grid;gap:1rem;margin-top:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}.dgr>*{min-width:0}
-.dcard h3{font-size:1.05rem;margin:0 0 .8rem;display:flex;justify-content:space-between;align-items:baseline;gap:.6rem}.dcard h3 small{font-family:var(--f-body,sans-serif);font-size:.78rem;font-weight:500;color:var(--mut)}
-.prow{display:flex;align-items:center;gap:.75rem;padding:.5rem 0}.prow+.prow{border-top:1px solid var(--line)}.prow .n{flex:1;min-width:0}.prow .n span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.92rem}.prow .meter{margin-top:.35rem}.prow b{font-size:.92rem}
-.prow .ic{width:34px;height:34px;display:grid;place-items:center;flex:none}.prow .ic img{width:22px;height:22px;image-rendering:pixelated}
 .dmini{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}.slotbox{padding:.75rem .9rem;background:var(--c-s2,rgba(255,255,255,.04));border:1px solid var(--line);border-radius:6px}.slotbox .k{font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}.slotbox .v{font-family:var(--f-px,monospace);font-size:1.05rem;margin-top:.2rem}
 .emp{padding:1.2rem 0 .4rem;text-align:center;color:var(--mut);font-size:.9rem}
 </style>`

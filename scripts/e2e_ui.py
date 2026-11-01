@@ -5,7 +5,7 @@ import sys, re
 from urllib.parse import unquote
 from playwright.sync_api import sync_playwright
 BASE, COOKIE = sys.argv[1], sys.argv[2]
-H = "mc.nwebnotfound.dev"; fails = 0; SH = "/workspace/screens/qa"
+H = "mc.nwebnotfound.dev"; U1x = "11111111222233334444555555555555"; fails = 0; SH = "/workspace/screens/qa"
 import os; os.makedirs(SH, exist_ok=True)
 cookie_name, cookie_val = COOKIE.split("=", 1)
 cookie_val = unquote(cookie_val)
@@ -104,6 +104,24 @@ with sync_playwright() as p:
         r2 = pg.evaluate("""t=>{const d=document.createElement('div');d.innerHTML=MCP.header({name:'Nils',meta:[['Team',t,'white_banner',{color:'#fff;background:url(x)'}],['CP',t,'gold_ingot'],['Zuletzt online',t,'clock',{seen:true}]]});return [d.querySelectorAll('img[src="x"]').length,d.querySelectorAll('[style]').length,d.textContent.split(t).length-1]}""", XT)
         ok(r2 == [0, 0, 3], f"{w}px MCP.header escaped alle Meta-Felder, Farbe nur #RRGGBB", r2)
         pg.unroute("**/api/mc-players/Seller")
+        # Parkour-Karte im Profil: Titel/Untertitel getrennt, Icon+Name+Zeit als Zeile, Rang als Badge mit Abstand
+        PR = '{"rank":2,"mc_uuid":"' + U1x + '","mc_name":"Nils","time_ms":49530,"set_at":"2026-10-31T20:00:00Z"}'
+        pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body='{"courses":{"cave_rush":[' + PR + ']},"course_names":{"cave_rush":"Cave Rush"},"course_icons":{"cave_rush":"lantern"}}'))
+        pg.goto("https://" + H + "/profile", wait_until="domcontentloaded"); pg.locator("#t-minispiele").wait_for(timeout=20000); pg.click("#t-minispiele")
+        pk = pg.locator(".dcard", has_text="Top-10-Platzierungen").first; pk.wait_for(timeout=10000)
+        L = pk.evaluate("""c=>{const R=e=>e.getBoundingClientRect(),h=c.querySelector('h3'),s=h.querySelector('small'),r=c.querySelector('.prow'),ic=R(r.querySelector('.ic')),n=R(r.querySelector('.n')),rk=r.querySelector('.pk-rk'),tm=R(r.querySelector('.pk-tm')||r.querySelector('b')),cs=getComputedStyle(c);
+          const t=document.createRange();t.selectNodeContents(h.firstChild);const tr=t.getBoundingClientRect();
+          return {title:h.firstChild.textContent,sep:(R(s).left-tr.right>=6)||(R(s).top>=tr.bottom-1),row:Math.abs((ic.top+ic.bottom)/2-(n.top+n.bottom)/2)<4&&n.left>=ic.right+8,rk:!!rk&&rk.textContent==='#2'&&tm.left-R(rk).right>=8&&Math.abs((R(rk).top+R(rk).bottom)/2-(tm.top+tm.bottom)/2)<4,pad:parseFloat(cs.paddingLeft)===(innerWidth>=640?24:16)&&parseFloat(cs.paddingTop)===(innerWidth>=640?24:16),fit:R(r).right<=R(c).right&&[...c.querySelectorAll('.prow')].every(x=>x.scrollWidth<=x.clientWidth)}}""")
+        ok(L["title"] == "Parkour" and L["sep"] and "Cave Rush" in pk.inner_text(), f"{w}px Profil-Parkour: Titel und Untertitel getrennt", L)
+        ok(L["row"] and L["rk"] and L["pad"] and L["fit"], f"{w}px Profil-Parkour: Icon/Name/Rang/Zeit als Zeile mit Abständen", L)
+        heads = pg.eval_on_selector_all("#pb .dcard h3", "hs=>hs.filter(h=>h.querySelector('small')).map(h=>{const s=h.querySelector('small').getBoundingClientRect(),t=document.createRange();t.selectNodeContents(h.firstChild);const r=t.getBoundingClientRect();return [h.firstChild.textContent,(s.left-r.right>=6)||(s.top>=r.bottom-1)]})")
+        ok(heads and all(x[1] for x in heads), f"{w}px Profil: alle Karten-Titel vom Untertitel getrennt", heads)
+        pk.scroll_into_view_if_needed(); pk.screenshot(path=f"{SH}/local-profil-parkour-{w}.png"); 
+        pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded"); pg.locator("#t-minispiele").wait_for(timeout=20000); pg.click("#t-minispiele")
+        sp = pg.locator(".dcard", has_text="Top-10-Platzierungen").first; sp.wait_for(timeout=10000)
+        S = sp.evaluate("""c=>{const R=e=>e.getBoundingClientRect(),h=c.querySelector('h3'),s=R(h.querySelector('small')),t=document.createRange();t.selectNodeContents(h.firstChild);const tr=t.getBoundingClientRect(),rk=R(c.querySelector('.pk-rk')),tm=R(c.querySelector('.pk-tm'));return [getComputedStyle(h).display,(s.left-tr.right>=6)||(s.top>=tr.bottom-1),tm.left-rk.right>=8,document.querySelectorAll('link[href*="/mc/profile.css"]').length]}""")
+        ok(S[0] == "flex" and S[1] and S[2] and S[3] == 1 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px /spieler: Karten-Styles aus profile.css, Parkour-Karte sauber", S)
+        sp.scroll_into_view_if_needed(); sp.screenshot(path=f"{SH}/local-spieler-parkour-{w}.png"); pg.unroute("**/api/mc-parkour")
         pg.goto("https://" + H + "/profile", wait_until="domcontentloaded"); pg.locator(".inv").wait_for(state="visible", timeout=20000)
         # Nav-Gruppen: max. 6 Top-Level-Einträge, aktive Gruppe markiert
         ok(pg.locator(".nl > .l, .nl > .ng").count() == 6 and pg.locator(".nl .ng").count() == 3, f"{w}px Nav: 6 Top-Level-Einträge, 3 Gruppen")

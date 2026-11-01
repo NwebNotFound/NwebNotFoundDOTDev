@@ -24,6 +24,10 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
 const now = Date.now(), H = 3600, HR0 = Math.floor(now / 1000 / H) * H, RESET = new Date((HR0 - 28 * H) * 1000).toISOString();
 
+// Rang-Badges im hellen Theme: Kontrast >= 4.5:1 gegen Badge-Hintergrund
+{ const css = fs.readFileSync(ROOT + "public/mc/profile.css", "utf8"), L = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }, CR = (a, b) => (Math.max(L(a), L(b)) + 0.05) / (Math.min(L(a), L(b)) + 0.05);
+  const bg = (css.match(/html:not\(\.mc\) \.pk-run \.pk-rk\{[^}]*background:(#[0-9a-f]{6})/i) || [])[1], cols = [...css.matchAll(/html:not\(\.mc\) \.pk-run \.pk-rk(?:\.p\d)?\{color:(#[0-9a-f]{6})/gi)].map((m) => m[1]);
+  ok(bg && cols.length === 4 && cols.every((c) => CR(c, bg) >= 4.5), "Rang-Badges hell: Kontrast >= 4.5:1", JSON.stringify(cols.map((c) => [c, bg && CR(c, bg).toFixed(2)]))); }
 // --- Setup
 fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
