@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 # UI-Prüfung gegen das lokale wrangler dev aus e2e.mjs (wird von dort aufgerufen). argv: BASE COOKIE
 import json
