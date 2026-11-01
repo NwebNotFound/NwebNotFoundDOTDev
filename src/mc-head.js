@@ -53,8 +53,10 @@ const MJ_TTL = 6 * 3600;
 async function mojangJson(url, fetcher) {
   const cache = typeof caches !== "undefined" ? caches.default : null, key = new Request(url);
   try { const hit = cache && (await cache.match(key)); if (hit) return hit.status === 204 ? null : await hit.json(); } catch {}
-  let r; try { r = await fetcher(url, { cf: { cacheTtl: MJ_TTL, cacheEverything: true } }); } catch { return null; }
-  if (r.status === 429 || r.status >= 500) return null; // nicht cachen, später neu versuchen
+  // Mojang liefert sporadisch 502/429: einmal neu versuchen; Edge-Cache nur für 2xx (Fehler nie lange cachen)
+  let r = null;
+  for (let i = 0; i < 2 && !(r && r.status !== 429 && r.status < 500); i++) { try { r = await fetcher(url, { cf: { cacheTtlByStatus: { "200-299": MJ_TTL, "404": 60, "400-599": 0 } } }); } catch { r = null; } }
+  if (!r || r.status === 429 || r.status >= 500) return null; // nicht cachen, später neu versuchen
   const body = r.ok ? await r.text().catch(() => null) : null;
   let j = null; try { j = body ? JSON.parse(body) : null; } catch {}
   if (cache) { try { await cache.put(key, j ? new Response(body, { headers: { "content-type": "application/json", "cache-control": "public, max-age=" + MJ_TTL } }) : new Response(null, { status: 204, headers: { "cache-control": "public, max-age=600" } })); } catch {} }
@@ -67,16 +69,19 @@ async function mojangSkin(id, fetcher) {
   const t = j.properties?.find((x) => x.name === "textures"); if (!t) return null;
   const u = JSON.parse(atob(t.value)).textures?.SKIN?.url; return u && /^https?:\/\/textures\.minecraft\.net\/texture\/[0-9a-f]+$/.test(u) ? u.replace(/^http:/, "https:") : null;
 }
+// Nur der Mojang-Skin gilt als echt (6 h Cache). mc-heads liefert für manche Accounts veraltete/Default-Skins
+// (z. B. Steve für Joni81, Nani_San123) → wie ein Fallback nur kurz cachen, damit Mojang bald neu versucht wird.
+const skinSources = (name, mj) => [[mj, true], [SKIN_SRC(name), false], [SKIN_SRC("MHF_Steve"), false]];
 export async function renderHead(name, size, fetcher = fetch) {
   let mj = null; try { mj = await mojangSkin(name, fetcher); } catch {}
-  for (const [n, src] of [[name, mj], [name, SKIN_SRC(name)], ["MHF_Steve", SKIN_SRC("MHF_Steve")]]) { if (!src) continue; try { const r = await fetcher(src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r.ok) continue; const s = await decodePng(await r.arrayBuffer()); if (!skinOk(s)) continue; return { png: await encodePng(size, size, faceRgba(s, size)), fallback: n !== name }; } catch {} }
+  for (const [src, real] of skinSources(name, mj)) { if (!src) continue; try { const r = await fetcher(src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r.ok) continue; const s = await decodePng(await r.arrayBuffer()); if (!skinOk(s)) continue; return { png: await encodePng(size, size, faceRgba(s, size)), fallback: !real }; } catch {} }
   return null;
 }
 export async function headResponse(req, path, ctx) {
   const m = path.match(/^\/mc-head\/([A-Za-z0-9_]{1,16}|[0-9a-f-]{32,36})(?:\/(\d{1,3}))?(?:\.png)?$/i);
   if (!m) return new Response("Not found", { status: 404 });
   const size = Math.min(256, Math.max(8, Math.round((+m[2] || 64) / 8) * 8));
-  const key = new Request(new URL("/mc-head/v3/" + m[1].toLowerCase() + "/" + size, req.url).toString());
+  const key = new Request(new URL("/mc-head/v4/" + m[1].toLowerCase() + "/" + size, req.url).toString());
   const cache = typeof caches !== "undefined" ? caches.default : null;
   const hit = cache && (await cache.match(key)); if (hit) return hit;
   const r = await renderHead(m[1], size);
@@ -89,12 +94,12 @@ export async function headResponse(req, path, ctx) {
 export async function skinResponse(req, path, ctx, fetcher = fetch) {
   const m = path.match(/^\/mc-skin\/([A-Za-z0-9_]{1,16}|[0-9a-f-]{32,36})(?:\.png)?$/i);
   if (!m) return new Response("Not found", { status: 404 });
-  const key = new Request(new URL("/mc-skin/" + m[1].toLowerCase(), req.url).toString());
+  const key = new Request(new URL("/mc-skin/v2/" + m[1].toLowerCase(), req.url).toString());
   const cache = typeof caches !== "undefined" ? caches.default : null;
   const hit = cache && (await cache.match(key)); if (hit) return hit;
   let mj = null; try { mj = await mojangSkin(m[1], fetcher); } catch {}
   let png = null, fb = false;
-  for (const [n, src] of [[m[1], mj], [m[1], SKIN_SRC(m[1])], ["MHF_Steve", SKIN_SRC("MHF_Steve")]]) { if (!src) continue; try { const r = await fetcher(src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r.ok) continue; const b = await r.arrayBuffer(); const s = await decodePng(b); if (!skinOk(s)) continue; png = b; fb = n !== m[1]; break; } catch {} }
+  for (const [src, real] of skinSources(m[1], mj)) { if (!src) continue; try { const r = await fetcher(src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r.ok) continue; const b = await r.arrayBuffer(); const s = await decodePng(b); if (!skinOk(s)) continue; png = b; fb = !real; break; } catch {} }
   if (!png) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } });
   const res = new Response(png, { headers: { "content-type": "image/png", "cache-control": "public, max-age=" + (fb ? 600 : 21600), "x-content-type-options": "nosniff" } });
   if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
