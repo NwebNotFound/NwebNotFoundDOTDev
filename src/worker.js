@@ -380,7 +380,7 @@ const safeNext = (n) => {
   const fallback = `https://${MAIN}/`;
   if (typeof n !== "string") return fallback;
   const s = n.trim();
-  if (!s || s.length > 2048 || /[\u0000-\u001f\\]/.test(s) || s.startsWith("//")) return fallback;
+  if (!s || s.length > 2048 || /[\u0000-\u001f\u007f\\@]/.test(s) || s.startsWith("//")) return fallback;
   if (s.startsWith("/")) {
     const path = s.split("?")[0].split("#")[0];
     const base = path === "/vip" || path.startsWith("/vip/") ? MCD : MAIN;

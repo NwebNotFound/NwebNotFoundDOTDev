@@ -639,6 +639,8 @@ try {
     { const bye = async (next) => { const r = await fetch(BASE + "/auth/discord/logout?next=" + encodeURIComponent(next), { headers: { host: HOST, "x-nnf-test-host": "nwebnotfound.dev" }, redirect: "manual" }); return r.headers.get("location") || ""; };
       const evil = await bye("https://evil.com"), proto = await bye("//evil.com"), bs = await bye("/\\evil.com"), info = await bye("https://evil.com@mc.nwebnotfound.dev/vip");
       ok(evil === "https://nwebnotfound.dev/" && proto === "https://nwebnotfound.dev/" && !bs.includes("evil.com") && info === "https://nwebnotfound.dev/", "next=https://evil.com, //evil.com, Backslash und Userinfo bleiben auf der Seite", JSON.stringify({ evil, proto, bs, info }));
+      const name = await bye("/spieler/Nils"), under = await bye("/spieler/a_b");
+      ok(name === "https://nwebnotfound.dev/spieler/Nils" && under === "https://nwebnotfound.dev/spieler/a_b", "next /spieler/Nils und /spieler/a_b bleiben erhalten", JSON.stringify({ name, under }));
       const rel = await bye("/vip"), abs = await bye("https://mc.nwebnotfound.dev/vip");
       const vipLoc = (loc) => { try { const u = new URL(loc); return u.pathname === "/vip" && (u.hostname === "mc.nwebnotfound.dev" || u.hostname === "127.0.0.1") && !loc.includes("evil"); } catch { return false; } };
       ok(vipLoc(rel) && vipLoc(abs), "relativer und absoluter next auf /vip ist erlaubt", JSON.stringify({ rel, abs }));
