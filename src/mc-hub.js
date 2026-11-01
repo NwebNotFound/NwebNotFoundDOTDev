@@ -53,7 +53,28 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 .mctip{display:inline-block;max-width:100%;background:rgba(16,0,16,.95);border:2px solid #100010;box-shadow:inset 0 0 0 2px #3a0f8f;padding:.6rem .8rem;font-family:var(--pf);font-size:.85rem;color:#c9a8ff}.mctip b{color:#fff}
 `;
 
-export const hubNav = (MAIN) => `<a class="brand" href="/"><img class="mi" alt="" width="22" height="22" src="/mc-icon/v2/grass_block"> NwebNotFound MC</a><nav class="nl" aria-label="Bereiche"><a class="l" href="/">Start</a><a class="l" href="/leaderboards">Bestenlisten</a><a class="l" href="/parkour">Parkour</a><a class="l" href="/pvp">PvP</a><a class="l" href="/spieler">Spieler</a><a class="l" href="/markt">Markt</a><a class="l" href="/shops">Shops</a><a class="l" href="/auktionen">Auktionen</a><a class="l" href="/wiki">Wiki</a><a class="l" href="/changelog">Changelog</a></nav><script>(()=>{const p=location.pathname.replace(/\\/$/,'')||'/';document.querySelectorAll('.nav .l').forEach(a=>{const h=a.getAttribute('href');if(h===p||(h!=='/'&&p.startsWith(h+'/')))a.setAttribute('aria-current','page')})})()</script>`;
+// Navigation: wenige Top-Level-Einträge, Rest in Gruppen (Desktop: Dropdown, Mobil: Drawer mit Akkordeon)
+const NAV_GROUPS = [
+  ["community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"]]],
+  ["minispiele", "Minispiele", [["/parkour", "Parkour", "golden_boots"], ["/pvp", "PvP", "iron_sword"]]],
+  ["wirtschaft", "Wirtschaft", [["/markt", "Markt", "emerald"], ["/shops", "Shops", "barrel"], ["/auktionen", "Auktionen", "bell"]]],
+];
+const CHEV = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3h2v2h2v2h0V5h2V3h2v2H7v2H5v2h0V7H3V5H1z" fill="currentColor"/></svg>`;
+const NAV_JS = `(()=>{const s=document.currentScript,N=s.closest('.nav'),bur=N.querySelector('.nbur'),G=[...N.querySelectorAll('.ng')],mob=()=>matchMedia('(max-width:900px)').matches;
+const p=location.pathname.replace(/\\/$/,'')||'/';
+N.querySelectorAll('.nl a').forEach(a=>{const h=a.getAttribute('href');if(h===p||(h!=='/'&&p.startsWith(h+'/'))){a.setAttribute('aria-current','page');const g=a.closest('.ng');if(g){g.classList.add('cur');g.querySelector('.ngb').setAttribute('data-cur','')}}});
+const set=(g,o)=>{g.classList.toggle('open',o);g.querySelector('.ngb').setAttribute('aria-expanded',o)};const shut=x=>G.forEach(g=>g!==x&&set(g,false));
+const drawer=o=>{N.classList.toggle('open',o);bur.setAttribute('aria-expanded',o);bur.setAttribute('aria-label',o?'Menü schließen':'Menü öffnen');if(o){const c=N.querySelector('.ng.cur');shut(c);if(c)set(c,true)}else shut()};
+G.forEach(g=>{const b=g.querySelector('.ngb'),I=[...g.querySelectorAll('.ngm a')];
+b.addEventListener('click',()=>{const o=Date.now()-(+g.dataset.hov||0)<500||b.getAttribute('aria-expanded')!=='true';if(!mob())shut(g);set(g,o)});
+g.addEventListener('keydown',e=>{const i=I.indexOf(document.activeElement);if(e.key==='Escape'&&g.classList.contains('open')){set(g,false);b.focus();e.preventDefault();e.stopPropagation()}else if(e.key==='ArrowDown'){e.preventDefault();if(!g.classList.contains('open')){if(!mob())shut(g);set(g,true)}I[Math.min(I.length-1,i+1)].focus()}else if(e.key==='ArrowUp'&&i>=0){e.preventDefault();(i?I[i-1]:b).focus()}});
+g.addEventListener('focusout',e=>{if(!mob()&&!g.contains(e.relatedTarget))set(g,false)});
+if(matchMedia('(hover:hover) and (pointer:fine)').matches){g.addEventListener('mouseenter',()=>{if(!mob()&&!g.classList.contains('open')){shut(g);set(g,true);g.dataset.hov=Date.now()}});g.addEventListener('mouseleave',()=>{if(!mob()&&!g.contains(document.activeElement))set(g,false)})}});
+bur.addEventListener('click',()=>drawer(!N.classList.contains('open')));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(N.classList.contains('open')){drawer(false);bur.focus()}else shut()}});
+document.addEventListener('click',e=>{if(!N.contains(e.target)){shut();if(N.classList.contains('open'))drawer(false)}});
+matchMedia('(max-width:900px)').addEventListener('change',()=>drawer(false))})()`;
+export const hubNav = (MAIN) => `<a class="brand" href="/"><img class="mi" alt="" width="22" height="22" src="/mc-icon/v2/grass_block"> NwebNotFound MC</a><button class="nbur" type="button" aria-expanded="false" aria-controls="nl" aria-label="Menü öffnen"><span></span><span></span><span></span></button><nav class="nl" id="nl" aria-label="Bereiche"><a class="l" href="/">Start</a>${NAV_GROUPS.map(([k, t, L]) => `<div class="ng" data-g="${k}"><button class="l ngb" type="button" aria-expanded="false" aria-controls="ng-${k}">${t}${CHEV}</button><div class="ngm" id="ng-${k}">${L.map(([h, n, i]) => `<a href="${h}"><img alt="" width="20" height="20" src="/mc-icon/v2/${i}">${n}</a>`).join("")}</div></div>`).join("")}<a class="l" href="/wiki">Wiki</a><a class="l" href="/changelog">Changelog</a></nav><script>${NAV_JS}</script>`;
 
 export const MI = (id, px = 26) => `<img class="mi" alt="" width="${px}" height="${px}" loading="lazy" src="/mc-icon/v2/${id}">`;
 const SEARCH_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;

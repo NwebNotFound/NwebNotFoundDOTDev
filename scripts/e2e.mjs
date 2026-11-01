@@ -4,6 +4,7 @@ import { spawn, execSync } from "node:child_process";
 import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
 import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
+import { faceRgba, skinOk } from "../src/mc-head.js";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
@@ -315,6 +316,9 @@ try {
   ok(/@1\.21\.11\/.*item\/diamond_spear\.png$/.test(await IC("diamond_spear")), "diamond_spear → echte Speer-Textur (kein Dreizack)");
   ok(/item\/acacia_hanging_sign\.png$/.test(await IC("acacia_hanging_sign")), "acacia_hanging_sign → eigene Textur");
   ok(/item\/creeper_spawn_egg\.png$/.test(await IC("creeper_spawn_egg")), "Spawn-Ei → eigenes Ei");
+  { const w = 64, h = 32, d = new Uint8Array(w * h * 4); for (let i = 0; i < w * h; i++) d.set([0, 0, 0, 255], i * 4); for (let y = 8; y < 16; y++) for (let x = 8; x < 16; x++) d.set([200, 150, 100, 255], (y * w + x) * 4);
+    ok(faceRgba({ w, h, data: d }, 8)[0] === 200, "Legacy-Skin 64x32: deckende Hut-Fläche wird ignoriert (Notch-Hack)");
+    ok(skinOk({ w: 64, h: 64 }) && skinOk({ w: 64, h: 32 }) && skinOk({ w: 256, h: 256 }) && !skinOk({ w: 100, h: 100 }) && !skinOk({ w: 64, h: 48 }), "Skin-Formate inkl. HD erkannt"); }
   ok(/mc-heads\.net\/head\/MHF_Zombie/.test(await IC("zombie_head")) && /MHF_WSkeleton/.test(await IC("wither_skeleton_skull")) && /MHF_Creeper/.test(await IC("creeper_wall_head")), "Mob-Köpfe → Kopf statt Block/Papier");
   const iau = JSON.parse(execSync("node scripts/icon-audit.mjs --json", { cwd: ROOT }).toString());
   ok(iau.placeholder.length === 0 && iau.approx.length === 0, "icon-audit: 0 Platzhalter, 0 falsche Icons", JSON.stringify({ p: iau.placeholder, a: iau.approx }).slice(0, 300));
@@ -518,6 +522,8 @@ try {
     { const pg = await req("/spieler/Nils"); ok(pg.s === 200 && pg.t.includes('id="pvp-pl"') && pg.t.includes('data-name="Nils"') && pg.t.includes("/mc/pvp.js"), "Spielerseite hat PvP-Block (extern)"); }
     { const js = await req("/mc/pvp.js"); ok(js.s === 200 && js.t.includes("E(p.favorite_kit)") && js.t.includes("p.matches<5") && !/style=|\.style\./.test(js.t), "pvp.js: Kit escaped, Quote erst ab 5 Kämpfen, keine Inline-Styles"); }
     sql("DELETE FROM mc_pvp_stats"); sql("DELETE FROM mc_player_ranks"); }
+  sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Rot', '$.team_color', '#FF5555', '$.team_color_code', '&c', '$.last_seen', '2026-10-31T23:05:00Z', '$.online', json('false')) WHERE mc_uuid = '${U1}'`);
+  sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Grün', '$.team_color', 'red;x', '$.team_color_hex', '#55ff55', '$.online', json('true')) WHERE mc_uuid = '${U2}'`);
   try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
 
 } catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }
