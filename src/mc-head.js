@@ -83,7 +83,7 @@ async function mojangSkin(id, fetcher) {
 // Skin-Quellen in fester Reihenfolge:
 //  a) skin_url aus dem Ingest (stats.skin_url oder mc_links.skin_url, nur textures.minecraft.net) → echt
 //  b) Mojang per UUID aus mc_links (sonst per Name) → echt
-//  c) minotar.net/skin/<uuid> – nur wenn Mojang nichts/Fehler liefert; echt nur, wenn kein Default-Skin
+//  c) minotar.net/skin/<uuid> – wenn Mojang keinen ladbaren Skin liefert; echt nur, wenn kein Default-Skin
 //  d) mc-heads (liefert für manche Accounts nur Steve) → Fallback
 //  e) Steve → Fallback
 // Echt = 6 h Cache, Fallback = 10 min.
@@ -114,7 +114,8 @@ export async function resolveSkin(id, env, fetcher = fetch) {
   if (info.skinUrl) { const x = await loadSkin(info.skinUrl, fetcher); if (x) return { ...x, real: true, src: "ingest" }; }
   let mj = null; try { mj = await mojangSkin(who, fetcher); } catch {}
   if (mj) { const x = await loadSkin(mj, fetcher); if (x) return { ...x, real: true, src: "mojang" }; }
-  else { const x = await loadSkin(MINOTAR(who), fetcher); if (x) { const real = !DEFAULT_SKINS.has(await sha1hex(x.s.data)); if (real) return { ...x, real, src: "minotar" }; } }
+  // minotar nach jedem erfolglosen Mojang-Versuch (keine URL, Fehler oder Download/PNG kaputt)
+  { const x = await loadSkin(MINOTAR(who), fetcher); if (x) { const real = !DEFAULT_SKINS.has(await sha1hex(x.s.data)); if (real) return { ...x, real, src: "minotar" }; } }
   for (const [src, n] of [[SKIN_SRC(id), "mc-heads"], [SKIN_SRC("MHF_Steve"), "steve"]]) { const x = await loadSkin(src, fetcher); if (x) return { ...x, real: false, src: n }; }
   return null;
 }

@@ -4,7 +4,7 @@ import { cleanRanks, rankStatements } from "./mc-ranks.js";
 import { cleanPvp, pvpStatements, pvpApi, pvpPlayerApi, pvpBody } from "./mc-pvp.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
-import { headResponse, skinResponse } from "./mc-head.js";
+import { headResponse, skinResponse, validSkinUrl } from "./mc-head.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
 import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
@@ -497,6 +497,8 @@ function cleanIngest(b) {
       if (!/^[a-z0-9_]{1,24}$/i.test(sk)) continue;
       if (/^(inventory|inv|inventar|items)$/i.test(sk)) { const inv = normInv(sv); if (inv) o.inventory = inv; continue; }
       if (/^(pickup|pickups|abholfach|abholungen|claims|claim_chest|pickup_chest)$/i.test(sk)) { const inv = normInv(sv); if (inv) o.pickup = inv; continue; }
+      // skin_url vollständig speichern (nicht auf 40 Zeichen kürzen), nur gültige textures.minecraft.net-URLs
+      if (sk === "skin_url") { const u = validSkinUrl(sv); if (u) o.skin_url = u; continue; }
       if (Number.isFinite(+sv) && typeof sv !== "boolean") o[sk] = +sv; else if (typeof sv === "string") o[sk] = clip(sv, 40);
     }
     players_stats[normU(k)] = o;

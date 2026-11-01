@@ -344,7 +344,7 @@ try {
     const up = (o = {}) => { const n = []; return [n, async (u) => { n.push(u); const J = (x) => new Response(JSON.stringify(x));
       if (u === ITX) return new Response(ING); if (/lookup\/name|users\/profiles/.test(u)) return J({ id: U });
       if (/sessionserver/.test(u)) return o.mj === "down" ? new Response("", { status: 502 }) : o.mj === "none" ? new Response(null, { status: 204 }) : J({ properties: [{ name: "textures", value: tex }] });
-      if (u === MTX) return new Response(MJ); if (/minotar\.net/.test(u)) return new Response(o.mt || MT); if (/mc-heads\.net\/skin\/MHF_Steve/.test(u)) return new Response(DEF); if (/mc-heads/.test(u)) return o.mh === false ? new Response("", { status: 404 }) : new Response(MH); return new Response("", { status: 404 }); }]; };
+      if (u === MTX) return o.mtx404 ? new Response("", { status: 404 }) : new Response(MJ); if (/minotar\.net/.test(u)) return new Response(o.mt || MT); if (/mc-heads\.net\/skin\/MHF_Steve/.test(u)) return new Response(DEF); if (/mc-heads/.test(u)) return o.mh === false ? new Response("", { status: 404 }) : new Response(MH); return new Response("", { status: 404 }); }]; };
     const same = (x, y) => x && x.b && new Uint8Array(x.b).length === y.length && new Uint8Array(x.b).every((v, i) => v === y[i]);
     RETRY_MS.v = 0;
     let [n, f] = up(); let k = await resolveSkin("Nani_San123", { DB: db({ skin_url: ITX }) }, f);
@@ -355,9 +355,19 @@ try {
     ok(same(k, MJ) && k.real && n.some((u) => u.endsWith("/profile/" + U)) && !n.some((u) => /lookup\/name|users\/profiles|minotar/.test(u)), "Skin b) Mojang per UUID aus mc_links, kein Name-Lookup, kein minotar", n);
     [n, f] = up({ mj: "down" }); k = await resolveSkin("Nani_San123", { DB: db(null) }, f);
     ok(same(k, MT) && k.real && k.src === "minotar" && n.some((u) => u === "https://minotar.net/skin/" + U), "Skin c) Mojang 502 → minotar per UUID, echt", n);
+    [n, f] = up({ mtx404: true }); k = await resolveSkin("Nani_San123", { DB: db(null) }, f);
+    ok(same(k, MT) && k.real && k.src === "minotar" && n.includes(MTX) && n.some((u) => u === "https://minotar.net/skin/" + U), "Skin c) Mojang-Textur-URL 404 → minotar trotzdem probiert, echt", n);
     { const H = [...new Uint8Array(await crypto.subtle.digest("SHA-1", new Uint8Array(64 * 64 * 4).fill(30)))].map((x) => x.toString(16).padStart(2, "0")).join(""); DEFAULT_SKINS.add(H);
       [n, f] = up({ mj: "none" }); k = await resolveSkin("Nani_San123", { DB: db(null) }, f); DEFAULT_SKINS.delete(H);
       ok(same(k, MH) && !k.real && k.src === "mc-heads", "Skin c) minotar-Default-Skin zählt nicht als echt → mc-heads-Fallback"); }
+    { // Ingest → D1 → Resolver: lange skin_url (>40 Zeichen) wird vollständig gespeichert und als Quelle a) genutzt
+      const IU = "0f0f0f0f-1111-4222-8333-444444444444", LTX = "https://textures.minecraft.net/texture/" + "ab".repeat(32), BAD = "https://evil.example/texture/" + "cd".repeat(20);
+      const r = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { players_stats: { [IU]: { skin_url: LTX, kills: 1 }, "0f0f0f0f-1111-4222-8333-555555555555": { skin_url: BAD } } } });
+      const st = JSON.parse(sqlRows(`SELECT stats FROM mc_player_stats WHERE mc_uuid='${IU}'`)[0]?.stats || "{}"), st2 = JSON.parse(sqlRows("SELECT stats FROM mc_player_stats WHERE mc_uuid='0f0f0f0f-1111-4222-8333-555555555555'")[0]?.stats || "{}");
+      ok(r.s === 200 && st.skin_url === LTX && st2.skin_url === undefined, "Ingest: skin_url vollständig gespeichert, ungültige verworfen", JSON.stringify([st, st2]));
+      const idb = { prepare: () => ({ bind: () => ({ first: async () => ({ mc_name: "Ingest1", mc_uuid: IU, stats: JSON.stringify(st) }) }) }) };
+      const nn = []; const kk = await resolveSkin("Ingest1", idb && { DB: idb }, async (u) => { nn.push(u); return u === LTX ? new Response(ING) : new Response("", { status: 404 }); });
+      ok(same(kk, ING) && kk.src === "ingest" && kk.real && nn[0] === LTX, "Ingest→Resolver: gespeicherte skin_url ist Quelle a)", nn); }
     [n, f] = up({ mj: "down", mt: new Uint8Array([1, 2, 3]), mh: false }); k = await resolveSkin("Nani_San123", { DB: db(null) }, f);
     ok(same(k, DEF) && !k.real && k.src === "steve", "Skin e) alles kaputt → Steve, kein echter Skin");
     [n, f] = up({ mj: "down", mt: new Uint8Array([1]) }); let r = await skinResponse(new Request("https://mc.nwebnotfound.dev/mc-skin/Nani_San123"), "/mc-skin/Nani_San123", null, { DB: db(null) }, f);
