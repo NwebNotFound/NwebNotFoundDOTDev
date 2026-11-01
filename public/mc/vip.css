@@ -6,15 +6,17 @@ html.mc .vip-acts{display:flex;flex-wrap:wrap;gap:.6rem;margin:.8rem 0 0}
 html.mc .vip-me{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin:0 0 1.4rem}
 html.mc .vip-me .hub-h2{margin:0}
 html.mc .vip-me .rk{margin-left:.45rem}
-html.mc .vip-ranks{display:grid;gap:1rem;grid-template-columns:1fr}
-@media(min-width:800px){html.mc .vip-ranks{grid-template-columns:1fr 1fr;align-items:stretch}}
-html.mc .vip-card header{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin:0 0 .9rem}
-html.mc .vip-card-h{display:flex;align-items:center;gap:.7rem;min-width:0}
+html.mc .vip-ranks{display:grid;gap:1rem;grid-template-columns:1fr;align-items:stretch}
+@media(min-width:800px){html.mc .vip-ranks{grid-template-columns:1fr 1fr}}
+html.mc .vip-card,html.mc .vip-me,html.mc .vip-world,html.mc .vip-stat,html.mc .vip-soon{padding:1.15rem 1.2rem}
+html.mc .vip-card{display:flex;flex-direction:column;align-self:stretch;min-width:0}
+html.mc .vip-card header{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem}
+html.mc .vip-card-h{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:.8rem;align-items:center;min-width:0}
 html.mc .vip-card .hub-h2{margin:0;font-size:1.25rem}
 html.mc .vip-card.is-you.is-vip{border-color:#c4860a}
 html.mc .vip-card.is-you.is-mvp{border-color:#a84bc4}
-html.mc .vip-perks{list-style:none;margin:0;padding:0;display:grid;gap:.8rem}
-html.mc .vip-perks li{display:flex;gap:.75rem;align-items:flex-start;min-width:0}
+html.mc .vip-perks{list-style:none;margin:0;padding:0;display:grid;gap:.85rem;flex:1;align-content:start}
+html.mc .vip-perks li{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:.8rem;align-items:center;min-width:0}
 html.mc .vip-perks li>span{min-width:0}
 html.mc .vip-perks b{display:block;font-family:var(--f-px);font-size:.95rem;margin:0 0 .15rem;overflow-wrap:anywhere}
 html.mc .vip-perks .mut{display:block;font-size:.88rem;line-height:1.45;overflow-wrap:anywhere}
@@ -32,7 +34,7 @@ html.mc .vip-world .mut{margin:.2rem 0 0;font-size:.85rem}
 html.mc .vip-stat{display:flex;flex-direction:column;align-items:flex-start;gap:.35rem;min-width:0;padding:1rem}
 html.mc .vip-stat .k{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
 html.mc .vip-stat .v{font-family:var(--f-px);font-size:clamp(1.05rem,3vw,1.25rem);overflow-wrap:anywhere}
-html.mc .vip-sec .slot{display:inline-grid;place-items:center;width:40px;height:40px;flex:none}
+html.mc .vip-sec .slot{display:inline-grid;place-items:center;width:40px;height:40px;margin:0;flex:none;position:relative}
 html.mc .vip-sec .slot img{width:28px;height:28px;image-rendering:pixelated;image-rendering:crisp-edges}
 html.mc .vip-sec .slot.big{width:56px;height:56px}
 html.mc .vip-sec .slot.big img{width:40px;height:40px}

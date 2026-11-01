@@ -4,7 +4,7 @@ import { AV } from "./asset-version.js";
 // Welten nur, wenn der Server-Snapshot einen passenden Key hat, sonst Platzhalter.
 // Keine Schreibaktion, kein RCON.
 
-export const VIP_NOTE = "Weitere Ingame-Vorteile liegen in LuckPerms und werden hier nicht ausgelesen. Diese Seite ändert nichts am Server.";
+export const VIP_NOTE = "";
 const WORLD_RE = /^vip(?:[-_]?(?:world|welt))?(?:[-_]?\d+)?$/i;
 const PANEL = new Set(["vip", "mvp"]);
 const RANK_LABEL = { vip: "VIP", mvp: "MVP", builder: "Builder", admin: "Admin", default: "Spieler" };
@@ -18,17 +18,19 @@ const STATS = {
   deaths: ["deaths"],
   blocks_mined: ["blocks_mined", "mined_total", "blocks"],
 };
+const PANEL_TEXT = "Dein Rang, der Status der VIP-Welten und eine kurze Übersicht deiner Stats.";
+const WORLDS_TEXT = "Zugang zu den VIP-Welten, sobald sie online sind. Geplant sind bis zu drei.";
 const PERKS = {
   vip: [
     { id: "badge", icon: "name_tag", title: "Rang-Badge", text: "Goldenes VIP-Badge auf Profil, Spielerliste und in der PvP-Rangliste." },
-    { id: "panel", icon: "ender_chest", title: "Dieses Panel", text: "Rang, Welten-Status und eine kurze Stats-Übersicht. Die Seite liest nur und schickt keine Befehle an den Server." },
-    { id: "worlds", icon: "grass_block", title: "VIP-Welten", text: "Zugang zu den VIP-Welten, sobald sie online sind. Geplant sind bis zu drei." },
+    { id: "panel", icon: "book", title: "Dieses Panel", text: PANEL_TEXT },
+    { id: "worlds", icon: "grass_block", title: "VIP-Welten", text: WORLDS_TEXT },
   ],
   mvp: [
     { id: "badge", icon: "name_tag", title: "Rang-Badge", text: "MVP-Badge in eigener Farbe, sichtbar über VIP, auf Profil, Spielerliste und in der PvP-Rangliste." },
-    { id: "panel", icon: "ender_chest", title: "Dieses Panel", text: "Rang, Welten-Status und eine kurze Stats-Übersicht. Die Seite liest nur und schickt keine Befehle an den Server." },
-    { id: "worlds", icon: "grass_block", title: "VIP-Welten", text: "Zugang zu den VIP-Welten, sobald sie online sind. Geplant sind bis zu drei." },
-    { id: "higher", icon: "nether_star", title: "Höherer Rang", text: "MVP steht über VIP. Weitere Ingame-Rechte liegen in LuckPerms und sind hier noch nicht angebunden." },
+    { id: "panel", icon: "book", title: "Dieses Panel", text: PANEL_TEXT },
+    { id: "worlds", icon: "grass_block", title: "VIP-Welten", text: WORLDS_TEXT },
+    { id: "higher", icon: "golden_apple", title: "Höherer Rang", text: "MVP steht über VIP. Weitere Ingame-Vorteile folgen." },
   ],
 };
 

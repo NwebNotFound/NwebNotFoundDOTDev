@@ -17,6 +17,7 @@
     return d ? d + " T " + h + " Std" : h ? h + " Std " + m + " Min" : m + " Min";
   };
   const badge = (rank, color) => RANKL[rank] && COLOR.test(color || "") ? `<span class="rk rk-${color}">${RANKL[rank]}</span>` : "";
+  const note = (t) => (t || "").trim() ? `<p class="mut vip-note">${E(t)}</p>` : "";
   const perks = (list) => `<ul class="vip-perks">${(list || []).map((p) => `<li>${slot(p.icon)}<span><b>${E(p.title)}</b><span class="mut">${E(p.text)}</span></span></li>`).join("")}</ul>`;
   const cards = (cat) => `<div class="vip-ranks">${(cat || []).map((c) => {
     const rk = c.rank === "mvp" ? "mvp" : c.rank === "vip" ? "vip" : "";
@@ -43,7 +44,7 @@
     const st = d.stats || {};
     const money = st.money == null ? "–" : NF(st.money) + " CP";
     const pub = name ? `<a class="btn sec" href="/spieler/${encodeURIComponent(name)}">Öffentliches Profil</a>` : "";
-    return `<div class="g vip-me">${head}<div><p class="eyb">Dein Rang</p><h2 class="hub-h2">${E(name || "Spieler")} ${badge(p.rank, p.color)}</h2><p class="vip-acts"><a class="btn" href="/profile">Zum Profil</a>${pub}</p></div></div><h2 class="hub-h2">Vorteile</h2>${cards(d.catalog)}<p class="mut vip-note">${E(d.note || "")}</p>${worlds(d.worlds)}<section class="vip-block" id="vip-stats"><h2 class="hub-h2">Deine Stats</h2><div class="vip-stats">${cell("gold_ingot", "Kontostand", money)}${cell("clock", "Spielzeit", st.playtime == null ? "–" : up(st.playtime))}${cell("iron_sword", "Spieler-Kills", st.kills == null ? "–" : NF(st.kills))}${cell("skeleton_skull", "Tode", st.deaths == null ? "–" : NF(st.deaths))}${cell("iron_pickaxe", "Blöcke", st.blocks_mined == null ? "–" : NF(st.blocks_mined))}</div></section>`;
+    return `<div class="g vip-me">${head}<div><p class="eyb">Dein Rang</p><h2 class="hub-h2">${E(name || "Spieler")} ${badge(p.rank, p.color)}</h2><p class="vip-acts"><a class="btn" href="/profile">Zum Profil</a>${pub}</p></div></div><h2 class="hub-h2">Vorteile</h2>${cards(d.catalog)}${note(d.note)}${worlds(d.worlds)}<section class="vip-block" id="vip-stats"><h2 class="hub-h2">Deine Stats</h2><div class="vip-stats">${cell("gold_ingot", "Kontostand", money)}${cell("clock", "Spielzeit", st.playtime == null ? "–" : up(st.playtime))}${cell("iron_sword", "Spieler-Kills", st.kills == null ? "–" : NF(st.kills))}${cell("skeleton_skull", "Tode", st.deaths == null ? "–" : NF(st.deaths))}${cell("iron_pickaxe", "Blöcke", st.blocks_mined == null ? "–" : NF(st.blocks_mined))}</div></section>`;
   };
   const gate = (d) => {
     const raw = location.pathname + location.search + location.hash;
@@ -57,7 +58,7 @@
       const own = d.own_rank && RANKL[d.own_rank.rank] ? " Dein Rang ist " + E(RANKL[d.own_rank.rank]) + "." : "";
       msg = `<p class="mut">Das Panel ist für die Ränge VIP und MVP.${own} Builder und Admin sehen die Übersicht, nicht das eigene Panel.</p><p class="vip-acts"><a class="btn sec" href="/profile">Zum Profil</a></p>`;
     }
-    return `<div class="vip-gate">${msg}</div><h2 class="hub-h2">Vorteile</h2>${cards(d.catalog)}<p class="mut vip-note">${E(d.note || "")}</p>${worlds(null)}`;
+    return `<div class="vip-gate">${msg}</div><h2 class="hub-h2">Vorteile</h2>${cards(d.catalog)}${note(d.note)}${worlds(null)}`;
   };
   (async () => {
     let d;
