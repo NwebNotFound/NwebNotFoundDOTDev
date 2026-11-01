@@ -592,6 +592,31 @@ try {
     { const pg = await req("/spieler/Nils"); ok(pg.s === 200 && pg.t.includes('id="pvp-pl"') && pg.t.includes('data-name="Nils"') && pg.t.includes("/mc/pvp.js"), "Spielerseite hat PvP-Block (extern)"); }
     { const js = await req("/mc/pvp.js"); ok(js.s === 200 && js.t.includes("E(p.favorite_kit)") && js.t.includes("p.matches<5") && !/style=|\.style\./.test(js.t), "pvp.js: Kit escaped, Quote erst ab 5 Kämpfen, keine Inline-Styles"); }
     sql("DELETE FROM mc_pvp_stats"); sql("DELETE FROM mc_player_ranks"); }
+  // Ingest: null bleibt NULL (nicht 0), online pro Spieler wird gespeichert (Dict- und View-Form)
+  { const nm = sqlRows(`SELECT mc_name FROM mc_links WHERE mc_uuid = '${U1}'`)[0]?.mc_name, bak = sqlRows(`SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0];
+    const pad = Object.fromEntries(Array.from({ length: 30 }, (_, i) => ["s" + i, i]));
+    let r = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { players_stats: { [U1]: { playtime: 5, ...pad, team: null, team_color: null, last_seen: null, online: true } } } });
+    let s = JSON.parse(sqlRows(`SELECT stats FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0].stats);
+    ok(r.s === 200 && s.team === null && s.team_color === null && s.last_seen === null && s.online === true && s.playtime === 5, "Ingest: null → null statt 0, online=true gespeichert (auch bei >24 Feldern)", JSON.stringify(s));
+    const a = await req("/api/mc-players/" + nm); ok(a.j?.online === true && a.j?.team === undefined && a.j?.last_seen === undefined, "API: online=true, kein Team/last_seen aus null", a.t.slice(0, 300));
+    r = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { v_player_stats_ext: [{ uuid: U1, name: nm, playtime: 6, team: null, team_color: null, last_seen: null, online: false }] } });
+    s = JSON.parse(sqlRows(`SELECT stats FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0].stats);
+    ok(r.s === 200 && s.team === null && s.last_seen === null && s.online === false && s.playtime === 6, "Ingest (View-Form): null bleibt null, online=false gespeichert", JSON.stringify(s));
+    r = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { players_stats: { [U1]: { playtime: 7, online: "1", team: "" } } } });
+    s = JSON.parse(sqlRows(`SELECT stats FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0].stats);
+    ok(s.online === true && s.team === null, "Ingest: online '1' → true, leerer String → null", JSON.stringify(s));
+    // null-Stats: nicht als 0 in Leaderboards, keine 'null'/NaN, Sortierung stimmt
+    const lbBak = sqlRows("SELECT kind, data, updated_at FROM mc_leaderboards"), snBak = sqlRows("SELECT data, updated_at FROM mc_snapshot WHERE id = 1")[0];
+    r = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { leaderboards: { kills: [{ name: "A", value: null }, { name: "B", value: 3 }, { name: "C", value: "" }, { name: "D", value: 9 }] } } });
+    let lb = await req("/api/mc-leaderboards"); const kl = lb.j?.total?.lists?.kills;
+    ok(r.s === 200 && JSON.stringify(kl) === JSON.stringify([{ name: "D", value: 9 }, { name: "B", value: 3 }]) && !/null|NaN/.test(JSON.stringify(kl)), "Leaderboard (Dict): null/leer verworfen, Sortierung ok", JSON.stringify(kl));
+    r = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { v_leaderboards: [{ category: "deaths", name: "A", value: null }, { category: "deaths", name: "B", value: 2 }, { category: "deaths", name: "D", value: 5 }] } });
+    lb = await req("/api/mc-leaderboards"); const dl = lb.j?.total?.lists?.deaths;
+    ok(r.s === 200 && JSON.stringify(dl) === JSON.stringify([{ name: "D", value: 5 }, { name: "B", value: 2 }]), "Leaderboard (View): null-Zeile verworfen statt 0", JSON.stringify(dl));
+    const pa = await req("/api/mc-players"); ok(pa.s === 200 && !/NaN|"null"/.test(pa.t), "Spielerliste ohne NaN/'null' bei null-Stats");
+    sql("DELETE FROM mc_leaderboards"); for (const x of lbBak) sql(`INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('${x.kind}', '${x.data.replace(/'/g, "''")}', ${x.updated_at})`);
+    if (snBak) sql(`UPDATE mc_snapshot SET data = '${snBak.data.replace(/'/g, "''")}', updated_at = ${snBak.updated_at} WHERE id = 1`);
+    if (bak) sql(`UPDATE mc_player_stats SET stats = '${bak.stats.replace(/'/g, "''")}', updated_at = ${bak.updated_at} WHERE mc_uuid = '${U1}'`); }
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Rot', '$.team_color', '#FF5555', '$.team_color_code', '&c', '$.last_seen', '2026-10-31T23:05:00Z', '$.online', json('false')) WHERE mc_uuid = '${U1}'`);
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Grün', '$.team_color', 'red;x', '$.team_color_hex', '#55ff55', '$.online', 1) WHERE mc_uuid = '${U2}'`);
   try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
