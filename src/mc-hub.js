@@ -55,7 +55,7 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 
 // Navigation: wenige Top-Level-Einträge, Rest in Gruppen (Desktop: Dropdown, Mobil: Drawer mit Akkordeon)
 const NAV_GROUPS = [
-  ["community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"]]],
+  ["community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"], ["/vip", "VIP", "nether_star"]]],
   ["minispiele", "Minispiele", [["/parkour", "Parkour", "golden_boots"], ["/pvp", "PvP", "iron_sword"]]],
   ["wirtschaft", "Wirtschaft", [["/markt", "Markt", "emerald"], ["/shops", "Shops", "barrel"], ["/auktionen", "Auktionen", "bell"]]],
 ];

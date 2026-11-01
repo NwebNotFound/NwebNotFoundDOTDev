@@ -5,6 +5,7 @@ import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
 import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
 import { faceRgba, skinOk, skinResponse, renderHead, encodePng, fetchRetry, RETRY_MS, resolveSkin, DEFAULT_SKINS, validSkinUrl } from "../src/mc-head.js";
+import "./vip-unit.mjs";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
@@ -481,7 +482,7 @@ try {
     { const m = await req("/parkour", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes("/api/mc-parkour")), "/parkour nur auf mc-Domain", m.s); }
   }
   console.log("7) Seiten");
-  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle", "/parkour"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
+  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle", "/parkour", "/vip"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
   console.log("8) UI (Chromium 390/1440)");
@@ -592,6 +593,59 @@ try {
     { const pg = await req("/spieler/Nils"); ok(pg.s === 200 && pg.t.includes('id="pvp-pl"') && pg.t.includes('data-name="Nils"') && pg.t.includes("/mc/pvp.js"), "Spielerseite hat PvP-Block (extern)"); }
     { const js = await req("/mc/pvp.js"); ok(js.s === 200 && js.t.includes("E(p.favorite_kit)") && js.t.includes("p.matches<5") && !/style=|\.style\./.test(js.t), "pvp.js: Kit escaped, Quote erst ab 5 Kämpfen, keine Inline-Styles"); }
     sql("DELETE FROM mc_pvp_stats"); sql("DELETE FROM mc_player_ranks"); }
+  console.log("H) VIP-Panel");
+  { const noPriv = (j) => j && j.access === false && !("stats" in j) && !("worlds" in j) && !("player" in j) && !JSON.stringify(j).includes("diamond_sword") && !JSON.stringify(j).includes("weight");
+    const anon = await req("/api/mc-vip"); ok(anon.s === 200 && anon.j?.reason === "login" && noPriv(anon.j) && anon.j.catalog?.length === 2, "VIP-API ohne Session → Übersicht, keine Stats", anon.t.slice(0, 180));
+    ok((await req("/api/mc-vip", { method: "POST", body: {}, cookie: c1 })).s === 405, "POST /api/mc-vip → 405");
+    const raw = await fetch(BASE + "/api/mc-vip", { headers: { host: HOST, cookie: c1 } });
+    ok(/private/.test(raw.headers.get("cache-control") || "") && /no-store/.test(raw.headers.get("cache-control") || ""), "VIP-API Cache private, no-store", raw.headers.get("cache-control"));
+    const none = await req("/api/mc-vip", { cookie: c1 }); ok(none.j?.reason === "rank" && noPriv(none.j) && !none.j.own_rank, "verknüpft ohne Rangzeile → kein Panel", none.t.slice(0, 160));
+    sql(`UPDATE mc_links SET verified = 0 WHERE discord_id = '${D1}'`);
+    ok((await req("/api/mc-vip", { cookie: c1 })).j?.reason === "link" && noPriv((await req("/api/mc-vip", { cookie: c1 })).j), "VIP-API: unverified → link, keine Stats");
+    sql(`UPDATE mc_links SET verified = 1, has_role = 0 WHERE discord_id = '${D1}'`);
+    ok((await req("/api/mc-vip", { cookie: c1 })).j?.reason === "link", "VIP-API: ohne Server-Rolle → link");
+    sql(`UPDATE mc_links SET has_role = 1 WHERE discord_id = '${D1}'`);
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }, { uuid: U2, name: "Seller", rank: "builder", color: "&a", weight: 80 }] } });
+    const adm = await req("/api/mc-vip", { cookie: c1 }); ok(adm.j?.reason === "rank" && adm.j?.own_rank?.rank === "admin" && adm.j.own_rank.color === "c" && noPriv(adm.j), "Admin sieht die Übersicht, nicht das Panel", adm.t.slice(0, 200));
+    ok((await req("/api/mc-vip", { cookie: c2 })).j?.own_rank?.rank === "builder" && (await req("/api/mc-vip", { cookie: c2 })).j?.access === false, "Builder kein Panel");
+    sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.skin_url', 'https://textures.minecraft.net/texture/secretvip') WHERE mc_uuid = '${U1}'`);
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }, { uuid: U2, name: "Seller", rank: "mvp", color: "&d", weight: 60 }] } });
+    const vip = await req("/api/mc-vip", { cookie: c1 });
+    ok(vip.j?.access === true && vip.j.player?.name === "Nils" && vip.j.player.rank === "vip" && vip.j.player.color === "6" && !("uuid" in (vip.j.player || {})) && vip.j.profile === "/profile", "VIP: eigener Rang, kein uuid", JSON.stringify(vip.j?.player));
+    ok(vip.j?.stats?.money === 900 && vip.j.stats.playtime === 7200 && vip.j.stats.deaths === 3 && vip.j.stats.money !== 1200 && !("inventory" in (vip.j.stats || {})) && !JSON.stringify(vip.j).includes("diamond_sword") && !JSON.stringify(vip.j).includes("secretvip") && !JSON.stringify(vip.j).includes("weight"), "VIP-Stats kurz, ohne Inventar/Skin/weight", JSON.stringify(vip.j?.stats));
+    ok(vip.j?.catalog?.[0]?.yours === true && vip.j.catalog[1].yours === false && vip.j.catalog[1].perks.some((p) => p.id === "higher") && vip.j.worlds?.placeholder === true, "VIP-Katalog markiert den eigenen Rang, Welten noch Platzhalter");
+    const mvp = await req("/api/mc-vip", { cookie: c2 });
+    ok(mvp.j?.access === true && mvp.j.player?.rank === "mvp" && mvp.j.player.color === "d" && mvp.j.stats?.money === 1200 && mvp.j.stats.money !== 900 && mvp.j.catalog?.[1]?.yours === true, "MVP sieht nur eigene Stats", JSON.stringify(mvp.j?.stats));
+    const up = U2.toUpperCase();
+    const ingU = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: up, name: "Seller", rank: "mvp", color: "&d", weight: 60 }, { uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }] } });
+    ok(ingU.s === 200 && ingU.j?.player_ranks === 2 && sqlRows("SELECT uuid FROM mc_player_ranks WHERE name='Seller'")[0]?.uuid === U2.replace(/-/g, ""), "Ranks-Ingest: UUID mit Bindestrichen und Großbuchstaben wird kleingeschrieben ohne Bindestriche gespeichert", ingU.t);
+    sql(`UPDATE mc_player_ranks SET uuid = '${up}', color = '&z' WHERE name = 'Seller'`);
+    sql(`UPDATE mc_links SET mc_uuid = '${up}' WHERE discord_id = '${D2}'`);
+    const mix = await req("/api/mc-vip", { cookie: c2 });
+    ok(mix.j?.access === true && mix.j.player?.rank === "mvp" && mix.j.player.color === "d" && mix.j.stats?.money === 1200, "normU trifft Rang trotz Bindestrichen/Großbuchstaben, ungültige Farbe → &d", JSON.stringify({ p: mix.j?.player, s: mix.j?.stats }));
+    sql(`UPDATE mc_links SET mc_uuid = '${U2}' WHERE discord_id = '${D2}'`);
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { servers: { lobby: { online: true, players: ["Nils"], max: 20, tps: 20 }, survival: { online: true, players: ["A"], max: 40, tps: 19 }, vipwelt: { online: true, players: ["Seller", "<script>"], max: 4, tps: 19.96 }, vip_1: { online: true, players: ["Nils", "not a name"], max: 8, tps: 20 }, "vip-2": { online: false, players: [], max: 8, tps: 18.2 }, vip_4: { online: true, players: ["Gast"], max: 4, tps: 20 } } } });
+    const live = await req("/api/mc-vip", { cookie: c1 });
+    const ids = (live.j?.worlds?.slots || []).map((s) => s.id);
+    ok(live.j?.worlds?.placeholder === false && ids.join() === "vipwelt,vip_1,vip-2" && live.j.worlds.slots[0].players === 1 && live.j.worlds.slots[1].online === true && live.j.worlds.slots[2].online === false && !JSON.stringify(live.j.worlds).includes("<script>") && !JSON.stringify(live.j.worlds).includes("lobby") && !JSON.stringify(live.j.worlds).includes("survival") && !ids.includes("vip_4"), "VIP-Welten: max 3, Lobby/Survival raus, Namen gefiltert", JSON.stringify(live.j?.worlds));
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { servers: {} } });
+    sql("DELETE FROM mc_player_ranks");
+    sql(`UPDATE mc_player_stats SET stats = json_remove(stats, '$.skin_url') WHERE mc_uuid = '${U1}'`);
+    const pg = await req("/vip"); const sec = pg.t.slice(pg.t.indexOf('id="vip"'));
+    ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && /data-g="community"[\s\S]*?href="\/vip"/.test(pg.t), "GET /vip bindet Panel ein, Link im Community-Menü", String(pg.s));
+    ok(!/<script|<style| style=/.test(sec.slice(0, sec.indexOf("</section>"))), "/vip-Inhalt ohne Inline-Script/-Style");
+    { const m = await req("/vip", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes('id="vip"')), "/vip nur auf mc-Domain", String(m.s)); }
+    { const js = await req("/mc/vip.js"); ok(js.s === 200 && js.t.includes("E(p.title)") && js.t.includes("E(s.label)") && js.t.includes('href="/profile"') && js.t.includes("encodeURIComponent(rel)") && !js.t.includes("location.href") && !/style=|\.style\./.test(js.t), "vip.js escaped, Login-next relativ, keine Inline-Styles"); }
+    { const bye = async (next) => { const r = await fetch(BASE + "/auth/discord/logout?next=" + encodeURIComponent(next), { headers: { host: HOST, "x-nnf-test-host": "nwebnotfound.dev" }, redirect: "manual" }); return r.headers.get("location") || ""; };
+      const evil = await bye("https://evil.com"), proto = await bye("//evil.com"), bs = await bye("/\\evil.com"), info = await bye("https://evil.com@mc.nwebnotfound.dev/vip");
+      ok(evil === "https://nwebnotfound.dev/" && proto === "https://nwebnotfound.dev/" && !bs.includes("evil.com") && info === "https://nwebnotfound.dev/", "next=https://evil.com, //evil.com, Backslash und Userinfo bleiben auf der Seite", JSON.stringify({ evil, proto, bs, info }));
+      const name = await bye("/spieler/Nils"), under = await bye("/spieler/a_b");
+      ok(name === "https://nwebnotfound.dev/spieler/Nils" && under === "https://nwebnotfound.dev/spieler/a_b", "next /spieler/Nils und /spieler/a_b bleiben erhalten", JSON.stringify({ name, under }));
+      const rel = await bye("/vip"), abs = await bye("https://mc.nwebnotfound.dev/vip");
+      const vipLoc = (loc) => { try { const u = new URL(loc); return u.pathname === "/vip" && (u.hostname === "mc.nwebnotfound.dev" || u.hostname === "127.0.0.1") && !loc.includes("evil"); } catch { return false; } };
+      ok(vipLoc(rel) && vipLoc(abs), "relativer und absoluter next auf /vip ist erlaubt", JSON.stringify({ rel, abs }));
+      ok((await bye("https://nwebnotfound.dev.evil.com/vip")) === "https://nwebnotfound.dev/", "Host muss nwebnotfound.dev oder Subdomain davon sein"); }
+  }
   // Ingest: null bleibt NULL (nicht 0), online pro Spieler wird gespeichert (Dict- und View-Form)
   { const nm = sqlRows(`SELECT mc_name FROM mc_links WHERE mc_uuid = '${U1}'`)[0]?.mc_name, bak = sqlRows(`SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0];
     const pad = Object.fromEntries(Array.from({ length: 30 }, (_, i) => ["s" + i, i]));

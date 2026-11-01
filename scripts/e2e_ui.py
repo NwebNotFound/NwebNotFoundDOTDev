@@ -220,10 +220,43 @@ with sync_playwright() as p:
         pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body='{"courses":{}}'))
         t = go("/parkour"); pg.locator("#pk-empty").wait_for(timeout=10000); ok("Noch keine Zeiten" in t or "Noch keine Zeiten" in pg.inner_text("body"), f"{w}px Parkour: Leerzustand")
         pg.screenshot(path=f"{SH}/local-parkour-leer-{w}.png", full_page=True); pg.unroute("**/api/mc-parkour")
+        go("/vip"); pg.locator("#vip-worlds").wait_for(timeout=10000); vt = pg.inner_text("#vip")
+        ok("Das Panel ist für die Ränge VIP und MVP." in vt and "bald verfügbar" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 0 and pg.locator("#vip a[href='/profile']").count() == 1, f"{w}px VIP ohne Rang: Übersicht, kein Panel", vt[:240])
+        ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator('.ng[data-g=community] a[href="/vip"]').count() == 1 and pg.locator('a[href="/vip"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=community] .ngb[data-cur]').count() == 1, f"{w}px VIP: Community-Menü aktiv, kein Formular")
+        ok("Monocraft" in pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"), f"{w}px VIP: Pixel-Schrift", pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"))
+        ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Übersicht: kein horizontales Scrollen")
+        pg.screenshot(path=f"{SH}/local-vip-gate-{w}.png", full_page=True)
+        XSS = "<img src=x onerror=alert(1)>"
+        vdlg0 = len(dlg)
+        pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps({
+            "access": True, "reason": None, "note": "<script>window.vipx=1</script>",
+            "player": {"name": "Nils", "rank": "mvp", "color": "d", "label": "MVP"},
+            "catalog": [
+                {"rank": "vip", "label": "VIP", "icon": "gold_ingot", "color": "6", "yours": False, "perks": [{"id": "badge", "icon": "name_tag", "title": XSS, "text": "sicher"}]},
+                {"rank": "mvp", "label": "MVP", "icon": "nether_star", "color": "d", "yours": True, "perks": [{"id": "higher", "icon": "nether_star", "title": "Höherer Rang", "text": "ja"}]},
+            ],
+            "stats": {"money": 12, "playtime": 3660, "kills": 2, "deaths": 1, "blocks_mined": 40},
+            "worlds": {"placeholder": False, "slots": [
+                {"id": "vip_1", "label": "VIP-Welt 1", "online": True, "players": 2, "max": 8, "tps": 20},
+                {"id": "vip-2", "label": XSS, "online": False, "players": 0, "max": None, "tps": 18.2},
+            ]},
+            "profile": "javascript:alert(1)",
+        })))
+        go("/vip"); pg.locator(".vip-world").first.wait_for(timeout=10000); vh = pg.inner_html("#vip"); vx = pg.inner_text("#vip")
+        ok(pg.locator(".vip-card.is-you.is-mvp").count() == 1 and pg.locator(".vip-stat").count() == 5 and "12 CP" in vx and "1 Std 1 Min" in vx and "Zum Profil" in vx, f"{w}px VIP-Panel: Rang, Stats, Profil-Link", vx[:300])
+        ok(pg.locator('#vip a[href="/profile"]').count() == 1 and pg.locator('#vip a[href^="javascript:"]').count() == 0, f"{w}px VIP: Profil-Link fest, nicht aus der API")
+        ok(XSS in vx and "&lt;img" in vh and pg.locator("#vip img[src='x']").count() == 0 and pg.locator("#vip script").count() == 0 and not pg.evaluate("window.vipx") and len(dlg) == vdlg0, f"{w}px VIP: Titel und Weltname escaped", vh[:240])
+        ok(pg.locator(".vip-world").count() == 2 and "online" in vx and "offline" in vx and "bald verfügbar" not in pg.inner_text("#vip-worlds"), f"{w}px VIP-Welten aus Daten, ohne Platzhalter")
+        ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Panel: kein Overflow, keine Inline-Styles")
+        pg.locator(".vip-me").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-vip-panel-{w}.png", full_page=True); pg.unroute("**/api/mc-vip")
         errs = [e for e in errs if e.strip() != "Event"]
         ok(not errs, f"{w}px keine Konsolen-/JS-Fehler", errs[:3])
         ctx.close()
         ctx = br.new_context(viewport={"width": w, "height": 900}); pg = ctx.new_page(); pg.route("**/*", route)
+        pg.goto("https://" + H + "/vip", wait_until="domcontentloaded", timeout=45000); pg.locator("#vip-worlds").wait_for(timeout=10000); vt = pg.inner_text("#vip")
+        ok("Mit Discord anmelden" in vt and "bald verfügbar" in vt and "VIP" in vt and "MVP" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 1, f"{w}px VIP anonym: Ränge und Login, kein Panel", vt[:240])
+        ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP anonym: kein horizontales Scrollen")
+        pg.screenshot(path=f"{SH}/local-vip-anon-{w}.png", full_page=True)
         pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded", timeout=45000); pg.wait_for_timeout(400); t = pg.inner_text("body")
         pg.locator(".pf-kpi").wait_for(timeout=10000); t = pg.inner_text("body"); ok(pg.locator(".pf-kpi .pf-tile").count() >= 1 and "nur für Mitspieler" in t, f"{w}px Spielerseite anonym: Details gesperrt", t[:300])
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px anonym: kein horizontales Scrollen")
