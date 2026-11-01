@@ -493,8 +493,16 @@ function cleanIngest(b) {
     if (!UUID.test(k) || typeof v !== "object" || !v) continue;
     const o = {};
     if (v.details !== undefined) { const d = cleanDetails(v.details); if (d) details[normU(k)] = d; }
-    for (const [sk, sv] of Object.entries(v).filter(([x]) => x !== "details").slice(0, 24)) {
+    // Meta-Felder (team, team_color, last_seen, online) immer zuerst, damit sie nicht am 24er-Limit hängen bleiben
+    const META = ["online", "team", "team_name", "team_color", "team_color_hex", "team_color_code", "last_seen", "last_online", "last_login"];
+    const ent = Object.entries(v).filter(([x]) => x !== "details"), metaE = ent.filter(([x]) => META.includes(x));
+    for (const [sk, sv] of [...metaE, ...ent.filter(([x]) => !META.includes(x)).slice(0, Math.max(0, 24 - metaE.length))]) {
       if (!/^[a-z0-9_]{1,24}$/i.test(sk)) continue;
+      // null bleibt null (vorher: +null === 0 → Platzhalter-0), Bool bleibt Bool (vorher verworfen → online fehlte)
+      if (sv === null) { o[sk] = null; continue; }
+      if (typeof sv === "boolean") { o[sk] = sv; continue; }
+      if (sk === "online") { const t = sv === 1 || sv === "1" || sv === "true" ? true : sv === 0 || sv === "0" || sv === "false" ? false : null; if (t !== null) o.online = t; continue; }
+      if (sv === "" || (typeof sv === "string" && !sv.trim())) { o[sk] = null; continue; }
       if (/^(inventory|inv|inventar|items)$/i.test(sk)) { const inv = normInv(sv); if (inv) o.inventory = inv; continue; }
       if (/^(pickup|pickups|abholfach|abholungen|claims|claim_chest|pickup_chest)$/i.test(sk)) { const inv = normInv(sv); if (inv) o.pickup = inv; continue; }
       // skin_url vollständig speichern (nicht auf 40 Zeichen kürzen), nur gültige textures.minecraft.net-URLs
