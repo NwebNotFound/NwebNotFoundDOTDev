@@ -340,6 +340,8 @@ try {
       ok(c === 1 && r.status === 429, "Retry " + new URL(u).host + ": 429 + Retry-After → 1 Call"); }
     let c = 0; RETRY_MS.v = 0; await skinResponse(new Request("https://mc.nwebnotfound.dev/mc-skin/Joni81"), "/mc-skin/Joni81", null, async () => { c++; return new Response("", { status: 500 }); }); RETRY_MS.v = 250;
     ok(c <= 2 * 4, "Skin: alle Upstreams 5xx → höchstens 2 Calls pro URL (" + c + ")"); }
+  { const P = (f) => fs.readFileSync(ROOT + f, "utf8"); // Client-URLs versioniert, damit Browser-Caches mit altem Steve-Ersatz umgangen werden
+    ok(P("public/mc/player3d.js").includes("+'?v=2'") && !/\/mc-head\/[^"'\n]{0,60}'\/'\+\(head\|\|64\)\+'"/.test(P("public/mc/player3d.js")) && ["src/mc-players.js", "src/mc-parkour.js", "public/mc/home.js", "public/mc/shops.js", "public/mc/shop.js", "public/mc/auction.js"].every((f) => P(f).includes("?v=4")), "Skin/Kopf-URLs im Client versioniert (?v=2 / ?v=4)"); }
     ok(skinOk({ w: 64, h: 64 }) && skinOk({ w: 64, h: 32 }) && skinOk({ w: 256, h: 256 }) && !skinOk({ w: 100, h: 100 }) && !skinOk({ w: 64, h: 48 }), "Skin-Formate inkl. HD erkannt"); }
   ok(/mc-heads\.net\/head\/MHF_Zombie/.test(await IC("zombie_head")) && /MHF_WSkeleton/.test(await IC("wither_skeleton_skull")) && /MHF_Creeper/.test(await IC("creeper_wall_head")), "Mob-Köpfe → Kopf statt Block/Papier");
   const iau = JSON.parse(execSync("node scripts/icon-audit.mjs --json", { cwd: ROOT }).toString());
