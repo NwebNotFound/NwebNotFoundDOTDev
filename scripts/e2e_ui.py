@@ -116,7 +116,12 @@ with sync_playwright() as p:
         ok(L["row"] and L["rk"] and L["pad"] and L["fit"], f"{w}px Profil-Parkour: Icon/Name/Rang/Zeit als Zeile mit Abständen", L)
         heads = pg.eval_on_selector_all("#pb .dcard h3", "hs=>hs.filter(h=>h.querySelector('small')).map(h=>{const s=h.querySelector('small').getBoundingClientRect(),t=document.createRange();t.selectNodeContents(h.firstChild);const r=t.getBoundingClientRect();return [h.firstChild.textContent,(s.left-r.right>=6)||(s.top>=r.bottom-1)]})")
         ok(heads and all(x[1] for x in heads), f"{w}px Profil: alle Karten-Titel vom Untertitel getrennt", heads)
-        pk.scroll_into_view_if_needed(); pk.screenshot(path=f"{SH}/local-profil-parkour-{w}.png"); pg.unroute("**/api/mc-parkour")
+        pk.scroll_into_view_if_needed(); pk.screenshot(path=f"{SH}/local-profil-parkour-{w}.png"); 
+        pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded"); pg.locator("#t-minispiele").wait_for(timeout=20000); pg.click("#t-minispiele")
+        sp = pg.locator(".dcard", has_text="Top-10-Platzierungen").first; sp.wait_for(timeout=10000)
+        S = sp.evaluate("""c=>{const R=e=>e.getBoundingClientRect(),h=c.querySelector('h3'),s=R(h.querySelector('small')),t=document.createRange();t.selectNodeContents(h.firstChild);const tr=t.getBoundingClientRect(),rk=R(c.querySelector('.pk-rk')),tm=R(c.querySelector('.pk-tm'));return [getComputedStyle(h).display,(s.left-tr.right>=6)||(s.top>=tr.bottom-1),tm.left-rk.right>=8,document.querySelectorAll('link[href*="/mc/profile.css"]').length]}""")
+        ok(S[0] == "flex" and S[1] and S[2] and S[3] == 1 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px /spieler: Karten-Styles aus profile.css, Parkour-Karte sauber", S)
+        sp.scroll_into_view_if_needed(); sp.screenshot(path=f"{SH}/local-spieler-parkour-{w}.png"); pg.unroute("**/api/mc-parkour")
         pg.goto("https://" + H + "/profile", wait_until="domcontentloaded"); pg.locator(".inv").wait_for(state="visible", timeout=20000)
         # Nav-Gruppen: max. 6 Top-Level-Einträge, aktive Gruppe markiert
         ok(pg.locator(".nl > .l, .nl > .ng").count() == 6 and pg.locator(".nl .ng").count() == 3, f"{w}px Nav: 6 Top-Level-Einträge, 3 Gruppen")
