@@ -4,7 +4,7 @@ import { spawn, execSync } from "node:child_process";
 import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
 import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
-import { faceRgba, skinOk, skinResponse, renderHead, encodePng, fetchRetry, RETRY_MS } from "../src/mc-head.js";
+import { faceRgba, skinOk, skinResponse, renderHead, encodePng, fetchRetry, RETRY_MS, resolveSkin, DEFAULT_SKINS, validSkinUrl } from "../src/mc-head.js";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
@@ -330,22 +330,54 @@ try {
       if (/sessionserver/.test(u)) return J({ properties: [{ name: "textures", value: tex }] });
       if (u === TX) return new Response(REAL); if (/mc-heads\.net/.test(u)) return new Response(MH); return new Response(null, { status: 404 }); }]; };
     const rq = new Request("https://mc.nwebnotfound.dev/mc-skin/Nani_San123");
-    let [n, f] = mk(1); let r = await skinResponse(rq, "/mc-skin/Nani_San123", null, f); let b = new Uint8Array(await r.arrayBuffer());
+    let [n, f] = mk(1); let r = await skinResponse(rq, "/mc-skin/Nani_San123", null, null, f); let b = new Uint8Array(await r.arrayBuffer());
     ok(r.status === 200 && b.length === REAL.length && b.every((x, k) => x === REAL[k]) && /max-age=21600/.test(r.headers.get("cache-control")) && !Object.keys(n).some((u) => /mc-heads/.test(u)), "Skin: Mojang-502 → Retry → echter Mojang-Skin (6 h)");
-    [n, f] = mk(9); r = await skinResponse(rq, "/mc-skin/Nani_San123", null, f); b = new Uint8Array(await r.arrayBuffer());
+    [n, f] = mk(9); r = await skinResponse(rq, "/mc-skin/Nani_San123", null, null, f); b = new Uint8Array(await r.arrayBuffer());
     ok(r.status === 200 && b.every((x, k) => x === MH[k]) && /max-age=600/.test(r.headers.get("cache-control")), "Skin: Mojang down → mc-heads-Ersatz nur 10 min gecacht");
     [n, f] = mk(9); const h = await renderHead("Joni81", 64, f); ok(h && h.fallback === true, "Kopf: mc-heads-Ersatz gilt als Fallback (kurzer Cache)");
     [n, f] = mk(0); const h2 = await renderHead("Joni81", 64, f); ok(h2 && h2.fallback === false, "Kopf: Mojang-Skin → langer Cache"); }
+  { // Quellen-Reihenfolge: ingest skin_url > Mojang per UUID > minotar (nur wenn Mojang nichts) > mc-heads > Steve
+    const px = async (v) => encodePng(64, 64, new Uint8Array(64 * 64 * 4).fill(v)), ING = await px(10), MJ = await px(20), MT = await px(30), MH = await px(40), DEF = await px(60);
+    const UID = "5629bc24-db84-4c65-b73d-40b038fa5906", U = UID.replace(/-/g, ""), ITX = "https://textures.minecraft.net/texture/feedbeef00112233", MTX = "https://textures.minecraft.net/texture/abc123abc123abc1";
+    const tex = btoa(JSON.stringify({ textures: { SKIN: { url: MTX } } }));
+    const db = (stats, links = {}) => ({ prepare: () => ({ bind: (...a) => ({ first: async () => (a.includes("nani_san123") || a.includes(U) ? { mc_name: "Nani_San123", mc_uuid: UID, stats: stats == null ? null : JSON.stringify(stats), ...links } : null) }) }) });
+    const up = (o = {}) => { const n = []; return [n, async (u) => { n.push(u); const J = (x) => new Response(JSON.stringify(x));
+      if (u === ITX) return new Response(ING); if (/lookup\/name|users\/profiles/.test(u)) return J({ id: U });
+      if (/sessionserver/.test(u)) return o.mj === "down" ? new Response("", { status: 502 }) : o.mj === "none" ? new Response(null, { status: 204 }) : J({ properties: [{ name: "textures", value: tex }] });
+      if (u === MTX) return new Response(MJ); if (/minotar\.net/.test(u)) return new Response(o.mt || MT); if (/mc-heads\.net\/skin\/MHF_Steve/.test(u)) return new Response(DEF); if (/mc-heads/.test(u)) return o.mh === false ? new Response("", { status: 404 }) : new Response(MH); return new Response("", { status: 404 }); }]; };
+    const same = (x, y) => x && x.b && new Uint8Array(x.b).length === y.length && new Uint8Array(x.b).every((v, i) => v === y[i]);
+    RETRY_MS.v = 0;
+    let [n, f] = up(); let k = await resolveSkin("Nani_San123", { DB: db({ skin_url: ITX }) }, f);
+    ok(same(k, ING) && k.real && k.src === "ingest" && !n.some((u) => /mojang|minotar|mc-heads/.test(u)), "Skin a) skin_url aus Ingest → echt, ohne Mojang", n);
+    [n, f] = up(); k = await resolveSkin("Nani_San123", { DB: db({ skin_url: "https://evil.example/texture/abc" }, { skin_url: "http://textures.minecraft.net/texture/zz" }) }, f);
+    ok(same(k, MJ) && k.src === "mojang" && !validSkinUrl("https://textures.minecraft.net.evil/texture/aa") && validSkinUrl("http://textures.minecraft.net/texture/abcdef0123456789") === "https://textures.minecraft.net/texture/abcdef0123456789", "Skin: ungültige skin_url ignoriert, nur textures.minecraft.net");
+    [n, f] = up(); k = await resolveSkin("Nani_San123", { DB: db(null) }, f);
+    ok(same(k, MJ) && k.real && n.some((u) => u.endsWith("/profile/" + U)) && !n.some((u) => /lookup\/name|users\/profiles|minotar/.test(u)), "Skin b) Mojang per UUID aus mc_links, kein Name-Lookup, kein minotar", n);
+    [n, f] = up({ mj: "down" }); k = await resolveSkin("Nani_San123", { DB: db(null) }, f);
+    ok(same(k, MT) && k.real && k.src === "minotar" && n.some((u) => u === "https://minotar.net/skin/" + U), "Skin c) Mojang 502 → minotar per UUID, echt", n);
+    { const H = [...new Uint8Array(await crypto.subtle.digest("SHA-1", new Uint8Array(64 * 64 * 4).fill(30)))].map((x) => x.toString(16).padStart(2, "0")).join(""); DEFAULT_SKINS.add(H);
+      [n, f] = up({ mj: "none" }); k = await resolveSkin("Nani_San123", { DB: db(null) }, f); DEFAULT_SKINS.delete(H);
+      ok(same(k, MH) && !k.real && k.src === "mc-heads", "Skin c) minotar-Default-Skin zählt nicht als echt → mc-heads-Fallback"); }
+    [n, f] = up({ mj: "down", mt: new Uint8Array([1, 2, 3]), mh: false }); k = await resolveSkin("Nani_San123", { DB: db(null) }, f);
+    ok(same(k, DEF) && !k.real && k.src === "steve", "Skin e) alles kaputt → Steve, kein echter Skin");
+    [n, f] = up({ mj: "down", mt: new Uint8Array([1]) }); let r = await skinResponse(new Request("https://mc.nwebnotfound.dev/mc-skin/Nani_San123"), "/mc-skin/Nani_San123", null, { DB: db(null) }, f);
+    ok(r.headers.get("cache-control") === "public, max-age=600" && r.headers.get("x-skin-source") === "mc-heads", "Skin d) mc-heads-Fallback → max-age=600");
+    [n, f] = up(); r = await skinResponse(new Request("https://mc.nwebnotfound.dev/mc-skin/Nani_San123"), "/mc-skin/Nani_San123", null, { DB: db({ skin_url: ITX }) }, f);
+    ok(r.headers.get("cache-control") === "public, max-age=21600" && r.headers.get("x-skin-source") === "ingest", "Skin a) echt → max-age=21600");
+    [n, f] = up(); k = await resolveSkin("Joni81", { DB: { prepare: () => { throw new Error("no such column: skin_url"); } } }, f);
+    ok(same(k, MJ) && k.src === "mojang", "Skin: D1-Fehler/fehlende Spalte wird toleriert (Name-Lookup)");
+    [n, f] = up(); const hd = await renderHead("Nani_San123", 64, f, { DB: db({ skin_url: ITX }) }); ok(hd && !hd.fallback && hd.src === "ingest", "Kopf nutzt dieselbe Quellen-Reihenfolge");
+    RETRY_MS.v = 250; }
   { // Retry begrenzt: 5xx → genau 2 Calls mit Backoff, 429+Retry-After → 1 Call (Mojang und mc-heads)
     for (const u of ["https://api.mojang.com/users/profiles/minecraft/x", "https://mc-heads.net/skin/x"]) {
       let c = 0; const t0 = Date.now(); let r = await fetchRetry(async () => { c++; return new Response("", { status: 503 }); }, u);
       ok(c === 2 && r.status === 503 && Date.now() - t0 >= 200, "Retry " + new URL(u).host + ": 5xx → 2 Calls mit Backoff");
       c = 0; r = await fetchRetry(async () => { c++; return new Response("", { status: 429, headers: { "retry-after": "30" } }); }, u);
       ok(c === 1 && r.status === 429, "Retry " + new URL(u).host + ": 429 + Retry-After → 1 Call"); }
-    let c = 0; RETRY_MS.v = 0; await skinResponse(new Request("https://mc.nwebnotfound.dev/mc-skin/Joni81"), "/mc-skin/Joni81", null, async () => { c++; return new Response("", { status: 500 }); }); RETRY_MS.v = 250;
-    ok(c <= 2 * 4, "Skin: alle Upstreams 5xx → höchstens 2 Calls pro URL (" + c + ")"); }
+    const per = {}; let c = 0; RETRY_MS.v = 0; await skinResponse(new Request("https://mc.nwebnotfound.dev/mc-skin/Joni81"), "/mc-skin/Joni81", null, null, async (u) => { c++; per[u] = (per[u] || 0) + 1; return new Response("", { status: 500 }); }); RETRY_MS.v = 250;
+    ok(Object.values(per).every((x) => x === 2), "Skin: alle Upstreams 5xx → höchstens 2 Calls pro URL (" + c + ")"); }
   { const P = (f) => fs.readFileSync(ROOT + f, "utf8"); // Client-URLs versioniert, damit Browser-Caches mit altem Steve-Ersatz umgangen werden
-    ok(P("public/mc/player3d.js").includes("+'?v=2'") && !/\/mc-head\/[^"'\n]{0,60}'\/'\+\(head\|\|64\)\+'"/.test(P("public/mc/player3d.js")) && ["src/mc-players.js", "src/mc-parkour.js", "public/mc/home.js", "public/mc/shops.js", "public/mc/shop.js", "public/mc/auction.js"].every((f) => P(f).includes("?v=4")), "Skin/Kopf-URLs im Client versioniert (?v=2 / ?v=4)"); }
+    ok(P("public/mc/player3d.js").includes("+'?v=3'") && !/\/mc-head\/[^"'\n]{0,60}'\/'\+\(head\|\|64\)\+'"/.test(P("public/mc/player3d.js")) && ["src/mc-players.js", "src/mc-parkour.js", "public/mc/home.js", "public/mc/shops.js", "public/mc/shop.js", "public/mc/auction.js"].every((f) => P(f).includes("?v=5")), "Skin/Kopf-URLs im Client versioniert (?v=3 / ?v=5)"); }
     ok(skinOk({ w: 64, h: 64 }) && skinOk({ w: 64, h: 32 }) && skinOk({ w: 256, h: 256 }) && !skinOk({ w: 100, h: 100 }) && !skinOk({ w: 64, h: 48 }), "Skin-Formate inkl. HD erkannt"); }
   ok(/mc-heads\.net\/head\/MHF_Zombie/.test(await IC("zombie_head")) && /MHF_WSkeleton/.test(await IC("wither_skeleton_skull")) && /MHF_Creeper/.test(await IC("creeper_wall_head")), "Mob-Köpfe → Kopf statt Block/Papier");
   const iau = JSON.parse(execSync("node scripts/icon-audit.mjs --json", { cwd: ROOT }).toString());
