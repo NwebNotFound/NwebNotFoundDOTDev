@@ -80,39 +80,73 @@ async function mojangSkin(id, fetcher) {
   const t = j.properties?.find((x) => x.name === "textures"); if (!t) return null;
   const u = JSON.parse(atob(t.value)).textures?.SKIN?.url; return u && /^https?:\/\/textures\.minecraft\.net\/texture\/[0-9a-f]+$/.test(u) ? u.replace(/^http:/, "https:") : null;
 }
-// Nur der Mojang-Skin gilt als echt (6 h Cache). mc-heads liefert für manche Accounts veraltete/Default-Skins
-// (z. B. Steve für Joni81, Nani_San123) → wie ein Fallback nur kurz cachen, damit Mojang bald neu versucht wird.
-const skinSources = (name, mj) => [[mj, true], [SKIN_SRC(name), false], [SKIN_SRC("MHF_Steve"), false]];
-export async function renderHead(name, size, fetcher = fetch) {
-  let mj = null; try { mj = await mojangSkin(name, fetcher); } catch {}
-  for (const [src, real] of skinSources(name, mj)) { if (!src) continue; try { const r = await fetchRetry(fetcher, src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r || !r.ok) continue; const s = await decodePng(await r.arrayBuffer()); if (!skinOk(s)) continue; return { png: await encodePng(size, size, faceRgba(s, size)), fallback: !real }; } catch {} }
+// Skin-Quellen in fester Reihenfolge:
+//  a) skin_url aus dem Ingest (stats.skin_url oder mc_links.skin_url, nur textures.minecraft.net) → echt
+//  b) Mojang per UUID aus mc_links (sonst per Name) → echt
+//  c) minotar.net/skin/<uuid> – wenn Mojang keinen ladbaren Skin liefert; echt nur, wenn kein Default-Skin
+//  d) mc-heads (liefert für manche Accounts nur Steve) → Fallback
+//  e) Steve → Fallback
+// Echt = 6 h Cache, Fallback = 10 min.
+const TEX_RE = /^https:\/\/textures\.minecraft\.net\/texture\/[0-9a-f]{16,128}$/;
+export const validSkinUrl = (u) => (typeof u === "string" && TEX_RE.test(u.replace(/^http:/, "https:")) ? u.replace(/^http:/, "https:") : null);
+const MINOTAR = (id) => "https://minotar.net/skin/" + encodeURIComponent(id);
+// SHA-1 der RGBA-Pixel bekannter Default-Skins (Mojang Steve/Alex, minotar- und mc-heads-Steve)
+export const DEFAULT_SKINS = new Set(["18b1728ad94f13571d903b913f5e58d47cee1b0a", "55955c2efee5c28a12cac80d271d83cbe19cd182", "24aca6a62fd30965a6e4f212f36b74adc91ac1fc", "ee5617598fb1d9efee0c63797534e1184d9de91b"]);
+const sha1hex = async (u8) => [...new Uint8Array(await crypto.subtle.digest("SHA-1", u8))].map((x) => x.toString(16).padStart(2, "0")).join("");
+// Spieler aus D1 (nur lesen): UUID und optionale skin_url. Fehlende Tabellen/Spalten/DB → {}
+export async function playerSkinInfo(env, id) {
+  if (!env?.DB) return {};
+  try {
+    const k = id.toLowerCase().replace(/-/g, "");
+    const r = await env.DB.prepare("SELECT l.*, s.stats AS stats FROM mc_links l LEFT JOIN mc_player_stats s ON s.mc_uuid = l.mc_uuid WHERE lower(l.mc_name) = ? OR lower(replace(l.mc_uuid, '-', '')) = ? LIMIT 1").bind(k, k).first();
+    if (!r) return {};
+    let st = {}; try { st = typeof r.stats === "string" ? JSON.parse(r.stats) : r.stats || {}; } catch {}
+    const uuid = String(r.mc_uuid || "").replace(/-/g, "").toLowerCase();
+    return { uuid: /^[0-9a-f]{32}$/.test(uuid) ? uuid : null, skinUrl: validSkinUrl(st?.skin_url) || validSkinUrl(r.skin_url) };
+  } catch { return {}; }
+}
+async function loadSkin(src, fetcher) {
+  try { const r = await fetchRetry(fetcher, src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r || !r.ok) return null; const b = await r.arrayBuffer(); const s = await decodePng(b); return skinOk(s) ? { b, s } : null; } catch { return null; }
+}
+// → { b: PNG-Bytes, s: dekodiert, real: bool, src: "ingest"|"mojang"|"minotar"|"mc-heads"|"steve" } oder null
+export async function resolveSkin(id, env, fetcher = fetch) {
+  const info = await playerSkinInfo(env, id), who = info.uuid || id;
+  if (info.skinUrl) { const x = await loadSkin(info.skinUrl, fetcher); if (x) return { ...x, real: true, src: "ingest" }; }
+  let mj = null; try { mj = await mojangSkin(who, fetcher); } catch {}
+  if (mj) { const x = await loadSkin(mj, fetcher); if (x) return { ...x, real: true, src: "mojang" }; }
+  // minotar nach jedem erfolglosen Mojang-Versuch (keine URL, Fehler oder Download/PNG kaputt)
+  { const x = await loadSkin(MINOTAR(who), fetcher); if (x) { const real = !DEFAULT_SKINS.has(await sha1hex(x.s.data)); if (real) return { ...x, real, src: "minotar" }; } }
+  for (const [src, n] of [[SKIN_SRC(id), "mc-heads"], [SKIN_SRC("MHF_Steve"), "steve"]]) { const x = await loadSkin(src, fetcher); if (x) return { ...x, real: false, src: n }; }
   return null;
 }
-export async function headResponse(req, path, ctx) {
+const CC = (real) => "public, max-age=" + (real ? 21600 : 600);
+export async function renderHead(name, size, fetcher = fetch, env = null) {
+  const k = await resolveSkin(name, env, fetcher); if (!k) return null;
+  return { png: await encodePng(size, size, faceRgba(k.s, size)), fallback: !k.real, src: k.src };
+}
+export async function headResponse(req, path, ctx, env = null, fetcher = fetch) {
   const m = path.match(/^\/mc-head\/([A-Za-z0-9_]{1,16}|[0-9a-f-]{32,36})(?:\/(\d{1,3}))?(?:\.png)?$/i);
   if (!m) return new Response("Not found", { status: 404 });
   const size = Math.min(256, Math.max(8, Math.round((+m[2] || 64) / 8) * 8));
-  const key = new Request(new URL("/mc-head/v4/" + m[1].toLowerCase() + "/" + size, req.url).toString());
+  const key = new Request(new URL("/mc-head/v5/" + m[1].toLowerCase() + "/" + size, req.url).toString());
   const cache = typeof caches !== "undefined" ? caches.default : null;
   const hit = cache && (await cache.match(key)); if (hit) return hit;
-  const r = await renderHead(m[1], size);
+  const r = await renderHead(m[1], size, fetcher, env);
   if (!r) return new Response(null, { status: 302, headers: { location: "/mc-icon/v2/player_head", "cache-control": "public, max-age=300" } });
-  const res = new Response(r.png, { headers: { "content-type": "image/png", "cache-control": "public, max-age=" + (r.fallback ? 600 : 21600), "x-content-type-options": "nosniff" } });
+  const res = new Response(r.png, { headers: { "content-type": "image/png", "cache-control": CC(!r.fallback), "x-skin-source": r.src, "x-content-type-options": "nosniff" } });
   if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
   return res;
 }
 // Roh-Skin same-origin für skinview3d (CSP: img/connect nur 'self'). Nur validierte PNGs (siehe skinOk), Fallback Steve.
-export async function skinResponse(req, path, ctx, fetcher = fetch) {
+export async function skinResponse(req, path, ctx, env = null, fetcher = fetch) {
   const m = path.match(/^\/mc-skin\/([A-Za-z0-9_]{1,16}|[0-9a-f-]{32,36})(?:\.png)?$/i);
   if (!m) return new Response("Not found", { status: 404 });
-  const key = new Request(new URL("/mc-skin/v2/" + m[1].toLowerCase(), req.url).toString());
+  const key = new Request(new URL("/mc-skin/v3/" + m[1].toLowerCase(), req.url).toString());
   const cache = typeof caches !== "undefined" ? caches.default : null;
   const hit = cache && (await cache.match(key)); if (hit) return hit;
-  let mj = null; try { mj = await mojangSkin(m[1], fetcher); } catch {}
-  let png = null, fb = false;
-  for (const [src, real] of skinSources(m[1], mj)) { if (!src) continue; try { const r = await fetchRetry(fetcher, src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r || !r.ok) continue; const b = await r.arrayBuffer(); const s = await decodePng(b); if (!skinOk(s)) continue; png = b; fb = !real; break; } catch {} }
-  if (!png) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } });
-  const res = new Response(png, { headers: { "content-type": "image/png", "cache-control": "public, max-age=" + (fb ? 600 : 21600), "x-content-type-options": "nosniff" } });
+  const k = await resolveSkin(m[1], env, fetcher);
+  if (!k) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } });
+  const res = new Response(k.b, { headers: { "content-type": "image/png", "cache-control": CC(k.real), "x-skin-source": k.src, "x-content-type-options": "nosniff" } });
   if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
   return res;
 }

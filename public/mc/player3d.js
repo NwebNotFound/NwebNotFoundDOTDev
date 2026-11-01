@@ -6,7 +6,7 @@ const STATIC=()=>matchMedia('(max-width:640px),(hover:none),(prefers-reduced-mot
 const NAME=/^[A-Za-z0-9_]{1,16}$/;const MAX_LIVE=6;let live=0,lib=null;const VS=[];
 const gc=()=>{for(let i=VS.length-1;i>=0;i--)if(!VS[i][0].isConnected){try{VS[i][1].dispose()}catch(_){}VS.splice(i,1);live--}};
 const load=()=>lib||(lib=new Promise((res,rej)=>{if(window.skinview3d)return res();const s=document.createElement('script');s.src='/vendor/skinview3d-3.4.2.min.js';s.async=true;s.onload=res;s.onerror=rej;document.head.appendChild(s)}));
-const skin=n=>'/mc-skin/'+encodeURIComponent(n)+'?v=2';
+const skin=n=>'/mc-skin/'+encodeURIComponent(n)+'?v=3';
 // Statische Frames nacheinander mit EINEM Viewer rendern (spart WebGL-Kontexte)
 let sv=null,q=Promise.resolve();
 function still(n,w,h,rot){return q=q.then(async()=>{await load();if(!sv){sv=new skinview3d.SkinViewer({canvas:document.createElement('canvas'),width:w,height:h,zoom:.86,fov:40,preserveDrawingBuffer:true});sv.renderPaused=true;sv.globalLight.intensity=2.6;sv.cameraLight.intensity=.7}
@@ -22,7 +22,7 @@ const io='IntersectionObserver' in window?new IntersectionObserver(es=>es.forEac
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 window.MC3D={
  // Container mit Kopf als Fallback; cls z. B. "pf-model" / "pod-model"
- html:(n,cls,head)=>NAME.test(n)?'<div class="m3d '+E(cls||'')+'" data-name="'+n+'"><img class="m3d-fb" alt="" loading="lazy" width="'+(head||64)+'" height="'+(head||64)+'" src="/mc-head/'+n+'/'+(head||64)+'?v=4" onerror="this.onerror=null;this.src=\'/mc-head/MHF_Steve/'+(head||64)+'?v=4\'"></div>':'',
+ html:(n,cls,head)=>NAME.test(n)?'<div class="m3d '+E(cls||'')+'" data-name="'+n+'"><img class="m3d-fb" alt="" loading="lazy" width="'+(head||64)+'" height="'+(head||64)+'" src="/mc-head/'+n+'/'+(head||64)+'?v=5" onerror="this.onerror=null;this.src=\'/mc-head/MHF_Steve/'+(head||64)+'?v=5\'"></div>':'',
  scan(root){gc();(root||document).querySelectorAll('.m3d[data-name]:not([data-m3d])').forEach(el=>{el.dataset.m3d='1';io?io.observe(el):draw(el)})},
  // Hover-Vorschau (nur Maus): ein gemeinsamer Viewer im Popover
  hover(root,sel){if(!OK||STATIC())return;const pop=document.createElement('div');pop.className='m3d-pop';pop.setAttribute('aria-hidden','true');document.body.appendChild(pop);let v=null,cur='',tm;
