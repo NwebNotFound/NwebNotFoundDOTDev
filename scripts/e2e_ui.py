@@ -1,5 +1,5 @@
-import os
 #!/usr/bin/env python3
+import os
 # UI-Prüfung gegen das lokale wrangler dev aus e2e.mjs (wird von dort aufgerufen). argv: BASE COOKIE
 import json
 import sys, re
@@ -7,7 +7,7 @@ from urllib.parse import unquote
 from playwright.sync_api import sync_playwright
 BASE, COOKIE = sys.argv[1], sys.argv[2]
 H = "mc.nwebnotfound.dev"; U1x = "11111111222233334444555555555555"; fails = 0; SH = os.environ.get("E2E_SCREENS_DIR", "/workspace/screens/qa")
-import os; os.makedirs(SH, exist_ok=True)
+os.makedirs(SH, exist_ok=True)
 cookie_name, cookie_val = COOKIE.split("=", 1)
 cookie_val = unquote(cookie_val)
 def ok(c, m, x=""):

@@ -19,9 +19,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-chromium-v1
+          key: ms-playwright-${{ runner.os }}-1.64.1-chromium
       - name: Playwright installieren
-        run: pip install playwright && python -m playwright install --with-deps chromium
+        run: pip install playwright==1.64.1 && python -m playwright install --with-deps chromium
       - name: Install wrangler
         run: npm i -g wrangler
       - name: Icon-Referenzcheck
