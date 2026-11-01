@@ -49,13 +49,24 @@ export function faceRgba(skin, size) {
 }
 // Skin-URL direkt von Mojang (mc-heads liefert für manche Accounts falsche/verrauschte Köpfe)
 const MJ_TTL = 6 * 3600;
+// Begrenzter Retry für Mojang und mc-heads: max. 2 Versuche, 250 ms Backoff. Kein Retry bei 429 mit Retry-After.
+export const RETRY_MS = { v: 250 };
+export async function fetchRetry(fetcher, url, init) {
+  let r = null;
+  for (let i = 0; i < 2; i++) {
+    if (i) await new Promise((ok) => setTimeout(ok, RETRY_MS.v));
+    try { r = await fetcher(url, init); } catch { r = null; }
+    if (r && r.status < 500 && r.status !== 429) return r;
+    if (r && r.status === 429 && r.headers.get("retry-after")) return r;
+  }
+  return r;
+}
 // Mojang-Lookups (Name→UUID, UUID→Skin) im Cache API zwischenspeichern; 429/Fehler → null (Fallback mc-heads, dann Steve)
 async function mojangJson(url, fetcher) {
   const cache = typeof caches !== "undefined" ? caches.default : null, key = new Request(url);
   try { const hit = cache && (await cache.match(key)); if (hit) return hit.status === 204 ? null : await hit.json(); } catch {}
   // Mojang liefert sporadisch 502/429: einmal neu versuchen; Edge-Cache nur für 2xx (Fehler nie lange cachen)
-  let r = null;
-  for (let i = 0; i < 2 && !(r && r.status !== 429 && r.status < 500); i++) { try { r = await fetcher(url, { cf: { cacheTtlByStatus: { "200-299": MJ_TTL, "404": 60, "400-599": 0 } } }); } catch { r = null; } }
+  const r = await fetchRetry(fetcher, url, { cf: { cacheTtlByStatus: { "200-299": MJ_TTL, "404": 60, "400-599": 0 } } });
   if (!r || r.status === 429 || r.status >= 500) return null; // nicht cachen, später neu versuchen
   const body = r.ok ? await r.text().catch(() => null) : null;
   let j = null; try { j = body ? JSON.parse(body) : null; } catch {}
@@ -74,7 +85,7 @@ async function mojangSkin(id, fetcher) {
 const skinSources = (name, mj) => [[mj, true], [SKIN_SRC(name), false], [SKIN_SRC("MHF_Steve"), false]];
 export async function renderHead(name, size, fetcher = fetch) {
   let mj = null; try { mj = await mojangSkin(name, fetcher); } catch {}
-  for (const [src, real] of skinSources(name, mj)) { if (!src) continue; try { const r = await fetcher(src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r.ok) continue; const s = await decodePng(await r.arrayBuffer()); if (!skinOk(s)) continue; return { png: await encodePng(size, size, faceRgba(s, size)), fallback: !real }; } catch {} }
+  for (const [src, real] of skinSources(name, mj)) { if (!src) continue; try { const r = await fetchRetry(fetcher, src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r || !r.ok) continue; const s = await decodePng(await r.arrayBuffer()); if (!skinOk(s)) continue; return { png: await encodePng(size, size, faceRgba(s, size)), fallback: !real }; } catch {} }
   return null;
 }
 export async function headResponse(req, path, ctx) {
@@ -99,7 +110,7 @@ export async function skinResponse(req, path, ctx, fetcher = fetch) {
   const hit = cache && (await cache.match(key)); if (hit) return hit;
   let mj = null; try { mj = await mojangSkin(m[1], fetcher); } catch {}
   let png = null, fb = false;
-  for (const [src, real] of skinSources(m[1], mj)) { if (!src) continue; try { const r = await fetcher(src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r.ok) continue; const b = await r.arrayBuffer(); const s = await decodePng(b); if (!skinOk(s)) continue; png = b; fb = !real; break; } catch {} }
+  for (const [src, real] of skinSources(m[1], mj)) { if (!src) continue; try { const r = await fetchRetry(fetcher, src, { cf: { cacheTtl: 3600, cacheEverything: true } }); if (!r || !r.ok) continue; const b = await r.arrayBuffer(); const s = await decodePng(b); if (!skinOk(s)) continue; png = b; fb = !real; break; } catch {} }
   if (!png) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } });
   const res = new Response(png, { headers: { "content-type": "image/png", "cache-control": "public, max-age=" + (fb ? 600 : 21600), "x-content-type-options": "nosniff" } });
   if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
