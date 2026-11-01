@@ -2,6 +2,7 @@ import { AV } from "./asset-version.js";
 import { cleanEconomy, economyStatements, economyApi } from "./mc-economy.js";
 import { cleanRanks, rankStatements } from "./mc-ranks.js";
 import { cleanPvp, pvpStatements, pvpApi, pvpPlayerApi, pvpBody } from "./mc-pvp.js";
+import { vipApi, vipBody } from "./mc-vip.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { headResponse, skinResponse, validSkinUrl } from "./mc-head.js";
@@ -799,6 +800,7 @@ export default {
     if (p === "/api/mc-leaderboards") return mcLeaderboards(env);
     if (p === "/api/mc-parkour") return json(await parkourApi(env), 200, { "cache-control": "public, max-age=30" });
     if (p === "/api/mc-pvp") return json(await pvpApi(env), 200, { "cache-control": "public, max-age=30" });
+    if (p === "/api/mc-vip") { if (req.method !== "GET") return json({ error: "Method not allowed" }, 405); const u = await getUser(req, env).catch(() => null); return json(await vipApi(env, u), 200, { "cache-control": "private, no-store" }); }
     if (p.startsWith("/api/mc-pvp/")) { const o = await pvpPlayerApi(env, decodeURIComponent(p.slice(12))); return o ? json(o, 200, { "cache-control": "public, max-age=30" }) : json({ error: "keine PvP-Daten" }, 404); }
     if (p === "/api/mc-economy") return json(await economyApi(env), 200, { "cache-control": "public, max-age=60" });
     if (p === "/api/mc-market") return mcMarket(env);
@@ -816,6 +818,7 @@ export default {
       if (p === "/profile") return html(PROFILE_MC());
       if (p === "/leaderboards") return html(LEADERBOARDS_MC());
       if (p === "/pvp") return html(mcPage("PvP · NwebNotFound MC", "PvP-Rangliste der Arena: Siege, Niederlagen und Siegquote", pvpBody()));
+      if (p === "/vip") return html(mcPage("VIP · NwebNotFound MC", "VIP- und MVP-Panel: eigener Rang, Vorteile, Welten und Stats", vipBody()));
       if (p === "/changelog") return html(mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", changelogBody()));
       if (p === "/parkour") return html(mcPage("Parkour · NwebNotFound MC", "Parkour-Bestzeiten aus der Lobby: Top 10 pro Kurs", parkourBody()));
       if (p === "/bestellungen" || p === "/abholungen") return html(mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));

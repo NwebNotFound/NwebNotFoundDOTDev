@@ -256,3 +256,8 @@ Die Antwort enthält `views: {leaderboard_rows, player_stat_rows, history_rows, 
 Höchstens 90 Zeilen, älteste zuerst (streng aufsteigend, kein Tag doppelt). Upsert pro Tag in `mc_economy_daily` (Migration `0010_economy_daily.sql`).
 Strikt: ungültiges Datum, Nicht-Integer, fehlendes `money_supply_cp`, falsche Reihenfolge oder mehr als 90 Zeilen → `400`, dann wird nichts geschrieben. Unbekannte Felder in Zeilen werden ignoriert (einmal pro Request `console.warn`, ohne Werte). Fehlende minted/burned/net zählen als `null`.
 Lesen: `GET /api/mc-economy` → `{updated_at, days:[…]}` (letzte 90 Tage, älteste zuerst). Anzeige auf `/markt` (Stufen-Graph der Geldmenge, `–` bei null).
+
+## VIP-Panel (`GET /api/mc-vip`, Seite `/vip`)
+Nur lesen. Zugang zum eigenen Panel haben eingeloggte Discord-User, deren `mc_links`-Zeile `verified` und `has_role` ist und deren Rang in `mc_player_ranks` `vip` oder `mvp` ist. Alle anderen bekommen die öffentliche Ränge-Übersicht, ohne Stats und ohne Weltenstatus. `POST` antwortet mit 405. Die Antwort ist `private, no-store`.
+
+VIP-Welten kommen nicht aus einer eigenen Tabelle. Die Seite nimmt aus dem bestehenden `servers`-Snapshot höchstens drei Keys, die auf `vip`, `vip1`, `vip_1`, `vip-2`, `vipwelt`, `vip_world`, `vip_world_3` (und dieselbe Form) passen. Lobby, Survival und andere Keys zählen nicht. Fehlt so ein Key, zeigt das Panel den Platzhalter „bald verfügbar“. Es gibt keinen RCON- oder Schreibpfad.
