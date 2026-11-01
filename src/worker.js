@@ -450,7 +450,8 @@ async function normalizeViews(env, b) {
       const raw = pk(r, ...LB_CAT); if (raw == null) continue; const cat = lbKey(raw);
       const u = pk(r, ...LB_U), name = pk(r, ...LB_N) ?? (u && UUIDX.test(String(u)) ? names[nU(u)] : null); if (!name || !/^[A-Za-z0-9_]{1,16}$/.test(String(name))) continue;
       const per = String(pk(r, "period", "scope", "range", "timeframe") ?? "total").toLowerCase(); const T = /week|woche|7d/.test(per) ? wk : tot;
-      (T[cat] ||= []).push({ name: String(name), value: Number(pk(r, ...LB_V)) || 0, rank: Number(r.rank) || null });
+      const val = pk(r, ...LB_V); if (val == null || !Number.isFinite(+val)) continue; // null-Stat → nicht ins Leaderboard (statt 0)
+      (T[cat] ||= []).push({ name: String(name), value: +val, rank: Number(r.rank) || null });
     }
     const fin = (T) => { for (const k in T) T[k] = T[k].sort((a, c) => (a.rank && c.rank ? a.rank - c.rank : c.value - a.value)).slice(0, 10).map(({ name, value }) => ({ name, value })); return T; };
     b.leaderboards = fin(tot); if (Object.keys(wk).length) b.leaderboards_weekly = fin(wk);
@@ -471,6 +472,7 @@ async function normalizeViews(env, b) {
 }
 const FRESH_MS = 5 * 60 * 1000;
 const clip = (v, n = 32) => String(v ?? "").slice(0, n);
+const META_KEYS = new Set(["online", "team", "team_name", "team_color", "team_color_hex", "team_color_code", "last_seen", "last_online", "last_login"]);
 function cleanIngest(b) {
   const servers = {};
   for (const [k, v] of Object.entries(b?.servers || {}).slice(0, 8)) {
@@ -481,7 +483,7 @@ function cleanIngest(b) {
   const leaderboards = {};
   for (const [k, v] of Object.entries(b?.leaderboards || {}).slice(0, 32)) {
     if (!/^[a-z0-9_-]{1,24}$/i.test(k) || !Array.isArray(v)) continue;
-    leaderboards[lbKey(k)] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => x.name);
+    leaderboards[lbKey(k)] = v.filter(x => x?.value != null && x.value !== "" && Number.isFinite(+x.value)).slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: +x.value })).filter(x => x.name);
   }
   const leaderboards_weekly = cleanLb(b?.leaderboards_weekly);
   const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
@@ -494,13 +496,13 @@ function cleanIngest(b) {
     const o = {};
     if (v.details !== undefined) { const d = cleanDetails(v.details); if (d) details[normU(k)] = d; }
     // Meta-Felder (team, team_color, last_seen, online) immer zuerst, damit sie nicht am 24er-Limit hängen bleiben
-    const META = ["online", "team", "team_name", "team_color", "team_color_hex", "team_color_code", "last_seen", "last_online", "last_login"];
-    const ent = Object.entries(v).filter(([x]) => x !== "details"), metaE = ent.filter(([x]) => META.includes(x));
-    for (const [sk, sv] of [...metaE, ...ent.filter(([x]) => !META.includes(x)).slice(0, Math.max(0, 24 - metaE.length))]) {
+    const ent = Object.entries(v).filter(([x]) => x !== "details"), metaE = ent.filter(([x]) => META_KEYS.has(x));
+    for (const [sk, sv] of [...metaE, ...ent.filter(([x]) => !META_KEYS.has(x)).slice(0, Math.max(0, 24 - metaE.length))]) {
       if (!/^[a-z0-9_]{1,24}$/i.test(sk)) continue;
       // null bleibt null (vorher: +null === 0 → Platzhalter-0), Bool bleibt Bool (vorher verworfen → online fehlte)
       if (sv === null) { o[sk] = null; continue; }
       if (typeof sv === "boolean") { o[sk] = sv; continue; }
+      // online: nur eindeutige Werte (true/false, 1/0, "1"/"0", "true"/"false"); unbekannte Werte werden verworfen (Feld fehlt dann)
       if (sk === "online") { const t = sv === 1 || sv === "1" || sv === "true" ? true : sv === 0 || sv === "0" || sv === "false" ? false : null; if (t !== null) o.online = t; continue; }
       if (sv === "" || (typeof sv === "string" && !sv.trim())) { o[sk] = null; continue; }
       if (/^(inventory|inv|inventar|items)$/i.test(sk)) { const inv = normInv(sv); if (inv) o.inventory = inv; continue; }
@@ -519,7 +521,7 @@ function cleanLb(o) {
   const r = {};
   for (const [k, v] of Object.entries(o).slice(0, 32)) {
     if (!/^[a-z0-9_-]{1,24}$/i.test(k) || !Array.isArray(v)) continue;
-    r[lbKey(k)] = v.slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: Number(x?.value) || 0 })).filter(x => /^[A-Za-z0-9_]{1,16}$/.test(x.name)).sort((a, b) => b.value - a.value);
+    r[lbKey(k)] = v.filter(x => x?.value != null && x.value !== "" && Number.isFinite(+x.value)).slice(0, 10).map(x => ({ name: clip(x?.name, 16), value: +x.value })).filter(x => /^[A-Za-z0-9_]{1,16}$/.test(x.name)).sort((a, b) => b.value - a.value);
   }
   return r;
 }
