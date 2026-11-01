@@ -4,7 +4,7 @@ import { spawn, execSync } from "node:child_process";
 import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
 import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
-import { faceRgba, skinOk } from "../src/mc-head.js";
+import { faceRgba, skinOk, skinResponse, renderHead, encodePng, fetchRetry, RETRY_MS } from "../src/mc-head.js";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
@@ -318,6 +318,30 @@ try {
   ok(/item\/creeper_spawn_egg\.png$/.test(await IC("creeper_spawn_egg")), "Spawn-Ei → eigenes Ei");
   { const w = 64, h = 32, d = new Uint8Array(w * h * 4); for (let i = 0; i < w * h; i++) d.set([0, 0, 0, 255], i * 4); for (let y = 8; y < 16; y++) for (let x = 8; x < 16; x++) d.set([200, 150, 100, 255], (y * w + x) * 4);
     ok(faceRgba({ w, h, data: d }, 8)[0] === 200, "Legacy-Skin 64x32: deckende Hut-Fläche wird ignoriert (Notch-Hack)");
+  { // Skins: Mojang 502 einmal → Retry; mc-heads-Ersatz nur kurz cachen (Joni81/Nani_San123 bekamen 6 h Steve)
+    const px = async (v) => encodePng(64, 64, new Uint8Array(64 * 64 * 4).fill(v)), REAL = await px(200), MH = await px(50);
+    const TX = "https://textures.minecraft.net/texture/abc123", tex = btoa(JSON.stringify({ textures: { SKIN: { url: TX.replace("https", "http"), metadata: { model: "slim" } } } }));
+    const mk = (fail) => { const n = {}; return [n, async (u) => { n[u] = (n[u] || 0) + 1; const J = (o) => new Response(JSON.stringify(o), { headers: { "content-type": "application/json" } });
+      if (/lookup\/name|users\/profiles/.test(u)) return n[u] <= fail ? new Response("bad gateway", { status: 502 }) : J({ id: "5629bc24db844c65b73d40b038fa5906", name: "Nani_San123" });
+      if (/sessionserver/.test(u)) return J({ properties: [{ name: "textures", value: tex }] });
+      if (u === TX) return new Response(REAL); if (/mc-heads\.net/.test(u)) return new Response(MH); return new Response(null, { status: 404 }); }]; };
+    const rq = new Request("https://mc.nwebnotfound.dev/mc-skin/Nani_San123");
+    let [n, f] = mk(1); let r = await skinResponse(rq, "/mc-skin/Nani_San123", null, f); let b = new Uint8Array(await r.arrayBuffer());
+    ok(r.status === 200 && b.length === REAL.length && b.every((x, k) => x === REAL[k]) && /max-age=21600/.test(r.headers.get("cache-control")) && !Object.keys(n).some((u) => /mc-heads/.test(u)), "Skin: Mojang-502 → Retry → echter Mojang-Skin (6 h)");
+    [n, f] = mk(9); r = await skinResponse(rq, "/mc-skin/Nani_San123", null, f); b = new Uint8Array(await r.arrayBuffer());
+    ok(r.status === 200 && b.every((x, k) => x === MH[k]) && /max-age=600/.test(r.headers.get("cache-control")), "Skin: Mojang down → mc-heads-Ersatz nur 10 min gecacht");
+    [n, f] = mk(9); const h = await renderHead("Joni81", 64, f); ok(h && h.fallback === true, "Kopf: mc-heads-Ersatz gilt als Fallback (kurzer Cache)");
+    [n, f] = mk(0); const h2 = await renderHead("Joni81", 64, f); ok(h2 && h2.fallback === false, "Kopf: Mojang-Skin → langer Cache"); }
+  { // Retry begrenzt: 5xx → genau 2 Calls mit Backoff, 429+Retry-After → 1 Call (Mojang und mc-heads)
+    for (const u of ["https://api.mojang.com/users/profiles/minecraft/x", "https://mc-heads.net/skin/x"]) {
+      let c = 0; const t0 = Date.now(); let r = await fetchRetry(async () => { c++; return new Response("", { status: 503 }); }, u);
+      ok(c === 2 && r.status === 503 && Date.now() - t0 >= 200, "Retry " + new URL(u).host + ": 5xx → 2 Calls mit Backoff");
+      c = 0; r = await fetchRetry(async () => { c++; return new Response("", { status: 429, headers: { "retry-after": "30" } }); }, u);
+      ok(c === 1 && r.status === 429, "Retry " + new URL(u).host + ": 429 + Retry-After → 1 Call"); }
+    let c = 0; RETRY_MS.v = 0; await skinResponse(new Request("https://mc.nwebnotfound.dev/mc-skin/Joni81"), "/mc-skin/Joni81", null, async () => { c++; return new Response("", { status: 500 }); }); RETRY_MS.v = 250;
+    ok(c <= 2 * 4, "Skin: alle Upstreams 5xx → höchstens 2 Calls pro URL (" + c + ")"); }
+  { const P = (f) => fs.readFileSync(ROOT + f, "utf8"); // Client-URLs versioniert, damit Browser-Caches mit altem Steve-Ersatz umgangen werden
+    ok(P("public/mc/player3d.js").includes("+'?v=2'") && !/\/mc-head\/[^"'\n]{0,60}'\/'\+\(head\|\|64\)\+'"/.test(P("public/mc/player3d.js")) && ["src/mc-players.js", "src/mc-parkour.js", "public/mc/home.js", "public/mc/shops.js", "public/mc/shop.js", "public/mc/auction.js"].every((f) => P(f).includes("?v=4")), "Skin/Kopf-URLs im Client versioniert (?v=2 / ?v=4)"); }
     ok(skinOk({ w: 64, h: 64 }) && skinOk({ w: 64, h: 32 }) && skinOk({ w: 256, h: 256 }) && !skinOk({ w: 100, h: 100 }) && !skinOk({ w: 64, h: 48 }), "Skin-Formate inkl. HD erkannt"); }
   ok(/mc-heads\.net\/head\/MHF_Zombie/.test(await IC("zombie_head")) && /MHF_WSkeleton/.test(await IC("wither_skeleton_skull")) && /MHF_Creeper/.test(await IC("creeper_wall_head")), "Mob-Köpfe → Kopf statt Block/Papier");
   const iau = JSON.parse(execSync("node scripts/icon-audit.mjs --json", { cwd: ROOT }).toString());
