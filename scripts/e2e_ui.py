@@ -85,6 +85,32 @@ with sync_playwright() as p:
         ok(pg.locator("#umm a[href$='/bestellungen']").count() == 1, f"{w}px Dropdown: Bestellungen")
         # 1) Profil: kein doppelter Tab, klare Blöcke
         ok(pg.locator(".nl a[href='/profile']").count() == 0, f"{w}px Nav: kein extra Profil-Tab")
+        hd = pg.inner_text(".pf-hd")
+        ok("Rot" in hd and pg.eval_on_selector(".pf-hd .pf-team", "e=>getComputedStyle(e).color") == "rgb(255, 85, 85)", f"{w}px Profil: Team in team_color", hd[:200])
+        ok("01.11.26, 00:05 Uhr" in hd and pg.locator(".pf-hd .pf-on").count() == 0, f"{w}px Profil: last_seen in Europe/Berlin", hd[:300])
+        pg.goto("https://" + H + "/spieler/Seller", wait_until="domcontentloaded"); pg.locator(".pf-hd .pf-meta").wait_for(timeout=15000); hd = pg.inner_text(".pf-hd")
+        ok(pg.locator(".pf-hd .pf-on").count() == 1 and "Zuletzt online" not in hd, f"{w}px Spieler: Online-Badge statt last_seen", hd[:300])
+        ok(pg.eval_on_selector(".pf-hd .pf-team", "e=>getComputedStyle(e).color") == "rgb(85, 255, 85)", f"{w}px Spieler: ungültige team_color → team_color_hex")
+        # XSS: spielergewählter Teamname / ungültige team_color im Header
+        XT = "<img src=x onerror=alert(1)>"; dlg = []; pg.on("dialog", lambda d: (dlg.append(d.message), d.dismiss()))
+        def evil(r):
+            u = r.request.url; h = {k: v for k, v in r.request.all_headers().items() if not k.startswith(":")}; h["host"] = H; j = json.loads(r.fetch(url=BASE + u[len("https://" + H):], headers=h).text()); j["team"] = XT; j["team_color"] = 'red" onmouseover="alert(2)'; j["team_color_hex"] = "#12345G"
+            r.fulfill(status=200, content_type="application/json", body=json.dumps(j))
+        pg.route("**/api/mc-players/Seller", evil)
+        pg.goto("https://" + H + "/spieler/Seller", wait_until="domcontentloaded"); pg.locator(".pf-hd .pf-meta").wait_for(timeout=15000); pg.wait_for_timeout(600)
+        hd = pg.inner_text(".pf-hd"); hh = pg.inner_html(".pf-hd")
+        ok(XT in hd and pg.locator(".pf-hd .pf-meta img:not([src^='/mc-icon/'])").count() == 0 and pg.locator("img[src='x']").count() == 0 and not dlg, f"{w}px Spieler: Team <img onerror> als Text, kein img/alert", hh[:400])
+        ok("onmouseover" not in hh and pg.locator(".pf-hd .pf-team").count() == 0, f"{w}px Spieler: ungültige team_color nicht übernommen", hh[:400])
+        r2 = pg.evaluate("""t=>{const d=document.createElement('div');d.innerHTML=MCP.header({name:'Nils',meta:[['Team',t,'white_banner',{color:'#fff;background:url(x)'}],['CP',t,'gold_ingot'],['Zuletzt online',t,'clock',{seen:true}]]});return [d.querySelectorAll('img[src="x"]').length,d.querySelectorAll('[style]').length,d.textContent.split(t).length-1]}""", XT)
+        ok(r2 == [0, 0, 3], f"{w}px MCP.header escaped alle Meta-Felder, Farbe nur #RRGGBB", r2)
+        pg.unroute("**/api/mc-players/Seller")
+        pg.goto("https://" + H + "/profile", wait_until="domcontentloaded"); pg.locator(".inv").wait_for(state="visible", timeout=20000)
+        # Nav-Gruppen: max. 6 Top-Level-Einträge, aktive Gruppe markiert
+        ok(pg.locator(".nl > .l, .nl > .ng").count() == 6 and pg.locator(".nl .ng").count() == 3, f"{w}px Nav: 6 Top-Level-Einträge, 3 Gruppen")
+        # Inventar: animierte Texturen (Magma 16x48) nur quadratisch
+        pg.evaluate("()=>{const i=document.querySelector('.inv .ivs img');if(i)i.src='/mc-icon/v2/magma_block'}"); pg.wait_for_timeout(800)
+        bx = pg.eval_on_selector(".inv .ivs img", "e=>{const r=e.getBoundingClientRect();return [r.width,r.height]}")
+        ok(abs(bx[0] - bx[1]) < 1.5, f"{w}px Inventar: animierte Textur quadratisch", bx)
         pg.locator("#pordl ul, #pordl p").first.wait_for(state="attached", timeout=10000)
         ok(pg.locator("#pbal").count() == 1 and pg.locator(".pf-kpi").count() == 1 and pg.locator("#pord").count() == 1, f"{w}px Profil: Kontostand, KPI-Leiste, Bestellungen da")
         tabs = pg.locator(".pf-tl [role=tab]").all_inner_texts()
@@ -136,6 +162,15 @@ with sync_playwright() as p:
         go("/parkour?course=test"); pg.locator(".pkr").first.wait_for(timeout=10000); t = pg.inner_text("body")
         ok(pg.locator(".pkg").count() == 1 and pg.locator(".pkr").count() == 10 and "00:39.000" in t, f"{w}px Parkour ?course=test: nur ein Board, Top 10, Zeit mm:ss.mmm", t[:300])
         ok(pg.locator(".pkr img[src^='/mc-head/']").count() == 10 and pg.locator(".pkh img[src*='/mc-icon/v2/']").count() == 1, f"{w}px Parkour: Köpfe + Item-Icon")
+        ok(pg.locator('.ng[data-g=minispiele] .ngb[data-cur]').count() == 1, f"{w}px Nav: Gruppe Minispiele aktiv")
+        if w < 900:
+            ok(not pg.locator(".nl").is_visible(), f"{w}px Nav mobil: eingeklappt"); pg.click(".nbur"); pg.wait_for_timeout(200)
+            ok(pg.locator('.nl a[href="/parkour"]').is_visible() and pg.get_attribute(".nbur", "aria-expanded") == "true", f"{w}px Nav mobil: Drawer öffnet aktive Gruppe")
+            pg.keyboard.press("Escape"); ok(not pg.locator(".nl").is_visible(), f"{w}px Nav mobil: Escape schließt")
+        else:
+            pg.focus(".ng[data-g=wirtschaft] .ngb"); pg.keyboard.press("Enter"); pg.keyboard.press("ArrowDown")
+            ok(pg.evaluate("document.activeElement.getAttribute('href')") == "/markt", f"{w}px Nav: Tastatur öffnet Dropdown")
+            pg.keyboard.press("Escape"); ok(pg.get_attribute(".ng[data-g=wirtschaft] .ngb", "aria-expanded") == "false", f"{w}px Nav: Escape schließt Dropdown")
         ok(pg.locator(".pkt .btn").count() >= 3 and pg.locator('.pkt .btn[aria-selected=true][data-k="test"]').count() == 1 and pg.locator('.nl a[href="/parkour"][aria-current=page]').count() == 1, f"{w}px Parkour: Kurs-Auswahl + Nav aktiv")
         hs = pg.eval_on_selector_all(".pkr", "els=>els.map(e=>e.getBoundingClientRect().height)"); ok(max(hs) < 70, f"{w}px Parkour: Zeilen einzeilig", hs)
         pg.screenshot(path=f"{SH}/local-parkour-{w}.png", full_page=True)

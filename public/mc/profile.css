@@ -53,3 +53,7 @@ html:not(.mc) .pf-tl button{border-radius:99px;border:1px solid var(--line);box-
 @media(max-width:380px){.pf-tile{gap:var(--sp2);padding:var(--sp2)}.pf-tile .slot{width:36px;height:36px}}
 @media(prefers-reduced-motion:reduce){.m3d canvas,.m3d .m3d-still{animation:none}.m3d-pop{transition:none}}
 .pf-panel[hidden]{display:none!important}
+.pf-meta .pf-team{font-weight:700;text-shadow:1px 1px 0 rgba(0,0,0,.6)}
+.pf-meta .pf-on{display:inline-flex;align-items:center;gap:.35rem;padding:.05rem .45rem;font-size:.78rem;font-weight:700;color:#5fe36d;background:rgba(95,227,109,.12);border:2px solid #2f8a3a}
+.pf-meta .pf-on::before{content:"";width:7px;height:7px;background:#5fe36d;box-shadow:0 0 6px #5fe36d}
+.pf-meta dd:has(.pf-seen){white-space:normal;font-size:.85rem;line-height:1.35}
