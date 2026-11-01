@@ -228,7 +228,6 @@ with sync_playwright() as p:
         lay = pg.evaluate("""() => {
           const R = e => e.getBoundingClientRect();
           const cards = [...document.querySelectorAll('#vip .vip-card')];
-          const box = root => [...root.querySelectorAll(':scope > .slot, :scope .vip-card-h > .slot, :scope .vip-perks .slot, :scope > .slot')];
           const inset = (root) => [...root.querySelectorAll('.slot')].map(s => { const a = R(root), b = R(s); return [b.left - a.left, b.top - a.top, a.right - b.right]; });
           const soon = document.querySelector('#vip .vip-soon');
           return { h: cards.map(c => R(c).height), tops: cards.map(c => R(c).top), bots: cards.map(c => R(c).bottom),
