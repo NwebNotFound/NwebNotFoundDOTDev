@@ -1,12 +1,16 @@
 import { AV } from "./asset-version.js";
-// VIP/MVP-Panel. Rang kommt aus mc_player_ranks (Join über mc_links). Welten nur, wenn der
-// Server-Snapshot einen passenden Key hat (vip, vip_1, vip-2, vipwelt, vip_world …), sonst Platzhalter.
+// VIP/MVP-Panel. Rang kommt aus mc_player_ranks. Der Ingest (normUuid) speichert die UUID
+// ohne Bindestriche; mc_links speichert normU mit Bindestrichen. Gelesen wird beides über normU.
+// Welten nur, wenn der Server-Snapshot einen passenden Key hat, sonst Platzhalter.
 // Keine Schreibaktion, kein RCON.
 
 export const VIP_NOTE = "Weitere Ingame-Vorteile liegen in LuckPerms und werden hier nicht ausgelesen. Diese Seite ändert nichts am Server.";
 const WORLD_RE = /^vip(?:[-_]?(?:world|welt))?(?:[-_]?\d+)?$/i;
 const PANEL = new Set(["vip", "mvp"]);
 const RANK_LABEL = { vip: "VIP", mvp: "MVP", builder: "Builder", admin: "Admin", default: "Spieler" };
+const RANK_COLOR = { vip: "6", mvp: "d" };
+// Gleiche Normalisierung wie normU in worker.js / mc-parkour.js / mc-trade.js: lowercase, Bindestriche kanonisch.
+export const normU = (x) => { const s = String(x ?? "").toLowerCase().replace(/-/g, ""); return /^[0-9a-f]{32}$/.test(s) ? s.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5") : null; };
 const STATS = {
   money: ["money", "cp", "balance"],
   playtime: ["playtime", "playtime_s", "play_time"],
@@ -88,8 +92,8 @@ export function vipCatalog(active) {
 export function vipRankView(rank, color) {
   const r = String(rank || "").toLowerCase();
   if (!PANEL.has(r)) return null;
-  if (typeof color !== "string" || !/^&[0-9a-f]$/i.test(color)) return null;
-  return { rank: r, color: color.slice(1).toLowerCase(), label: RANK_LABEL[r] };
+  const c = typeof color === "string" && /^&[0-9a-f]$/i.test(color) ? color.slice(1).toLowerCase() : RANK_COLOR[r];
+  return { rank: r, color: c, label: RANK_LABEL[r] };
 }
 function gate(reason, extra = {}) {
   return { access: false, reason, catalog: vipCatalog(null), note: VIP_NOTE, ...extra };
@@ -117,18 +121,22 @@ async function loadWorlds(env) {
 export async function vipApi(env, user) {
   if (!user?.id) return gate("login");
   const link = await env.DB.prepare(
-    "SELECT l.mc_name AS mc_name, l.mc_uuid AS mc_uuid, l.has_role AS has_role, l.verified AS verified, r.rank AS rank, r.color AS color FROM mc_links l LEFT JOIN mc_player_ranks r ON r.uuid = lower(replace(l.mc_uuid, '-', '')) WHERE l.discord_id = ? LIMIT 1"
+    "SELECT mc_name, mc_uuid, has_role, verified FROM mc_links WHERE discord_id = ? LIMIT 1"
   ).bind(String(user.id)).first().catch(() => null);
-  if (!link || !link.verified || !link.has_role || !/^[A-Za-z0-9_]{1,16}$/.test(String(link.mc_name || ""))) return gate("link");
-  const raw = String(link.rank || "").toLowerCase();
+  const uuid = normU(link?.mc_uuid);
+  if (!link || !link.verified || !link.has_role || !uuid || !/^[A-Za-z0-9_]{1,16}$/.test(String(link.mc_name || ""))) return gate("link");
+  const rankRow = await env.DB.prepare(
+    "SELECT rank, color FROM mc_player_ranks WHERE lower(replace(uuid, '-', '')) = ? LIMIT 1"
+  ).bind(uuid.replace(/-/g, "")).first().catch(() => null);
+  const raw = String(rankRow?.rank || "").toLowerCase();
   if (!PANEL.has(raw)) {
-    const own = RANK_LABEL[raw] ? { rank: raw, label: RANK_LABEL[raw], ...(typeof link.color === "string" && /^&[0-9a-f]$/i.test(link.color) ? { color: link.color.slice(1).toLowerCase() } : {}) } : null;
+    const own = RANK_LABEL[raw] ? { rank: raw, label: RANK_LABEL[raw], ...(typeof rankRow?.color === "string" && /^&[0-9a-f]$/i.test(rankRow.color) ? { color: rankRow.color.slice(1).toLowerCase() } : {}) } : null;
     return gate("rank", own ? { own_rank: own } : {});
   }
-  const view = vipRankView(raw, link.color);
-  const player = { name: link.mc_name, ...(view || { rank: raw, label: RANK_LABEL[raw] }) };
+  const view = vipRankView(raw, rankRow?.color);
+  const player = { name: link.mc_name, ...view };
   let stats = {}, stats_at = null;
-  const ps = await env.DB.prepare("SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = ?").bind(link.mc_uuid).first().catch(() => null);
+  const ps = await env.DB.prepare("SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = ?").bind(uuid).first().catch(() => null);
   if (ps) {
     let rawS = {};
     try { rawS = JSON.parse(ps.stats || "{}"); } catch { rawS = {}; }

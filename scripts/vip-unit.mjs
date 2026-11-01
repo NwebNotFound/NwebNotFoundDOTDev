@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Reine VIP-Helfer (ohne Worker). Wird von scripts/e2e.mjs importiert und kann allein laufen.
 import assert from "node:assert/strict";
-import { isVipWorldKey, pickVipWorlds, vipStats, vipWorldLabel, vipCatalog, vipRankView } from "../src/mc-vip.js";
+import { isVipWorldKey, pickVipWorlds, vipStats, vipWorldLabel, vipCatalog, vipRankView, normU } from "../src/mc-vip.js";
 
 const worlds = {
   lobby: { online: true, players: ["Nils"], max: 20, tps: 20 },
@@ -49,10 +49,14 @@ assert.equal(cat[0].perks.some((p) => p.id === "higher"), false);
 assert.equal(vipCatalog(null)[1].yours, false);
 assert.equal(vipCatalog("admin")[0].yours, false);
 
+assert.equal(normU("0F3C2A1B-4D5E-6F70-8192-A3B4C5D6E7F8"), "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8");
+assert.equal(normU("0f3c2a1b4d5e6f708192a3b4c5d6e7f8"), "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8");
+assert.equal(normU("nicht-uuid"), null);
 assert.deepEqual(vipRankView("vip", "&6"), { rank: "vip", color: "6", label: "VIP" });
 assert.deepEqual(vipRankView("MVP", "&d"), { rank: "mvp", color: "d", label: "MVP" });
 assert.equal(vipRankView("admin", "&c"), null);
-assert.equal(vipRankView("vip", "&z"), null, "ungültige Farbe ist kein stiller Fallback");
+assert.deepEqual(vipRankView("vip", "&z"), { rank: "vip", color: "6", label: "VIP" }, "ungültige Farbe → Standard &6");
+assert.deepEqual(vipRankView("mvp", ""), { rank: "mvp", color: "d", label: "MVP" }, "fehlende Farbe → Standard &d");
 assert.equal(vipRankView("player", "&7"), null);
 
 console.log("vip-unit ok");

@@ -616,6 +616,14 @@ try {
     ok(vip.j?.catalog?.[0]?.yours === true && vip.j.catalog[1].yours === false && vip.j.catalog[1].perks.some((p) => p.id === "higher") && vip.j.worlds?.placeholder === true, "VIP-Katalog markiert den eigenen Rang, Welten noch Platzhalter");
     const mvp = await req("/api/mc-vip", { cookie: c2 });
     ok(mvp.j?.access === true && mvp.j.player?.rank === "mvp" && mvp.j.player.color === "d" && mvp.j.stats?.money === 1200 && mvp.j.stats.money !== 900 && mvp.j.catalog?.[1]?.yours === true, "MVP sieht nur eigene Stats", JSON.stringify(mvp.j?.stats));
+    const up = U2.toUpperCase();
+    const ingU = await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: up, name: "Seller", rank: "mvp", color: "&d", weight: 60 }, { uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }] } });
+    ok(ingU.s === 200 && ingU.j?.player_ranks === 2 && sqlRows("SELECT uuid FROM mc_player_ranks WHERE name='Seller'")[0]?.uuid === U2.replace(/-/g, ""), "Ranks-Ingest: UUID mit Bindestrichen und Großbuchstaben wird kleingeschrieben ohne Bindestriche gespeichert", ingU.t);
+    sql(`UPDATE mc_player_ranks SET uuid = '${up}', color = '&z' WHERE name = 'Seller'`);
+    sql(`UPDATE mc_links SET mc_uuid = '${up}' WHERE discord_id = '${D2}'`);
+    const mix = await req("/api/mc-vip", { cookie: c2 });
+    ok(mix.j?.access === true && mix.j.player?.rank === "mvp" && mix.j.player.color === "d" && mix.j.stats?.money === 1200, "normU trifft Rang trotz Bindestrichen/Großbuchstaben, ungültige Farbe → &d", JSON.stringify({ p: mix.j?.player, s: mix.j?.stats }));
+    sql(`UPDATE mc_links SET mc_uuid = '${U2}' WHERE discord_id = '${D2}'`);
     await req("/api/mc-ingest", { method: "POST", token: TOK, body: { servers: { lobby: { online: true, players: ["Nils"], max: 20, tps: 20 }, survival: { online: true, players: ["A"], max: 40, tps: 19 }, vipwelt: { online: true, players: ["Seller", "<script>"], max: 4, tps: 19.96 }, vip_1: { online: true, players: ["Nils", "not a name"], max: 8, tps: 20 }, "vip-2": { online: false, players: [], max: 8, tps: 18.2 }, vip_4: { online: true, players: ["Gast"], max: 4, tps: 20 } } } });
     const live = await req("/api/mc-vip", { cookie: c1 });
     const ids = (live.j?.worlds?.slots || []).map((s) => s.id);
@@ -627,7 +635,14 @@ try {
     ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && /data-g="community"[\s\S]*?href="\/vip"/.test(pg.t), "GET /vip bindet Panel ein, Link im Community-Menü", String(pg.s));
     ok(!/<script|<style| style=/.test(sec.slice(0, sec.indexOf("</section>"))), "/vip-Inhalt ohne Inline-Script/-Style");
     { const m = await req("/vip", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes('id="vip"')), "/vip nur auf mc-Domain", String(m.s)); }
-    { const js = await req("/mc/vip.js"); ok(js.s === 200 && js.t.includes("E(p.title)") && js.t.includes("E(s.label)") && js.t.includes('href="/profile"') && !/style=|\.style\./.test(js.t), "vip.js escaped Titel und Weltnamen, keine Inline-Styles"); }
+    { const js = await req("/mc/vip.js"); ok(js.s === 200 && js.t.includes("E(p.title)") && js.t.includes("E(s.label)") && js.t.includes('href="/profile"') && js.t.includes("encodeURIComponent(rel)") && !js.t.includes("location.href") && !/style=|\.style\./.test(js.t), "vip.js escaped, Login-next relativ, keine Inline-Styles"); }
+    { const bye = async (next) => { const r = await fetch(BASE + "/auth/discord/logout?next=" + encodeURIComponent(next), { headers: { host: HOST, "x-nnf-test-host": "nwebnotfound.dev" }, redirect: "manual" }); return r.headers.get("location") || ""; };
+      const evil = await bye("https://evil.com"), proto = await bye("//evil.com"), bs = await bye("/\\evil.com"), info = await bye("https://evil.com@mc.nwebnotfound.dev/vip");
+      ok(evil === "https://nwebnotfound.dev/" && proto === "https://nwebnotfound.dev/" && !bs.includes("evil.com") && info === "https://nwebnotfound.dev/", "next=https://evil.com, //evil.com, Backslash und Userinfo bleiben auf der Seite", JSON.stringify({ evil, proto, bs, info }));
+      const rel = await bye("/vip"), abs = await bye("https://mc.nwebnotfound.dev/vip");
+      const vipLoc = (loc) => { try { const u = new URL(loc); return u.pathname === "/vip" && (u.hostname === "mc.nwebnotfound.dev" || u.hostname === "127.0.0.1") && !loc.includes("evil"); } catch { return false; } };
+      ok(vipLoc(rel) && vipLoc(abs), "relativer und absoluter next auf /vip ist erlaubt", JSON.stringify({ rel, abs }));
+      ok((await bye("https://nwebnotfound.dev.evil.com/vip")) === "https://nwebnotfound.dev/", "Host muss nwebnotfound.dev oder Subdomain davon sein"); }
   }
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Rot', '$.team_color', '#FF5555', '$.team_color_code', '&c', '$.last_seen', '2026-10-31T23:05:00Z', '$.online', json('false')) WHERE mc_uuid = '${U1}'`);
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Grün', '$.team_color', 'red;x', '$.team_color_hex', '#55ff55', '$.online', 1) WHERE mc_uuid = '${U2}'`);

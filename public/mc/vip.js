@@ -46,7 +46,9 @@
     return `<div class="g vip-me">${head}<div><p class="eyb">Dein Rang</p><h2 class="hub-h2">${E(name || "Spieler")} ${badge(p.rank, p.color)}</h2><p class="vip-acts"><a class="btn" href="/profile">Zum Profil</a>${pub}</p></div></div><h2 class="hub-h2">Vorteile</h2>${cards(d.catalog)}<p class="mut vip-note">${E(d.note || "")}</p>${worlds(d.worlds)}<section class="vip-block" id="vip-stats"><h2 class="hub-h2">Deine Stats</h2><div class="vip-stats">${cell("gold_ingot", "Kontostand", money)}${cell("clock", "Spielzeit", st.playtime == null ? "–" : up(st.playtime))}${cell("iron_sword", "Spieler-Kills", st.kills == null ? "–" : NF(st.kills))}${cell("skeleton_skull", "Tode", st.deaths == null ? "–" : NF(st.deaths))}${cell("iron_pickaxe", "Blöcke", st.blocks_mined == null ? "–" : NF(st.blocks_mined))}</div></section>`;
   };
   const gate = (d) => {
-    const login = "https://nwebnotfound.dev/auth/discord/login?next=" + encodeURIComponent(location.href);
+    const raw = location.pathname + location.search + location.hash;
+    const rel = raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("\\") && !raw.includes("://") ? raw : "/vip";
+    const login = "https://nwebnotfound.dev/auth/discord/login?next=" + encodeURIComponent(rel);
     let msg;
     if (d.reason === "login") msg = `<p class="mut">Melde dich mit Discord an. Das Panel gibt es für verknüpfte Spieler mit dem Rang VIP oder MVP.</p><p class="vip-acts"><a class="btn discord" href="${login}">Mit Discord anmelden</a></p>`;
     else if (d.reason === "link") msg = `<p class="mut">Verknüpfe deinen Minecraft-Account im Discord mit <code>/link</code> und bestätige ihn. Danach prüft diese Seite deinen Rang.</p><p class="vip-acts"><a class="btn sec" href="/profile">Zum Profil</a></p>`;
