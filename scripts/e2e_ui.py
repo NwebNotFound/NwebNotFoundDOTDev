@@ -225,6 +225,24 @@ with sync_playwright() as p:
         ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator('.ng[data-g=community] a[href="/vip"]').count() == 1 and pg.locator('a[href="/vip"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=community] .ngb[data-cur]').count() == 1, f"{w}px VIP: Community-Menü aktiv, kein Formular")
         ok("Monocraft" in pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"), f"{w}px VIP: Pixel-Schrift", pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"))
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Übersicht: kein horizontales Scrollen")
+        lay = pg.evaluate("""() => {
+          const R = e => e.getBoundingClientRect();
+          const cards = [...document.querySelectorAll('#vip .vip-card')];
+          const inset = (root) => [...root.querySelectorAll('.slot')].map(s => { const a = R(root), b = R(s); return [b.left - a.left, b.top - a.top, a.right - b.right]; });
+          const soon = document.querySelector('#vip .vip-soon');
+          return { h: cards.map(c => R(c).height), tops: cards.map(c => R(c).top), bots: cards.map(c => R(c).bottom),
+            inset: cards.flatMap(inset).concat(soon ? inset(soon) : []),
+            icons: cards.map(c => [...c.querySelectorAll('img')].map(i => (i.getAttribute('src')||'').split('/').pop())),
+            text: document.querySelector('#vip').innerText };
+        }""")
+        if w >= 800:
+            ok(abs(lay["h"][0] - lay["h"][1]) <= 2 and abs(lay["tops"][0] - lay["tops"][1]) <= 2, f"{w}px VIP-Karten gleich hoch", lay["h"])
+        else:
+            ok(lay["tops"][1] >= lay["bots"][0] - 1, f"{w}px VIP-Karten untereinander", lay["tops"])
+        ok(lay["inset"] and all(x >= 12 and y >= 12 and r >= 12 for x, y, r in lay["inset"]), f"{w}px VIP-Slots eingerückt in der Karte", lay["inset"][:8])
+        ok(all(len(xs) == len(set(xs)) for xs in lay["icons"]) and all("book" in xs for xs in lay["icons"]) and not any("ender_chest" in x or x == "obsidian" for xs in lay["icons"] for x in xs), f"{w}px VIP: Buch statt Obsidian, keine doppelten Icons", lay["icons"])
+        ok("LuckPerms" not in lay["text"] and "schickt keine Befehle" not in lay["text"] and "Weitere Ingame-Vorteile folgen." in lay["text"], f"{w}px VIP: spielerfreundliche Vorteile", lay["text"][:280])
+        pg.locator(".vip-ranks").screenshot(path=f"{SH}/local-vip-vorteile-{w}.png")
         pg.screenshot(path=f"{SH}/local-vip-gate-{w}.png", full_page=True)
         XSS = "<img src=x onerror=alert(1)>"
         vdlg0 = len(dlg)
@@ -248,6 +266,8 @@ with sync_playwright() as p:
         ok(XSS in vx and "&lt;img" in vh and pg.locator("#vip img[src='x']").count() == 0 and pg.locator("#vip script").count() == 0 and not pg.evaluate("window.vipx") and len(dlg) == vdlg0, f"{w}px VIP: Titel und Weltname escaped", vh[:240])
         ok(pg.locator(".vip-world").count() == 2 and "online" in vx and "offline" in vx and "bald verfügbar" not in pg.inner_text("#vip-worlds"), f"{w}px VIP-Welten aus Daten, ohne Platzhalter")
         ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Panel: kein Overflow, keine Inline-Styles")
+        pins = pg.evaluate("""() => { const R = e => e.getBoundingClientRect(); return [...document.querySelectorAll('#vip .g')].flatMap(card => [...card.querySelectorAll('.slot')].map(s => { const a = R(card), b = R(s); return [b.left-a.left, b.top-a.top, a.right-b.right]; })); }""")
+        ok(pins and all(x >= 12 and y >= 12 and r >= 12 for x, y, r in pins), f"{w}px VIP-Panel: Slots in Karten, Welten und Stats eingerückt", pins[:6])
         pg.locator(".vip-me").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-vip-panel-{w}.png", full_page=True); pg.unroute("**/api/mc-vip")
         errs = [e for e in errs if e.strip() != "Event"]
         ok(not errs, f"{w}px keine Konsolen-/JS-Fehler", errs[:3])

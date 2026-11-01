@@ -46,6 +46,11 @@ assert.equal(cat[1].yours, true);
 assert.ok(cat[0].perks.every((p) => !/[<>]/.test(p.title + p.text)));
 assert.ok(cat[1].perks.some((p) => p.id === "higher"));
 assert.equal(cat[0].perks.some((p) => p.id === "higher"), false);
+assert.equal(cat[0].perks.find((p) => p.id === "panel").icon, "book");
+assert.equal(cat[1].perks.find((p) => p.id === "higher").icon, "golden_apple");
+assert.ok(cat[1].perks.find((p) => p.id === "higher").text.includes("Weitere Ingame-Vorteile folgen."));
+assert.ok(!JSON.stringify(cat).includes("LuckPerms") && !JSON.stringify(cat).includes("schickt keine Befehle"));
+for (const c of cat) { const ids = [c.icon, ...c.perks.map((p) => p.icon)]; assert.equal(new Set(ids).size, ids.length, c.rank); }
 assert.equal(vipCatalog(null)[1].yours, false);
 assert.equal(vipCatalog("admin")[0].yours, false);
 
