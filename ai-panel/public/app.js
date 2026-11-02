@@ -18,15 +18,7 @@ import {
   toolFailed,
   toolOutputText,
 } from "./run-events.js";
-import {
-  crewCard,
-  crewMessageRow,
-  formatTime as crewTime,
-  kindLabel,
-  messageCountLabel,
-  rangeLabel,
-  statusLabel,
-} from "./crew.js";
+import { createCrewView } from "./crew.js";
 
 const state = {
   me: null,
@@ -43,19 +35,6 @@ const state = {
   models: null,
   jobs: [],
   editingJob: null,
-  // Crew-Runs: a read-only browser over the bots' sessions. Nothing here writes.
-  crew: {
-    bot: "",
-    filter: "all",
-    rows: [],
-    total: 0,
-    hasMore: false,
-    session: null,
-    sessionMeta: "",
-    msgOffset: 0,
-    msgTotal: 0,
-    msgHasMore: false,
-  },
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -1310,134 +1289,10 @@ async function loadRuns() {
 }
 
 // ---------------------------------------------------------------------------------------
-// Crew-Runs (read-only)
+// Crew-Runs (read-only) — the view itself lives in crew.js; this is the only hook.
 // ---------------------------------------------------------------------------------------
 
-const CREW_PAGE = 30;
-const CREW_MSG_PAGE = 100;
-
-/** Bot picker for the crew view: the same allowlist the sidebar shows. */
-function fillCrewBots() {
-  const sel = $("#crew-bot");
-  if (!sel) return;
-  const names = (state.bots || [])
-    .map((entry) => (typeof entry === "string" ? entry : entry?.name))
-    .filter(Boolean);
-  const wanted = state.crew.bot || state.bot || names[0] || "";
-  clear(sel);
-  for (const name of names) sel.append(el("option", { value: name, text: name }));
-  if (names.includes(wanted)) sel.value = wanted;
-  state.crew.bot = sel.value || wanted;
-}
-
-async function loadCrew({ reset = true } = {}) {
-  const crew = state.crew;
-  const list = $("#crew-list");
-  const range = $("#crew-range");
-  const more = $("#btn-crew-more");
-  if (!crew.bot) fillCrewBots();
-  if (!crew.bot) {
-    clear(list).append(el("div", { class: "crew-empty mut", text: "Kein Bot verfügbar." }));
-    return;
-  }
-  if (reset) {
-    crew.rows = [];
-    crew.total = 0;
-    crew.hasMore = false;
-    more.classList.add("hidden");
-    range.textContent = "";
-    clear(list).append(el("div", { class: "crew-empty mut", text: "lade…" }));
-  }
-  const params = new URLSearchParams({
-    bot: crew.bot,
-    filter: crew.filter,
-    limit: String(CREW_PAGE),
-    offset: String(crew.rows.length),
-  });
-  let data;
-  try {
-    data = await api(`/api/crew/sessions?${params.toString()}`);
-  } catch (err) {
-    clear(list).append(el("div", { class: "crew-empty mut", text: `Crew-Runs: ${describeError(err).text}` }));
-    return;
-  }
-  if (reset) clear(list);
-  const rows = Array.isArray(data.sessions) ? data.sessions : [];
-  crew.rows = crew.rows.concat(rows);
-  crew.total = Number(data.total) || crew.rows.length;
-  crew.hasMore = Boolean(data.has_more);
-  for (const row of rows) list.append(crewCard(el, row, openCrewSession));
-  if (!crew.rows.length) list.append(el("div", { class: "crew-empty mut", text: "Keine Sessions für diesen Filter." }));
-  range.textContent = rangeLabel({ shown: crew.rows.length, total: crew.total, offset: 0 });
-  if (data.truncated) range.textContent += " · Fenster begrenzt";
-  more.classList.toggle("hidden", !crew.hasMore);
-}
-
-function closeCrewSession() {
-  state.crew.session = null;
-  $("#crew-transcript").classList.add("hidden");
-  clear($("#crew-messages"));
-  clear($("#crew-transcript-title"));
-  $("#crew-transcript-meta").textContent = "";
-  $("#btn-crew-msgs-more").classList.add("hidden");
-}
-
-async function openCrewSession(row) {
-  if (!row || !row.id) return;
-  const crew = state.crew;
-  crew.session = row;
-  crew.msgOffset = 0;
-  crew.msgTotal = 0;
-  crew.msgHasMore = false;
-  crew.sessionMeta = [kindLabel(row.kind), statusLabel(row.status), crewTime(row.started_at), messageCountLabel(row.message_count)]
-    .filter(Boolean)
-    .join(" · ");
-
-  // Title and meta are text nodes: a session title is untrusted input.
-  const title = clear($("#crew-transcript-title"));
-  title.append(document.createTextNode(String(row.title || row.id)));
-  $("#crew-transcript-meta").textContent = crew.sessionMeta;
-  $("#crew-transcript").classList.remove("hidden");
-  $("#btn-crew-msgs-more").classList.add("hidden");
-  clear($("#crew-messages")).append(el("div", { class: "crew-empty mut", text: "lade…" }));
-  $("#crew-transcript").scrollIntoView({ block: "nearest", behavior: "smooth" });
-  await loadCrewMessages({ reset: true });
-}
-
-async function loadCrewMessages({ reset = false } = {}) {
-  const crew = state.crew;
-  const row = crew.session;
-  if (!row) return;
-  const box = $("#crew-messages");
-  const more = $("#btn-crew-msgs-more");
-  const meta = $("#crew-transcript-meta");
-  if (reset) {
-    crew.msgOffset = 0;
-    more.classList.add("hidden");
-    clear(box).append(el("div", { class: "crew-empty mut", text: "lade…" }));
-  }
-  const params = new URLSearchParams({ limit: String(CREW_MSG_PAGE), offset: String(crew.msgOffset) });
-  const path = `/api/crew/sessions/${encodeURIComponent(crew.bot)}/${encodeURIComponent(row.id)}/messages?${params.toString()}`;
-  let data;
-  try {
-    data = await api(path);
-  } catch (err) {
-    clear(box).append(el("div", { class: "crew-empty mut", text: `Transkript: ${describeError(err).text}` }));
-    return;
-  }
-  if (reset) clear(box);
-  const messages = Array.isArray(data.messages) ? data.messages : [];
-  crew.msgOffset += messages.length;
-  crew.msgTotal = Number(data.total) || crew.msgOffset;
-  crew.msgHasMore = Boolean(data.has_more);
-  for (const msg of messages) box.append(crewMessageRow(el, msg));
-  if (!crew.msgOffset) box.append(el("div", { class: "crew-empty mut", text: "Keine Nachrichten." }));
-  more.classList.toggle("hidden", !crew.msgHasMore);
-  meta.textContent = [crew.sessionMeta, rangeLabel({ shown: crew.msgOffset, total: crew.msgTotal, offset: 0 })]
-    .filter(Boolean)
-    .join(" · ");
-}
-
+const crewView = createCrewView({ $, el, clear, api, describeError, state });
 // ---------------------------------------------------------------------------------------
 // Shell: views, drawer, theme, logout
 // ---------------------------------------------------------------------------------------
@@ -1451,10 +1306,7 @@ function switchView(view) {
   if (view === "usage") loadUsage();
   if (view === "log") loadLog();
   if (view === "runs") loadRuns();
-  if (view === "crew") {
-    fillCrewBots();
-    loadCrew({ reset: true });
-  }
+  if (view === "crew") crewView.open();
   if (window.innerWidth <= 860) closeDrawer();
 }
 
@@ -1550,28 +1402,7 @@ function wire() {
   $("#btn-log-refresh").onclick = loadLog;
   $("#btn-runs-refresh").onclick = loadRuns;
 
-  // Crew-Runs: read-only. Every handler here loads or filters — none of them write.
-  $("#btn-crew-refresh").onclick = () => loadCrew({ reset: true });
-  $("#btn-crew-more").onclick = () => loadCrew({ reset: false });
-  $("#btn-crew-msgs-more").onclick = () => loadCrewMessages({ reset: false });
-  $("#crew-transcript-close").onclick = closeCrewSession;
-  $("#crew-bot").onchange = (e) => {
-    state.crew.bot = e.target.value;
-    closeCrewSession();
-    loadCrew({ reset: true });
-  };
-  $("#crew-filters").addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-crew-filter]");
-    if (!btn) return;
-    state.crew.filter = btn.dataset.crewFilter;
-    for (const chip of document.querySelectorAll("#crew-filters .chip")) {
-      const on = chip === btn;
-      chip.classList.toggle("active", on);
-      chip.setAttribute("aria-pressed", on ? "true" : "false");
-    }
-    closeCrewSession();
-    loadCrew({ reset: true });
-  });
+  crewView.wire();
 
   window.addEventListener("resize", () => {
     if (window.innerWidth > 860) closeDrawer();
