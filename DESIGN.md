@@ -213,8 +213,9 @@ shadow of the same purpose on the same element.
 
 ## 6. Motion
 
-- Durations `--ds-duration-fast` 120ms (hover, focus), `--ds-duration` 180ms (popover, drawer),
-  `--ds-duration-slow` 320ms (card lift, reveal). Easings: `--ds-ease-out` `cubic-bezier(.2,.8,.2,1)`,
+- Durations `--ds-duration-fast` 150ms (hover, focus), `--ds-duration` 200ms (popover, drawer,
+  `--ds-duration-slow` 250ms (card lift, reveal). Nothing in the UI animates longer than 250ms.
+  Easings: `--ds-ease-out` `cubic-bezier(.2,.8,.2,1)`,
   `--ds-ease-in-out` `cubic-bezier(.4,0,.2,1)`.
 - Animate only `opacity` and `transform`. Layout properties, `width`, `height` and `filter` are not
   animatable on interactive elements.
@@ -287,6 +288,53 @@ capped at `40ch`–`72ch`.
   comments each map to one token. Comments must still pass 4.5:1.
 - Horizontal scroll inside the block, never on the page. Copy button top-right, 44px target,
   `aria-label` in German ("Kopieren").
+
+### Headers (glass)
+
+- The panel top bar floats over the scroll area: `position:absolute; inset:0 0 auto`, translucent
+  `color-mix(in srgb, var(--ds-background) 78%, transparent)` plus
+  `backdrop-filter: saturate(180%) blur(20px)` and `-webkit-backdrop-filter`. Content scrolls
+  underneath it, which is what makes the blur visible; the scroll containers pad by
+  `calc(var(--header-h) + …)` instead of pushing the bar into the flow.
+- `--header-h` is 60px (`64px` on phones) plus `env(safe-area-inset-top)`. The site nav uses the
+  same recipe (`--ds-navbar` + blur) and pads its top with the safe-area inset.
+- No solid `background` on a glass header, ever: it turns the blur into a cheap shadow.
+
+### Drawer (panel, ≤860px)
+
+- The sidebar becomes an off-canvas rail, `width: min(86vw, 320px)`, sliding in over the content
+  with a 1.5% blur scrim behind it.
+- **Swipe from the left edge opens it, swipe left closes it.** The gesture only starts after 10px
+  of mostly-horizontal travel inside a 24px edge strip, so scrolling and tapping are untouched;
+  the rail follows the finger and snaps to the nearer edge at 35% travel. The menu button and the
+  ✕ button remain the non-gesture path. `prefers-reduced-motion` removes the follow animation.
+- Focus stays in the page, `Escape` closes the drawer, tapping the scrim closes it.
+
+### Dialogs
+
+- Always a native `<dialog>` with `showModal()` — never `prompt()`, `alert()` or `confirm()`.
+  The element gives the focus trap, `Escape`, the backdrop and `::backdrop`; the promise behind it
+  settles on `close`, so Esc cannot leave a hanging `await`.
+- Desktop: centred, `--ds-radius-xl`, `width:min(440px, 100vw - 2×16px)`, `--ds-shadow-3`.
+  Phone (≤860px): a bottom sheet pinned to the safe area, full width, radius only on the top
+  corners, actions stacked (`flex-direction: column-reverse`, 48px tall, full width) so the
+  primary action sits under the thumb.
+- Fields are real `<label>`s, 44px tall, **16px text** (no iOS zoom), `aria-describedby` for the
+  hint, `aria-invalid` plus a `role="alert"` message for errors. Validation is explicit, not
+  `required`-only, and the message names the rule.
+- The only blocking confirmations left are destructive ones (logout-all, SOUL overwrite); they use
+  the same dialog with a danger-styled confirm button.
+
+### Approval cards (panel)
+
+- A pending tool approval is a warning-tinted card, not an accent card: `--ds-warning` at 7%
+  background, 3px warning left rail, warning dot in the title, and the command in a monospace
+  block. The accent stays reserved for the primary action inside it.
+- **≤639px: every choice is a full-width 44px button, stacked** (`display:grid`), because the
+  card is usually the bottom-most thing in the thread and must be thumb-reachable without aiming.
+  From 640px up they sit in a row of 36px buttons.
+- The card is `role="group"` with an `aria-label`; answering replaces it with a one-line result
+  instead of leaving dead buttons behind.
 
 ---
 

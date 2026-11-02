@@ -65,7 +65,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:.6rem 1.4rem;justify-content:space-
 input,textarea{width:100%;padding:.8rem 1rem;margin:.35rem 0 1rem;background:var(--field);color:var(--fg);border:1px solid var(--line);border-radius:var(--ds-radius-lg,12px);font:inherit;transition:border-color var(--ds-duration,180ms),box-shadow var(--ds-duration,180ms)}
 input:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 4px var(--ring)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.js .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)),transform .8s var(--ds-ease-out,cubic-bezier(.2,.8,.2,1))}
+.js .reveal{opacity:0;transform:translateY(24px);transition:opacity var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)),transform var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1))}
 .js .reveal.in{opacity:1;transform:none}
 .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
 @media (max-width:420px){.nav .wrap{gap:.55rem!important}.nav a.l{font-size:.76rem!important}.brand{font-size:.95rem}}@media (max-width:640px){.only-s{display:inline}.nav .wrap{gap:.9rem}.nav a.l{font-size:.8rem}.hide-s{display:none}input,textarea,select{font-size:16px}}@media (pointer:coarse){.nav a.l,.btn.sm{min-height:44px;display:inline-flex;align-items:center}}
@@ -98,7 +98,7 @@ const MC_CSS = `:root{--menubg:#141a16}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:1rem;margin-top:1.6rem}
 .mcgrid{grid-template-columns:repeat(2,1fr)}@media(min-width:700px){.mcgrid{grid-template-columns:repeat(3,1fr)}}@media(min-width:1000px){.mcgrid{grid-template-columns:repeat(5,1fr)}}
 .stat .k{font-size:.8rem;color:var(--mut)}.stat .v{font-size:1.6rem;font-weight:700;margin-top:.2rem}
-.bar{height:6px;background:var(--line);border-radius:3px;margin-top:.6rem;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.bar{height:6px;background:var(--line);border-radius:3px;margin-top:.6rem;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1))}
 .addr{display:inline-flex;align-items:center;gap:.6rem;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.5rem .5rem .5rem 1rem;margin-top:2rem;max-width:100%}
 .addr code{font-size:1rem;overflow:hidden;text-overflow:ellipsis}
 .steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
@@ -288,7 +288,7 @@ const PICKUP_BODY = `<section class="sec"><div class="wrap" id="pu"><p class="ey
 const PROFILE_PB_CSS = `<style>
 #pb .mch{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:1.5rem;align-items:center;padding:clamp(1.2rem,3vw,1.6rem);background:var(--card);border:1px solid var(--line);border-radius:22px}
 #pb .mch-model{position:relative;height:min(400px,55vw);display:grid;place-items:center}
-#pb .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchInMain .8s ease forwards}
+#pb .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchInMain var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)) forwards}
 #pb .mch-model.ready .mch-fb{opacity:0;transition:opacity .4s}
 #pb .mch-fb{max-height:280px;image-rendering:pixelated;filter:drop-shadow(0 12px 24px rgba(0,0,0,.2))}
 #pb .mch-info{min-width:0}

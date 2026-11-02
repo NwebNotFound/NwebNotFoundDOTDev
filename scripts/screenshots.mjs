@@ -22,6 +22,7 @@
 import { chromium } from "playwright";
 import { spawn, execSync } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -100,6 +101,16 @@ async function startServers() {
       console.warn(`! could not apply schema.sql to ${path.relative(ROOT, to)} — the pages will show their error state`);
     }
   }
+
+  // The panel needs a Hermes-shaped backend for the chat, drawer and approval screenshots.
+  const { origin } = await startMockHermes();
+  panelEnv = {
+    HERMES_ORIGIN: origin,
+    HERMES_PANEL_SECRET: "screens-panel-secret",
+    SESSION_SECRET: "screens-session-secret-0123456789abcdef",
+    ALLOWED_DISCORD_ID: "111111111111111111",
+    PANEL_BOTS: "cloudflare,minecraft,discord,homelab",
+  };
 
   // Two Workers because the site is host-routed: the Worker decides the surface from the host name.
   serve("npx", ["wrangler", "dev", "--port", "8790", "--local", "--ip", "127.0.0.1", "--local-upstream", "nwebnotfound.dev", "--persist-to", path.join(persist, "site")]);
