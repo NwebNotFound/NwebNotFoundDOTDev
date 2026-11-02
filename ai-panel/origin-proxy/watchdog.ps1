@@ -58,6 +58,29 @@ $ErrorActionPreference = "Stop"
 $LogDir = Join-Path $env:LOCALAPPDATA "ai-panel\logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
+# Hard-coded restart allowlist. Nothing that arrives from outside (argument, file, environment)
+# can widen this: -Check may only ever start one of these three tasks.
+$AllowedTasks = @("AIPanel_proxy", "AIPanel_dashboard", "AIPanel_tunnel")
+
+function Start-AllowedTask {
+  <#
+    Start-ScheduledTask, but only for a name from $AllowedTasks. Anything else is refused with a
+    warning instead of being started, so a tampered service table cannot launch an arbitrary task.
+  #>
+  param([string]$TaskName)
+  if ($AllowedTasks -notcontains $TaskName) {
+    Write-Warning "refusing to start '$TaskName': not in the AIPanel allowlist"
+    return $false
+  }
+  try {
+    Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+    return $true
+  } catch {
+    Write-Warning "could not start ${TaskName}: $($_.Exception.Message)"
+    return $false
+  }
+}
+
 # TaskName -> what it runs. `Port` 0 means "no local listener to probe" (cloudflared).
 $Services = @(
   @{ Name = "proxy";     Task = "AIPanel_proxy";     Port = 8650; RunScript = "run-proxy.ps1";     Command = "node";   Arguments = "proxy.mjs";                 Log = "proxy.log" },
@@ -173,7 +196,7 @@ switch ($PSCmdlet.ParameterSetName) {
       if ($state.Listening -eq $false) {
         $failed++
         Write-Warning "$($entry.Task): port $($entry.Port) not listening - restarting the task"
-        if ($state.Registered) { Start-ScheduledTask -TaskName $entry.Task }
+        if ($state.Registered) { Start-AllowedTask -TaskName $entry.Task | Out-Null }
         else { Write-Warning "$($entry.Task) is not registered; run -Install once." }
       }
     }
