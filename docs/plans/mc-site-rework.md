@@ -303,7 +303,7 @@ Keine dieser Dateien ändert dieser Plan-PR.
 | `src/mc-trade.js` als Vorbild, neue Funktionen daneben in `src/mc-vip.js` | Pending, Ack, Rate-Limit. Nicht in die Shop-Routen mischen. |
 | `schema.sql`, `migrations/0013_vip_commands.sql` | Queue-Tabelle. |
 | `INGEST.md` | `vip_worlds` und die Pending-Routen, in Folge-PR 2. Nicht in diesem Plan-PR. |
-| `scripts/e2e.mjs`, `scripts/e2e_ui.py` | Assertions der jeweiligen Phase. Aufruf bleibt `node scripts/e2e.mjs`. |
+| `scripts/e2e.mjs`, `scripts/e2e_ui.py` | Assertions des jeweiligen Folge-PRs. Aufruf bleibt `node scripts/e2e.mjs`. |
 
 `MCP.games` in `public/mc/player3d.js` holt heute `/api/mc-pvp/<name>` für Profil und Spielerseite. Nach Folge-PR 1 holt es nur noch Parkour. Die PvP-Seite hat einen eigenen Fetch.
 
