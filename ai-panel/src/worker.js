@@ -1,11 +1,11 @@
 // KI-Panel. Vertrag und Setup: docs/ai-panel.md
-import { cleanSoul, isBotName } from "./names.js";
+import { cleanSoul, isBotName, keyEnvName } from "./names.js";
 import { createRedactor } from "./redact.js";
 import { PAGE } from "./page.js";
 
 const HOST = "ai.nwebnotfound.dev";
 const BUILTIN = ["cloudflare", "minecraft", "discord", "homelab"];
-const KEY_ENV = { cloudflare: "HERMES_KEY_CLOUDFLARE", minecraft: "HERMES_KEY_MINECRAFT", discord: "HERMES_KEY_DISCORD", homelab: "HERMES_KEY_HOMELAB" };
+const JOB_ID = "[A-Za-z0-9_-]{1,80}";
 const PROXY = [
   ["POST", /^\/v1\/chat\/completions$/],
   ["GET", /^\/v1\/runs$/],
@@ -16,9 +16,14 @@ const PROXY = [
   ["POST", /^\/v1\/stop$/],
   ["GET", /^\/v1\/runs\/[A-Za-z0-9_-]{1,64}\/events$/],
   ["GET", /^\/api\/sessions$/],
+  ["GET", /^\/api\/jobs$/],
+  ["POST", /^\/api\/jobs$/],
+  ["PATCH", new RegExp(`^/api/jobs/${JOB_ID}$`)],
+  ["DELETE", new RegExp(`^/api/jobs/${JOB_ID}$`)],
+  ["POST", new RegExp(`^/api/jobs/${JOB_ID}/(pause|resume|run)$`)],
 ];
 const WINDOW_MS = 60000, LIMIT = 30, SESSION_MS = 30 * 86400000;
-const enc = new TextEncoder(), dec = new TextDecoder();
+const enc = new TextEncoder();
 const SECURITY = { "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "x-robots-tag": "noindex" };
 const CSP = "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://discord.com; object-src 'none'";
 
@@ -27,13 +32,6 @@ const b64u = (buf) => {
   let s = "";
   for (const b of bytes) s += String.fromCharCode(b);
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-const b64d = (s) => {
-  const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
-  const bin = atob(String(s).replace(/-/g, "+").replace(/_/g, "/") + pad);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
 };
 const rand = (n = 32) => b64u(crypto.getRandomValues(new Uint8Array(n)));
 function safeEq(a, b) {
@@ -55,21 +53,6 @@ async function unsign(env, s) {
   const v = s.slice(0, i);
   return safeEq(s.slice(i + 1), await hmac(env.AI_SESSION_SECRET, v)) ? v : null;
 }
-async function aesKey(secret) {
-  return crypto.subtle.importKey("raw", await crypto.subtle.digest("SHA-256", enc.encode(secret)), "AES-GCM", false, ["encrypt", "decrypt"]);
-}
-async function seal(secret, text) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await aesKey(secret), enc.encode(text)));
-  const out = new Uint8Array(iv.length + ct.length);
-  out.set(iv, 0); out.set(ct, iv.length);
-  return b64u(out);
-}
-async function openSeal(secret, stored) {
-  const raw = b64d(stored);
-  return dec.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(0, 12) }, await aesKey(secret), raw.slice(12)));
-}
-
 const cookies = (req) => {
   const out = {};
   for (const part of (req.headers.get("cookie") || "").split(/;\s*/)) {
@@ -133,7 +116,7 @@ function accessHeaders(env) {
   return { "CF-Access-Client-Id": env.CF_ACCESS_CLIENT_ID, "CF-Access-Client-Secret": env.CF_ACCESS_CLIENT_SECRET };
 }
 function knownSecrets(env, extra) {
-  return [env.AI_DISCORD_CLIENT_SECRET, env.AI_SESSION_SECRET, env.HELPER_KEY, env.OPENROUTER_KEY, env.CF_ACCESS_CLIENT_ID, env.CF_ACCESS_CLIENT_SECRET, env.HERMES_KEY_CLOUDFLARE, env.HERMES_KEY_MINECRAFT, env.HERMES_KEY_DISCORD, env.HERMES_KEY_HOMELAB, extra];
+  return [env.AI_DISCORD_CLIENT_SECRET, env.AI_SESSION_SECRET, env.HERMES_DASHBOARD_SESSION_TOKEN, env.OPENROUTER_KEY, env.CF_ACCESS_CLIENT_ID, env.CF_ACCESS_CLIENT_SECRET, env.HERMES_KEY_CLOUDFLARE, env.HERMES_KEY_MINECRAFT, env.HERMES_KEY_DISCORD, env.HERMES_KEY_HOMELAB, extra];
 }
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
@@ -144,13 +127,10 @@ async function getUser(req, env) {
   if (!row || row.expires_at < Date.now() || !allowed(env, row.discord_id)) return null;
   return row;
 }
-async function botKey(env, name) {
-  const fromEnv = KEY_ENV[name] && env[KEY_ENV[name]];
-  if (fromEnv) return fromEnv;
-  if (!env.AI_SESSION_SECRET) return null;
-  const row = await env.DB.prepare("SELECT key_enc FROM ai_bots WHERE name = ?").bind(name).first();
-  if (!row?.key_enc) return null;
-  try { return await openSeal(env.AI_SESSION_SECRET, row.key_enc); } catch { return null; }
+function botKey(env, name) {
+  const slot = keyEnvName(name);
+  const value = slot && env[slot];
+  return typeof value === "string" && value ? value : null;
 }
 async function writeLog(env, info) {
   const res = await env.DB.prepare("INSERT INTO ai_log (at, session_id, bot, path, status, model) VALUES (?, ?, ?, ?, ?, ?)").bind(Date.now(), info.session || null, info.bot || null, String(info.path || "/").slice(0, 180), info.status, info.model || null).run();
@@ -261,40 +241,87 @@ async function usage(req, env, url, user) {
   });
 }
 
-async function listBots(env) {
-  const stored = await env.DB.prepare("SELECT name FROM ai_bots").all();
-  let remote = [];
-  const helper = httpBase(env.HELPER_ORIGIN);
-  if (helper && env.HELPER_KEY) {
-    try {
-      const r = await fetch(`${helper}/profiles`, { headers: { authorization: `Bearer ${env.HELPER_KEY}`, ...accessHeaders(env) }, signal: AbortSignal.timeout(2000) });
-      if (r.ok) remote = ((await r.json())?.profiles || []).filter(isBotName);
-    } catch { /* Helfer ist optional für die Liste */ }
-  }
-  const names = [...new Set([...BUILTIN, ...remote, ...(stored.results || []).map((r) => r.name)])].filter(isBotName);
-  const bots = [];
-  for (const name of names) bots.push({ name, ready: !!(await botKey(env, name)) });
-  return json({ bots });
+function profileNames(j) {
+  const raw = Array.isArray(j) ? j : (j?.profiles || j?.items || []);
+  return raw.map((x) => typeof x === "string" ? x : x?.name).filter(isBotName);
 }
-async function createBot(req, env, user) {
+function scrubBody(text, max) {
+  if (text.length > max) return { error: 413 };
+  let body; try { body = text ? JSON.parse(text) : {}; } catch { return { error: 400 }; }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { error: 400 };
+  for (const k of ["key", "api_key", "api_server_key", "token", "session_token", "authorization"]) delete body[k];
+  if (typeof body.soul === "string") body.soul = cleanSoul(body.soul);
+  if (typeof body.content === "string") body.content = cleanSoul(body.content);
+  if (body.name != null && !isBotName(String(body.name))) return { error: 400 };
+  return { body };
+}
+async function dashFetch(env, method, path, bodyText) {
+  const base = httpBase(env.HERMES_DASHBOARD_ORIGIN);
+  if (!base || !env.HERMES_DASHBOARD_SESSION_TOKEN) return { error: json({ error: "Dashboard ist nicht eingerichtet" }, 503) };
+  const headers = { "X-Hermes-Session-Token": env.HERMES_DASHBOARD_SESSION_TOKEN, accept: "application/json", "accept-encoding": "identity", ...accessHeaders(env) };
+  if (bodyText != null) headers["content-type"] = "application/json";
+  let upstream;
+  try { upstream = await fetch(base + path, { method, headers, body: bodyText ?? undefined, signal: AbortSignal.timeout(8000) }); }
+  catch { return { error: json({ error: "Dashboard nicht erreichbar" }, 502) }; }
+  const raw = await upstream.text();
+  const redactor = createRedactor(knownSecrets(env, env.HERMES_DASHBOARD_SESSION_TOKEN));
+  const clean = redactor.push(raw.slice(0, 1_000_000)) + redactor.end();
+  let parsed = null; try { parsed = JSON.parse(clean); } catch { parsed = null; }
+  return { status: upstream.status, text: clean, json: parsed, type: upstream.headers.get("content-type") || "application/json" };
+}
+function dashResponse(got) {
+  if (got.error) return got.error;
+  return new Response(got.text, { status: got.status, headers: { ...SECURITY, "content-type": got.type } });
+}
+async function listBots(env) {
+  let names = [];
+  const got = await dashFetch(env, "GET", "/api/profiles", null);
+  if (!got.error && got.status === 200) names = profileNames(got.json);
+  if (!names.length && (got.error || got.status !== 200)) names = BUILTIN.slice();
+  return json({ bots: names.filter(isBotName).map((name) => ({ name, ready: !!botKey(env, name), secret: keyEnvName(name) })) });
+}
+async function dashboard(req, env, url, user) {
   if (!user) return json({ error: "Anmeldung nötig" }, 401);
-  let body; try { body = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
-  if (!isBotName(body?.name)) return json({ error: "Name ungültig" }, 400);
-  const helper = httpBase(env.HELPER_ORIGIN);
-  if (!helper || !env.HELPER_KEY) return json({ error: "Helfer ist nicht eingerichtet" }, 503);
-  const soul = cleanSoul(body?.soul);
-  let r;
-  try {
-    r = await fetch(`${helper}/profiles`, { method: "POST", headers: { authorization: `Bearer ${env.HELPER_KEY}`, "content-type": "application/json", ...accessHeaders(env) }, body: JSON.stringify({ name: body.name, soul }) });
-  } catch { return json({ error: "Helfer nicht erreichbar" }, 502); }
-  let created = null; try { created = await r.json(); } catch { created = null; }
-  if (!r.ok || !created?.ok) return json({ error: "Anlegen fehlgeschlagen" }, 502);
-  if (created.key && !KEY_ENV[body.name] && env.AI_SESSION_SECRET) {
-    await env.DB.prepare("INSERT INTO ai_bots (name, key_enc, created_at) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET key_enc = excluded.key_enc, created_at = excluded.created_at").bind(body.name, await seal(env.AI_SESSION_SECRET, String(created.key)), Date.now()).run();
+  if (req.method !== "GET" && !originOk(req)) return json({ error: "Ungültige Herkunft" }, 403);
+  const limited = await rateLimit(env, user.id);
+  if (limited) return limited;
+  const rest = url.pathname.slice("/api/hermes".length) || "/";
+  const profile = url.searchParams.get("profile");
+  if (profile != null && profile !== "" && !isBotName(profile)) return json({ error: "Name ungültig" }, 400);
+  const q = profile ? `?profile=${encodeURIComponent(profile)}` : "";
+  let path = "";
+  const one = rest.match(/^\/profiles\/([^/]+)(?:\/(model|soul))?$/);
+  if (rest === "/profiles" && (req.method === "GET" || req.method === "POST")) path = "/api/profiles";
+  else if (one && isBotName(decodeURIComponent(one[1])) && !one[2] && (req.method === "PATCH" || req.method === "DELETE")) path = `/api/profiles/${encodeURIComponent(decodeURIComponent(one[1]))}`;
+  else if (one && isBotName(decodeURIComponent(one[1])) && one[2] && req.method === "PUT") path = `/api/profiles/${encodeURIComponent(decodeURIComponent(one[1]))}/${one[2]}`;
+  else if (rest === "/model/options" && req.method === "GET" && profile) path = "/api/model/options" + q;
+  else if (rest === "/model/set" && req.method === "POST" && profile) path = "/api/model/set" + q;
+  else return json({ error: "not found" }, 404);
+  let bodyText = null;
+  if (req.method !== "GET" && req.method !== "DELETE") {
+    const cleaned = scrubBody(await req.text(), 8000);
+    if (cleaned.error) return json({ error: cleaned.error === 413 ? "Anfrage zu groß" : "invalid json" }, cleaned.error);
+    if (req.method === "POST" && rest === "/profiles" && !isBotName(cleaned.body.name)) return json({ error: "Name ungültig" }, 400);
+    bodyText = JSON.stringify(cleaned.body);
   }
-  return json({ ok: true, name: body.name, ready: !!(await botKey(env, body.name)) });
+  const got = await dashFetch(env, req.method, path, bodyText);
+  if (got.error) return got.error;
+  if (req.method === "POST" && rest === "/profiles" && got.status >= 200 && got.status < 300) {
+    const name = JSON.parse(bodyText).name;
+    const hint = `Setze API_SERVER_KEY als Worker-Secret ${keyEnvName(name)} und starte auf PC-Nils: hermes gateway restart.`;
+    const payload = got.json && typeof got.json === "object" && !Array.isArray(got.json) ? { ...got.json } : { ok: true };
+    for (const k of ["key", "api_key", "api_server_key", "token", "session_token"]) delete payload[k];
+    return json({ ...payload, name, ready: !!botKey(env, name), hint }, got.status);
+  }
+  return dashResponse(got);
 }
 
+async function rateLimit(env, sessionId) {
+  const since = Date.now() - WINDOW_MS;
+  const rate = await env.DB.prepare("SELECT COUNT(*) AS n, MIN(at) AS t FROM ai_log WHERE session_id = ? AND at > ? AND (path LIKE '/p/%' OR path LIKE '/api/hermes/%')").bind(sessionId, since).first();
+  if ((rate?.n || 0) >= LIMIT) return json({ error: "Zu viele Anfragen", retry_after_ms: Math.max(1, (rate?.t || Date.now()) + WINDOW_MS - Date.now()) }, 429);
+  return null;
+}
 function textual(ct) { return !ct || /json|text|event-stream|xml|javascript|urlencoded/i.test(ct); }
 function streamRedacted(body, secrets) {
   let usage = null, buf = "";
@@ -327,16 +354,15 @@ async function proxy(req, env, url, user) {
   if (!isBotName(name)) return json({ error: "Name ungültig" }, 400);
   if (!PROXY.some(([method, re]) => method === req.method && re.test(rest))) return json({ error: "not found" }, 404);
   if (!user) return json({ error: "Anmeldung nötig" }, 401);
-  if (req.method === "POST" && !originOk(req)) return json({ error: "Ungültige Herkunft" }, 403);
-  const key = await botKey(env, name);
-  if (!key) return json({ error: "Bot nicht bereit" }, 404);
-  const since = Date.now() - WINDOW_MS;
-  const rate = await env.DB.prepare("SELECT COUNT(*) AS n, MIN(at) AS t FROM ai_log WHERE session_id = ? AND at > ? AND path LIKE '/p/%'").bind(user.id, since).first();
-  if ((rate?.n || 0) >= LIMIT) return json({ error: "Zu viele Anfragen", retry_after_ms: Math.max(1, (rate?.t || Date.now()) + WINDOW_MS - Date.now()) }, 429);
+  if (req.method !== "GET" && !originOk(req)) return json({ error: "Ungültige Herkunft" }, 403);
+  const key = botKey(env, name);
+  if (!key) return json({ error: "Bot nicht bereit", secret: keyEnvName(name) }, 404);
+  const limited = await rateLimit(env, user.id);
+  if (limited) return limited;
   const base = httpBase(env.HERMES_ORIGIN);
   if (!base) return json({ error: "Hermes ist nicht eingerichtet" }, 503);
   let upstreamBody;
-  if (req.method === "POST") {
+  if (req.method === "POST" || req.method === "PATCH" || req.method === "PUT") {
     const text = await req.text();
     if (text.length > (rest === "/v1/chat/completions" ? 100000 : 8000)) return json({ error: "Anfrage zu groß" }, 413);
     if (rest === "/v1/chat/completions") {
@@ -385,10 +411,7 @@ async function dispatch(req, env, url) {
   if (path === "/api/me") return user ? json({ user: { name: user.global_name || user.username, username: user.username } }) : json({ user: null }, 401);
   if (path === "/api/usage" && req.method === "GET") return usage(req, env, url, user);
   if (path === "/api/bots" && req.method === "GET") return user ? listBots(env) : json({ error: "Anmeldung nötig" }, 401);
-  if (path === "/api/bots" && req.method === "POST") {
-    if (!originOk(req)) return json({ error: "Ungültige Herkunft" }, 403);
-    return createBot(req, env, user);
-  }
+  if (path === "/api/hermes" || path.startsWith("/api/hermes/")) return dashboard(req, env, url, user);
   if (path.startsWith("/p/")) return proxy(req, env, new URL(path, url), user);
   return json({ error: "not found" }, 404);
 }

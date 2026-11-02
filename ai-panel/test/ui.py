@@ -29,6 +29,8 @@ with sync_playwright() as p:
                 try:
                     pg.get_by_role("button", name="cloudflare").wait_for(timeout=8000)
                     pg.get_by_role("button", name="Bestätigen").click(timeout=8000)
+                    pg.get_by_role("button", name="Löschen").click(timeout=8000)
+                    pg.get_by_role("button", name="Wirklich löschen").click(timeout=8000)
                 except Exception:
                     print("TEXT", pg.locator("body").inner_text())
                     raise

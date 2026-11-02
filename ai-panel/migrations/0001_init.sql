@@ -21,8 +21,3 @@ CREATE TABLE IF NOT EXISTS ai_log (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_log_at ON ai_log(at);
 CREATE INDEX IF NOT EXISTS idx_ai_log_session ON ai_log(session_id, at);
-CREATE TABLE IF NOT EXISTS ai_bots (
-  name TEXT PRIMARY KEY,
-  key_enc TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);

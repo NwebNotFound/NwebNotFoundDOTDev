@@ -41,7 +41,7 @@ input{flex:1;min-width:0;min-height:44px;padding:.7rem .9rem;border-radius:12px;
 input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 4px var(--ring)}
 .run{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center;padding:.7rem 0;border-bottom:1px solid var(--line)}
 .run p{flex:1 1 12rem;margin:0}
-.row{display:flex;gap:.5rem;margin:.6rem 0}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}
 .err{color:#ff453a}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .note{color:var(--mut);font-size:.85rem}
@@ -130,6 +130,81 @@ async function loadSide(runsBox, sessBox) {
   sessBox.replaceChildren();
   for (const s of items.slice(0, 12)) sessBox.append(el("p", "note", s.title || s.id || "Sitzung"));
 }
+function jobId(job) { return String(job.id || job.job_id || ""); }
+async function dashSend(path, opt, mount) {
+  const res = await api(path, opt);
+  if (!(res.j && res.j.confirm_required)) return res;
+  const box = el("div", "card");
+  box.append(el("p", null, res.j.confirm_message || "Diese Änderung braucht eine Bestätigung."));
+  const yes = el("button", "btn", "Trotzdem setzen");
+  yes.type = "button";
+  const no = el("button", "btn sec", "Abbrechen");
+  no.type = "button";
+  box.append(yes, no);
+  mount.append(box);
+  return new Promise(function (resolve) {
+    no.addEventListener("click", function () { box.remove(); resolve(res); });
+    yes.addEventListener("click", async function () {
+      yes.disabled = true;
+      let body = {};
+      try { body = opt && opt.body ? JSON.parse(opt.body) : {}; } catch (e) { body = {}; }
+      body.confirm_expensive_model = true;
+      const again = await api(path, { method: opt.method || "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      box.remove();
+      resolve(again);
+    });
+  });
+}
+async function loadJobs(box) {
+  if (!bot) return;
+  box.replaceChildren(el("p", "note", "Lade Aufträge…"));
+  const res = await api("/p/" + encodeURIComponent(bot) + "/api/jobs");
+  const list = res.j && (Array.isArray(res.j) ? res.j : res.j.jobs) || [];
+  box.replaceChildren();
+  if (!res.ok) { box.append(el("p", "note", (res.j && res.j.error) || "Aufträge gerade nicht erreichbar.")); return; }
+  const form = el("form", "row");
+  const nm = el("input"); nm.placeholder = "Name"; nm.setAttribute("aria-label", "Auftragsname"); nm.maxLength = 80;
+  const sch = el("input"); sch.placeholder = "0 3 * * *"; sch.setAttribute("aria-label", "Zeitplan"); sch.maxLength = 80;
+  const pr = el("input"); pr.placeholder = "Auftrag"; pr.setAttribute("aria-label", "Auftragstext"); pr.maxLength = 500;
+  const add = el("button", "btn sec", "Auftrag anlegen"); add.type = "submit";
+  form.append(nm, sch, pr, add);
+  form.addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    await api("/p/" + encodeURIComponent(bot) + "/api/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: nm.value.trim(), schedule: sch.value.trim(), prompt: pr.value.trim() }) });
+    loadJobs(box);
+  });
+  box.append(form);
+  for (const job of list) {
+    const id = jobId(job);
+    if (!id) continue;
+    const row = el("div", "run");
+    row.append(el("p", null, (job.name || id) + " · " + (job.schedule || "")));
+    const edit = el("input"); edit.value = job.prompt || job.schedule || ""; edit.setAttribute("aria-label", "Auftrag bearbeiten"); edit.maxLength = 500;
+    const save = el("button", "btn sec", "Speichern"); save.type = "button";
+    save.addEventListener("click", async function () {
+      await api("/p/" + encodeURIComponent(bot) + "/api/jobs/" + encodeURIComponent(id), { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ schedule: job.schedule || "", prompt: edit.value }) });
+      loadJobs(box);
+    });
+    const pause = el("button", "btn sec", job.paused ? "Fortsetzen" : "Pause"); pause.type = "button";
+    pause.addEventListener("click", async function () {
+      await api("/p/" + encodeURIComponent(bot) + "/api/jobs/" + encodeURIComponent(id) + (job.paused ? "/resume" : "/pause"), { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      loadJobs(box);
+    });
+    const run = el("button", "btn sec", "Ausführen"); run.type = "button";
+    run.addEventListener("click", function () { api("/p/" + encodeURIComponent(bot) + "/api/jobs/" + encodeURIComponent(id) + "/run", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }); });
+    const del = el("button", "btn sec", "Löschen"); del.type = "button";
+    del.addEventListener("click", function () {
+      const yes = el("button", "btn", "Wirklich löschen"); yes.type = "button";
+      yes.addEventListener("click", async function () {
+        await api("/p/" + encodeURIComponent(bot) + "/api/jobs/" + encodeURIComponent(id), { method: "DELETE" });
+        loadJobs(box);
+      });
+      row.append(yes);
+    });
+    row.append(edit, save, pause, run, del);
+    box.append(row);
+  }
+}
 async function panel(user) {
   document.getElementById("logout").hidden = false;
   app.append(el("p", "eyebrow", "Angemeldet"));
@@ -152,9 +227,10 @@ async function panel(user) {
   form.addEventListener("submit", async function (ev) {
     ev.preventDefault();
     err.textContent = "";
-    const res = await api("/api/bots", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: name.value.trim() }) });
+    const res = await api("/api/hermes/profiles", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: name.value.trim() }) });
     if (!res.ok) { err.textContent = (res.j && res.j.error) || "Anlegen fehlgeschlagen"; return; }
     name.value = "";
+    err.textContent = (res.j && res.j.hint) || "";
     loadBots(bots, res.j.name);
   });
   app.append(form, err);
@@ -175,7 +251,11 @@ async function panel(user) {
   const runsBox = el("div");
   runsBox.id = "runs";
   const sessBox = el("div");
-  app.append(el("h2", "eyebrow", "Läufe"), runsBox, el("h2", "eyebrow", "Sitzungen"), sessBox);
+  const jobsBox = el("div");
+  jobsBox.id = "jobs";
+  const modelBox = el("div");
+  modelBox.id = "model";
+  app.append(el("h2", "eyebrow", "Läufe"), runsBox, el("h2", "eyebrow", "Sitzungen"), sessBox, el("h2", "eyebrow", "Cron"), jobsBox, el("h2", "eyebrow", "Modell"), modelBox);
   composer.addEventListener("submit", async function (ev) {
     ev.preventDefault();
     const text = msg.value.trim();
@@ -238,7 +318,24 @@ async function panel(user) {
     }
     await loadSide(runsBox, sessBox);
     await fillUsage();
+    await loadJobs(jobsBox);
+    await loadModel(modelBox);
   }
+async function loadModel(box) {
+  if (!bot) return;
+  box.replaceChildren();
+  const field = el("input");
+  field.value = "hermes-agent";
+  field.maxLength = 80;
+  field.setAttribute("aria-label", "Modell");
+  const save = el("button", "btn sec", "Modell speichern");
+  save.type = "button";
+  save.addEventListener("click", async function () {
+    const res = await dashSend("/api/hermes/model/set?profile=" + encodeURIComponent(bot), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: field.value.trim(), profile: bot }) }, box);
+    if (res.j && res.j.ok) box.append(el("p", "note", "Modell gespeichert."));
+  });
+  box.append(field, save);
+}
   async function fillUsage() {
     const res = await api("/api/usage");
     const u = res.j || {};

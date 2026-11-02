@@ -4,9 +4,9 @@ Eigenes Cloudflare-Worker-Projekt `nwebnotfound-ai` unter `ai-panel/`. Die Seite
 
 ## Was läuft wo
 
-- **Worker** (`ai-panel/src/worker.js`): Discord-Login, Session, Proxy zu Hermes, Rate-Limit, D1-Log, Usage.
-- **Helfer** (`ai-panel/helper/server.mjs`): nur auf dem PC, nur `127.0.0.1`. Legt Hermes-Profile an. Keine Shell, nur argv-Listen.
-- **Hermes** hinter einem Cloudflare-Tunnel. Der Worker holt sich den Host aus der Var `HERMES_ORIGIN`.
+- **Worker** (`ai-panel/src/worker.js`): Discord-Login, Session, Proxy zu Hermes, Rate-Limit, D1-Log, Usage. Einziger Zugang von außen.
+- **Gateway** hinter `HERMES_ORIGIN`: Chat, Läufe und Cron (`/api/jobs`). Der Worker setzt den Bot-Key.
+- **Dashboard** hinter `HERMES_DASHBOARD_ORIGIN`: Profile und Modelle. Der Worker setzt `X-Hermes-Session-Token`.
 
 ## Discord
 
@@ -34,13 +34,13 @@ npx wrangler secret put HERMES_KEY_DISCORD
 npx wrangler secret put HERMES_KEY_HOMELAB
 npx wrangler secret put CF_ACCESS_CLIENT_ID
 npx wrangler secret put CF_ACCESS_CLIENT_SECRET
-npx wrangler secret put HELPER_KEY
+npx wrangler secret put HERMES_DASHBOARD_SESSION_TOKEN
 npx wrangler secret put OPENROUTER_KEY
 ```
 
-Die vier `HERMES_KEY_*` sind die Bot-Schlüssel für `cloudflare`, `minecraft`, `discord` und `homelab`. Der Browser schickt keinen Schlüssel. Der Worker setzt `Authorization` selbst und entfernt diese Werte aus der durchgereichten Antwort.
+`HERMES_KEY_*` sind die Bot-Schlüssel. Der Name wird großgeschrieben, Bindestriche werden zu Unterstrichen: `cloudflare` ist `HERMES_KEY_CLOUDFLARE`, `side-bot` ist `HERMES_KEY_SIDE_BOT`. Der Browser schickt keinen Schlüssel. Der Worker setzt am Gateway `Authorization: Bearer` und am Dashboard den Header `X-Hermes-Session-Token` aus `HERMES_DASHBOARD_SESSION_TOKEN`. Beide Werte werden aus der Antwort an den Browser entfernt.
 
-Zusätzliche Bots aus dem Helfer: der Schlüssel kommt einmal über den Helfer zurück, wird mit `AI_SESSION_SECRET` (AES-GCM) in D1 gelegt und nie an den Browser gegeben. Liegt für einen der vier Namen ein Secret, gewinnt das Secret.
+Ein neuer Bot im Panel legt nur das Profil an. Danach auf PC-Nils den `API_SERVER_KEY` dieses Profils als Worker-Secret `HERMES_KEY_<NAME>` setzen und `hermes gateway restart` ausführen. Ohne das Secret bleibt der Bot im Panel ohne Chat. Das Panel zeigt diesen Hinweis, es startet Hermes nicht selbst.
 
 ## Vars
 
@@ -49,7 +49,7 @@ In `ai-panel/wrangler.jsonc` vor dem Deploy eintragen (echte Hostnamen, nicht co
 ```jsonc
 "vars": {
   "HERMES_ORIGIN": "https://hermes.nwebnotfound.dev",
-  "HELPER_ORIGIN": "https://ai-helper.nwebnotfound.dev"
+  "HERMES_DASHBOARD_ORIGIN": "https://hermes-dashboard.nwebnotfound.dev"
 }
 ```
 
@@ -57,7 +57,7 @@ Beide Werte sind `https`-URLs ohne Benutzer oder Passwort im URL. Leer oder fehl
 
 ## Tunnel auf PC-Nils
 
-Hermes und der Helfer bleiben auf localhost. `cloudflared` auf demselben PC macht sie für den Worker erreichbar. Beispiel `~/.cloudflared/config.yml`:
+Gateway und Dashboard bleiben auf localhost. Nur `cloudflared` auf demselben PC macht sie für den Worker erreichbar. Beispiel `~/.cloudflared/config.yml`:
 
 ```yaml
 tunnel: <TUNNEL_ID>
@@ -65,14 +65,14 @@ credentials-file: /home/nils/.cloudflared/<TUNNEL_ID>.json
 ingress:
   - hostname: hermes.nwebnotfound.dev
     service: http://127.0.0.1:8787
-  - hostname: ai-helper.nwebnotfound.dev
-    service: http://127.0.0.1:8765
+  - hostname: hermes-dashboard.nwebnotfound.dev
+    service: http://127.0.0.1:<DASHBOARD_PORT>
   - service: http_status:404
 ```
 
-`8787` ist der Port von Hermes auf dem PC, `8765` der Helfer. Beide Prozesse binden `127.0.0.1`, nicht `0.0.0.0`.
+`8787` ist der Gateway-Port, `<DASHBOARD_PORT>` der Port des Hermes-Dashboards. Beide Prozesse binden `127.0.0.1`, nicht `0.0.0.0`. Die Hostnamen sind nicht der öffentliche Zugang.
 
-Cloudflare Access vor beide Hostnamen, Service Token. Dieselbe Client-ID und dasselbe Secret liegen in `CF_ACCESS_CLIENT_ID` und `CF_ACCESS_CLIENT_SECRET`. Der Worker schickt sie als `CF-Access-Client-Id` und `CF-Access-Client-Secret` an Hermes und an den Helfer. Den Token nicht in den Tunnel schreiben.
+Cloudflare Access vor beide Hostnamen, Service Token, ist der empfohlene Schutz. Dieselbe Client-ID und dasselbe Secret liegen in `CF_ACCESS_CLIENT_ID` und `CF_ACCESS_CLIENT_SECRET`. Der Worker schickt sie als `CF-Access-Client-Id` und `CF-Access-Client-Secret` an Gateway und Dashboard. Den Token nicht in den Tunnel schreiben. Menschen kommen nur über `https://ai.nwebnotfound.dev` und den Discord-Login.
 
 Tunnel starten, falls er nicht als Dienst läuft:
 
@@ -80,24 +80,17 @@ Tunnel starten, falls er nicht als Dienst läuft:
 cloudflared tunnel run
 ```
 
-## Helfer starten
+## Neuer Bot
 
-Im Verzeichnis `ai-panel`, auf PC-Nils:
+Im Panel ein Profil anlegen. Danach auf PC-Nils:
 
-```bash
-HELPER_KEY='derselbe Wert wie das Worker-Secret' node helper/server.mjs
-```
+1. `API_SERVER_KEY` des neuen Profils kopieren.
+2. `npx wrangler secret put HERMES_KEY_<NAME>` im Verzeichnis `ai-panel`. `<NAME>` ist der Profilname in Großbuchstaben, `-` wird `_`.
+3. `hermes gateway restart`
 
-Optional `PORT` (Standard 8765) und `HERMES_HOME` (Standard `~/.hermes`). Der Prozess hört nur auf `127.0.0.1`.
+Erst danach kann der Chat dieses Bots. Cron (`/api/jobs`, Pause, Fortsetzen, Ausführen, Löschen) benutzt denselben Key am Gateway. Löschen fragt im Panel noch einmal nach.
 
-Er ruft, jeweils als argv-Liste und mit `shell: false`:
-
-- `hermes profile list`
-- `hermes profile create <name> --clone`
-- schreibt `SOUL.md` und `api_key` unter `$HERMES_HOME/profiles/<name>/` (Modus 0600)
-- `hermes gateway restart`
-
-Namen müssen `^[a-z0-9-]{1,32}$` sein. Alles andere ist 400, und `hermes` wird nicht gestartet. Der Helfer verlangt `Authorization: Bearer <HELPER_KEY>`.
+Profile, Soul und Modell laufen über das Dashboard. Antwortet es mit `confirm_required`, zeigt das Panel den Text und schickt die Änderung erst nach dem Klick erneut, mit `confirm_expensive_model: true`.
 
 ## D1
 
@@ -110,7 +103,7 @@ npx wrangler d1 migrations apply nwebnotfound-ai --remote --config ai-panel/wran
 
 Die Migration `migrations/0001_init.sql` ist additiv (`IF NOT EXISTS`). Geloggt wird Zeit, Session, Bot, Pfad, Status, und falls die Antwort das hergibt Tokenzahlen und Kosten. Keine Prompts, keine Schlüssel.
 
-Pro Session gelten 30 Proxy-Aufrufe (`/p/…`) je 60000 ms. Darüber `429` mit `retry_after_ms`.
+Pro Session gelten 30 Proxy-Aufrufe (`/p/…` und `/api/hermes/…`) je 60000 ms. Darüber `429` mit `retry_after_ms`.
 
 ## Routen
 
@@ -118,7 +111,11 @@ Pro Session gelten 30 Proxy-Aufrufe (`/p/…`) je 60000 ms. Darüber `429` mit `
 | --- | --- |
 | `GET /` | Panel, mobil zuerst, derselbe Apple-Stil wie die Hauptseite |
 | `GET /auth/login`, `GET /auth/callback`, `GET /auth/logout` | Discord, Scope `identify` |
-| `GET /api/me`, `GET /api/bots`, `POST /api/bots`, `GET /api/usage` | Session |
+| `GET /api/me`, `GET /api/bots`, `GET /api/usage` | Session. Die Botliste kommt aus `GET /api/profiles` |
+| `GET/POST /api/hermes/profiles`, `PATCH/DELETE /api/hermes/profiles/<name>` | Dashboard-Profile |
+| `PUT /api/hermes/profiles/<name>/model` und `…/soul` | Modell und Soul des Profils |
+| `GET /api/hermes/model/options?profile=`, `POST /api/hermes/model/set?profile=` | Modellauswahl, `confirm_required` bleibt ein Dialog |
+| `GET/POST /p/<name>/api/jobs`, `PATCH/DELETE …/jobs/<id>`, `POST …/pause`, `…/resume`, `…/run` | Cron am Gateway, mit dem Bot-Key |
 | `POST /p/<name>/v1/chat/completions` | Chat, Modell immer `hermes-agent`, SSE wird durchgereicht |
 | `GET/POST /p/<name>/v1/runs`, `GET …/runs/<id>`, `GET …/events` | Läufe |
 | `POST /p/<name>/v1/approval` | Bestätigen im UI |
@@ -144,6 +141,6 @@ node ai-panel/test/unit.mjs
 node ai-panel/test/e2e.mjs
 ```
 
-Der e2e-Lauf startet wrangler und einen Mock für Discord, Hermes, OpenRouter und den Helfer. Er prüft die 403 für eine fremde Discord-ID, die Namensregeln, und dass Schlüssel weder in der Antwort noch im D1-Log stehen. In CI hängt dasselbe am Workflow `e2e`.
+Der e2e-Lauf startet wrangler und einen Mock für Discord, Gateway, Dashboard und OpenRouter. Er prüft die 403 für eine fremde Discord-ID, die Namensregeln, Cron über den Bot-Key, `confirm_required` ohne zweiten Aufruf von allein, und dass weder Bot-Key noch Dashboard-Token in der Antwort oder im D1-Log stehen. In CI hängt dasselbe am Workflow `e2e`.
 
 `AI_OAUTH_BASE` und `OPENROUTER_ORIGIN` sind nur für diesen lokalen Lauf. Der Worker benutzt sie ausschließlich, wenn die URL auf `127.0.0.1` zeigt und der Request ein Loopback-Host ist oder den Header `x-ai-local: 1` trägt. In Produktion beide weglassen.

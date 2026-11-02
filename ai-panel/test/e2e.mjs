@@ -13,12 +13,12 @@ const ORIGIN = BASE;
 const PERSIST = ROOT + ".wrangler/e2e";
 const DV = ROOT + ".dev.vars";
 const ALLOWED = "100000000000000001";
-const SECRETS = ["hermes-key-cloudflare-SECRET", "hermes-key-minecraft-SECRET", "hermes-key-discord-SECRET", "hermes-key-homelab-SECRET", "cf-access-id-SECRET", "cf-access-secret-SECRET", "openrouter-key-SECRET", "e2e-helper-key", "e2e-discord-secret", "e2e-session-secret", "generated-helper-key-SECRET"];
+const SECRETS = ["hermes-key-cloudflare-SECRET", "hermes-key-minecraft-SECRET", "hermes-key-discord-SECRET", "hermes-key-homelab-SECRET", "sidebot-key-SECRET", "cf-access-id-SECRET", "cf-access-secret-SECRET", "openrouter-key-SECRET", "dashboard-session-SECRET", "e2e-discord-secret", "e2e-session-secret"];
 const leak = (t) => SECRETS.find((s) => String(t).includes(s)) || "";
 let pass = 0, fail = 0;
 const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + String(extra).slice(0, 400))); };
 
-const seen = { hermes: [], helperPosts: [], approvals: [] };
+const seen = { hermes: [], approvals: [], dash: [], deletes: [] };
 let lastCode = "";
 const mock = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://127.0.0.1");
@@ -46,17 +46,25 @@ const mock = http.createServer(async (req, res) => {
   if (url.pathname === "/hermes/api/sessions") return send(200, { sessions: [{ id: "s-1", title: "Heute" }] });
   if (url.pathname === "/hermes/v1/approval") { seen.approvals.push(body); return send(200, { ok: true }); }
   if (url.pathname === "/hermes/v1/stop" || url.pathname === "/hermes/v1/steer") return send(200, { ok: true });
+  if (url.pathname === "/hermes/api/jobs" && req.method === "GET") return send(200, { jobs: [{ id: "job-1", name: "nacht", schedule: "0 3 * * *" }] });
+  if (url.pathname === "/hermes/api/jobs" && req.method === "POST") return send(200, { ok: true, id: "job-2" });
+  if (url.pathname === "/hermes/api/jobs/job-1" && req.method === "DELETE") { seen.deletes.push(req.headers.authorization || ""); return send(200, { ok: true }); }
+  if (url.pathname === "/hermes/api/jobs/job-1/pause" || url.pathname === "/hermes/api/jobs/job-1/resume" || url.pathname === "/hermes/api/jobs/job-1/run") return send(200, { ok: true });
+  if (url.pathname.startsWith("/dash/")) {
+    if ((req.headers["x-hermes-session-token"] || "") !== "dashboard-session-SECRET") return send(401, { error: "no token" });
+    seen.dash.push({ method: req.method, path: url.pathname + url.search, body, cf: req.headers["cf-access-client-id"] || "" });
+    if (url.pathname === "/dash/api/profiles" && req.method === "GET") return send(200, { profiles: [{ name: "cloudflare" }, { name: "minecraft" }, { name: "discord" }, { name: "homelab" }, { name: "sidebot" }] });
+    if (url.pathname === "/dash/api/profiles" && req.method === "POST") return send(200, { ok: true, api_server_key: "should-not-leak" });
+    if (url.pathname === "/dash/api/model/options") return send(200, { options: [{ id: "hermes-agent" }, { id: "expensive" }] });
+    if (url.pathname === "/dash/api/model/set") {
+      const j = JSON.parse(body || "{}");
+      if (j.confirm_expensive_model === true) return send(200, { ok: true });
+      return send(200, { ok: false, confirm_required: true, confirm_message: "Teures Modell" });
+    }
+    return send(200, { ok: true });
+  }
   if (url.pathname === "/openrouter/api/v1/credits") return send(200, { data: { total_credits: 12.5, total_usage: 1.25 } });
   if (url.pathname === "/openrouter/api/v1/models") return send(200, { data: [{ id: "hermes-agent", pricing: { prompt: "0.000001", completion: "0.000002" } }, { id: "expensive", pricing: { prompt: "0.01", completion: "0.03" } }] });
-  if (url.pathname === "/helper/profiles" && req.method === "GET") {
-    if (req.headers.authorization !== "Bearer e2e-helper-key") return send(401, { error: "unauthorized" });
-    return send(200, { profiles: ["cloudflare", "minecraft", "discord", "homelab"] });
-  }
-  if (url.pathname === "/helper/profiles" && req.method === "POST") {
-    seen.helperPosts.push(body);
-    const j = JSON.parse(body || "{}");
-    return send(200, { ok: true, name: j.name, key: "generated-helper-key-SECRET" });
-  }
   send(404, { error: "mock" });
 });
 await new Promise((resolve) => mock.listen(MOCK, "127.0.0.1", resolve));
@@ -69,8 +77,9 @@ fs.writeFileSync(DV, [
   "AI_SESSION_SECRET=e2e-session-secret",
   `ALLOWED_DISCORD_ID=${ALLOWED}`,
   `HERMES_ORIGIN=http://127.0.0.1:${MOCK}/hermes`,
-  `HELPER_ORIGIN=http://127.0.0.1:${MOCK}/helper`,
-  "HELPER_KEY=e2e-helper-key",
+  `HERMES_DASHBOARD_ORIGIN=http://127.0.0.1:${MOCK}/dash`,
+  "HERMES_DASHBOARD_SESSION_TOKEN=dashboard-session-SECRET",
+  "HERMES_KEY_SIDEBOT=sidebot-key-SECRET",
   "HERMES_KEY_CLOUDFLARE=hermes-key-cloudflare-SECRET",
   "HERMES_KEY_MINECRAFT=hermes-key-minecraft-SECRET",
   "HERMES_KEY_DISCORD=hermes-key-discord-SECRET",
@@ -161,18 +170,27 @@ try {
     if (!usageRow?.tokens_in) await new Promise((r) => setTimeout(r, 150));
   }
   ok(usageRow?.tokens_in === 3 && usageRow.tokens_out === 1 && Math.abs(usageRow.cost_usd - 0.000005) < 1e-9 && usageRow.model === "hermes-agent", "Log speichert Tokens und Kosten", JSON.stringify(usageRow));
-  const dump = sqlText("SELECT path, status, bot, model FROM ai_log") + sqlText("SELECT name, key_enc FROM ai_bots");
+  const dump = sqlText("SELECT path, status, bot, model FROM ai_log");
   ok(!leak(dump) && !dump.includes("GEHEIM-PROMPT-TEXT"), "D1 ohne Prompt und ohne Schlüssel", leak(dump));
 
-  console.log("Bots und Usage");
-  const before = seen.helperPosts.length;
-  const badBot = await post("/api/bots", { name: "a;rm -rf /" }, session);
-  ok(badBot.s === 400 && seen.helperPosts.length === before, "Name mit Shell-Zeichen → 400, Helfer bleibt still", badBot.t);
-  const made = await post("/api/bots", { name: "sidebot" }, session);
-  ok(made.s === 200 && made.j?.ready === true && !leak(made.t) && !("key" in (made.j || {})), "Anlegen ohne Schlüssel in der Antwort", made.t);
+  console.log("Bots, Cron und Usage");
+  const dashBefore = seen.dash.length;
+  const badBot = await post("/api/hermes/profiles", { name: "a;rm -rf /" }, session);
+  ok(badBot.s === 400 && seen.dash.length === dashBefore, "Profilname mit Shell-Zeichen → 400, Dashboard bleibt still", badBot.t);
+  const made = await post("/api/hermes/profiles", { name: "sidebot" }, session);
+  ok(made.s === 200 && made.j?.hint?.includes("HERMES_KEY_SIDEBOT") && made.j.hint.includes("gateway restart") && !leak(made.t) && !made.t.includes("should-not-leak") && !made.t.includes("dashboard-session"), "Neuer Bot nennt das Secret und den Neustart, ohne Schlüssel", made.t);
+  ok(seen.dash.at(-1)?.cf === "cf-access-id-SECRET" && !seen.dash.at(-1).body.includes("dashboard-session"), "Dashboard-Aufruf trägt Access, nicht den Token im Body");
+  const ask = await post("/api/hermes/model/set?profile=cloudflare", { model: "expensive" }, session);
+  ok(ask.s === 200 && ask.j?.confirm_required === true && ask.j.confirm_message === "Teures Modell" && seen.dash.filter((d) => d.path.startsWith("/dash/api/model/set")).length === 1 && !seen.dash.filter((d) => d.path.startsWith("/dash/api/model/set"))[0].body.includes("confirm_expensive_model"), "confirm_required ohne automatische zweite Anfrage", ask.t);
+  const yes = await post("/api/hermes/model/set?profile=cloudflare", { model: "expensive", confirm_expensive_model: true }, session);
+  ok(yes.s === 200 && yes.j?.ok === true && !leak(yes.t), "Bestätigung wird erst im zweiten Aufruf geschickt", yes.t);
+  const badOpt = await fetch(BASE + "/api/hermes/model/options?profile=Bad_Name", { headers: { ...local, cookie: session } });
+  ok(badOpt.status === 400, "Modelloptionen mit ungültigem Profil → 400", String(badOpt.status));
+  const jobs = await fetch(BASE + "/p/cloudflare/api/jobs", { headers: { ...local, cookie: session } });
+  const jobsText = await jobs.text();
+  ok(jobs.status === 200 && jobsText.includes("job-1") && seen.hermes.at(-1)?.authorization === "Bearer hermes-key-cloudflare-SECRET" && !jobsText.includes("dashboard-session"), "Cron läuft über den Bot-Key", jobsText.slice(0, 160));
   const side = await post("/p/sidebot/v1/chat/completions", { messages: [{ role: "user", content: "noch ein geheimtext" }] }, session);
-  ok(side.s === 200 && seen.hermes.at(-1)?.authorization === "Bearer generated-helper-key-SECRET" && !leak(side.t), "neuer Bot nutzt den serverseitigen Key, Antwort bleibt sauber", seen.hermes.at(-1)?.authorization);
-  ok(!leak(sqlText("SELECT key_enc FROM ai_bots")), "gespeicherter Key ist nicht der Klartext");
+  ok(side.s === 200 && seen.hermes.at(-1)?.authorization === "Bearer sidebot-key-SECRET" && !leak(side.t), "HERMES_KEY_SIDEBOT bleibt serverseitig", seen.hermes.at(-1)?.authorization);
   const use = await fetch(BASE + "/api/usage", { headers: { ...local, cookie: session } });
   const uj = await use.json();
   ok(use.status === 200 && uj.credits?.remaining === 11.25 && uj.model?.id === "hermes-agent" && !JSON.stringify(uj).includes("expensive") && !leak(JSON.stringify(uj)), "Usage: Guthaben, nur hermes-agent, kein OpenRouter-Key", JSON.stringify(uj).slice(0, 300));
@@ -195,6 +213,7 @@ try {
   });
   pass++;
   ok(seen.approvals.length === approvals + 1 && seen.approvals.at(-1).includes("run-1") && seen.approvals.at(-1).includes("true"), "Bestätigen im UI ruft /approval auf", seen.approvals.at(-1));
+  ok(seen.deletes.at(-1) === "Bearer hermes-key-cloudflare-SECRET", "Löschen im UI geht erst nach der zweiten Bestätigung an den Bot-Key", seen.deletes.at(-1));
 
   console.log("Rate-Limit");
   const sid = rows("SELECT id FROM ai_sessions")[0].id;
