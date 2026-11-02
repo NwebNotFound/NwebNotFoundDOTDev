@@ -72,7 +72,9 @@ function upstreamProblem(where, status, data) {
 }
 
 function upstreamFailure(err) {
-  const status = err instanceof up.UpstreamError ? err.status : 502;
+  let status = err instanceof up.UpstreamError ? err.status : 502;
+  // Never forward an upstream 401/403: the browser would treat it as its own session expiring.
+  if (status === 401 || status === 403 || !status) status = 502;
   console.error(JSON.stringify({ ai_panel_upstream: { where: "transport", status, detail: String(err?.message || err).slice(0, 300) } }));
   return json({ error: status === 503 ? "upstream_not_configured" : "upstream_unreachable" }, status);
 }

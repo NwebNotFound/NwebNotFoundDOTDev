@@ -109,8 +109,11 @@ async function api(path, { method = "GET", body } = {}) {
   if (method !== "GET") headers["x-csrf-token"] = state.csrf;
   const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (res.status === 401) {
-    location.href = "/auth/login";
-    throw new Error("unauthorized");
+    // No auto-redirect (that caused a reload loop); show the login screen and let the user click.
+    showLogin();
+    const err = new Error("unauthorized");
+    err.status = 401;
+    throw err;
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok && !data.confirm_required) {
@@ -1065,6 +1068,12 @@ function applyTheme(theme) {
   if (meta) meta.setAttribute("content", theme === "dark" ? "#0f1115" : "#ffffff");
 }
 
+function showLogin() {
+  document.documentElement.dataset.auth = "out";
+  const box = $("#login-screen");
+  if (box) box.hidden = false;
+}
+
 function initTheme() {
   const saved = localStorage.getItem("ai-theme");
   const prefersLight = window.matchMedia?.("(prefers-color-scheme: light)").matches;
@@ -1088,7 +1097,7 @@ async function logoutAll() {
   } catch {
     /* ignore */
   }
-  location.href = "/auth/login";
+  showLogin();
 }
 
 function wire() {
@@ -1149,9 +1158,13 @@ async function boot() {
   let me;
   try {
     me = await api("/api/me");
-  } catch {
+  } catch (err) {
+    if (err?.status !== 401) showLogin();
     return;
   }
+  document.documentElement.dataset.auth = "in";
+  const login = $("#login-screen");
+  if (login) login.hidden = true;
   state.me = me.user;
   state.csrf = me.csrf;
   state.bots = me.bots;
