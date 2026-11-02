@@ -516,7 +516,13 @@ export async function route(request, env, ctx) {
   const csrf = cookies[auth.CSRF_COOKIE] || "";
 
   if (path === "/api/me") {
-    return json({ user: { id: user.id, name: user.name, avatar: user.avatar }, csrf, bots: up.bots(env) });
+    // If the CSRF cookie is missing (cleared cookies, older session), mint one here instead of
+    // leaving the UI with an empty token that makes every mutation fail.
+    const token = csrf || auth.randomToken(24);
+    const headers = csrf
+      ? {}
+      : { "set-cookie": auth.cookie(auth.CSRF_COOKIE, token, auth.SESSION_SECONDS, { httpOnly: false }) };
+    return json({ user: { id: user.id, name: user.name, avatar: user.avatar }, csrf: token, bots: up.bots(env) }, 200, headers);
   }
   if (path === "/api/log") {
     return json({ entries: log.recent(Number(url.searchParams.get("limit")) || 50) });

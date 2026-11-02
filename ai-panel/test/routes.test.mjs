@@ -174,6 +174,14 @@ test("me returns the user, csrf token and bots", async () => {
   assert.equal(data.bots.length, 4);
 });
 
+test("me mints a csrf cookie when it is missing", async () => {
+  const res = await call("/api/me", { cookies: { [CSRF_COOKIE]: "" } });
+  const data = await body(res);
+  assert.ok(data.csrf && data.csrf.length > 10);
+  const set = cookiesFrom(res);
+  assert.equal(set[CSRF_COOKIE], data.csrf);
+});
+
 test("bots list marks which allow-listed bots exist", async () => {
   const data = await body(await call("/api/bots"));
   assert.equal(data.bots.length, 4);

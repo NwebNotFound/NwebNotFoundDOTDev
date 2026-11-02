@@ -84,12 +84,13 @@ overwrite) render a confirm dialog in the panel; the API refuses the action with
 
 ## Tests / CI
 
-- `node --test test/` — unit tests for session signing, CSRF, rate limit, bot-name validation,
-  upstream path building; then an e2e-ish suite that boots the Worker's `fetch` handler against a
-  real local mock Hermes (HTTP server on 127.0.0.1) and walks login → chat run → SSE events →
-  approve → jobs → usage.
-- `.github/workflows/ai-panel.yml`: node 22, `npm ci` (no deps beyond dev), `npm test`,
-  path-filtered to `ai-panel/**`. The site's `e2e.yml` is untouched.
+- `node --test test/*.test.mjs` — unit tests for session signing, CSRF, rate limit, bot-name
+  validation, upstream path building; then an e2e-ish suite that boots the Worker's `fetch` handler
+  against a real local mock Hermes (HTTP server on 127.0.0.1) and walks login → chat run → SSE
+  events → approve → jobs → usage; plus the origin proxy as a real child process.
+- `.github/workflows/ai-panel.yml`: node 22, syntax check, `npm test` (no dependencies to install)
+  and a `wrangler deploy --dry-run` config check; path-filtered to `ai-panel/**`. The site's
+  `e2e.yml` is untouched.
 
 ## Rollout (after merge, by Nils)
 
