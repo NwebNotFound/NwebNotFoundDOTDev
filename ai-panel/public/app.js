@@ -81,8 +81,8 @@ function confirmAction(title, text, okLabel = "Bestätigen") {
   });
 }
 
-// The "new bot" flow used to be a browser prompt() (blocking, unstyled, not reachable with a
-// keyboard on iOS). This is the same dialog pattern as confirmAction, with a real form field.
+// The "new bot" flow used to be a blocking browser dialog (unstyled, unreachable on iOS).
+// This is the same dialog pattern as confirmAction, with a real form field.
 function askBotName() {
   return new Promise((resolve) => {
     const dialog = $("#bot-dialog");
@@ -453,7 +453,7 @@ function approvalCard(runId, event) {
   for (const choice of choices) {
     actions.append(
       el("button", {
-        class: choice === "deny" ? "danger sm" : "primary sm",
+        class: choice === "deny" ? "danger sm" : choice === "once" ? "primary sm" : "ghost sm",
         text: labels[choice] || choice,
         onclick: async () => {
           try {

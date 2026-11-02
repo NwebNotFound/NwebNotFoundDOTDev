@@ -931,7 +931,7 @@ dialog.modal input[aria-invalid="true"] { border-color: var(--danger); }
       calc(var(--ds-space-3) + env(safe-area-inset-bottom)) max(var(--ds-space-3), env(safe-area-inset-left));
   }
   .composer textarea { font-size: 16px; } /* no iOS zoom on focus */
-  .model-picker { max-width: 132px; font-size: 16px; }
+  .model-picker { display: none; } /* model lives in Bots → Modell on phones, the header stays quiet */
   .panel-view {
     padding: calc(var(--header-h) + var(--ds-space-2)) max(var(--ds-space-3), env(safe-area-inset-right))
       calc(var(--ds-space-8) + env(safe-area-inset-bottom)) max(var(--ds-space-3), env(safe-area-inset-left));
@@ -949,8 +949,18 @@ dialog.modal input[aria-invalid="true"] { border-color: var(--danger); }
       calc(var(--ds-space-5) + env(safe-area-inset-bottom)) max(var(--ds-space-4), env(safe-area-inset-left));
     animation: sheet-up var(--ds-duration) var(--ds-ease-out);
   }
-  .modal-actions { flex-direction: column-reverse; gap: var(--ds-space-2); }
+  .modal-actions { flex-direction: column; gap: var(--ds-space-2); }
   .modal-actions button { width: 100%; min-height: 48px; font-size: var(--ds-text-base); }
+  /* grabber: makes the bottom sheet read as a sheet, not as a stranded card */
+  dialog.modal .modal-box::before {
+    content: "";
+    justify-self: center;
+    width: 36px;
+    height: 4px;
+    margin: calc(-1 * var(--ds-space-2)) 0 var(--ds-space-2);
+    border-radius: var(--ds-radius-full);
+    background: var(--ds-border);
+  }
 }
 
 /* Touch targets: 44px minimum wherever the input is a finger, and 16px form text so mobile Safari

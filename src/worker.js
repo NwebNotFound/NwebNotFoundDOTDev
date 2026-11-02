@@ -46,7 +46,8 @@ img{max-width:100%;display:block}
 .btn.sm{min-height:36px;padding:0 .95rem;font-size:.84rem;position:relative}.btn.sm::before{content:"";position:absolute;inset:-4px -2px}
 @media(pointer:coarse){.btn.sm{min-height:40px}}
 .btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
-.discord{background:#5865F2;color:#fff}
+.discord{background:var(--acc);color:var(--accfg)}
+.discord:disabled{background:var(--line);color:var(--mut);box-shadow:none;cursor:not-allowed;transform:none}
 .mut{color:var(--mut)}
 .eyebrow{font-size:.85rem;font-weight:600;color:var(--acc2);letter-spacing:.02em;margin:0 0 .6rem}
 h1,h2,h3{letter-spacing:-.025em;line-height:1.08;margin:0}

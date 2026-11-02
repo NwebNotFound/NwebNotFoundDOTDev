@@ -14,7 +14,7 @@
 //
 // --serve needs wrangler on PATH (`npm i -g wrangler`). The two site Workers run with
 // --local-upstream so the Worker sees the real host names; the panel runs under the plain Node
-// dev server, which serves public/ without Discord; the signed-out state is the SPA's login screen.
+// dev server, which serves public/ and the /login route without Discord.
 //
 // Screenshots use `prefers-reduced-motion: reduce` so scroll-reveal sections are never captured
 // half faded — the layout, colours and spacing are the normal ones.
@@ -24,6 +24,7 @@ import { spawn, execSync } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { startMockHermes } from "./mock-hermes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -48,6 +49,7 @@ const SCHEMES = ["light", "dark"];
 
 const children = [];
 let failures = 0;
+let panelEnv = {};
 
 function serve(cmd, cmdArgs, extraEnv = {}) {
   const child = spawn(cmd, cmdArgs, {
@@ -101,27 +103,106 @@ async function startServers() {
     }
   }
 
-  // Ports follow the URLs, so a second checkout on this machine cannot be mistaken for this one.
-  const sitePort = new URL(SITE).port || "80";
-  const mcPort = new URL(MC).port || "80";
-  const panelPort = new URL(PANEL).port || "80";
+  // The panel needs a Hermes-shaped backend for the chat, drawer and approval screenshots.
+  const { origin } = await startMockHermes();
+  panelEnv = {
+    HERMES_ORIGIN: origin,
+    HERMES_PANEL_SECRET: "screens-panel-secret",
+    SESSION_SECRET: "screens-session-secret-0123456789abcdef",
+    ALLOWED_DISCORD_ID: "111111111111111111",
+    PANEL_BOTS: "cloudflare,minecraft,discord,homelab",
+  };
 
   // Two Workers because the site is host-routed: the Worker decides the surface from the host name.
+  // Ports follow the --site/--mc URLs so a stale local server can never be screenshotted by accident.
+  const sitePort = new URL(SITE).port || "8790";
+  const mcPort = new URL(MC).port || "8791";
   serve("npx", ["wrangler", "dev", "--port", sitePort, "--local", "--ip", "127.0.0.1", "--local-upstream", "nwebnotfound.dev", "--persist-to", path.join(persist, "site")]);
   serve("npx", ["wrangler", "dev", "--port", mcPort, "--local", "--ip", "127.0.0.1", "--local-upstream", "mc.nwebnotfound.dev", "--persist-to", path.join(persist, "mc")]);
-  serve("node", [path.join("ai-panel", "scripts", "dev-server.mjs")], { PORT: panelPort });
+  serve("node", [path.join("ai-panel", "scripts", "dev-server.mjs")], { PORT: new URL(PANEL).port || "8788", ...panelEnv });
 
   await Promise.all([reachable(`${SITE}/`), reachable(`${MC}/`), reachable(`${PANEL}/`)]);
 }
 
 const PAGES = [
-  { group: "site", name: "home", url: `${SITE}/`, wait: "main section", fullPage: true },
-  { group: "site", name: "guestbook", url: `${SITE}/guestbook`, wait: "main section", fullPage: true },
-  // The MC home fetches the live status after first paint; capture it once the fetch settled.
-  { group: "mc", name: "mc-home", url: `${MC}/`, wait: "main section", settle: "() => !/Pr(ü|u)fe Status/.test(document.body.innerText)", fullPage: true },
-  { group: "mc", name: "mc-wiki", url: `${MC}/wiki`, wait: "main section", fullPage: true },
-  // Signed-out panel: the SPA renders its login screen once /api/me answers 401.
-  { group: "panel", name: "panel-login", url: `${PANEL}/`, wait: "#login-screen:not([hidden])", fullPage: false },
+  { group: "site", name: "home", url: `${SITE}/`, fullPage: true },
+  { group: "site", name: "guestbook", url: `${SITE}/guestbook`, fullPage: true },
+  { group: "mc", name: "mc-home", url: `${MC}/`, fullPage: false, waitUntil: "domcontentloaded", schemes: ["dark"] },
+  { group: "mc", name: "mc-wiki", url: `${MC}/wiki`, fullPage: true, waitUntil: "domcontentloaded", schemes: ["dark"] },
+  // Panel: signed out (login), chat with tool output, approval card, drawer open, new-bot dialog.
+  { group: "panel", name: "panel-login", url: `${PANEL}/`, fullPage: false, waitUntil: "domcontentloaded", async script(tab) {
+      await tab.waitForSelector("#login-screen:not([hidden])", { timeout: 20_000 });
+      await tab.waitForTimeout(250);
+    } },
+  {
+    group: "panel",
+    name: "panel-chat",
+    url: `${PANEL}/`,
+    fullPage: false,
+    waitUntil: "domcontentloaded",
+    login: true,
+    async script(tab) {
+      await tab.waitForSelector("#bot-list .bot-item", { timeout: 20_000 });
+      await tab.fill("#input", "Status der Website, bitte kurz.");
+      await tab.click("#btn-send");
+      await tab.waitForSelector(".msg.assistant .code-block", { timeout: 20_000 });
+      await tab.waitForTimeout(400);
+    },
+  },
+  {
+    group: "panel",
+    name: "panel-approval",
+    url: `${PANEL}/`,
+    fullPage: false,
+    waitUntil: "domcontentloaded",
+    login: true,
+    async script(tab) {
+      await tab.waitForSelector("#bot-list .bot-item", { timeout: 20_000 });
+      await tab.fill("#input", "Bitte Deploy freigeben: wrangler deploy auf nwebnotfound.");
+      await tab.click("#btn-send");
+      await tab.waitForSelector(".approval", { timeout: 20_000 });
+      await tab.waitForTimeout(350);
+      await tab.evaluate(() => {
+        const t = document.querySelector("#messages");
+        if (t) t.scrollTop = t.scrollHeight;
+      });
+    },
+  },
+  {
+    group: "panel",
+    name: "panel-drawer",
+    url: `${PANEL}/`,
+    fullPage: false,
+    waitUntil: "domcontentloaded",
+    login: true,
+    only: (vp) => vp.w === 390,
+    async script(tab) {
+      await tab.waitForSelector("#bot-list .bot-item", { timeout: 20_000 });
+      await tab.click("#btn-menu");
+      await tab.waitForSelector("body.drawer-open", { timeout: 5_000 });
+      await tab.waitForTimeout(300);
+    },
+  },
+  {
+    group: "panel",
+    name: "panel-newbot",
+    url: `${PANEL}/`,
+    fullPage: false,
+    waitUntil: "domcontentloaded",
+    login: true,
+    async script(tab, page) {
+      await tab.waitForSelector("#bot-list .bot-item", { timeout: 20_000 });
+      if (page.w <= 860) {
+        await tab.click("#btn-menu");
+        await tab.waitForSelector("body.drawer-open", { timeout: 5_000 });
+      }
+      await tab.click('button[data-view="bots"]');
+      await tab.waitForSelector("#btn-new-bot", { state: "visible" });
+      await tab.click("#btn-new-bot");
+      await tab.waitForSelector("#bot-dialog[open]", { timeout: 5_000 });
+      await tab.waitForTimeout(300);
+    },
+  },
 ];
 
 async function shoot(browser, page, file) {
@@ -133,16 +214,34 @@ async function shoot(browser, page, file) {
     locale: "de-DE",
   });
   const tab = await context.newPage();
-  // domcontentloaded + a page-specific anchor: "networkidle" never settles on pages that poll
-  // (MC status, running runs) and would time out instead of waiting for the layout.
-  const res = await tab.goto(page.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+  if (page.login) {
+    // Mint the dev session through the request context so its cookies land in this context's jar
+    // before the first navigation (a redirect-following goto raced the app's /api/me call).
+    const login = await context.request.get(`${PANEL}/__dev/login`, { maxRedirects: 0 });
+    if (![302, 200].includes(login.status())) throw new Error(`dev login → HTTP ${login.status()}`);
+  }
+  const res = await tab.goto(page.url, { waitUntil: page.waitUntil || "networkidle", timeout: 45_000 });
   if (!res || res.status() >= 400) throw new Error(`${page.url} → HTTP ${res ? res.status() : "no response"}`);
-  await tab.waitForSelector(page.wait, { timeout: 20_000 });
-  // The MC status comes from public status APIs and can take a few seconds; wait for the
-  // loading placeholder to disappear rather than photographing it.
-  if (page.settle) await tab.waitForFunction(page.settle, null, { timeout: 40_000 }).catch(() => {});
   await tab.evaluate(() => document.fonts.ready);
-  await tab.waitForTimeout(400);
+  if (page.script) {
+    try {
+      await page.script(tab, page);
+    } catch (err) {
+      // One reload+retry: the first paint after /__dev/login occasionally loses the session race.
+      if (!page.login) throw err;
+      const state = await tab.evaluate(() => ({
+        auth: document.documentElement.dataset.auth,
+        bots: document.querySelectorAll("#bot-list .bot-item").length,
+        text: document.body.innerText.slice(0, 120),
+      }));
+      console.error(`  ! retry ${page.name} (${page.w}px): ${JSON.stringify(state)}`);
+      await tab.screenshot({ path: path.join(OUT, `_retry-${page.name}-${page.w}.png`) });
+      await tab.goto(`${PANEL}/__dev/login`, { waitUntil: "domcontentloaded", timeout: 45_000 });
+      await tab.goto(page.url, { waitUntil: page.waitUntil || "networkidle", timeout: 45_000 });
+      await page.script(tab, page);
+    }
+  }
+  await tab.waitForTimeout(250);
 
   const metrics = await tab.evaluate(() => {
     const el = document.documentElement;
@@ -171,7 +270,7 @@ async function main() {
     const wanted = [];
     if (GROUPS.includes("site")) wanted.push(`${SITE}/`);
     if (GROUPS.includes("mc")) wanted.push(`${MC}/`);
-    if (GROUPS.includes("panel")) wanted.push(`${PANEL}/`);
+    if (GROUPS.includes("panel")) wanted.push(`${PANEL}/login`);
     await Promise.all(wanted.map((url) => reachable(url, 20_000))).catch((err) => {
       throw new Error(`${err.message}\nStart the servers first or pass --serve.`);
     });
@@ -182,8 +281,9 @@ async function main() {
   try {
     for (const group of GROUPS) {
       for (const page of PAGES.filter((p) => p.group === group)) {
-        for (const scheme of SCHEMES) {
+        for (const scheme of page.schemes || SCHEMES) {
           for (const vp of VIEWPORTS) {
+            if (page.only && !page.only(vp)) continue;
             const file = path.join(OUT, `${page.name}-${vp.tag}-${scheme}.png`);
             await shoot(browser, { ...page, ...vp, scheme }, file);
             const rel = path.relative(ROOT, file).replace(/\\/g, "/");

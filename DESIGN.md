@@ -260,6 +260,8 @@ capped at `40ch`–`72ch`.
 - States: hover lifts 1px, active scales to .98, `[disabled]` 50% opacity and `cursor:not-allowed`,
   focus ring from §2. Icons are 18px, `gap:--ds-space-2`, `aria-hidden` unless the icon is the label.
 - No icon-only button without `aria-label`.
+- Third-party brand colours are not used. The Discord login button keeps the glyph but takes
+  `--ds-primary` (panel) / `--ds-primary` green (MC): one accent per surface, not a purple island.
 
 ### Inputs
 
@@ -317,8 +319,8 @@ capped at `40ch`–`72ch`.
   settles on `close`, so Esc cannot leave a hanging `await`.
 - Desktop: centred, `--ds-radius-xl`, `width:min(440px, 100vw - 2×16px)`, `--ds-shadow-3`.
   Phone (≤860px): a bottom sheet pinned to the safe area, full width, radius only on the top
-  corners, actions stacked (`flex-direction: column-reverse`, 48px tall, full width) so the
-  primary action sits under the thumb.
+  corners, actions stacked full width (`flex-direction: column`, 48px tall) with the primary action
+  last, i.e. closest to the thumb. A 36×4px grabber marks it as a sheet.
 - Fields are real `<label>`s, 44px tall, **16px text** (no iOS zoom), `aria-describedby` for the
   hint, `aria-invalid` plus a `role="alert"` message for errors. Validation is explicit, not
   `required`-only, and the message names the rule.
