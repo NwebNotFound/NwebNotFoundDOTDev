@@ -593,6 +593,8 @@ try {
     { const r = await req("/api/mc-pvp/nils"); ok(r.s === 200 && r.j?.wins === 10 && r.j?.name === "Nils", "PvP-Spieler-API → 200"); ok((await req("/api/mc-pvp/Niemand")).s === 404, "PvP-Spieler-API unbekannt → 404"); }
     { const r = await PV([{ ...A, winrate_pct: 71.4 }, { ...B, winrate_pct: 99.5 }, C]); const w = Object.fromEntries(sqlRows("SELECT name, winrate_pct FROM mc_pvp_stats").map((x) => [x.name, x.winrate_pct]));
       ok(r.s === 200 && r.j?.pvp_stats === 3 && w.Nils === 71 && w.Seller === 100, "winrate_pct Float gerundet (71.4→71, 99.5→100)", r.t + " " + JSON.stringify(w)); }
+    { await PV([{ ...C, wins: 1, losses: 1, matches: 2, winrate_pct: null }]); const g = ((await req("/api/mc-pvp")).j.players || []).find((x) => x.name === "Gast");
+      ok(g?.winrate_pct === 50 && sqlRows("SELECT winrate_pct FROM mc_pvp_stats WHERE name='Gast'")[0]?.winrate_pct == null, "API: fehlende Quote 1/2 → 50, DB bleibt null", JSON.stringify(g)); }
     await PV([B]); ok(sqlRows("SELECT COUNT(*) AS n FROM mc_pvp_stats")[0].n === 1, "pvp_stats Snapshot entfernt fehlende UUIDs");
     await PV([A, B, C]);
     { const pg = await req("/pvp"); const sec = pg.t.slice(pg.t.indexOf('id="pvp"'));
@@ -601,8 +603,8 @@ try {
       ok(pg.t.includes('href="/pvp"'), "PvP in der MC-Navigation"); }
     { const pg = await req("/spieler/Nils"); ok(pg.s === 200 && pg.t.includes('id="pvp-pl"') && pg.t.includes('data-name="Nils"') && pg.t.includes("/mc/pvp.js"), "Spielerseite hat PvP-Block (extern)"); }
     { const js = await req("/mc/pvp.js"); ok(js.s === 200 && js.t.includes("E(p.favorite_kit)") && !js.t.includes(">Unent.") && !js.t.includes("['Unentschieden'") && js.t.includes("ohne Unentschieden") && !js.t.includes("p.matches<5") && js.t.includes("Siege / Kämpfe") && !/style=|\.style\./.test(js.t), "pvp.js: keine Unentschieden-Spalte, Quote auch unter 5 Kämpfen, Kit escaped"); }
-    { const p3 = fs.readFileSync(ROOT + "public/mc/player3d.js", "utf8"); ok(p3.includes("pointermove") && p3.includes("head.rotation.y") && p3.includes("head.rotation.x") && p3.includes("(tx-cx)*.08") && p3.includes("pf-model"), "Profil-3D: Kopf folgt der Maus, geglättet"); }
-    { const it = fs.readFileSync(ROOT + "public/mc/item.js", "utf8"); ok(it.includes("function mono") && it.includes("3600000") && it.includes("const med") && !it.includes("'H'+"), "Preisverlauf: Stunden-Median und monotone Kurve, keine Stufenlinie"); }
+    { const p3 = fs.readFileSync(ROOT + "public/mc/player3d.js", "utf8"); ok(p3.includes("pointermove") && p3.includes("head.rotation.y") && p3.includes("head.rotation.x") && p3.includes("(tx-cx)*.08") && p3.includes("visibilitychange") && p3.includes("IntersectionObserver") && !p3.includes("house_climb") && !p3.includes("Math.round"), "Profil-3D: Kopf folgt der Maus, Loop pausiert offscreen, keine Kurs-/Quote-Kopie"); }
+    { const it = fs.readFileSync(ROOT + "public/mc/item.js", "utf8"); ok(it.includes("function mono") && it.includes("3600000") && it.includes("const med") && !it.includes("'H'+") && !it.includes("1.67"), "Preisverlauf: Stunden-Median, keine Preis-Band-Löschung, keine Stufenlinie"); }
     { const lb = await req("/leaderboards"); ok(lb.s === 200 && lb.t.includes("Survival-Kills") && lb.t.includes("['pvp','PvP']") && !lb.t.includes("K/D") && lb.t.includes(">Survival<") && lb.t.includes(">Arena<") && lb.t.includes("nicht die PvP-Arena"), "Bestenlisten: Survival-Kills, PvP-Tab, kein K/D"); }
     sql("DELETE FROM mc_pvp_stats"); sql("DELETE FROM mc_player_ranks"); }
   console.log("H) VIP-Panel");

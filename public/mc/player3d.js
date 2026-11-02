@@ -13,12 +13,17 @@ function still(n,w,h,rot){return q=q.then(async()=>{await load();if(!sv){sv=new 
 sv.setSize(w,h);await sv.loadSkin(skin(n));sv.playerObject.rotation.y=rot;sv.playerObject.skin.leftArm.rotation.x=.2;sv.playerObject.skin.rightArm.rotation.x=-.2;sv.render();return sv.canvas.toDataURL('image/png')})}
 function look(v,el){if(!el.classList.contains('pf-model'))return;const P=v.playerObject,head=P&&P.skin&&P.skin.head;if(!head)return;const base=P.rotation.y;
 const fine=matchMedia('(hover:hover) and (pointer:fine)').matches;
-if(!fine){let t=0;const tick=()=>{if(!el.isConnected)return;t+=.012;head.rotation.y=Math.sin(t*.9)*.18;requestAnimationFrame(tick)};tick();return}
-let tx=0,ty=0,cx=0,cy=0;
-const mv=e=>{const r=el.getBoundingClientRect(),ox=r.left+r.width/2,oy=r.top+r.height*.22;tx=Math.max(-1,Math.min(1,(e.clientX-ox)/(innerWidth*.45)));ty=Math.max(-1,Math.min(1,(e.clientY-oy)/(innerHeight*.45)))};
+let shown=true,page=document.visibilityState!=='hidden',raf=0,tx=0,ty=0,cx=0,cy=0,t=0;
+const alive=()=>el.isConnected&&shown&&page;
+const step=()=>{raf=1;if(!el.isConnected){raf=0;stop();return}if(!alive()){raf=0;return}if(fine){cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;head.rotation.y=cx*.85;head.rotation.x=cy*.55;P.rotation.y=base+cx*.35}else{t+=.012;head.rotation.y=Math.sin(t*.9)*.18}raf=requestAnimationFrame(step)};
+const kick=()=>{if(!raf&&alive())raf=requestAnimationFrame(step)};
+const mv=e=>{if(!fine)return;const r=el.getBoundingClientRect(),ox=r.left+r.width/2,oy=r.top+r.height*.22;tx=Math.max(-1,Math.min(1,(e.clientX-ox)/(innerWidth*.45)));ty=Math.max(-1,Math.min(1,(e.clientY-oy)/(innerHeight*.45)))};
 const leave=()=>{tx=0;ty=0};
-addEventListener('pointermove',mv,{passive:true});addEventListener('pointerleave',leave);
-const loop=()=>{if(!el.isConnected){removeEventListener('pointermove',mv);removeEventListener('pointerleave',leave);return}cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;head.rotation.y=cx*.85;head.rotation.x=cy*.55;P.rotation.y=base+cx*.35;requestAnimationFrame(loop)};loop()}
+const onVis=()=>{page=document.visibilityState!=='hidden';kick()};
+const io=new IntersectionObserver(es=>{shown=!!es[0]&&es[0].isIntersecting;if(!shown){tx=0;ty=0}kick()});
+function stop(){removeEventListener('pointermove',mv);removeEventListener('pointerleave',leave);document.removeEventListener('visibilitychange',onVis);try{io.disconnect()}catch(_){}}
+if(fine){addEventListener('pointermove',mv,{passive:true});addEventListener('pointerleave',leave)}
+document.addEventListener('visibilitychange',onVis);io.observe(el);kick()}
 function live3d(el,n,w,h,rot){const cv=document.createElement('canvas');const v=new skinview3d.SkinViewer({canvas:cv,width:w,height:h,zoom:.86,fov:40});
 v.controls.enableZoom=false;v.controls.enablePan=false;v.globalLight.intensity=2.6;v.cameraLight.intensity=.7;v.playerObject.rotation.y=rot;
 return v.loadSkin(skin(n)).then(()=>{v.animation=new skinview3d.IdleAnimation();v.animation.speed=.6;if(!el.isConnected){v.dispose();live--;return}el.appendChild(cv);el.classList.add('ready');VS.push([el,v]);look(v,el);
@@ -58,11 +63,8 @@ window.MCP={NF,MS,AGO,E,TC,SEEN,
  // PvP + Parkour eines Spielers (öffentliche APIs)
  async games(n){const [pv,pk]=await Promise.all([fetch('/api/mc-pvp/'+encodeURIComponent(n)).then(r=>r.ok?r.json():null).catch(()=>null),fetch('/api/mc-parkour').then(r=>r.ok?r.json():null).catch(()=>null)]);
   const pretty=k=>String(k||'').split('_').filter(Boolean).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')||String(k||'');
-  const cname=(c,nm)=>{nm=nm||'';if(!nm||nm===c||(nm.includes('_')&&!/\s/.test(nm)))return pretty(nm&&nm!==c?nm:c);return nm};
-  const cicon=(c,i)=>{i=i||'';if(c==='house_climb'&&(!i||i==='paper'))return 'ladder';return /^[a-z0-9_]{1,48}$/.test(i)?i:'paper'};
-  const runs=[];for(const[c,L]of Object.entries((pk&&pk.courses)||{}))for(const x of L)if(String(x.mc_name).toLowerCase()===n.toLowerCase())runs.push({course:c,name:cname(c,x.course_name||(pk.course_names||{})[c]),icon:cicon(c,x.course_icon||(pk.course_icons||{})[c]),rank:x.rank,ms:x.time_ms});runs.sort((a,b)=>a.ms-b.ms);
-  const qOf=pv=>{if(!pv)return null;const m=+pv.matches||0;if(!(m>0))return '0 %';let q=pv.winrate_pct;if(q==null||q===''){const d=(+pv.wins||0)+(+pv.losses||0);q=Math.round(100*(+pv.wins||0)/(d||m))}return NF(+q)+' %'};
-  const wr=pv?qOf(pv):null;
+  const runs=[];for(const[c,L]of Object.entries((pk&&pk.courses)||{}))for(const x of L)if(String(x.mc_name).toLowerCase()===n.toLowerCase()){const nm=x.course_name||(pk.course_names||{})[c]||'',ic=x.course_icon||(pk.course_icons||{})[c]||'';runs.push({course:c,name:nm||pretty(c),icon:/^[a-z0-9_]{1,48}$/.test(ic)?ic:'paper',rank:x.rank,ms:x.time_ms})}runs.sort((a,b)=>a.ms-b.ms);
+  const wr=pv?NF(+pv.winrate_pct||0)+' %':null;
   const one=runs.length===1;
   const pkh=runs.length?'<div class="g pad dcard pk-card'+(one?' pk-one':'')+'"><h3>Parkour<small>'+(one?'Beste Platzierung':'Top-10-Platzierungen')+'</small></h3>'+runs.map(r=>{const rk=Number(r.rank),sz=one?40:22;return '<div class="prow pk-run"><span class="slot ic"><img alt="" width="'+sz+'" height="'+sz+'" loading="lazy" src="/mc-icon/v2/'+encodeURIComponent(r.icon)+'" onerror="this.onerror=null;this.src=\'/mc-icon/v2/paper\'"></span><div class="n"><span><a href="/parkour#'+encodeURIComponent(r.course)+'">'+E(r.name)+'</a></span></div><span class="pk-rk tnum'+(rk>=1&&rk<=3?' p'+rk:'')+'" title="Platz '+E(rk)+'">#'+E(rk)+'</span><b class="pk-tm tnum">'+MS(r.ms)+'</b></div>'}).join('')+'</div>':'';
   return {pvp:pv,winrate:wr,best:runs[0]||null,parkourHtml:pkh}}

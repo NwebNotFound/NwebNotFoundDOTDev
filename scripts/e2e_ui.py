@@ -290,11 +290,11 @@ with sync_playwright() as p:
                     {"uuid": "u2", "name": "Gast", "wins": 1, "losses": 0, "draws": 0, "matches": 1, "winrate_pct": 100, "favorite_kit": "axe", "rank": None},
                 ]}))
             elif u.endswith("/api/mc-pvp/Nils"):
-                r.fulfill(status=200, content_type="application/json", body=json.dumps({"uuid": "u1", "name": "Nils", "wins": 1, "losses": 1, "draws": 0, "matches": 2, "winrate_pct": None, "favorite_kit": "crystal", "rank": None}))
+                r.fulfill(status=200, content_type="application/json", body=json.dumps({"uuid": "u1", "name": "Nils", "wins": 1, "losses": 1, "draws": 0, "matches": 2, "winrate_pct": 50, "favorite_kit": "crystal", "rank": None}))
             else:
                 r.fallback()
         pg.route("**/api/mc-pvp**", pvp_route)
-        pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps({"courses": {"house_climb": [{"rank": 1, "mc_uuid": U1x, "mc_name": "Nils", "time_ms": 7896, "set_at": "2026-11-01T17:54:04.541Z", "course_name": "house_climb", "course_icon": "paper"}]}, "course_names": {"house_climb": "house_climb"}, "course_icons": {"house_climb": "paper"}})))
+        pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps({"courses": {"house_climb": [{"rank": 1, "mc_uuid": U1x, "mc_name": "Nils", "time_ms": 7896, "set_at": "2026-11-01T17:54:04.541Z", "course_name": "House Climb", "course_icon": "ladder"}]}, "course_names": {"house_climb": "House Climb"}, "course_icons": {"house_climb": "ladder"}})))
         pg.route("**/api/mc-market/flint", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(flint)))
         go("/profile"); pg.locator("#t-minispiele").wait_for(timeout=20000); pg.click("#t-minispiele")
         pg.locator(".pk-card.pk-one").wait_for(timeout=10000)
@@ -303,7 +303,7 @@ with sync_playwright() as p:
         ok(pg.locator(".pk-card.pk-one img[src='/mc-icon/v2/ladder']").count() == 1 and pg.locator(".pvp-arena .slotbox").count() == 3, f"{w}px Profil: Leiter-Icon, PvP-Karte ohne Unentschieden")
         pg.locator(".pk-card").screenshot(path=f"{SH}/local-house-climb-{w}.png")
         src3 = pg.evaluate("async () => await (await fetch('/mc/player3d.js')).text()")
-        ok("pointermove" in src3 and "head.rotation.y" in src3 and "(tx-cx)*.08" in src3, f"{w}px 3D-Kopf folgt der Maus")
+        ok("pointermove" in src3 and "head.rotation.y" in src3 and "(tx-cx)*.08" in src3 and "visibilitychange" in src3, f"{w}px 3D-Kopf folgt der Maus und pausiert versteckt")
         go("/pvp"); pg.locator(".pvp-t").wait_for(timeout=10000)
         head, bodyp = pg.locator(".pvp-t thead").inner_text(), pg.inner_text(".pvp-t")
         ok("Unent" not in head and "Unentschieden" not in bodyp and "100 %" in bodyp and "Gast" in bodyp, f"{w}px PvP-Tabelle: Quote auch bei einem Kampf", head)
@@ -327,7 +327,16 @@ with sync_playwright() as p:
             except ValueError: pass
         ok(nums and min(nums) > 8, f"{w}px Flint: Flipflop-Snapshots nicht als Zacken in der Skala", labels)
         pg.locator("#cw").screenshot(path=f"{SH}/local-preis-glatt-{w}.png")
-        pg.unroute("**/api/mc-pvp**"); pg.unroute("**/api/mc-parkour"); pg.unroute("**/api/mc-market/flint")
+        crash = {"item": {"item": "nether_star", "buy_price": 2.4, "sell_price": 1, "base_price": 2, "buy_locked": 0, "sell_locked": 0, "volume_24h_qty": 4, "volume_24h_cp": 40, "trades_24h": 2, "change_24h_pct": -97, "updated_at": now_s, "has_hist": 1}, "price_reset_at": None, "ticks": [], "history": [[bucket(40), 100, 100, 100, 2], [bucket(30), 98, 96, 100, 1], [bucket(12), 2, 2, 2, 3], [bucket(6), 2.2, 2, 2.4, 2], [bucket(3), 2.4, 2.3, 2.5, 2]]}
+        pg.route("**/api/mc-market/nether_star", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(crash)))
+        go("/markt/nether_star"); pg.locator("#cw path[fill='none']").wait_for(timeout=10000)
+        clab = pg.evaluate("""() => { const svg=document.querySelector('#cw svg'); const vb=svg.viewBox.baseVal.width; return [...svg.querySelectorAll('text')].filter(t => +t.getAttribute('x') > vb*0.72).map(t => t.textContent); }""")
+        cnums = []
+        for lab in clab:
+            try: cnums.append(float(str(lab).replace(".", "").replace(",", ".")))
+            except ValueError: pass
+        ok(cnums and max(cnums) > 40 and min(cnums) < 20, f"{w}px Crash 100→2 bleibt in der Skala", clab)
+        pg.unroute("**/api/mc-pvp**"); pg.unroute("**/api/mc-parkour"); pg.unroute("**/api/mc-market/flint"); pg.unroute("**/api/mc-market/nether_star")
         errs = [e for e in errs if e.strip() != "Event"]
         ok(not errs, f"{w}px keine Konsolen-/JS-Fehler", errs[:3])
         ctx.close()

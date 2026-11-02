@@ -2,7 +2,7 @@
 (()=>{const{E,NF,get}=window.MC;
 const RL={vip:'VIP',mvp:'MVP',builder:'Builder',admin:'Admin'};
 const RB=p=>p.rank&&RL[p.rank.rank]&&/^[0-9a-f]$/.test(p.rank.color)?'<span class="rk rk-'+p.rank.color+'">'+RL[p.rank.rank]+'</span>':'';
-const WR=p=>{const m=+p.matches||0;if(!(m>0))return '0 %';let q=p.winrate_pct;if(q==null||q===''){const d=(+p.wins||0)+(+p.losses||0);q=Math.round(100*(+p.wins||0)/(d||m))}return NF(+q)+' %'};
+const WR=p=>NF(+p.winrate_pct||0)+' %';
 const KIT=p=>p.favorite_kit?E(p.favorite_kit):'–';
 const T=document.getElementById('pvp');
 if(T)(async()=>{let d;try{d=await get('/api/mc-pvp')}catch(_){d={players:[]}}const L=d.players||[];

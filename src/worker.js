@@ -230,7 +230,7 @@ const HIDE=new Set(['kd','kdr','k_d','kill_death','pvp']);
 let D={},PV=null,tab=(location.hash.slice(1)||'money'),per='total';
 if(tab==='kd'||tab==='kdr'||tab==='k_d')tab='kills';
 const av=n=>'/mc-head/'+encodeURIComponent(n)+'/72?v=5';
-const WR=p=>{const m=+p.matches||0;if(!(m>0))return '0 %';let q=p.winrate_pct;if(q==null||q===''){const d=(+p.wins||0)+(+p.losses||0);q=Math.round(100*(+p.wins||0)/(d||m))}return NF(+q)+' %'};
+const WR=p=>NF(+p.winrate_pct||0)+' %';
 function draw(){const X=Object.keys(Object.assign({},D.total&&D.total.lists,D.weekly&&D.weekly.lists)).filter(k=>!HIDE.has(k)&&!T.some(t=>t[0]===k));X.forEach(k=>T.push([k,k.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase()),NF]));if(tab!=='pvp'&&!T.some(t=>t[0]===tab))tab='money';
 const lab=(k,t)=>k==='money'?(per==='total'?'Kontostand':'<span title="Netto seit Montag (Europe/Berlin)">Kontostand ± diese Woche</span>'):t;
 const tip=k=>k==='kills'?' title="Spieler-Kills auf Survival, nicht die PvP-Arena"':k==='pvp'?' title="Siege und Siegquote der Arena, Best of 3"':'';

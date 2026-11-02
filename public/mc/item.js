@@ -6,7 +6,7 @@ if(!x){R.innerHTML='<div class="g empty-st"><div class="big"><img alt="" width="
 const RS=d.price_reset_at?Date.parse(d.price_reset_at):null;let Hs=[];const CUR=x=>x&&(x.buy_locked?+x.sell_price:+x.buy_price);
 // Stunden-Median der angezeigten Seite (Kauf, bzw. Verkauf wenn gesperrt). Volumenlose Snapshots der anderen Seite (Kauf/Verkauf-Flipflop) fallen raus, damit keine Zacken-Rechteckwelle entsteht.
 const med=a=>{const s=a.filter(v=>Number.isFinite(v)&&v>0).slice().sort((x,y)=>x-y);if(!s.length)return 0;const i=s.length>>1;return s.length%2?s[i]:(s[i-1]+s[i])/2};
-function series(d){const item=d.item||{},sell=!!item.buy_locked,cur=+CUR(item)||0;
+function series(d){const item=d.item||{},sell=!!item.buy_locked;
 const ticks=(d.ticks||[]).map(r=>({t:+r[0]*1000,buy:+r[1],sell:+r[2]})).filter(t=>t.t>0&&(sell?t.sell:t.buy)>0);
 const shown=ticks.map(t=>sell?t.sell:t.buy),other=ticks.map(t=>sell?t.buy:t.sell).filter(v=>v>0),shownMed=med(shown);
 const otherSide=p=>shownMed>0&&!(p/shownMed>0.72&&p/shownMed<1.4)&&other.some(o=>o>0&&Math.abs(p-o)/o<0.12);
@@ -16,7 +16,8 @@ for(const t of ticks)raw.push({t:t.t,p:sell?t.sell:t.buy,vol:0,tk:1});
 const B=new Map();
 for(const s of raw){if(!(s.t>0))continue;const h=Math.floor(s.t/3600000)*3600000;let g=B.get(h);if(!g){g=[];B.set(h,g)}g.push(s)}
 let pts=[...B.entries()].sort((a,b)=>a[0]-b[0]).map(([t,ss])=>({t,a:med(ss.map(s=>s.p)),mn:Math.min(...ss.map(s=>s.p)),mx:Math.max(...ss.map(s=>s.p)),v:ss.reduce((n,s)=>n+(s.vol||0),0),tk:ss.every(s=>s.tk)?1:0}));
-if(cur>0&&pts.length>=4){let flips=0;for(let i=2;i<pts.length;i++){const a=pts[i-2].a,b=pts[i-1].a,c=pts[i].a;if(a>0&&b>0&&Math.abs(a-c)/a<0.15&&Math.abs(a-b)/Math.max(a,b)>0.35)flips++}if(flips>=2){const near=pts.filter(p=>p.a/cur>0.6&&p.a/cur<1.67);if(near.length>=2)pts=near}}
+// Nur eine einzelne volumenlose Zacke zwischen zwei ähnlichen Nachbarn. Ein Crash oder Spike mit Folge oder Umsatz bleibt komplett.
+if(pts.length>=3){const drop=new Set();for(let i=1;i<pts.length-1;i++){const a=pts[i-1],b=pts[i],c=pts[i+1];if(!(a.a>0&&b.a>0&&c.a>0)||(b.v||0)>0)continue;const mid=(a.a+c.a)/2;if(Math.abs(a.a-c.a)/Math.max(a.a,c.a)<0.15&&Math.abs(b.a-mid)/mid>0.35)drop.add(i)}if(drop.size)pts=pts.filter((_,i)=>!drop.has(i))}
 return pts}
 const mk=series;Hs=mk(d);
 R.innerHTML='<style>.rchg{display:inline-block;font-size:.9rem;font-weight:600;margin-left:.6rem}.cw{position:relative;user-select:none;touch-action:pan-y}.cw svg{display:block;width:100%;height:auto}.tt{position:absolute;top:0;pointer-events:none;background:#141a16f0;border:1px solid var(--line);border-radius:12px;padding:.45rem .7rem;font-size:.8rem;white-space:nowrap;transform:translateX(-50%);backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.5)}.kv{display:grid;gap:.9rem;grid-template-columns:repeat(2,1fr);margin-top:1rem}@media(min-width:900px){.kv{grid-template-columns:repeat(3,1fr)}}.kv .k{font-size:.8rem;color:var(--mut)}.kv .v{font-size:1.35rem;font-weight:700;margin-top:.2rem}</style>'
