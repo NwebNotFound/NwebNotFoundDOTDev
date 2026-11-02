@@ -1,0 +1,10 @@
+{
+  "name": "nwebnotfound-ai",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-02",
+  "workers_dev": false,
+  "observability": { "enabled": true, "traces": { "enabled": true } },
+  "routes": [{ "pattern": "ai.nwebnotfound.dev", "custom_domain": true }],
+  // Platzhalter für lokales wrangler dev. Vor dem ersten Deploy: wrangler d1 create nwebnotfound-ai und diese id ersetzen.
+  "d1_databases": [{ "binding": "DB", "database_name": "nwebnotfound-ai", "database_id": "00000000-0000-0000-0000-000000000000" }]
+}

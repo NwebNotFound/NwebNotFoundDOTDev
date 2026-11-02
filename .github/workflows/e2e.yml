@@ -30,3 +30,5 @@ jobs:
         env:
           E2E_SCREENS_DIR: ${{ runner.temp }}/screens/qa
         run: node scripts/e2e.mjs
+      - name: KI-Panel e2e
+        run: node ai-panel/test/e2e.mjs
