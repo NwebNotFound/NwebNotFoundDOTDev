@@ -7,7 +7,6 @@
 //   2. Every response leaves with the security headers (CSP, frame-ancestors 'none', …).
 
 import * as auth from "./auth.js";
-import * as rl from "./ratelimit.js";
 import * as up from "./upstream.js";
 import * as store from "./store.js";
 
