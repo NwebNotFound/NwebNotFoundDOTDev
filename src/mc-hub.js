@@ -4,7 +4,7 @@ export const HUB_CSS = String.raw`
 .seg{display:inline-flex;padding:.25rem;border-radius:12px;background:rgba(255,255,255,.06)}.seg button{border:0;background:transparent;color:var(--mut);font:inherit;font-size:.82rem;padding:.4rem .9rem;border-radius:9px;cursor:pointer;transition:background .2s,color .2s}
 .acct .btn{white-space:nowrap}
 .tabs button,.seg button{min-height:44px}*,*::before,*::after{box-sizing:border-box}#hs{grid-template-columns:minmax(0,1fr)!important}#hs>*{min-width:0;width:100%}#hs .addr{display:flex;width:100%;justify-content:space-between}#hs .addr code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats{gap:.8rem!important}.stats>*,.kv2>*,.kv3>*,.shg>*,.lrow>*,.wgrid>*,.grid>*,[style*="display:grid"]>*,[style*="display:flex"]>*{min-width:0}.stats .card{width:100%;padding:1rem 1.1rem}@media(max-width:600px){.g.pad,.card.pad{padding:1rem}#hs{gap:.8rem!important}#hs>div:first-child{gap:.8rem!important}#hs .addr code{font-size:.78rem}}.nl{display:flex;align-items:center;gap:1.2rem}.nl .l{display:inline-flex;align-items:center;min-height:44px;white-space:nowrap}
-@media(max-width:900px){.nav .wrap{flex-wrap:wrap;height:auto;min-height:52px;row-gap:0;column-gap:.8rem;padding-top:4px}.nl{order:3;flex:1 0 100%;overflow-x:auto;scrollbar-width:none;gap:.2rem;margin:0 -.4rem;padding:0 .4rem;-webkit-mask:linear-gradient(90deg,#000 90%,transparent)}.nl::-webkit-scrollbar{display:none}.nl .l{padding:0 .55rem;border-radius:10px;font-size:.88rem}.nl .l[aria-current=page]{background:rgba(74,222,128,.12)}.nav .hide-s{display:inline-flex}}
+@media(max-width:900px){.nav .wrap{flex-wrap:wrap;height:auto;min-height:52px}}
 .seg button{min-height:44px}@media(pointer:coarse){.seg button{min-height:44px}}
 .wgrid>*{min-width:0}
 .addr .btn{flex:none}
@@ -53,28 +53,46 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 .mctip{display:inline-block;max-width:100%;background:rgba(16,0,16,.95);border:2px solid #100010;box-shadow:inset 0 0 0 2px #3a0f8f;padding:.6rem .8rem;font-family:var(--pf);font-size:.85rem;color:#c9a8ff}.mctip b{color:#fff}
 `;
 
-// Navigation: wenige Top-Level-Einträge, Rest in Gruppen (Desktop: Dropdown, Mobil: Drawer mit Akkordeon)
-const NAV_GROUPS = [
-  ["community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"], ["/vip", "VIP", "nether_star"]]],
-  ["minispiele", "Minispiele", [["/parkour", "Parkour", "golden_boots"], ["/pvp", "PvP", "iron_sword"]]],
-  ["wirtschaft", "Wirtschaft", [["/markt", "Markt", "emerald"], ["/shops", "Shops", "barrel"], ["/auktionen", "Auktionen", "bell"]]],
-];
+// Eine Navigationsquelle. Wiki-Artikel kommen aus WIKI (weiter unten), aufgerufen erst nach dem Modul-Init.
 const CHEV = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3h2v2h2v2h0V5h2V3h2v2H7v2H5v2h0V7H3V5H1z" fill="currentColor"/></svg>`;
-const NAV_JS = `(()=>{const s=document.currentScript,N=s.closest('.nav'),bur=N.querySelector('.nbur'),G=[...N.querySelectorAll('.ng')],mob=()=>matchMedia('(max-width:900px)').matches;
-const p=location.pathname.replace(/\\/$/,'')||'/';
-N.querySelectorAll('.nl a').forEach(a=>{const h=a.getAttribute('href');if(h===p||(h!=='/'&&p.startsWith(h+'/'))){a.setAttribute('aria-current','page');const g=a.closest('.ng');if(g){g.classList.add('cur');g.querySelector('.ngb').setAttribute('data-cur','')}}});
-const set=(g,o)=>{g.classList.toggle('open',o);g.querySelector('.ngb').setAttribute('aria-expanded',o)};const shut=x=>G.forEach(g=>g!==x&&set(g,false));
-const drawer=o=>{N.classList.toggle('open',o);bur.setAttribute('aria-expanded',o);bur.setAttribute('aria-label',o?'Menü schließen':'Menü öffnen');if(o){const c=N.querySelector('.ng.cur');shut(c);if(c)set(c,true)}else shut()};
-G.forEach(g=>{const b=g.querySelector('.ngb'),I=[...g.querySelectorAll('.ngm a')];
-b.addEventListener('click',()=>{const o=Date.now()-(+g.dataset.hov||0)<500||b.getAttribute('aria-expanded')!=='true';if(!mob())shut(g);set(g,o)});
-g.addEventListener('keydown',e=>{const i=I.indexOf(document.activeElement);if(e.key==='Escape'&&g.classList.contains('open')){set(g,false);b.focus();e.preventDefault();e.stopPropagation()}else if(e.key==='ArrowDown'){e.preventDefault();if(!g.classList.contains('open')){if(!mob())shut(g);set(g,true)}I[Math.min(I.length-1,i+1)].focus()}else if(e.key==='ArrowUp'&&i>=0){e.preventDefault();(i?I[i-1]:b).focus()}});
+const NAV_JS = `(()=>{const s=document.currentScript,N=s.closest('.nav'),bur=N.querySelector('.nbur');
+const mob=()=>matchMedia('(max-width:900px)').matches,groups=()=>[...N.querySelectorAll('.ng')];
+function mark(){const p=location.pathname.replace(/\\/$/,'')||'/';const links=[...N.querySelectorAll('.nl a[href^="/"]')];let best=null;
+for(const a of links){const h=a.getAttribute('href').split('#')[0].split('?')[0];if(!(h===p||(h!=='/'&&p.startsWith(h+'/'))))continue;if(!best||h.length>best.h.length)best={a,h}}
+N.querySelectorAll('.nl a[aria-current]').forEach(a=>a.removeAttribute('aria-current'));
+groups().forEach(g=>{g.classList.remove('cur');const b=g.querySelector('.ngb');if(b)b.removeAttribute('data-cur')});
+if(best){best.a.setAttribute('aria-current','page');const g=best.a.closest('.ng');if(g){g.classList.add('cur');const b=g.querySelector('.ngb');if(b)b.setAttribute('data-cur','')}}}
+const set=(g,o)=>{g.classList.toggle('open',!!o);const b=g.querySelector('.ngb');if(b)b.setAttribute('aria-expanded',o?'true':'false')};
+const shut=x=>groups().forEach(g=>{if(g!==x)set(g,false)});
+const lock=o=>{document.documentElement.classList.toggle('nav-lock',!!o&&mob())};
+const drawer=o=>{N.classList.toggle('open',!!o);if(bur){bur.setAttribute('aria-expanded',o?'true':'false');bur.setAttribute('aria-label',o?'Menü schließen':'Menü öffnen')}lock(o);if(o){const c=N.querySelector('.ng.cur');shut(c);if(c)set(c,true)}else shut()};
+function bind(g){const b=g.querySelector('.ngb');if(!b||b.dataset.bound)return;b.dataset.bound='1';let t=0;
+b.addEventListener('click',e=>{e.stopPropagation();clearTimeout(t);const open=b.getAttribute('aria-expanded')==='true';if(!mob())shut(g);set(g,!open)});
+g.addEventListener('keydown',e=>{const I=[...g.querySelectorAll('.ngm a')];const i=I.indexOf(document.activeElement);
+if(e.key==='Escape'&&(g.classList.contains('open')||N.classList.contains('open'))){if(mob()&&N.classList.contains('open')){drawer(false);bur&&bur.focus()}else{set(g,false);b.focus()}e.preventDefault();e.stopPropagation()}
+else if(e.key==='ArrowDown'){e.preventDefault();if(!g.classList.contains('open')){if(!mob())shut(g);set(g,true)}const n=I[i<0?0:Math.min(I.length-1,i+1)];n&&n.focus()}
+else if(e.key==='ArrowUp'&&i>=0){e.preventDefault();(i?I[i-1]:b).focus()}});
 g.addEventListener('focusout',e=>{if(!mob()&&!g.contains(e.relatedTarget))set(g,false)});
-if(matchMedia('(hover:hover) and (pointer:fine)').matches){g.addEventListener('mouseenter',()=>{if(!mob()&&!g.classList.contains('open')){shut(g);set(g,true);g.dataset.hov=Date.now()}});g.addEventListener('mouseleave',()=>{if(!mob()&&!g.contains(document.activeElement))set(g,false)})}});
-bur.addEventListener('click',()=>drawer(!N.classList.contains('open')));
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(N.classList.contains('open')){drawer(false);bur.focus()}else shut()}});
+if(matchMedia('(hover:hover) and (pointer:fine)').matches){g.addEventListener('mouseenter',()=>{clearTimeout(t);if(!mob()&&!g.classList.contains('open')){shut(g);set(g,true)}});g.addEventListener('mouseleave',()=>{if(mob())return;clearTimeout(t);t=setTimeout(()=>{if(!g.contains(document.activeElement))set(g,false)},150)})}}
+groups().forEach(bind);
+if(bur)bur.addEventListener('click',()=>drawer(!N.classList.contains('open')));
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(N.classList.contains('open')){drawer(false);bur&&bur.focus()}else shut()});
 document.addEventListener('click',e=>{if(!N.contains(e.target)){shut();if(N.classList.contains('open'))drawer(false)}});
-matchMedia('(max-width:900px)').addEventListener('change',()=>drawer(false))})()`;
-export const hubNav = (MAIN) => `<a class="brand" href="/"><img class="mi" alt="" width="22" height="22" src="/mc-icon/v2/grass_block"> NwebNotFound MC</a><button class="nbur" type="button" aria-expanded="false" aria-controls="nl" aria-label="Menü öffnen"><span></span><span></span><span></span></button><nav class="nl" id="nl" aria-label="Bereiche"><a class="l" href="/">Start</a>${NAV_GROUPS.map(([k, t, L]) => `<div class="ng" data-g="${k}"><button class="l ngb" type="button" aria-expanded="false" aria-controls="ng-${k}">${t}${CHEV}</button><div class="ngm" id="ng-${k}">${L.map(([h, n, i]) => `<a href="${h}"><img alt="" width="20" height="20" src="/mc-icon/v2/${i}">${n}</a>`).join("")}</div></div>`).join("")}<a class="l" href="/wiki">Wiki</a><a class="l" href="/changelog">Changelog</a></nav><script>${NAV_JS}</script>`;
+matchMedia('(max-width:900px)').addEventListener('change',()=>{if(N.classList.contains('open'))drawer(false)});
+mark();window.mcNavMark=()=>{mark();groups().forEach(bind)}})()`;
+const navGroup = (k, label, links, end) => `<div class="ng${end ? " ng-end" : ""}" data-g="${k}"><button class="l ngb" type="button" aria-expanded="false" aria-controls="ng-${k}">${label}${CHEV}</button><div class="ngm" id="ng-${k}">${links.map(([h, n, i]) => `<a href="${h}"><img alt="" width="20" height="20" src="/mc-icon/v2/${i}">${n}</a>`).join("")}</div></div>`;
+export const hubNav = (MAIN) => {
+  const wiki = [["/wiki", "Übersicht", "bookshelf"], ...WIKI.map((a) => [`/wiki/${a.slug}`, a.title, a.icon])];
+  const groups = [
+    navGroup("server", "Server", [["/", "Status", "grass_block"], ["/changelog", "Changelog", "writable_book"]]),
+    navGroup("wirtschaft", "Wirtschaft", [["/markt", "Markt", "emerald"], ["/shops", "Shops", "barrel"], ["/auktionen", "Auktionen", "bell"]]),
+    navGroup("minispiele", "Minispiele", [["/parkour", "Parkour", "golden_boots"], ["/pvp", "PvP", "iron_sword"]]),
+    navGroup("community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"], ["/feedback", "Feedback", "writable_book"]]),
+    navGroup("wiki", "Wiki", wiki, true),
+  ].join("");
+  const konto = `<div class="ng ng-end" data-g="konto" id="konto"><button class="l ngb" type="button" aria-expanded="false" aria-controls="ng-konto"><img class="mi konto-av" alt="" width="20" height="20" src="/mc-icon/v2/player_head"><span class="konto-lab">Mein Konto</span>${CHEV}</button><div class="ngm" id="ng-konto"><a href="/profile"><img alt="" width="20" height="20" src="/mc-icon/v2/name_tag">Profil</a><a href="/vip"><img alt="" width="20" height="20" src="/mc-icon/v2/nether_star">VIP</a><a href="/bestellungen"><img alt="" width="20" height="20" src="/mc-icon/v2/chest">Bestellungen</a><a class="out" href="https://${MAIN}/auth/discord/logout">Abmelden</a></div></div>`;
+  return `<a class="brand" href="/"><img class="mi" alt="" width="22" height="22" src="/mc-icon/v2/grass_block"> NwebNotFound MC</a><button class="nbur" type="button" aria-expanded="false" aria-controls="nl" aria-label="Menü öffnen"><span></span><span></span><span></span></button><nav class="nl" id="nl" aria-label="Bereiche">${groups}${konto}</nav><script>${NAV_JS}</script>`;
+};
 
 export const MI = (id, px = 26) => `<img class="mi" alt="" width="${px}" height="${px}" loading="lazy" src="/mc-icon/v2/${id}">`;
 const SEARCH_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
@@ -94,12 +112,12 @@ export const homeBody = (HOST) => `
 <p id="names" class="mut" style="margin:0;font-size:.9rem;min-height:1.2em"></p><div id="onl" class="onl" aria-label="Gerade online" hidden></div></div>
 </div></section>
 <section class="sec" style="padding-top:1rem"><div class="hub-wrap"><div class="qgrid q6">
-<a class="g q" href="/profile"><div class="qi">${MI("name_tag", 40)}</div><div class="qt"><b>Profil</b><span>Deine Stats & dein 3D-Skin</span></div></a>
-<a class="g q" href="/leaderboards"><div class="qi">${MI("diamond", 40)}</div><div class="qt"><b>Bestenlisten</b><span>Woche & Gesamt</span></div></a>
-<a class="g q" href="/markt"><div class="qi">${MI("emerald", 40)}</div><div class="qt"><b>Markt</b><span>Preise & Verläufe</span></div></a>
-<a class="g q" href="/shops"><div class="qi">${MI("barrel", 40)}</div><div class="qt"><b>Shops</b><span>Spielershops & Angebote</span></div></a>
-<a class="g q" href="/auktionen"><div class="qi">${MI("bell", 40)}</div><div class="qt"><b>Auktionen</b><span>Live bieten</span></div></a>
-<a class="g q" href="/wiki"><div class="qi">${MI("bookshelf", 40)}</div><div class="qt"><b>Wiki</b><span>Anleitungen & FAQ</span></div></a>
+<a class="g q" href="/#srv-sec"><div class="qi">${MI("grass_block", 40)}</div><div class="qt"><b>Status</b><span>Wer online ist</span></div></a>
+<a class="g q" href="/markt"><div class="qi">${MI("emerald", 40)}</div><div class="qt"><b>Wirtschaft</b><span>Markt, Shops, Auktionen</span></div></a>
+<a class="g q" href="/pvp"><div class="qi">${MI("iron_sword", 40)}</div><div class="qt"><b>Minispiele</b><span>PvP</span><span>Parkour</span></div></a>
+<a class="g q" href="/spieler"><div class="qi">${MI("name_tag", 40)}</div><div class="qt"><b>Community</b><span>Spieler und Bestenlisten</span></div></a>
+<a class="g q" href="/wiki"><div class="qi">${MI("bookshelf", 40)}</div><div class="qt"><b>Wiki</b><span>Anleitungen und FAQ</span></div></a>
+<a class="g q" href="/profile"><div class="qi">${MI("player_head", 40)}</div><div class="qt"><b>Mein Konto</b><span>Profil und Bestellungen</span></div></a>
 </div></div></section>
 <section class="sec" id="srv-sec" hidden><div class="hub-wrap"><h2 class="hub-h2">Welten.</h2><div class="qgrid" id="srv" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))"></div></div></section>
 <section class="sec"><div class="hub-wrap" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))">

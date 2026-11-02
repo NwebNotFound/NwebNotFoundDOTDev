@@ -85,9 +85,9 @@ with sync_playwright() as p:
         ok(pg.locator(".inv .iv-pane").count() >= 1 and pg.locator(".inv .ivs").count() >= 41, f"{w}px Profil: volles Inventar-Layout")
         ok("AB" not in pg.locator(".inv").inner_text(), f"{w}px Profil: keine Text-Platzhalter")
         pg.locator(".inv").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-polish-profil-{w}.png", full_page=True)
-        ok(pg.locator("#umm a[href$='/bestellungen']").count() == 1, f"{w}px Dropdown: Bestellungen")
+        ok(pg.locator(".ng[data-g=konto] a[href='/bestellungen']").count() == 1, f"{w}px Dropdown: Bestellungen")
         # 1) Profil: kein doppelter Tab, klare Blöcke
-        ok(pg.locator(".nl a[href='/profile']").count() == 0, f"{w}px Nav: kein extra Profil-Tab")
+        ok(pg.locator(".nl > a[href='/profile']").count() == 0 and pg.locator(".ng[data-g=konto] a[href='/profile']").count() == 1, f"{w}px Nav: Profil nur im Konto-Menü")
         hd = pg.inner_text(".pf-hd")
         ok("Rot" in hd and pg.eval_on_selector(".pf-hd .pf-team", "e=>getComputedStyle(e).color") == "rgb(255, 85, 85)", f"{w}px Profil: Team in team_color", hd[:200])
         ok("01.11.26, 00:05 Uhr" in hd and pg.locator(".pf-hd .pf-on").count() == 0, f"{w}px Profil: last_seen in Europe/Berlin", hd[:300])
@@ -127,7 +127,7 @@ with sync_playwright() as p:
         sp.scroll_into_view_if_needed(); sp.screenshot(path=f"{SH}/local-spieler-parkour-{w}.png"); pg.unroute("**/api/mc-parkour")
         pg.goto("https://" + H + "/profile", wait_until="domcontentloaded"); pg.locator(".inv").wait_for(state="visible", timeout=20000)
         # Nav-Gruppen: max. 6 Top-Level-Einträge, aktive Gruppe markiert
-        ok(pg.locator(".nl > .l, .nl > .ng").count() == 6 and pg.locator(".nl .ng").count() == 3, f"{w}px Nav: 6 Top-Level-Einträge, 3 Gruppen")
+        ok(pg.locator(".nl > .ng").count() == 6, f"{w}px Nav: sechs Gruppen")
         # Inventar: animierte Texturen (Magma 16x48) nur quadratisch
         pg.evaluate("()=>{const i=document.querySelector('.inv .ivs img');if(i)i.src='/mc-icon/v2/magma_block'}"); pg.wait_for_timeout(800)
         bx = pg.eval_on_selector(".inv .ivs img", "e=>{const r=e.getBoundingClientRect();return [r.width,r.height]}")
@@ -141,13 +141,15 @@ with sync_playwright() as p:
         ok(pg.locator("#pbal").is_visible() and not pg.locator(".inv").is_visible(), f"{w}px Profil: Tab-Wechsel zeigt Markt")
         pg.screenshot(path=f"{SH}/local-profil-markt-{w}.png", full_page=True)
         # 2) Dropdown im MC-Theme
-        pg.click("#umb"); pg.wait_for_timeout(300)
-        st = pg.evaluate("(()=>{const c=getComputedStyle(document.querySelector('#umm'));return [c.backgroundColor,c.borderTopColor]})()")
+        if w < 900: pg.click(".nbur")
+        else: pg.locator(".ng[data-g=konto] .ngb").dispatch_event("click")
+        pg.wait_for_timeout(300)
+        st = pg.evaluate("(()=>{const c=getComputedStyle(document.querySelector('.ng[data-g=konto] .ngm'));return [c.backgroundColor,c.borderTopColor]})()")
         ok("18, 13, 31" not in st[0] and "45, 29, 90" not in st[1], f"{w}px Dropdown: MC-Theme statt Lila", st)
         pg.screenshot(path=f"{SH}/ux-dropdown-{w}.png")
         # 4) einheitliches Hover
         hov = []
-        for sel in ("#umm a[role=menuitem]", "#pbal .acts .btn.sec"):
+        for sel in (".ng[data-g=konto] .ngm a[href='/bestellungen']", "#pbal .acts .btn.sec"):
             el = pg.locator(sel).first; el.hover(); pg.wait_for_timeout(200)
             hov.append(el.evaluate("e=>{const c=getComputedStyle(e);return c.backgroundColor+'|'+c.boxShadow}"))
         pg.keyboard.press("Escape")
@@ -160,6 +162,7 @@ with sync_playwright() as p:
         ok(r1.evaluate("e=>getComputedStyle(e).backgroundColor") == hov[0].split("|")[0], f"{w}px Hover: Listenzeile nutzt dasselbe Token")
         # 6) Bank-Direktkauf auf der Item-Seite
         go("/markt/diamond"); pg.locator("#bbf").wait_for(timeout=10000)
+        ok(pg.locator('.ng[data-g=wirtschaft] .ngb[data-cur]').count() == 1 and pg.locator('a[href="/markt"][aria-current=page]').count() == 1, f"{w}px Nav: /markt/diamond markiert Markt")
         ok(pg.evaluate("document.documentElement.scrollWidth<=innerWidth+1"), f"{w}px Item-Seite mit Bank-Kauf: kein Overflow")
         t0 = pg.inner_text("#bbt"); pg.fill("#bba", "2"); ok(pg.inner_text("#bbt") != t0, f"{w}px Bank-Kauf: Summe live", pg.inner_text("#bbt"))
         pg.click("#bbb"); pg.wait_for_function("document.getElementById('bbm').textContent.length>0", timeout=10000)
@@ -179,7 +182,10 @@ with sync_playwright() as p:
         ok("7.200" not in t.split("Details",1)[-1], f"{w}px Details: Spielzeit formatiert statt Sekunden")
         pg.screenshot(path=f"{SH}/local-spieler-nils-{w}.png", full_page=True)
         for nm, path in (("start", "/"), ("markt", "/markt"), ("bestenlisten", "/leaderboards")): go(path); pg.wait_for_timeout(400); pg.screenshot(path=f"{SH}/local-polish-{nm}-{w}.png", full_page=True)
+        go("/"); ok(pg.locator(".qgrid .q").count() == 6 and pg.locator('.qgrid a[href="/#srv-sec"]').count() == 1 and pg.locator('.qgrid a[href="/pvp"]').count() == 1 and pg.locator('.qgrid a[href="/profile"]').count() == 1, f"{w}px Start: sechs Kacheln wie das Menü")
+        ok(pg.locator('.ng[data-g=server] a[href="/changelog"]').count() == 1 and pg.locator('.ng[data-g=wiki] a[href="/wiki/befehle"]').count() == 1 and pg.locator('.ng[data-g=konto] a[href="/bestellungen"]').count() == 1 and pg.locator('.ng[data-g=konto] a[href="/vip"]').count() == 1, f"{w}px Nav: Server, Wiki, Konto")
         for path in ("/markt", "/wiki", "/wiki/befehle"): go(path); pg.screenshot(path=f"{SH}/local{path.replace('/','-')}-{w}.png", full_page=True)
+        ok(pg.locator('.nl a[href="/wiki/befehle"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=wiki] .ngb[data-cur]').count() == 1 and pg.locator('.nl a[href="/wiki"][aria-current=page]').count() == 0, f"{w}px Nav: Wiki-Artikel markiert, nicht die Übersicht")
         go("/parkour?course=test"); pg.locator(".pkr").first.wait_for(timeout=10000); t = pg.inner_text("body")
         ok(pg.locator(".pkg").count() == 1 and pg.locator(".pkr").count() == 10 and "00:39.000" in t, f"{w}px Parkour ?course=test: nur ein Board, Top 10, Zeit mm:ss.mmm", t[:300])
         ok(pg.locator(".pkr img[src^='/mc-head/']").count() == 10 and pg.locator(".pkh img[src*='/mc-icon/v2/']").count() == 1, f"{w}px Parkour: Köpfe + Item-Icon")
@@ -192,6 +198,10 @@ with sync_playwright() as p:
             pg.focus(".ng[data-g=wirtschaft] .ngb"); pg.keyboard.press("Enter"); pg.keyboard.press("ArrowDown")
             ok(pg.evaluate("document.activeElement.getAttribute('href')") == "/markt", f"{w}px Nav: Tastatur öffnet Dropdown")
             pg.keyboard.press("Escape"); ok(pg.get_attribute(".ng[data-g=wirtschaft] .ngb", "aria-expanded") == "false", f"{w}px Nav: Escape schließt Dropdown")
+            pg.locator(".ng[data-g=community] .ngb").dispatch_event("click")
+            ok(pg.get_attribute(".ng[data-g=community] .ngb", "aria-expanded") == "true" and pg.locator('.ng[data-g=community] a[href="/spieler"]').count() == 1, f"{w}px Nav: Klick öffnet Community")
+            pg.locator(".ng[data-g=community] .ngb").dispatch_event("click")
+            ok(pg.get_attribute(".ng[data-g=community] .ngb", "aria-expanded") == "false", f"{w}px Nav: zweiter Klick schließt")
         ok(pg.locator(".pkt .btn").count() >= 3 and pg.locator('.pkt .btn[aria-selected=true][data-k="test"]').count() == 1 and pg.locator('.nl a[href="/parkour"][aria-current=page]').count() == 1, f"{w}px Parkour: Kurs-Auswahl + Nav aktiv")
         hs = pg.eval_on_selector_all(".pkr", "els=>els.map(e=>e.getBoundingClientRect().height)"); ok(max(hs) < 70, f"{w}px Parkour: Zeilen einzeilig", hs)
         pg.screenshot(path=f"{SH}/local-parkour-{w}.png", full_page=True)
@@ -225,7 +235,7 @@ with sync_playwright() as p:
         pg.screenshot(path=f"{SH}/local-parkour-leer-{w}.png", full_page=True); pg.unroute("**/api/mc-parkour")
         go("/vip"); pg.locator("#vip-worlds").wait_for(timeout=10000); vt = pg.inner_text("#vip")
         ok("Das Panel ist für die Ränge VIP und MVP." in vt and "bald verfügbar" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 0 and pg.locator("#vip a[href='/profile']").count() == 1, f"{w}px VIP ohne Rang: Übersicht, kein Panel", vt[:240])
-        ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator('.ng[data-g=community] a[href="/vip"]').count() == 1 and pg.locator('a[href="/vip"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=community] .ngb[data-cur]').count() == 1, f"{w}px VIP: Community-Menü aktiv, kein Formular")
+        ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator('.ng[data-g=konto] a[href="/vip"]').count() == 1 and pg.locator('.ng[data-g=community] a[href="/vip"]').count() == 0 and pg.locator('a[href="/vip"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=konto] .ngb[data-cur]').count() == 1, f"{w}px VIP: Konto-Menü aktiv, kein Formular")
         ok("Monocraft" in pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"), f"{w}px VIP: Pixel-Schrift", pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"))
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Übersicht: kein horizontales Scrollen")
         lay = pg.evaluate("""() => {

@@ -646,7 +646,8 @@ try {
     sql("DELETE FROM mc_player_ranks");
     sql(`UPDATE mc_player_stats SET stats = json_remove(stats, '$.skin_url') WHERE mc_uuid = '${U1}'`);
     const pg = await req("/vip"); const sec = pg.t.slice(pg.t.indexOf('id="vip"'));
-    ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && /data-g="community"[\s\S]*?href="\/vip"/.test(pg.t), "GET /vip bindet Panel ein, Link im Community-Menü", String(pg.s));
+    { const comm = (pg.t.split('data-g="community"')[1] || "").split("</div></div>")[0], konto = (pg.t.split('data-g="konto"')[1] || "").split("</div></div>")[0];
+      ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && konto.includes('href="/vip"') && !comm.includes('href="/vip"'), "GET /vip bindet Panel ein, Link im Konto-Menü", String(pg.s)); }
     ok(!/<script|<style| style=/.test(sec.slice(0, sec.indexOf("</section>"))), "/vip-Inhalt ohne Inline-Script/-Style");
     { const m = await req("/vip", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes('id="vip"')), "/vip nur auf mc-Domain", String(m.s)); }
     { const js = await req("/mc/vip.js"); ok(js.s === 200 && js.t.includes("E(p.title)") && js.t.includes("E(s.label)") && js.t.includes('href="/profile"') && js.t.includes("encodeURIComponent(rel)") && !js.t.includes("location.href") && !/style=|\.style\./.test(js.t), "vip.js escaped, Login-next relativ, keine Inline-Styles"); }
