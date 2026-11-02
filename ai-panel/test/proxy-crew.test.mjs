@@ -33,6 +33,13 @@ const messages = [
   { role: "assistant", content: "Authorization: Bearer abcdefghijklmnop123456", timestamp: 1767225720 },
 ];
 
+// A long transcript, for the "a 600-message session is still reachable" case.
+const longMessages = Array.from({ length: 6 }, (_, i) => ({
+  role: i % 2 ? "assistant" : "user",
+  content: `m${i + 1}`,
+  timestamp: 1767000000 + i * 60,
+}));
+
 let gateway;
 let proxy;
 let proxyUrl;
@@ -58,15 +65,24 @@ before(async () => {
     if (req.headers.authorization !== `Bearer ${KEY}`) return send(401, { error: "bad key" });
 
     const limit = Number(url.searchParams.get("limit")) || 0;
-    const page = (rows) => (limit > 0 ? rows.slice(0, limit) : rows);
+    const offset = Number(url.searchParams.get("offset")) || 0;
+    const order = url.searchParams.get("order") || "";
 
     if (url.pathname === "/p/cloudflare/api/sessions" && req.method === "GET") {
-      return send(200, { sessions: page(sessions) });
+      const page = limit > 0 ? sessions.slice(offset, offset + limit) : sessions;
+      return send(200, { sessions: page, total: sessions.length, limit, offset });
     }
     const m = url.pathname.match(/^\/p\/cloudflare\/api\/sessions\/([^/]+)\/messages$/);
     if (m && req.method === "GET") {
-      if (m[1] !== "run_aaa111") return send(404, { error: "no such session" });
-      return send(200, { messages: page(messages) });
+      // Same contract as the gateway (hermes_cli/web_routers/sessions.py): limit, offset and
+      // order=oldest|latest, where latest anchors the offset at the newest message.
+      const rows = m[1] === "run_long1" ? longMessages : m[1] === "run_aaa111" ? messages : null;
+      if (!rows) return send(404, { error: "no such session" });
+      const page =
+        order === "latest"
+          ? rows.slice(Math.max(0, rows.length - offset - limit), rows.length - offset)
+          : rows.slice(offset, offset + limit);
+      return send(200, { messages: page, pagination: { limit, offset, order: order || "oldest", returned: page.length } });
     }
     return send(404, { error: "not found" });
   });
@@ -142,7 +158,9 @@ test("paging is capped at the hard maximum even when the client asks for more", 
   const data = await res.json();
   assert.equal(data.limit, 200, "limit clamped to the cap");
   assert.equal(data.offset, 0, "negative offset clamped");
-  assert.equal(seen.at(-1).search, "?limit=200", "the gateway is asked for one capped window");
+  const sent = new URL(`http://x${seen.at(-1).search}`);
+  assert.equal(sent.searchParams.get("limit"), "200", "the gateway is asked for one capped window");
+  assert.equal(sent.searchParams.get("order"), "recent");
   assert.equal(res.headers.get("cache-control"), "no-store");
 });
 
@@ -204,9 +222,9 @@ test("the transcript is paged, ordered, and redacted", async () => {
   assert.equal(res.status, 200);
   const data = await res.json();
   assert.equal(data.session_id, "run_aaa111");
-  assert.deepEqual(data.messages.map((m) => m.role), ["user", "tool"]);
-  assert.equal(data.messages[1].tool_name, "terminal");
-  assert.equal(data.has_more, true);
+  assert.deepEqual(data.messages.map((m) => m.role), ["tool", "assistant"], "the newest page");
+  assert.equal(data.messages[0].tool_name, "terminal");
+  assert.equal(data.has_more, true, "the user message is behind this page");
 
   const raw = JSON.stringify(await (await call("/gw/p/cloudflare/api/sessions/run_aaa111/messages")).json());
   assert.doesNotMatch(raw, /ghp_0123456789abcdefghijABCDEFGHIJ012345/);
@@ -221,13 +239,41 @@ test("an unknown session is the gateway's 404, and a malformed id never gets the
   assert.equal(missing.status, 404);
   assert.equal((await missing.json()).error, "session_not_found");
 
-  // A path that is not a valid crew route is proxied as a normal gateway call and 404s there —
-  // the important part is that this proxy never answers it with the redacted crew payload.
-  const malformed = await call("/gw/p/cloudflare/api/sessions/bad..id/messages");
-  assert.equal(malformed.status, 404);
-  const malformedBody = await malformed.json();
-  assert.equal(malformedBody.error, "no such session", "answered by the gateway, not by the crew route");
-  assert.equal(malformedBody.messages, undefined, "no crew payload for an invalid id");
+  // Near-miss paths used to fall through to the generic passthrough, which does not redact.
+  // They are refused here now, before any upstream call.
+  for (const p of [
+    "/gw/p/cloudflare/api/sessions/bad..id/messages",
+    "/gw/p/cloudflare/api/sessions/run_aaa111",
+    "/gw/p/cloudflare/api/sessions/",
+  ]) {
+    const before = seen.length;
+    const res = await call(p);
+    assert.equal(res.status, 404, `${p} is not a crew route`);
+    const body = await res.json();
+    assert.equal(body.error, "not_found");
+    assert.equal(body.messages, undefined, "no transcript payload");
+    assert.equal(seen.length, before, `${p} never reached the gateway`);
+  }
+});
+
+test("a transcript longer than one page stays reachable page by page", async () => {
+  // The review point: a 600-message session must not stop at the first window.
+  const contents = [];
+  let offset = 0;
+  let page;
+  let guard = 0;
+  do {
+    page = await (await call(`/gw/p/cloudflare/api/sessions/run_long1/messages?limit=2&offset=${offset}`)).json();
+    contents.unshift(...page.messages.map((m) => m.content));
+    offset += page.messages.length;
+    guard += 1;
+  } while (page.has_more && guard < 10);
+  assert.equal(guard, 3, "six messages in pages of two");
+  assert.equal(page.has_more, false, "the oldest page says it is the end");
+  assert.deepEqual(contents, ["m1", "m2", "m3", "m4", "m5", "m6"], "the whole transcript is reachable");
+  const sent = new URL(`http://x${seen.at(-1).search}`);
+  assert.equal(sent.searchParams.get("offset"), "4", "the last page asked for a real offset");
+  assert.equal(sent.searchParams.get("order"), "latest");
 });
 
 test("the crew routes still need the shared secret", async () => {

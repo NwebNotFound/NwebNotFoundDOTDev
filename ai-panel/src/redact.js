@@ -39,9 +39,25 @@ const RULES = [
     `$1${MASK}`,
   ],
 
+  // The same thing inline, quoted, or as JSON: {"api_key":"…"}, "password": "…", token=…
+  // The key name stays so the reader can see *what* was masked.
+  [
+    /\b(["']?(?:api[_-]?key|apikey|client[_-]?secret|secret|token|access[_-]?token|refresh[_-]?token|password|passwd|authorization|auth[_-]?key|cookie|private[_-]?key|session[_-]?key|credential)["']?[ \t]*[:=][ \t]*)(["']?)([^"',}\s]{3,})/gi,
+    `$1${MASK}`,
+  ],
+
+  // Credentials passed as query parameters: ?token=…, &api_key=…
+  [/([?&](?:token|key|secret|sig|signature|code|access_token|api_key|apikey|password|auth)=)[^&\s#]+/gi, `$1${MASK}`],
+
+  // Header lines that are not `Authorization`: X-Api-Key: …, X-Hermes-Panel-Secret: …
+  [/(\bx-[a-z0-9-]*(?:key|secret|token|auth)[a-z0-9-]*[ \t]*:[ \t]*)\S+/gi, `$1${MASK}`],
+
   // A connection string carrying credentials: scheme://user:pass@host
   [/\b([a-z][a-z0-9+.-]{1,15}:\/\/)[^\s/:@]+:[^\s/@]+@/gi, `$1${MASK}@`],
 ];
+
+/** Field names whose *value* is a credential no matter what it looks like. */
+const SENSITIVE_KEY = /(?:api[_-]?key|apikey|secret|token|password|passwd|authorization|auth|^cookie$|private[_-]?key|credential|session[_-]?key|^dsn$|connection[_-]?string)/i;
 
 /**
  * Redact one string. Cheap enough for a page of transcript: every rule is a single linear pass,
@@ -74,7 +90,13 @@ export function redactValue(value, depth = 0) {
   if (Array.isArray(value)) return value.map((v) => redactValue(v, depth + 1));
   if (value && typeof value === "object") {
     const out = {};
-    for (const [k, v] of Object.entries(value)) out[k] = redactValue(v, depth + 1);
+    for (const [k, v] of Object.entries(value)) {
+      // A field *named* like a credential carries one, even when the value has no key shape
+      // ("hunter2" is not a token pattern). Numbers and booleans are counts/flags, not secrets.
+      const sensitive = SENSITIVE_KEY.test(k);
+      if (sensitive && v !== null && typeof v !== "boolean" && typeof v !== "number") out[k] = MASK;
+      else out[k] = redactValue(v, depth + 1);
+    }
     return out;
   }
   return value;
