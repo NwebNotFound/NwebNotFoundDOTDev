@@ -167,14 +167,18 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     // Vertrag: trusted wird bevorzugt über die UUID geprüft, der Name ist nur der Fallback.
     const invite = (world.invites || []).find((i) => (i.uuid && normU(i.uuid) === a.uuid) || (i.name && i.name.toLowerCase() === a.name.toLowerCase()));
     const isOwner = world.owner_uuid === a.uuid;
-    let allowed = false;
-    if (a.admin || isOwner) allowed = true;
-    else if (invite?.role === "trusted" && action === "start") allowed = true;
+    const isAdmin = a.admin === true;
+    // Admin darf jede Welt verwalten, der Owner seine eigene, trusted nur starten.
+    const allowed = isAdmin || isOwner || (invite?.role === "trusted" && action === "start");
     if (!allowed) return deny(403, action === "start" ? "not_trusted" : "not_owner");
-    if (isOwner && !a.admin && !OWNER_RANKS.has(a.rank)) return deny(403, "no_rank");
-    if (!isOwner && !a.admin && action === "start") {
-      const ownerRank = await env.DB.prepare("SELECT rank FROM mc_player_ranks WHERE lower(replace(uuid, '-', '')) = ?").bind(world.owner_uuid.replace(/-/g, "")).first().catch(() => null);
-      if (!OWNER_RANKS.has(String(ownerRank?.rank || "").toLowerCase())) return deny(403, "no_rank");
+    // Die Rangprüfung gilt nur für Spieler: ein Admin braucht für fremde Welten keinen VIP-Rang,
+    // ein Owner muss einen Panel-Rang haben und trusted startet nur Welten mit berechtigtem Owner.
+    if (!isAdmin) {
+      if (isOwner && !OWNER_RANKS.has(a.rank)) return deny(403, "no_rank");
+      if (!isOwner && action === "start") {
+        const ownerRank = await env.DB.prepare("SELECT rank FROM mc_player_ranks WHERE lower(replace(uuid, '-', '')) = ?").bind(world.owner_uuid.replace(/-/g, "")).first().catch(() => null);
+        if (!OWNER_RANKS.has(String(ownerRank?.rank || "").toLowerCase())) return deny(403, "no_rank");
+      }
     }
     if (action === "invite" || action === "uninvite") {
       const has = (world.invites || []).some((i) => i.name && i.name.toLowerCase() === name.toLowerCase());

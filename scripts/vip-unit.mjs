@@ -30,6 +30,10 @@ assert.equal(slots[2].tps, 18.2);
 assert.equal(slots[0].tps, 20);
 assert.deepEqual(pickVipWorlds(null), []);
 assert.deepEqual(pickVipWorlds({}), []);
+assert.equal(pickVipWorlds(worlds, Infinity).length, 4, "Admin: alle VIP-Welten ohne 3er-Limit");
+assert.deepEqual(pickVipWorlds(worlds, Infinity).map((s) => s.id), ["vipwelt", "vip_1", "vip-2", "vip_4"]);
+assert.equal(pickVipWorlds(worlds, 1).length, 1, "Limit gilt weiter für die Übersicht");
+assert.equal(pickVipWorlds(worlds, 0).length, 3, "0 fällt auf den Standard zurück");
 assert.equal(pickVipWorlds({ vip: { online: true, players: [], max: null, tps: null } })[0].max, null);
 assert.equal(pickVipWorlds({ vip: { online: false, players: ["ok"], tps: null } })[0].tps, null);
 assert.equal(vipWorldLabel("vip_world_3"), "VIP-Welt 3");
@@ -54,6 +58,13 @@ assert.ok(!JSON.stringify(cat).includes("LuckPerms") && !JSON.stringify(cat).inc
 for (const c of cat) { const ids = [c.icon, ...c.perks.map((p) => p.icon)]; assert.equal(new Set(ids).size, ids.length, c.rank); }
 assert.equal(vipCatalog(null)[1].yours, false);
 assert.equal(vipCatalog("admin")[0].yours, false);
+assert.deepEqual(vipCatalog("admin").map((c) => c.rank), ["vip", "mvp", "admin"], "Admin-Katalog enthält alle Ränge");
+assert.equal(vipCatalog("admin")[2].yours, true);
+assert.equal(vipCatalog("admin")[2].label, "Admin");
+assert.equal(vipCatalog("admin")[2].color, "c");
+assert.equal(vipCatalog("vip").length, 2, "VIP sieht nur VIP und MVP");
+assert.equal(vipCatalog("builder").length, 2, "Builder sieht die Übersicht ohne eigene Karte");
+for (const c of vipCatalog("admin")) { const ids = [c.icon, ...c.perks.map((p) => p.icon)]; assert.equal(new Set(ids).size, ids.length, "Admin-Karte " + c.rank); }
 
 assert.equal(normU("0F3C2A1B-4D5E-6F70-8192-A3B4C5D6E7F8"), "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8");
 assert.equal(normU("0f3c2a1b4d5e6f708192a3b4c5d6e7f8"), "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8");
@@ -114,7 +125,9 @@ assert.equal(cleanLog([{ ...CL, action: "explode" }]).log.length, 0, "unbekannte
 assert.equal(cleanLog([{ world_id: CL.world_id, admin: "100000000000000001", owner: CL.owner_uuid, action: "start", created_at: 1793504000000 }]).log.length, 0, "alte Felder admin/owner/created_at werden verworfen");
 assert.deepEqual(vipRankView("vip", "&6"), { rank: "vip", color: "6", label: "VIP" });
 assert.deepEqual(vipRankView("MVP", "&d"), { rank: "mvp", color: "d", label: "MVP" });
-assert.equal(vipRankView("admin", "&c"), null);
+assert.deepEqual(vipRankView("admin", "&c"), { rank: "admin", color: "c", label: "Admin" }, "Admin hat ein Panel");
+assert.deepEqual(vipRankView("admin", ""), { rank: "admin", color: "c", label: "Admin" }, "Admin ohne Farbe → Standard &c");
+assert.deepEqual(vipRankView("builder", "&a"), null, "Builder bleibt ohne Panel");
 assert.deepEqual(vipRankView("vip", "&z"), { rank: "vip", color: "6", label: "VIP" }, "ungültige Farbe → Standard &6");
 assert.deepEqual(vipRankView("mvp", ""), { rank: "mvp", color: "d", label: "MVP" }, "fehlende Farbe → Standard &d");
 assert.equal(vipRankView("player", "&7"), null);
