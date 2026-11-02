@@ -138,7 +138,9 @@ async function shoot(browser, page, file) {
   const res = await tab.goto(page.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
   if (!res || res.status() >= 400) throw new Error(`${page.url} → HTTP ${res ? res.status() : "no response"}`);
   await tab.waitForSelector(page.wait, { timeout: 20_000 });
-  if (page.settle) await tab.waitForFunction(page.settle, null, { timeout: 15_000 }).catch(() => {});
+  // The MC status comes from public status APIs and can take a few seconds; wait for the
+  // loading placeholder to disappear rather than photographing it.
+  if (page.settle) await tab.waitForFunction(page.settle, null, { timeout: 40_000 }).catch(() => {});
   await tab.evaluate(() => document.fonts.ready);
   await tab.waitForTimeout(400);
 

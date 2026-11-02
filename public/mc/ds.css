@@ -105,6 +105,8 @@ html.mc .btn:hover{background:#7df08a;border-color:var(--c-acc);color:#06210b;tr
 html.mc .btn:active{box-shadow:inset 0 2px 0 rgba(0,0,0,.25);transform:translateY(1px)}
 @media(prefers-reduced-motion:reduce){html.mc .btn:active{transform:none}}
 html.mc .btn.sec,html.mc .btn.sm{background:var(--c-s3);border-color:var(--c-line2);color:var(--c-fg);box-shadow:inset 0 -2px 0 rgba(0,0,0,.3)}
+/* .sm bleibt die dichte Variante (36px), sonst schiebt das 44px-Padding enge Listenzeilen über den Rand. */
+html.mc .btn.sm{min-height:36px;padding:0 var(--s3);font-size:var(--t-xs)}
 html.mc .btn.sec:hover,html.mc .btn.sm:hover{background:var(--c-s4);border-color:var(--c-dim);color:var(--c-fg)}
 html.mc .btn.go{background:var(--c-acc);border-color:var(--c-acc-d);color:#06210b}
 html.mc .btn.discord{background:#5865f2;border-color:#4450d6;color:#fff}html.mc .btn.discord:hover{background:#6b77ff;color:#fff}
@@ -308,7 +310,7 @@ html.mc .pslot{aspect-ratio:1;position:relative;display:grid;place-items:center;
 html.mc .pslot img{width:72%;height:72%;image-rendering:pixelated}
 html.mc .pslot b{position:absolute;right:2px;bottom:0;font:700 .7rem var(--f-px,monospace);color:#fff;text-shadow:1px 1px 0 #3f3f3f}
 html.mc .plist{list-style:none;margin:0;padding:0}
-html.mc .po{display:flex;gap:.8rem;padding:.9rem 0;border-top:1px solid var(--line,#2a2f2b)}
+html.mc .po{display:flex;flex-wrap:wrap;align-items:flex-start;gap:.5rem .8rem;padding:.9rem 0;border-top:1px solid var(--line,#2a2f2b)}
 html.mc .poi{width:36px;height:36px;flex:none;display:grid;place-items:center}
 html.mc .poi img{width:32px;height:32px;image-rendering:pixelated}
 html.mc .pom{display:flex;flex-direction:column;gap:.25rem;min-width:0;flex:1}
@@ -380,6 +382,15 @@ html.mc #pb .pord .tag{font-size:var(--t-xs)}
 
 /* ---------- Bestellungen (zusammengelegt) + Bank-Direktkauf ---------- */
 html.mc .po .hide{margin-left:auto;align-self:start}
+html.mc .po>.tag{margin-left:auto;align-self:flex-start}
+/* Schmale Viewports: Badge und Ausblenden-Knopf unter den Text statt in die Zeile gequetscht. */
+@media(max-width:640px){
+html.mc .po{display:grid;grid-template-columns:36px minmax(0,1fr);column-gap:.8rem;row-gap:.4rem;align-items:start}
+html.mc .po>.poi{grid-column:1;grid-row:1}
+html.mc .po>.pom{grid-column:2;grid-row:1}
+html.mc .po>.tag{grid-column:2;grid-row:2;justify-self:start;margin-left:0}
+html.mc .po>.hide{grid-column:2;grid-row:3;justify-self:start;margin-left:0}
+}
 html.mc .otype{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--c-dia);margin-right:var(--s2)}
 html.mc .bbuy{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:var(--s2);align-items:end;margin-top:var(--s3)}
 html.mc .bbuy label{display:grid;gap:var(--s1);font-size:var(--t-sm);color:var(--c-mut)}
