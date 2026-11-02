@@ -6,7 +6,7 @@
   "description": "Mobile-first Hermes control panel at ai.nwebnotfound.dev (Cloudflare Worker)",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check src/index.js && node --check src/auth.js && node --check src/upstream.js && node --check src/store.js && node --check public/app.js && node --check public/run-events.js && node --check public/markdown.js && node --check public/highlight.js",
+    "check": "node --check src/index.js && node --check src/auth.js && node --check src/upstream.js && node --check src/store.js && node --check src/redact.js && node --check origin-proxy/proxy.mjs && node --check public/app.js && node --check public/crew.js && node --check public/run-events.js && node --check public/markdown.js && node --check public/highlight.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },

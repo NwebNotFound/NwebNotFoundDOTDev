@@ -12,6 +12,11 @@
 //   /gw/p/<bot>/…      → Authorization: Bearer ***   (API_SERVER_KEY from profiles/<bot>/.env)
 //   /gw/… (no profile) → Authorization: Bearer ***   (API_SERVER_KEY of this .env)
 //
+// Two routes are special-cased instead of proxied as-is (see "Crew routes" below):
+//   GET /gw/p/<bot>/api/sessions
+//   GET /gw/p/<bot>/api/sessions/<id>/messages
+// They are read-only, paged with hard caps, and redact credential-shaped text server-side.
+//
 // Gateway keys are read from the Hermes profile directories on each lookup (cached ~30 s), so a
 // key rotated in a profile is picked up without restarting this process. HERMES_KEY_<BOT> is an
 // optional override.
@@ -25,6 +30,9 @@ import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
+
+// One implementation of the redaction rules for both the proxy and the Worker.
+import { clampInt, redactValue, sessionKind } from "../src/redact.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -190,6 +198,174 @@ async function healthPayload() {
 
 const PROFILE = /^\/p\/([a-z0-9][a-z0-9_-]{0,31})(?=\/|$)/;
 
+// ---------------------------------------------------------------------------------------
+// Crew routes — read-only session browsing
+// ---------------------------------------------------------------------------------------
+//
+//   GET /gw/p/<bot>/api/sessions                 a bot's sessions, paged
+//   GET /gw/p/<bot>/api/sessions/<id>/messages   one session's transcript, paged
+//
+// These two are the only routes that rewrite the body instead of piping it: they clamp paging
+// to a hard maximum and redact credential-shaped text before it leaves the host. Everything
+// else (/v1/runs, /api/jobs, …) still streams through untouched, which is what the chat and
+// the cron editor need.
+//
+// The allowlist is the same one every other /gw/p/<bot>/ route uses: a profile whose gateway
+// key resolves. A bot without a key is a 404 here too, so a typo cannot read another bot's
+// history.
+
+const CREW_LIST = /^\/gw\/p\/([a-z0-9][a-z0-9_-]{0,31})\/api\/sessions$/;
+const CREW_MESSAGES = /^\/gw\/p\/([a-z0-9][a-z0-9_-]{0,31})\/api\/sessions\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/messages$/;
+const CREW_PAGE_MAX = 200; // hard cap per request, for the gateway call and the response
+const CREW_OFFSET_MAX = 100_000;
+const CREW_FILTERS = new Set(["all", "run", "cli"]);
+
+/** The crew route this pathname names, or null. A malformed session id never matches. */
+export function crewRoute(pathname) {
+  const messages = pathname.match(CREW_MESSAGES);
+  if (messages) return { kind: "messages", bot: messages[1], sessionId: messages[2] };
+  const list = pathname.match(CREW_LIST);
+  if (list) return { kind: "sessions", bot: list[1], sessionId: null };
+  return null;
+}
+
+function sendJson(res, status, data, extra = {}) {
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra });
+  res.end(JSON.stringify(data));
+}
+
+const seconds = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value > 1e12 ? Math.round(value / 1000) : Math.round(value);
+  if (typeof value === "string" && value) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return seconds(n);
+    const t = Date.parse(value);
+    if (Number.isFinite(t)) return Math.round(t / 1000);
+  }
+  return null;
+};
+
+const clip = (value, max) => (typeof value === "string" ? value.slice(0, max) : value ?? null);
+
+/** The fields the panel shows, and nothing else. Unknown upstream fields are dropped. */
+function normalizeSession(row) {
+  const id = String(row?.id || row?.session_id || "");
+  if (!id) return null;
+  return {
+    id,
+    title: clip(String(row?.title || row?.preview || ""), 300),
+    kind: sessionKind(id),
+    status: clip(String(row?.status || row?.state || ""), 40) || null,
+    source: clip(String(row?.source || ""), 40) || null,
+    model: clip(String(row?.model || ""), 120) || null,
+    provider: clip(String(row?.provider || ""), 60) || null,
+    started_at: seconds(row?.started_at || row?.created_at),
+    last_active: seconds(row?.last_active || row?.updated_at || row?.ended_at || row?.started_at),
+    message_count: Number(row?.message_count || 0) || 0,
+    input_tokens: Number(row?.input_tokens || 0) || 0,
+    output_tokens: Number(row?.output_tokens || 0) || 0,
+    api_call_count: Number(row?.api_call_count || 0) || 0,
+    cost_usd: Number(row?.actual_cost_usd || row?.estimated_cost_usd || row?.cost_usd || 0) || 0,
+  };
+}
+
+function normalizeMessage(row) {
+  if (!row || typeof row !== "object") return null;
+  const content = typeof row.content === "string" ? row.content : row.content == null ? "" : JSON.stringify(row.content);
+  return {
+    role: clip(String(row.role || "?"), 24),
+    content: content.slice(0, 20_000),
+    timestamp: seconds(row.timestamp || row.created_at || row.ts),
+    tool_name: clip(String(row.tool_name || row.name || row.tool || ""), 80) || null,
+    ok: typeof row.ok === "boolean" ? row.ok : null,
+  };
+}
+
+/** One JSON GET against the gateway, with the already-resolved per-bot key. */
+async function gatewayGet(bearer, pathAndQuery) {
+  try {
+    const res = await fetch(`${GATEWAY.replace(/\/$/, "")}${pathAndQuery}`, {
+      headers: { authorization: `Bearer ${bearer}`, accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const text = await res.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+    return { ok: res.status < 400, status: res.status, data };
+  } catch (err) {
+    // The reason (host, timeout) stays in this process's log, never in the response.
+    console.warn(`crew upstream error: ${String(err?.message || err)}`);
+    return { ok: false, status: 0, data: null };
+  }
+}
+
+async function handleCrew(req, res, url, route) {
+  if (req.method !== "GET") {
+    sendJson(res, 405, { error: "method_not_allowed" }, { allow: "GET" });
+    console.warn(`${req.method} ${url.pathname} 405 (crew routes are read-only)`);
+    return;
+  }
+
+  const bearer = gatewayKeyFor(route.bot);
+  if (!bearer) {
+    sendJson(res, 404, { error: "unknown_bot" });
+    console.warn(`${req.method} ${url.pathname} 404 (no key for profile ${route.bot})`);
+    return;
+  }
+
+  const isList = route.kind === "sessions";
+  const limit = clampInt(url.searchParams.get("limit"), { min: 1, max: CREW_PAGE_MAX, dflt: isList ? 50 : 100 });
+  const offset = clampInt(url.searchParams.get("offset"), { min: 0, max: CREW_OFFSET_MAX, dflt: 0 });
+  const filter = String(url.searchParams.get("filter") || "all").toLowerCase();
+  if (!CREW_FILTERS.has(filter)) {
+    sendJson(res, 400, { error: "invalid_filter" });
+    return;
+  }
+
+  // Always ask the gateway for one full window and page locally: the cap then holds even if
+  // the upstream ignores limit/offset (it does support limit today, it does not support offset).
+  const path0 = `/p/${route.bot}/api/sessions`;
+  const upstreamPath = isList
+    ? `${path0}?limit=${CREW_PAGE_MAX}`
+    : `${path0}/${encodeURIComponent(route.sessionId)}/messages?limit=${CREW_PAGE_MAX}`;
+
+  const got = await gatewayGet(bearer, upstreamPath);
+  if (!got.ok) {
+    console.warn(`${req.method} ${url.pathname} ${got.status || 502} (crew upstream)`);
+    if (got.status === 404) return sendJson(res, 404, { error: "session_not_found" });
+    return sendJson(res, 502, { error: "upstream_unreachable" });
+  }
+
+  const payload = got.data;
+  const arrayFrom = (obj, key) => (Array.isArray(obj?.[key]) ? obj[key] : Array.isArray(obj) ? obj : []);
+  const rawRows = isList ? arrayFrom(payload, "sessions") : arrayFrom(payload, "messages");
+  let rows = rawRows.map(isList ? normalizeSession : normalizeMessage).filter(Boolean);
+  if (isList) {
+    rows.sort((a, b) => (b.last_active || 0) - (a.last_active || 0));
+    if (filter !== "all") rows = rows.filter((r) => r.kind === filter);
+  }
+
+  const page = rows.slice(offset, offset + limit);
+  const body = {
+    bot: route.bot,
+    session_id: route.sessionId,
+    [isList ? "sessions" : "messages"]: page,
+    total: rows.length,
+    limit,
+    offset,
+    has_more: rows.length > offset + page.length,
+    // The upstream call was capped, so a full window means "there may be more upstream".
+    truncated: rawRows.length >= CREW_PAGE_MAX,
+  };
+
+  sendJson(res, 200, redactValue(body));
+  console.log(`${req.method} ${url.pathname} 200 ${page.length}/${rows.length} (crew ${route.kind})`);
+}
+
 function upstreamFor(pathname) {
   if (pathname.startsWith("/gw/")) {
     const rest = pathname.slice(3);
@@ -214,6 +390,14 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/health") {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     res.end(JSON.stringify(await healthPayload()));
+    return;
+  }
+
+  // Read-only session browsing. Matched before the generic router so a non-GET on these two
+  // paths is a 405 here instead of being proxied to the gateway.
+  const crew = crewRoute(url.pathname);
+  if (crew) {
+    await handleCrew(req, res, url, crew);
     return;
   }
 
