@@ -3,19 +3,29 @@
 // expired setzt nur mc-stack, frühestens 600000 ms nach created_at.
 import { normU } from "./mc-vip.js";
 
+// Vom Browser erlaubte ops (Pfad → action).
 export const ACTIONS = ["start", "set_visibility", "invite", "uninvite"];
+// Alle Aktionen des Vertrags. Nur diese dürfen im Admin-Log stehen.
+export const CONTRACT_ACTIONS = ["create", "rename", "start", "stop", "settings", "set_visibility", "invite", "uninvite", "trust", "addons", "delete"];
 export const ROLES = ["member", "trusted"];
 export const VIS = ["friends", "private"];
 const OWNER_RANKS = new Set(["vip", "mvp", "admin"]);
-const ACK_OK = new Set(["accepted", "rejected", "failed", "confirmed", "denied", "expired"]);
+// Vertrag: nur done, denied, expired, failed. done/expired senden reason "".
+const ACK_STATUS = new Set(["done", "denied", "expired", "failed"]);
+const ACK_DENIED = new Set(["not_linked", "no_rank", "not_owner", "not_trusted", "already_member", "name_taken", "no_free_slot", "invalid_name", "invalid_type", "invalid_setting", "invalid_visibility", "invalid_addon", "invalid_role", "invalid_player", "invalid_timestamp", "is_owner", "player_not_found", "member_not_found", "world_not_found", "addon_limit"]);
+const ACK_FAILED = new Set(["ram_budget", "host_unavailable", "audit_failed"]);
+const WORLD_STATUS = new Set(["stopped", "starting", "running", "stopping", "error"]);
+const WORLD_TYPES = new Set(["normal", "flat", "void"]);
+const ADDONS = new Set(["keep-inventory", "peaceful", "creative", "day-lock", "pvp"]);
 const EXPIRE_MS = 600000;
 const HOUR = 3600000;
 const NAME = /^[A-Za-z0-9_]{1,16}$/;
-const RID = /^[A-Za-z0-9_.:-]{8,64}$/;
+const RID = /^[A-Za-z0-9_-]{1,64}$/;
 
+// Vertrag: Cc und Cf raus, dann jedes § mit dem folgenden Zeichen, dann trim, dann 120 Zeichen.
 export function sanitizeInfo(v) {
   let t = typeof v === "string" ? v : "";
-  t = t.replace(/\p{Cc}|\p{Cf}/gu, "").replace(/§[0-9a-fk-or]?/gi, "");
+  t = t.replace(/\p{Cc}|\p{Cf}/gu, "").replace(/§[\s\S]/gu, "").replace(/§/gu, "").trim();
   return t.slice(0, 120);
 }
 
@@ -31,26 +41,32 @@ async function writeBlob(env, kind, list, now) {
   await env.DB.prepare("INSERT INTO mc_blobs (kind, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(kind) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(kind, JSON.stringify(list), now).run();
 }
 
+function num(v) { return v == null || v === "" || typeof v === "boolean" || !Number.isFinite(+v) ? null : +v; }
+// Vertrag: alle Zeiten sind Millisekunden. Kleine Werte sind Sekunden und werden umgerechnet.
+function ms(v) { const n = num(v); return n == null ? null : n < 1e12 ? Math.round(n * 1000) : Math.round(n); }
 function cleanInvites(raw) {
   if (raw == null) return [];
   if (!Array.isArray(raw)) return null;
   const out = [], seen = new Set();
   for (const x of raw) {
-    const name = typeof x?.name === "string" ? x.name : "";
-    const role = x?.role === "trusted" ? "trusted" : x?.role === "member" ? "member" : "";
-    if (!NAME.test(name) || !role || seen.has(name.toLowerCase())) continue;
-    seen.add(name.toLowerCase());
-    out.push({ name, role });
-    if (out.length === 12) break;
+    const uuid = normU(x?.uuid);
+    const name = typeof x?.name === "string" ? sanitizeInfo(x.name) : "";
+    const okName = NAME.test(name) ? name : null;
+    if (!uuid && !okName) continue;
+    const key = uuid || "n:" + okName.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ uuid: uuid || null, name: okName, role: x?.role === "trusted" ? "trusted" : "member", added_at: ms(x?.added_at) });
+    if (out.length === 32) break;
   }
   return out;
 }
-function num(v) { return v == null || v === "" || typeof v === "boolean" || !Number.isFinite(+v) ? null : +v; }
 function playersOf(v) {
   if (Array.isArray(v?.players)) return v.players.filter((n) => typeof n === "string" && NAME.test(n)).length;
   const n = num(v?.players);
   return n != null && n >= 0 ? Math.min(100, Math.floor(n)) : 0;
 }
+// Schema wie im Vertrag: name, status, slot, player_limit, invites[].uuid (name nullable).
 export function cleanWorlds(raw) {
   if (!Array.isArray(raw)) return { error: "vip_worlds muss ein Array sein" };
   if (raw.length > 30) return { error: "höchstens 30 Welten" };
@@ -63,31 +79,45 @@ export function cleanWorlds(raw) {
     const invites = cleanInvites(w?.invites);
     if (invites == null) continue;
     seen.add(id);
-    const max = num(w?.max), tps = num(w?.tps);
+    const limit = num(w?.player_limit);
+    const slot = typeof w?.slot === "string" && /^[A-Za-z0-9_-]{1,32}$/.test(w.slot) ? w.slot : null;
+    const addons = Array.isArray(w?.addons) ? [...new Set(w.addons.filter((a) => ADDONS.has(a)))].slice(0, 3) : [];
+    const name = sanitizeInfo(w?.name);
+    const ownerName = NAME.test(w?.owner_name || "") ? w.owner_name : null;
     out.push({
-      id, owner_uuid: owner, owner_name: NAME.test(w?.owner_name || "") ? w.owner_name : null,
-      label: sanitizeInfo(w?.label || "") || "VIP-Welt",
+      id, owner_uuid: owner, owner_name: ownerName,
+      name: name || null,
+      type: WORLD_TYPES.has(w?.type) ? w.type : "normal",
+      status: WORLD_STATUS.has(w?.status) ? w.status : "stopped",
+      slot,
+      player_limit: limit == null ? null : Math.max(0, Math.floor(limit)),
       visibility: w?.visibility === "private" ? "private" : "friends",
-      online: !!w?.online, players: playersOf(w),
-      max: max == null ? null : Math.max(0, Math.floor(max)),
-      tps: tps == null ? null : Math.round(tps * 10) / 10,
+      players: playersOf(w),
       info: sanitizeInfo(w?.info),
-      invites: invites.filter((i) => i.name.toLowerCase() !== String(w?.owner_name || "").toLowerCase()),
+      invites: invites.filter((i) => !(i.name && ownerName && i.name.toLowerCase() === ownerName.toLowerCase()) && i.uuid !== owner),
+      addons,
+      created_at: ms(w?.created_at),
+      last_started_at: ms(w?.last_started_at),
     });
   }
   return { worlds: out };
 }
+// Schema wie im Vertrag: at, admin_uuid, admin_name, owner_uuid, owner_name, world_id, action, detail.
 export function cleanLog(raw) {
   if (!Array.isArray(raw)) return { error: "vip_admin_log muss ein Array sein" };
   const out = [];
   for (const x of raw.slice(0, 200)) {
     const world_id = normU(x?.world_id);
-    const owner = normU(x?.owner);
-    const admin = String(x?.admin ?? "");
-    const action = ACTIONS.includes(x?.action) ? x.action : "";
-    const created_at = Number(x?.created_at);
-    if (!world_id || !owner || !/^\d{15,21}$/.test(admin) || !action || !Number.isFinite(created_at)) continue;
-    out.push({ world_id, admin, owner, action, created_at: created_at < 1e12 ? Math.round(created_at * 1000) : Math.round(created_at) });
+    const owner_uuid = normU(x?.owner_uuid);
+    const admin_uuid = normU(x?.admin_uuid);
+    const action = CONTRACT_ACTIONS.includes(x?.action) ? x.action : "";
+    const at = ms(x?.at);
+    if (!world_id || !owner_uuid || !admin_uuid || !action || at == null) continue;
+    out.push({
+      at, admin_uuid, admin_name: NAME.test(x?.admin_name || "") ? x.admin_name : null,
+      owner_uuid, owner_name: NAME.test(x?.owner_name || "") ? x.owner_name : null,
+      world_id, action, detail: sanitizeInfo(x?.detail),
+    });
   }
   return { log: out };
 }
@@ -123,7 +153,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     }
     if (action === "invite") {
       name = typeof body?.name === "string" ? body.name : "";
-      role = body?.role;
+      role = body?.role == null ? "member" : body.role; // Vertrag: role optional, Default member
       if (!NAME.test(name)) return json({ error: "Name ungültig" }, 400);
       if (role !== "member" && role !== "trusted") return json({ error: "role nur member oder trusted" }, 400);
     }
@@ -134,7 +164,8 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     const list = await worlds(env);
     const world = (list || []).find((w) => w.id === id);
     if (!world) return a.admin ? json({ error: "Welt nicht gefunden" }, 404) : deny(403, action === "start" ? "not_trusted" : "not_owner");
-    const invite = (world.invites || []).find((i) => i.name.toLowerCase() === a.name.toLowerCase());
+    // Vertrag: trusted wird bevorzugt über die UUID geprüft, der Name ist nur der Fallback.
+    const invite = (world.invites || []).find((i) => (i.uuid && normU(i.uuid) === a.uuid) || (i.name && i.name.toLowerCase() === a.name.toLowerCase()));
     const isOwner = world.owner_uuid === a.uuid;
     let allowed = false;
     if (a.admin || isOwner) allowed = true;
@@ -146,7 +177,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       if (!OWNER_RANKS.has(String(ownerRank?.rank || "").toLowerCase())) return deny(403, "no_rank");
     }
     if (action === "invite" || action === "uninvite") {
-      const has = (world.invites || []).some((i) => i.name.toLowerCase() === name.toLowerCase());
+      const has = (world.invites || []).some((i) => i.name && i.name.toLowerCase() === name.toLowerCase());
       if (name.toLowerCase() === String(world.owner_name || "").toLowerCase()) return json({ error: "Owner ist schon auf der Welt", reason: "not_owner" }, 409);
       if (action === "invite" && has) return json({ error: "schon eingeladen" }, 409);
       if (action === "uninvite" && !has) return json({ error: "nicht eingeladen" }, 409);
@@ -154,7 +185,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     }
     const spec = { action, world_id: id, name, role, visibility };
     const rid = body?.request_id != null ? String(body.request_id) : crypto.randomUUID();
-    if (!RID.test(rid)) return json({ error: "request_id ungültig (8-64 Zeichen [A-Za-z0-9_.:-])" }, 400);
+    if (!RID.test(rid)) return json({ error: "request_id ungültig (1-64 Zeichen [A-Za-z0-9_-])" }, 400);
     const ex = await env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, status FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
     if (ex) {
       const same = ex.action === spec.action && ex.world_id === spec.world_id && (ex.name || null) === name && (ex.role || null) === role && (ex.visibility || null) === visibility;
@@ -205,13 +236,18 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     const now = Date.now();
     let updated = 0;
     for (const x of acks) {
-      if (!ACK_OK.has(x?.status) || typeof x?.request_id !== "string" || typeof x?.discord_id !== "string") continue;
+      if (!ACK_STATUS.has(x?.status) || typeof x?.request_id !== "string" || typeof x?.discord_id !== "string") continue;
+      if (!RID.test(x.request_id)) continue;
+      // Vertrag: reason ist je Status festgelegt, done und expired senden "".
+      const reason = typeof x.reason === "string" ? x.reason.trim() : "";
+      const allowed = x.status === "denied" ? ACK_DENIED : x.status === "failed" ? ACK_FAILED : null;
+      if (allowed ? !allowed.has(reason) : reason !== "") continue;
       const row = await env.DB.prepare("SELECT request_id, discord_id, action, status, created_at FROM mc_vip_commands WHERE request_id = ? AND discord_id = ?").bind(x.request_id, x.discord_id).first();
       if (!row || row.status !== "pending") continue;
       if (x.action != null && x.action !== row.action) continue;
       if (x.status === "expired" && now - row.created_at < EXPIRE_MS) continue;
-      const reason = typeof x.reason === "string" ? x.reason.slice(0, 120) : null;
-      const res = await env.DB.prepare("UPDATE mc_vip_commands SET status = ?, reason = ?, acked_at = ? WHERE request_id = ? AND discord_id = ? AND status = 'pending'").bind(x.status, reason, now, x.request_id, x.discord_id).run();
+      // Die IP dient nur dem Rate-Limit und wird beim Ack gelöscht.
+      const res = await env.DB.prepare("UPDATE mc_vip_commands SET status = ?, reason = ?, acked_at = ?, ip = NULL WHERE request_id = ? AND discord_id = ? AND status = 'pending'").bind(x.status, reason || null, now, x.request_id, x.discord_id).run();
       updated += res.meta?.changes || 0;
     }
     return json({ ok: true, updated });

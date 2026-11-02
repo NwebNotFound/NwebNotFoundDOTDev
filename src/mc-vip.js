@@ -122,12 +122,13 @@ async function loadWorlds(env, viewer) {
     try { list = JSON.parse(synced.data); } catch { list = []; }
     if (Array.isArray(list) && list.length) {
       const name = String(viewer?.name || "").toLowerCase();
-      const mine = list.filter((w) => viewer?.admin || normU(w.owner_uuid) === viewer?.uuid || (w.invites || []).some((i) => String(i.name || "").toLowerCase() === name));
+      const isMine = (i) => (i.uuid && normU(i.uuid) === viewer?.uuid) || (i.name && String(i.name).toLowerCase() === name);
+      const mine = list.filter((w) => viewer?.admin || normU(w.owner_uuid) === viewer?.uuid || (w.invites || []).some(isMine));
       const slots = mine.slice(0, 3).map((w) => ({
-        id: w.id, label: w.label || "VIP-Welt", visibility: w.visibility === "private" ? "private" : "friends",
-        online: !!w.online, players: w.players || 0, max: w.max ?? null, tps: w.tps ?? null, info: w.info || "",
+        id: w.id, label: w.name || "VIP-Welt", visibility: w.visibility === "private" ? "private" : "friends",
+        online: w.status === "running", players: w.players || 0, max: w.player_limit ?? null, tps: null, info: w.info || "",
         owner_name: w.owner_name || null, owner: normU(w.owner_uuid) === viewer?.uuid,
-        members: (w.invites || []).map((i) => ({ name: i.name, role: i.role === "trusted" ? "trusted" : "member" })),
+        members: (w.invites || []).map((i) => ({ name: i.name || null, role: i.role === "trusted" ? "trusted" : "member" })),
       }));
       return { placeholder: slots.length === 0, updated_at: synced.updated_at, slots };
     }
