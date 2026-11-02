@@ -9,16 +9,21 @@
 //
 // Credentials it injects (all from .env, never from the request):
 //   /dash/*            → X-Hermes-Session-Token: $HERMES_DASHBOARD_SESSION_TOKEN
-//   /gw/p/<bot>/…      → Authorization: Bearer $HERMES_KEY_<BOT>
-//   /gw/… (no profile) → Authorization: Bearer $API_SERVER_KEY
+//   /gw/p/<bot>/…      → Authorization: Bearer ***   (API_SERVER_KEY from profiles/<bot>/.env)
+//   /gw/… (no profile) → Authorization: Bearer ***   (API_SERVER_KEY of this .env)
+//
+// Gateway keys are read from the Hermes profile directories on each lookup (cached ~30 s), so a
+// key rotated in a profile is picked up without restarting this process. HERMES_KEY_<BOT> is an
+// optional override.
 //
 // A /gw/p/<bot>/ request for a bot without a configured key is refused with 404, so a typo
 // in the profile name cannot silently fall back to another bot's credential.
 
 import http from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import os from "node:os";
 import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -66,9 +71,92 @@ export function keyNameFor(bot) {
   return `HERMES_KEY_${bot.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
 }
 
-/** The gateway key for a profile, or "" when none is configured. */
-function gatewayKeyFor(bot) {
-  return process.env[keyNameFor(bot)] || process.env[`API_SERVER_KEY_${bot.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`] || "";
+// Profile names the Worker and the gateway both accept; anything else is not a bot.
+const BOT_NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+const KEY_TTL_MS = 30_000;
+
+/** The Hermes data directory: %LOCALAPPDATA%\hermes unless HERMES_HOME says otherwise. */
+function hermesHome() {
+  if (process.env.HERMES_HOME) return path.resolve(process.env.HERMES_HOME);
+  const local = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
+  return path.join(local, "hermes");
+}
+
+/**
+ * The .env holding this profile's API_SERVER_KEY. The default profile keeps it in the Hermes
+ * home, every other profile in profiles/<bot>/.env. The resolved file must stay inside the
+ * profiles directory — a bot name that escapes it gets no key at all.
+ */
+function envFileFor(bot) {
+  const home = hermesHome();
+  if (bot === "default") return path.join(home, ".env");
+  const profilesDir = path.resolve(home, "profiles");
+  const file = path.resolve(profilesDir, bot, ".env");
+  if (!file.startsWith(profilesDir + path.sep)) return "";
+  return file;
+}
+
+/** API_SERVER_KEY from an env file, or "". Tolerates quotes, `export ` and trailing comments. */
+function readApiServerKey(file) {
+  if (!file) return "";
+  let text;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?API_SERVER_KEY\s*=\s*(.*)$/);
+    if (!m) continue;
+    let value = m[1].trim();
+    const quoted = value.match(/^(["'])(.*?)\1/);
+    if (quoted) value = quoted[2].trim();
+    else value = value.replace(/\s+#.*$/, "").trim();
+    return value;
+  }
+  return "";
+}
+
+/** Read the key for one bot from disk. Never logs the value. */
+function resolveGatewayKey(bot) {
+  const override = process.env[keyNameFor(bot)];
+  if (override) return override; // explicit env override wins
+  const fromFile = readApiServerKey(envFileFor(bot));
+  if (fromFile) return fromFile;
+  if (bot === "default") return process.env.API_SERVER_KEY || "";
+  return process.env[`API_SERVER_KEY_${bot.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`] || "";
+}
+
+// bot → { key, at }; misses are cached too, so a missing profile cannot cause a read per request.
+const keyCache = new Map();
+
+/**
+ * The gateway key for a profile, or "" when none is configured. Resolved from the Hermes
+ * profile .env on disk (cached ~30 s), so a key rotated in one profile needs no restart.
+ */
+export function gatewayKeyFor(bot) {
+  if (typeof bot !== "string" || !BOT_NAME.test(bot)) return "";
+  const now = Date.now();
+  const hit = keyCache.get(bot);
+  if (hit && now - hit.at < KEY_TTL_MS) return hit.key;
+  const key = resolveGatewayKey(bot);
+  keyCache.set(bot, { key, at: now });
+  return key;
+}
+
+/** Profile directories under the Hermes home (names only, never contents). */
+function discoverBots() {
+  const bots = ["default"];
+  try {
+    for (const entry of readdirSync(path.join(hermesHome(), "profiles"), { withFileTypes: true })) {
+      if (!entry.isDirectory() || !BOT_NAME.test(entry.name)) continue;
+      bots.push(entry.name);
+    }
+  } catch {
+    // no profiles directory: default only
+    return bots;
+  }
+  return bots;
 }
 
 function secretOk(header) {
@@ -120,6 +208,12 @@ const server = http.createServer((req, res) => {
         console.warn(`${req.method} ${url.pathname} 404 (no key for profile ${target.bot})`);
         return;
       }
+    } else if (target.path.startsWith("/p/")) {
+      // A profile-shaped path whose name is not a valid bot must not fall back to the default key.
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "unknown_bot" }));
+      console.warn(`${req.method} ${url.pathname} 404 (invalid profile name)`);
+      return;
     } else {
       bearer = API_SERVER_KEY;
     }
@@ -179,10 +273,13 @@ server.listen(PORT, HOST, () => {
   console.log(`  /dash/* → ${DASHBOARD}`);
   console.log(`  shared secret: configured (${PANEL_SECRET.length} chars)`);
   console.log(`  dashboard session token: ${DASHBOARD_TOKEN ? "configured" : "MISSING (set HERMES_DASHBOARD_SESSION_TOKEN)"}`);
-  const bots = Object.keys(process.env)
+  console.log(`  hermes home: ${hermesHome()}`);
+  // Names only: which profiles exist, never whether their key is set or what it looks like.
+  console.log(`  gateway keys resolved from profile .env: ${discoverBots().join(", ")}`);
+  const overrides = Object.keys(process.env)
     .filter((k) => /^HERMES_KEY_[A-Z0-9_]+$/.test(k))
     .map((k) => k.slice("HERMES_KEY_".length).toLowerCase());
-  console.log(`  per-bot gateway keys: ${bots.length ? bots.join(", ") : "none (set HERMES_KEY_<BOT>)"}`);
+  console.log(`  env overrides: ${overrides.length ? overrides.join(", ") : "none"}`);
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {

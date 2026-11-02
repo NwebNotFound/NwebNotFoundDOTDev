@@ -55,7 +55,7 @@ exist in the Worker.
 |---|---|---|
 | `PANEL_SECRET` / `HERMES_PANEL_SECRET` | proxy `.env` / Worker secret | shared secret between Worker and proxy |
 | `HERMES_DASHBOARD_SESSION_TOKEN` | proxy `.env` | `X-Hermes-Session-Token` on every `/dash/*` call |
-| `HERMES_KEY_<BOT>` | proxy `.env` | gateway `Authorization: Bearer` per profile |
+| `HERMES_KEY_<BOT>` | proxy `.env` | optional override for one profile's gateway key (normally read from the profile's own env file) |
 | `API_SERVER_KEY` | proxy `.env` | gateway routes without a profile prefix |
 | `DISCORD_CLIENT_SECRET`, `SESSION_SECRET`, `ALLOWED_DISCORD_ID` | Worker secret | login |
 | `OPENROUTER_API_KEY` | Worker secret | usage page |

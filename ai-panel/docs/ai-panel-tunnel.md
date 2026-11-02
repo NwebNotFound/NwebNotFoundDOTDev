@@ -13,8 +13,9 @@ The panel Worker must reach the Hermes gateway (`127.0.0.1:8642`) and the dashbo
 - injects the credential for the destination:
   - `/dash/*` → `X-Hermes-Session-Token: <HERMES_DASHBOARD_SESSION_TOKEN>` (the dashboard
     answers 401 without it),
-  - `/gw/p/<bot>/…` → `Authorization: Bearer <HERMES_KEY_<BOT>>`, chosen from the profile in
-    the path; a profile without a key is refused with 404,
+  - `/gw/p/<bot>/…` → `Authorization: Bearer <API_SERVER_KEY>`, read from that profile's own
+    env file at request time (cached ~30 s); a profile without a key, or an invalid bot name,
+    is refused with 404,
   - `/gw/…` without a profile → `Authorization: Bearer <API_SERVER_KEY>`,
 - strips any `authorization`, `x-hermes-session-token` or `cookie` header the caller sent, so a
   client cannot smuggle its own credential through,
@@ -78,17 +79,21 @@ node proxy.mjs
 |---|---|
 | `PANEL_SECRET` | shared secret, identical to the Worker's `HERMES_PANEL_SECRET` |
 | `HERMES_DASHBOARD_SESSION_TOKEN` | the dashboard's session token (the value the dashboard runs with); sent as `X-Hermes-Session-Token` on `/dash/*` |
-| `HERMES_KEY_CLOUDFLARE` | `API_SERVER_KEY` of the `cloudflare` profile |
-| `HERMES_KEY_MINECRAFT` | `API_SERVER_KEY` of the `minecraft` profile |
-| `HERMES_KEY_<BOT>` | one per profile; `my-bot` → `HERMES_KEY_MY_BOT` |
-| `API_SERVER_KEY` | optional, for `/gw/…` routes without a profile prefix |
+| `HERMES_KEY_<BOT>` | optional override for one profile; `my-bot` → `HERMES_KEY_MY_BOT` |
+| `API_SERVER_KEY` | optional, for `/gw/…` routes without a profile prefix (and the `default` bot fallback) |
+| `HERMES_HOME` | optional, the Hermes data dir if not `%LOCALAPPDATA%\hermes` |
 | `PORT` | listen port, default `8650` |
 | `GATEWAY` | default `http://127.0.0.1:8642` |
 | `DASHBOARD` | default `http://127.0.0.1:9119` |
 
-The proxy prints which keys it found at startup (`per-bot gateway keys: …`) and warns when the
-dashboard token is missing. A bot created in the panel needs its `HERMES_KEY_<BOT>` added here
-before its chat works — the panel itself picks it up without a redeploy.
+Gateway keys are not configured here any more: on each `/gw/p/<bot>/…` the proxy reads
+`API_SERVER_KEY` from the Hermes profile's own env file — `%LOCALAPPDATA%\hermes\.env` for
+`default`, `%LOCALAPPDATA%\hermes\profiles\<bot>\.env` for every other bot — and caches the
+result for ~30 s (misses included). So a bot created in the panel works without touching this
+`.env` and without a restart, and a rotated key is picked up within half a minute. Only
+`[a-z0-9][a-z0-9_-]{0,31}` is a valid bot name; anything else is a hard 404 `unknown_bot`, and
+the resolved file must stay inside the profiles directory. `HERMES_KEY_<BOT>`, when set, still
+wins. The proxy prints the profiles it discovered at startup (names only, never key values).
 
 The proxy binds `127.0.0.1` only. `.env` is gitignored; never commit it.
 
