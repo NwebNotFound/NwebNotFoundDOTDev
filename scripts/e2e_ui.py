@@ -360,5 +360,35 @@ with sync_playwright() as p:
         pg.locator(".pf-kpi").wait_for(timeout=10000); t = pg.inner_text("body"); ok(pg.locator(".pf-kpi .pf-tile").count() >= 1 and "nur für Mitspieler" in t, f"{w}px Spielerseite anonym: Details gesperrt", t[:300])
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px anonym: kein horizontales Scrollen")
         pg.screenshot(path=f"{SH}/local-spieler-nils-anon-{w}.png", full_page=True); ctx.close()
+    P = "nwebnotfound.dev"; FB = "/mc-head/MHF_Steve/64?v=5"
+    GIF = bytes.fromhex("47494638396101000100800000ffffff00000021f90401000000002c000000000100010000020144003b")
+    def chip(avatar):
+        def route_p(r):
+            u = r.request.url
+            if u.split("?", 1)[0].endswith("/api/me"):
+                r.fulfill(status=200, content_type="application/json", body=json.dumps({"available": True, "user": {"id": "1", "name": "Nils<img>", "username": "ni'ls", "avatar": avatar, "mc_name": None}}))
+                return
+            if "cdn.discordapp.com" in u:
+                r.fulfill(status=200, content_type="image/gif", body=GIF)
+                return
+            if u.startswith("https://" + P):
+                h = {k: v for k, v in r.request.all_headers().items() if not k.startswith(":")}; h["host"] = P; h["x-nnf-test-host"] = P
+                try: r.fulfill(response=r.fetch(url=BASE + u[len("https://" + P):], headers=h, max_redirects=0))
+                except Exception:
+                    if "/mc-head/" not in u: raise
+                return
+            r.continue_()
+        ctx = br.new_context(viewport={"width": 1280, "height": 800}); pg = ctx.new_page(); pg.route("**/*", route_p)
+        pg.goto("https://" + P + "/", wait_until="domcontentloaded", timeout=45000); pg.locator("#umb img").wait_for(timeout=10000)
+        info = pg.evaluate("""() => { const img = document.querySelector('#umb img'); const name = document.querySelector('#umb .hide-s'); return { src: img ? img.src : '', attr: img ? img.getAttribute('onerror') : 'missing', xss: window.__xss || 0, name: name ? name.textContent : '', imgs: document.querySelectorAll('#umb img').length }; }""")
+        ctx.close(); return info
+    bad = chip('"><img src=x onerror=window.__xss=1>')
+    ok(bad["xss"] == 0 and bad["attr"] is None and bad["src"].endswith(FB) and bad["name"] == "Nils<img>" and bad["imgs"] == 1, "Portfolio-Chip: Avatar-Breakout bleibt Text, Fallback-Bild", bad)
+    js = chip("javascript:alert(1)")
+    ok(js["xss"] == 0 and js["attr"] is None and js["src"].endswith(FB), "Portfolio-Chip: javascript-URL fällt auf Steve zurück", js)
+    http = chip("http://cdn.discordapp.com/embed/avatars/0.png")
+    ok(http["src"].endswith(FB) and "http://cdn.discordapp.com" not in http["src"], "Portfolio-Chip: http-Avatar fällt auf Steve zurück", http)
+    good = chip("https://cdn.discordapp.com/embed/avatars/0.png")
+    ok(good["src"].startswith("https://cdn.discordapp.com/") and good["attr"] is None and good["xss"] == 0, "Portfolio-Chip: https-Avatar bleibt gesetzt", good)
     br.close()
 sys.exit(1 if fails else 0)

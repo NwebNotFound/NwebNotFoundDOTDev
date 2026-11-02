@@ -112,8 +112,25 @@ if(d.user){const nm=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?
 const out=k.querySelector('a.out');if(out)out.href='${loginBase}/auth/discord/logout?next='+nx;if(window.mcNavMark)window.mcNavMark()}
 else if(d.available){k.outerHTML='<a class="l" id="konto" href="${loginBase}/auth/discord/login?next='+nx+'">Mit Discord anmelden</a>'}
 else{k.outerHTML='<span class="l" id="konto">Login bald</span>'}}
-else if(d.user){const n=d.user.name.replace(/[<>&"']/g,''),un=(d.user.username||'').replace(/[<>&"']/g,'');el.innerHTML='<div class="um"><button type="button" id="umb" aria-haspopup="menu" aria-expanded="false" aria-controls="umm"><img alt="" src="'+(d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?'/mc-head/'+d.user.mc_name+'/64?v=5':d.user.avatar)+'" onerror="this.onerror=null;this.src=\\''+d.user.avatar+'\\'"><span class="hide-s">'+n+'</span><svg class="chev" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><div class="menu" id="umm" role="menu"><div class="hd"><b>'+n+'</b><span>@'+un+'</span></div><a role="menuitem" href="/profile">Profil</a><a role="menuitem" href="'+(/^mc\\./.test(location.hostname)||!/\\./.test(location.hostname)?'':'https://mc.'+location.hostname.replace(/^www\\./,''))+'/bestellungen">Bestellungen</a><a role="menuitem" class="out" href="${loginBase}/auth/discord/logout?next='+nx+'">Abmelden</a></div></div>';
-const b=document.getElementById('umb'),m=document.getElementById('umm'),it=()=>[...m.querySelectorAll('a')];const set=o=>{b.setAttribute('aria-expanded',o);m.classList.toggle('open',o);if(o)setTimeout(()=>it()[0].focus(),20)};
+else if(d.user){const n=String(d.user.name||''),un=String(d.user.username||'');
+const httpsAvatar=u=>{try{const x=new URL(String(u||''));if(x.protocol!=='https:'||x.username||x.password)return '';return x.href}catch(e){return ''}};
+const fb='/mc-head/MHF_Steve/64?v=5';
+const head=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?'/mc-head/'+d.user.mc_name+'/64?v=5':'';
+const pic=head||httpsAvatar(d.user.avatar)||fb;
+const um=document.createElement('div');um.className='um';
+const b=document.createElement('button');b.type='button';b.id='umb';b.setAttribute('aria-haspopup','menu');b.setAttribute('aria-expanded','false');b.setAttribute('aria-controls','umm');
+const img=document.createElement('img');img.alt='';img.src=pic;img.onerror=function(){this.onerror=null;if(!String(this.src||'').endsWith(fb))this.src=fb};
+const sp=document.createElement('span');sp.className='hide-s';sp.textContent=n;
+const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','chev');svg.setAttribute('viewBox','0 0 10 10');svg.setAttribute('aria-hidden','true');
+const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M1 3l4 4 4-4');path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.6');path.setAttribute('stroke-linecap','round');svg.append(path);
+b.append(img,sp,svg);
+const m=document.createElement('div');m.className='menu';m.id='umm';m.setAttribute('role','menu');
+const hd=document.createElement('div');hd.className='hd';const bn=document.createElement('b');bn.textContent=n;const su=document.createElement('span');su.textContent='@'+un;hd.append(bn,su);
+const item=(href,text,cls)=>{const a=document.createElement('a');a.setAttribute('role','menuitem');a.href=href;a.textContent=text;if(cls)a.className=cls;return a};
+const orders=(/^mc\\./.test(location.hostname)||!/\\./.test(location.hostname)?'':'https://mc.'+location.hostname.replace(/^www\\./,''))+'/bestellungen';
+m.append(hd,item('/profile','Profil'),item(orders,'Bestellungen'),item('${loginBase}/auth/discord/logout?next='+nx,'Abmelden','out'));
+um.append(b,m);el.replaceChildren(um);
+const it=()=>[...m.querySelectorAll('a')];const set=o=>{b.setAttribute('aria-expanded',o);m.classList.toggle('open',o);if(o)setTimeout(()=>it()[0].focus(),20)};
 b.onclick=e=>{e.stopPropagation();set(!m.classList.contains('open'))};document.addEventListener('click',e=>{if(!m.contains(e.target))set(false)});
 document.addEventListener('keydown',e=>{if(!m.classList.contains('open'))return;if(e.key==='Escape'){set(false);b.focus()}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const a=it(),i=a.indexOf(document.activeElement);a[(i+(e.key==='ArrowDown'?1:a.length-1))%a.length].focus()}});}
 else if(d.available){el.innerHTML='<a class="btn discord sm" href="${loginBase}/auth/discord/login?next='+nx+'"><span class="hide-s">Mit Discord anmelden</span><span class="only-s">Anmelden</span></a>';}
