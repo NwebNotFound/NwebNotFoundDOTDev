@@ -1,136 +1,166 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0d10" />
+    <meta name="theme-color" content="#0f1115" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="dark light" />
     <title>AI Panel</title>
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand"><span class="dot"></span> AI Panel</div>
-      <div class="topbar-right">
-        <select id="bot-switch" aria-label="Bot wählen"></select>
-        <button id="logout" class="ghost" title="Abmelden">Abmelden</button>
-      </div>
-    </header>
-
-    <nav class="tabs" id="tabs">
-      <button data-tab="chat" class="active">Chat</button>
-      <button data-tab="bots">Bots</button>
-      <button data-tab="cron">Cron</button>
-      <button data-tab="usage">Usage</button>
-      <button data-tab="sessions">Sessions</button>
-      <button data-tab="log">Log</button>
-    </nav>
-
-    <main>
-      <section id="view-chat" class="view active">
-        <div id="messages" class="messages" aria-live="polite"></div>
-        <div class="composer">
-          <div id="run-controls" class="run-controls hidden">
-            <button id="btn-stop" class="danger sm">Stop</button>
-            <input id="steer-input" placeholder="Steuern…" />
-            <button id="btn-steer" class="sm">Steer</button>
-          </div>
-          <div class="composer-row">
-            <textarea id="input" rows="1" placeholder="Nachricht an den Bot…"></textarea>
-            <button id="btn-send" class="primary">Senden</button>
-          </div>
-          <label class="quick"><input type="checkbox" id="quick-mode" /> Quick-Modus (chat/completions)</label>
+    <div class="app" id="app">
+      <aside class="sidebar" id="sidebar" aria-label="Navigation">
+        <div class="side-head">
+          <div class="brand"><span class="dot"></span> AI Panel</div>
+          <button id="btn-close-sidebar" class="icon only-mobile" aria-label="Menü schließen">✕</button>
         </div>
-      </section>
 
-      <section id="view-bots" class="view">
-        <div class="row space">
-          <h2>Bots</h2>
-          <button id="btn-new-bot" class="ghost sm">+ Neu</button>
+        <button id="btn-new-chat" class="new-chat"><span class="plus">+</span> Neuer Chat</button>
+
+        <nav class="side-nav" id="side-nav">
+          <button data-view="bots" class="nav-item">Bots</button>
+          <button data-view="cron" class="nav-item">Cron</button>
+          <button data-view="usage" class="nav-item">Usage</button>
+          <button data-view="log" class="nav-item">Log</button>
+        </nav>
+
+        <div class="side-section">
+          <div class="side-label">Bots</div>
+          <div id="bot-list" class="bot-list"></div>
         </div>
-        <div id="bot-list" class="cards"></div>
-        <div id="bot-detail" class="panel hidden">
-          <div class="row space">
-            <h3 id="bot-detail-title"></h3>
-            <button id="bot-detail-close" class="ghost sm">Schließen</button>
+
+        <div class="side-section grow">
+          <div class="side-label">
+            Verlauf
+            <button id="btn-refresh-sessions" class="icon tiny" aria-label="Verlauf neu laden">↻</button>
           </div>
-          <p class="mut" id="bot-detail-meta"></p>
-          <h4>Modell</h4>
-          <div class="row">
-            <select id="model-provider"></select>
-            <select id="model-name"></select>
-            <button id="btn-set-model" class="primary sm">Setzen</button>
-          </div>
-          <h4>SOUL.md</h4>
-          <textarea id="soul" rows="10" spellcheck="false"></textarea>
-          <div class="row">
-            <button id="btn-save-soul" class="primary sm">Speichern</button>
-            <span id="soul-state" class="mut"></span>
+          <div id="session-list" class="session-list"></div>
+        </div>
+
+        <div class="side-foot">
+          <div class="me" id="me"></div>
+          <div class="side-actions">
+            <button id="btn-logout-all" class="ghost tiny" title="Alle Sitzungen beenden">Überall abmelden</button>
+            <button id="logout" class="ghost tiny">Abmelden</button>
           </div>
         </div>
-      </section>
+      </aside>
 
-      <section id="view-cron" class="view">
-        <div class="row space">
-          <h2>Cron · <span id="cron-bot"></span></h2>
-          <button id="btn-new-job" class="ghost sm">+ Job</button>
-        </div>
-        <div id="job-list" class="cards"></div>
-        <form id="job-form" class="panel hidden">
-          <h3 id="job-form-title">Neuer Job</h3>
-          <label>Name <input id="job-name" required /></label>
-          <label>Schedule (cron) <input id="job-schedule" placeholder="0 8 * * *" required /></label>
-          <label>Prompt <textarea id="job-prompt" rows="4"></textarea></label>
-          <div class="row">
-            <button class="primary sm" type="submit">Speichern</button>
-            <button class="ghost sm" type="button" id="job-form-cancel">Abbrechen</button>
+      <div class="scrim" id="scrim"></div>
+
+      <main class="main">
+        <header class="topbar">
+          <button id="btn-menu" class="icon only-mobile" aria-label="Menü">☰</button>
+          <div class="chat-title" id="chat-title">Neuer Chat</div>
+          <div class="topbar-right">
+            <select id="model-picker" class="model-picker" aria-label="Modell"></select>
+            <button id="btn-theme" class="icon" aria-label="Design wechseln">◐</button>
           </div>
-        </form>
-      </section>
+        </header>
 
-      <section id="view-usage" class="view">
-        <div class="row space">
-          <h2>Usage</h2>
-          <button id="btn-usage-refresh" class="ghost sm">Aktualisieren</button>
-        </div>
-        <div id="usage-cards" class="cards"></div>
-        <h3>Pro Bot</h3>
-        <div id="usage-bots" class="cards"></div>
-        <h3>Täglich</h3>
-        <div id="usage-daily" class="cards"></div>
-        <h3>Letzte Requests</h3>
-        <div id="usage-recent" class="cards"></div>
-        <h3>Modellpreise (pro 1M Tokens)</h3>
-        <div id="usage-prices" class="cards"></div>
-      </section>
-
-      <section id="view-sessions" class="view">
-        <div class="row space">
-          <h2>Sessions · <span id="sessions-bot"></span></h2>
-          <button id="btn-sessions-refresh" class="ghost sm">Aktualisieren</button>
-        </div>
-        <div id="session-list" class="cards"></div>
-        <div id="session-detail" class="panel hidden">
-          <div class="row space">
-            <h3 id="session-title"></h3>
-            <button id="session-close" class="ghost sm">Schließen</button>
+        <section id="view-chat" class="view active">
+          <div class="thread" id="messages" aria-live="polite" aria-relevant="additions text"></div>
+          <div class="composer-wrap">
+            <div class="composer" id="composer">
+              <textarea id="input" rows="1" placeholder="Nachricht an den Bot…" autocomplete="off"></textarea>
+              <button id="btn-stop" class="send stop hidden" title="Stopp">■</button>
+              <button id="btn-send" class="send" title="Senden">↑</button>
+            </div>
+            <div class="composer-hint">
+              <span><kbd>Enter</kbd> senden · <kbd>Shift</kbd>+<kbd>Enter</kbd> neue Zeile</span>
+              <label class="quick"><input type="checkbox" id="quick-mode" /> Quick-Modus</label>
+            </div>
           </div>
-          <div id="session-messages" class="messages small"></div>
-        </div>
-      </section>
+        </section>
 
-      <section id="view-log" class="view">
-        <div class="row space">
-          <h2>Request-Log</h2>
-          <button id="btn-log-refresh" class="ghost sm">Aktualisieren</button>
-        </div>
-        <div id="log-list" class="log"></div>
-      </section>
-    </main>
+        <section id="view-bots" class="view panel-view">
+          <div class="view-head">
+            <h2>Bots</h2>
+            <div class="row">
+              <button id="btn-new-bot" class="ghost sm">+ Neu</button>
+              <button class="ghost sm back" data-view="chat">Zurück zum Chat</button>
+            </div>
+          </div>
+          <div id="bot-list-full" class="cards"></div>
+          <div id="bot-detail" class="panel hidden">
+            <div class="row space">
+              <h3 id="bot-detail-title"></h3>
+              <button id="bot-detail-close" class="ghost sm">Schließen</button>
+            </div>
+            <p class="mut" id="bot-detail-meta"></p>
+            <h4>Modell</h4>
+            <div class="row">
+              <select id="model-provider"></select>
+              <select id="model-name"></select>
+              <button id="btn-set-model" class="primary sm">Setzen</button>
+            </div>
+            <h4>SOUL.md</h4>
+            <textarea id="soul" rows="12" spellcheck="false"></textarea>
+            <div class="row">
+              <button id="btn-save-soul" class="primary sm">Speichern</button>
+              <span id="soul-state" class="mut"></span>
+            </div>
+          </div>
+        </section>
 
-    <div id="toast" class="toast hidden"></div>
+        <section id="view-cron" class="view panel-view">
+          <div class="view-head">
+            <h2>Cron · <span id="cron-bot"></span></h2>
+            <div class="row">
+              <button id="btn-new-job" class="ghost sm">+ Job</button>
+              <button class="ghost sm back" data-view="chat">Zurück zum Chat</button>
+            </div>
+          </div>
+          <div id="job-list" class="cards"></div>
+          <form id="job-form" class="panel hidden">
+            <h3 id="job-form-title">Neuer Job</h3>
+            <label>Name <input id="job-name" required /></label>
+            <label>Schedule (cron) <input id="job-schedule" placeholder="0 8 * * *" required /></label>
+            <label>Prompt <textarea id="job-prompt" rows="4"></textarea></label>
+            <div class="row">
+              <button class="primary sm" type="submit">Speichern</button>
+              <button class="ghost sm" type="button" id="job-form-cancel">Abbrechen</button>
+            </div>
+          </form>
+        </section>
 
-    <div id="modal" class="modal hidden">
+        <section id="view-usage" class="view panel-view">
+          <div class="view-head">
+            <h2>Usage</h2>
+            <div class="row">
+              <button id="btn-usage-refresh" class="ghost sm">Aktualisieren</button>
+              <button class="ghost sm back" data-view="chat">Zurück zum Chat</button>
+            </div>
+          </div>
+          <div id="usage-cards" class="cards"></div>
+          <h3>Pro Bot</h3>
+          <div id="usage-bots" class="cards"></div>
+          <h3>Täglich</h3>
+          <div id="usage-daily" class="cards"></div>
+          <h3>Letzte Requests</h3>
+          <div id="usage-recent" class="cards"></div>
+          <h3>Modellpreise (pro 1M Tokens)</h3>
+          <div id="usage-prices" class="cards"></div>
+        </section>
+
+        <section id="view-log" class="view panel-view">
+          <div class="view-head">
+            <h2>Request-Log</h2>
+            <div class="row">
+              <button id="btn-log-refresh" class="ghost sm">Aktualisieren</button>
+              <button class="ghost sm back" data-view="chat">Zurück zum Chat</button>
+            </div>
+          </div>
+          <div id="log-list" class="log"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status"></div>
+
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-box">
         <h3 id="modal-title">Bestätigen</h3>
         <p id="modal-text"></p>
