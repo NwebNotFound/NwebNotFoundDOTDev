@@ -4,6 +4,8 @@
 
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import { once } from "node:events";
 
 import { handle } from "../src/index.js";
 import { createSession, SESSION_COOKIE, CSRF_COOKIE } from "../src/auth.js";
@@ -338,4 +340,24 @@ test("upstream failure surfaces as 502, not a 500", async () => {
   );
   assert.equal(res.status, 502);
   assert.equal((await body(res)).error, "upstream_unreachable");
+});
+
+test("an upstream 401 is a 502 for the panel, not a session expiry", async () => {
+  const srv = createServer((req, res) => {
+    res.writeHead(401, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "bad key" }));
+  });
+  srv.listen(0, "127.0.0.1");
+  await once(srv, "listening");
+  const url = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const res = await handle(
+      new Request(`${HOST}/api/bots`, { headers: { cookie: cookieHeader({ [SESSION_COOKIE]: session }) } }),
+      { ...env, HERMES_ORIGIN: url },
+    );
+    assert.equal(res.status, 502);
+    assert.equal((await body(res)).error, "upstream_auth_failed");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
 });

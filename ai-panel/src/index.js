@@ -98,7 +98,7 @@ function handleLogout() {
 
 async function listBots(env) {
   const { status, data } = await up.call(env, "dash", "/api/profiles");
-  if (status >= 400) return json({ error: "profiles_unavailable", status }, 502);
+  if (status >= 400) return json({ error: data?.error || "profiles_unavailable", status }, 502);
   const rows = Array.isArray(data?.profiles) ? data.profiles : Array.isArray(data) ? data : [];
   const allowed = up.bots(env);
   const byName = new Map(rows.map((p) => [p.name, p]));
@@ -322,7 +322,8 @@ async function startRun(env, bot, body) {
   if (!input) return json({ error: "input_required" }, 400);
   if (input.length > 20_000) return json({ error: "input_too_long" }, 413);
   const payload = { model: "hermes-agent", input };
-  if (body.session_key) payload.session_id = String(body.session_key);
+  const continueId = body.session_id || body.session_key;
+  if (continueId) payload.session_id = String(continueId);
   const { status, data } = await up.call(env, "gw", `/p/${bot}/v1/runs`, { method: "POST", body: payload });
   if (status >= 400) {
     return json({ error: "run_start_failed", detail: data?.error?.message || data?.error || null }, status);
@@ -333,7 +334,7 @@ async function startRun(env, bot, body) {
 async function runEvents(env, bot, runId, req) {
   if (!JOB_ID.test(runId)) return json({ error: "invalid_run_id" }, 400);
   const res = await up.stream(env, "gw", `/p/${bot}/v1/runs/${runId}/events`, { method: "GET" });
-  return up.pipeSse(res);
+  return await up.pipeSse(res);
 }
 
 async function runAction(env, bot, runId, action, body) {
@@ -366,7 +367,7 @@ async function quickChat(env, bot, body) {
     method: "POST",
     body: { model: "hermes-agent", messages, stream: true },
   });
-  return up.pipeSse(res);
+  return await up.pipeSse(res);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -394,14 +395,19 @@ async function usage(env) {
   const recent = [];
   const now = Date.now() / 1000;
 
-  for (const bot of up.bots(env)) {
-    let rows = [];
-    try {
-      const { status, data } = await up.call(env, "gw", `/p/${bot}/api/sessions?limit=100`);
-      if (status < 400) rows = (Array.isArray(data?.sessions) ? data.sessions : []).map(trimSession);
-    } catch {
-      rows = [];
-    }
+  const botRows = await Promise.all(
+    up.bots(env).map(async (bot) => {
+      try {
+        const { status, data } = await up.call(env, "gw", `/p/${bot}/api/sessions?limit=100`);
+        const rows = status < 400 && Array.isArray(data?.sessions) ? data.sessions.map(trimSession) : [];
+        return { bot, rows };
+      } catch {
+        return { bot, rows: [] };
+      }
+    }),
+  );
+
+  for (const { bot, rows } of botRows) {
     let cost = 0;
     let inputTokens = 0;
     let outputTokens = 0;
