@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "nwebnotfound-ai-panel",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    { "pattern": "ai.nwebnotfound.dev", "custom_domain": true }
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "PANEL_STORE", "class_name": "PanelStore" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PanelStore"] }
+  ],
+  "vars": {
+    "DISCORD_CLIENT_ID": "1566865767029284884",
+    "PANEL_HOST": "ai.nwebnotfound.dev",
+    "HERMES_ORIGIN": "https://hermes.nwebnotfound.dev",
+    "PANEL_BOTS": "cloudflare,minecraft,discord,homelab",
+    "SESSION_VERSION": "1"
+  }
+}

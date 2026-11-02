@@ -1,0 +1,39 @@
+name: ai-panel
+
+on:
+  pull_request:
+    paths:
+      - "ai-panel/**"
+      - ".github/workflows/ai-panel.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ai-panel/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai-panel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax check
+        run: npm run check
+
+      - name: Tests (unit + e2e against a mock Hermes)
+        run: npm test
+
+      - name: Wrangler config check (dry run, no deploy)
+        run: |
+          npm i -g wrangler@4.156.2
+          wrangler deploy --dry-run --outdir "$RUNNER_TEMP/ai-panel-dist"
