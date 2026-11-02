@@ -99,6 +99,29 @@ The browser never sees any of them. See `docs/ai-panel-tunnel.md` for the exact 
 - `/api/health` is public but answers `{ok}` only; bot names, origin state and `session_version`
   need a valid session.
 
+## Crew-Runs (read-only)
+
+A second, deliberately narrow view over what the bots did: the sessions the gateway recorded, split
+into API runs (`run_*`) and CLI sessions (`local-*`), with a paged transcript.
+
+- `GET /api/crew/sessions?bot=<bot>&filter=all|run|cli&limit&offset` →
+  `{bot, filter, sessions, total, limit, offset, has_more, truncated}`.
+- `GET /api/crew/sessions/<bot>/<session_id>/messages?limit&offset` →
+  `{bot, session_id, messages, total, limit, offset, has_more, truncated}`.
+- Both are GET-only (405 otherwise), behind the panel session, and forward to the origin proxy's
+  `/gw/p/<bot>/api/sessions[/<id>/messages]` with the panel secret. There is no write, approve,
+  delete or steer route in this view on either side.
+- Limits: list `limit` ≤ 100 at the Worker, ≤ 200 at the proxy; messages ≤ 200 at both; `offset`
+  ≤ 100 000. The proxy always asks the gateway for one capped window and pages locally, so the cap
+  holds even where the gateway ignores `offset`.
+- The bot must be on the allowlist the rest of the panel uses (a profile whose gateway key
+  resolves), the session id must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`.
+- **Redaction** (`src/redact.js`, shared by the proxy and the Worker) removes PEM blocks,
+  `Bearer|Basic|Token` values, JWTs, `sk-`/`rk-`/`ghp_`/`github_pat_`/`xox*-`/`AKIA`/`glpat-`/
+  `npm_`/Stripe keys, `NAME=value` lines whose name says credential, `scheme://user:pass@` and
+  long hex/base64 runs. It runs over every returned string, in the proxy *and* again in the
+  Worker. It is a second line of defence, not a reason to put a key in a response.
+
 ## Not deployed by this branch
 
 Nothing here is deployed automatically. `wrangler deploy` is a manual step after review.
