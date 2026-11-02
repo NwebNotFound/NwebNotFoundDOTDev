@@ -800,7 +800,7 @@ try {
       await ack([{ request_id: "vip-admin-foreign", discord_id: D1, status: "done", reason: "" }]);
       await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U2, name: "Seller", rank: "vip", color: "&6", weight: 40 }, { uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }] } });
       const vipV = await req("/api/mc-vip", { cookie: c2 }), vIds = (vipV.j?.worlds?.slots || []).map((s) => s.id);
-      ok(vipV.j?.access === true && vipV.j?.admin === false && vIds.join() === [WID2, WID].join() && !("admin_log" in vipV.j) && !("admin" in JSON.stringify(vipV.j?.worlds || {})), "VIP sieht nur eigene und eingeladene Welten, kein Protokoll", JSON.stringify({ ids: vIds, log: vipV.j?.admin_log })); }
+      ok(vipV.j?.access === true && vipV.j?.admin === false && vIds.join() === [WID2, WID].join() && !("admin_log" in vipV.j) && !JSON.stringify(vipV.j?.worlds || {}).includes("admin_log"), "VIP sieht nur eigene und eingeladene Welten, kein Protokoll", JSON.stringify({ ids: vIds, log: vipV.j?.admin_log })); }
     sql(`UPDATE mc_links SET verified = 0 WHERE discord_id = '${D1}'`);
     ok((await post(`/api/mc-vip/worlds/${WID2}/start`, {}, { cookie: c1 })).j?.reason === "not_linked", "ohne Link → not_linked");
     sql(`UPDATE mc_links SET verified = 1 WHERE discord_id = '${D1}'`);
