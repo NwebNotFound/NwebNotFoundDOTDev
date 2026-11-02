@@ -142,8 +142,10 @@ Zugang zum Verwalten, alle Bedingungen:
 1. Session gültig, sonst 401 `{error, reason:"login"}`.
 2. `mc_links` für diese `discord_id`: `verified = 1`, `has_role = 1`, Name `^[A-Za-z0-9_]{1,16}$`, UUID kanonisch. Sonst 403 `{reason:"link"}`.
 3. `mc_player_ranks.rank` ist `vip` oder `mvp`. Builder und Admin bekommen 403 `{reason:"rank"}` und sehen nur den öffentlichen Katalog. **Offen mit Craft:** ob Admin das Panel doch benutzen soll. Bis dahin: nein. Admins schalten Welten am Server, nicht in diesem Formular.
-4. **Welt-Check, jede VIP-Aktion, nur auf dem Worker.** Nach Session, Link und Rang lädt der Worker die Welt aus dem letzten `vip_worlds`-Stand. Die UUID aus `mc_links` ist `owner_uuid` (Rolle `owner`) oder sie steht über den verknüpften Namen in `members` (Rolle `member`). Sonst `403 {reason:"not_member"}` und keine Zeile in `mc_vip_commands`. `mc_uuid`, `owner` oder `members` aus dem Body werden ignoriert. Ein Fallback-Slot aus `servers` ohne `owner_uuid` hat keine Rolle und ist nicht aufrufbar.
-5. Schreiben (Power, Info, Einladen, Entfernen) verlangt zusätzlich Rolle `owner`. Ein Mitglied besteht den Welt-Check und bekommt danach `403 {reason:"owner"}`, ebenfalls ohne neue Zeile. Lesen liefert Owner und Mitglied nur die Welten, in denen sie eine der beiden Rollen haben. **Offen mit Craft:** Co-Owner. Bis dahin gibt es genau einen Owner, und nur der schreibt.
+4. **Welt-Check, jede VIP-Aktion, nur auf dem Worker.** Nach Session, Link und Rang lädt der Worker die Welt aus dem letzten `vip_worlds`-Stand. Die UUID aus `mc_links` ist `owner_uuid` (Rolle `owner`) oder sie steht über den verknüpften Namen in `members` (Rolle `member`). Sonst, bei einem Aufruf mit Welt-Id: `403 {reason:"not_member"}` und keine Zeile in `mc_vip_commands`. `GET /api/mc-vip` bleibt 200 und lässt die fremde Welt weg. `mc_uuid`, `owner` oder `members` aus dem Body werden ignoriert. Ein Fallback-Slot aus `servers` ohne `owner_uuid` hat keine Rolle und ist nicht aufrufbar.
+5. Schreiben (Power, Info, Einladen, Entfernen) verlangt zusätzlich Rolle `owner`. Ein Mitglied besteht den Welt-Check und bekommt danach `403 {reason:"owner"}`, ebenfalls ohne neue Zeile. **Offen mit Craft:** Co-Owner. Bis dahin gibt es genau einen Owner, und nur der schreibt.
+
+**Leserechte, fest.** Owner und Mitglied dürfen die Welt lesen. Ein Fremder darf sie nicht lesen. `GET /api/mc-vip` enthält für Owner und Mitglied denselben Slot, inklusive `info`, Status und `members`. Die Antwort eines Fremden enthält diese Welt nicht und keinen Namen aus ihrer Mitgliederliste. Die alte Formulierung „eine fremde UUID sieht die Mitgliederliste nicht“ meint nur den Fremden, nicht das Mitglied. Auf `/` bleiben Mitglieder unsichtbar; dort steht nur online/offline und die Spielerzahl.
 
 Lese-URL bleibt `GET /api/mc-vip` (Cookie, `cache-control: private, no-store`). Ohne Zugang dieselbe Hülle wie heute: `{access:false, reason, catalog, note}` und keine Weltenliste. Mit Zugang zusätzlich:
 
@@ -171,13 +173,17 @@ Lese-URL bleibt `GET /api/mc-vip` (Cookie, `cache-control: private, no-store`). 
 }
 ```
 
-`id` ist `^[a-z0-9_]{1,32}$`. `info` ist Klartext, 0–120 Zeichen, ohne Steuerzeichen. `members` sind Minecraft-Namen, höchstens 12. `pending` sind eigene offene Kommandos `{request_id, op, status}` und nichts anderes. `stats` (Geld, Spielzeit, Kills, Tode, Blöcke) bleiben im Panel, **ohne** PvP-Felder.
+`id` ist `^[a-z0-9_]{1,32}$`. `members` sind Minecraft-Namen, höchstens 12. `pending` sind nur die offenen Kommandos der eigenen `discord_id`: `{request_id, op, status}`. `stats` (Geld, Spielzeit, Kills, Tode, Blöcke) bleiben im Panel, **ohne** PvP-Felder.
+
+`info` ist Klartext, 0–120 Zeichen, nachdem der Worker gesäubert hat. Vor dem Speichern entfernt er Steuerzeichen (`\n`, `\r`, `\t` und die übrigen C0-Zeichen) und jeden `§`, zusammen mit einem direkt folgenden Farbcode `[0-9a-fk-or]`. `"Hallo\n§cWelt"` wird `HalloWelt`. Ist der Text danach leer, antwortet der Worker 400 und schreibt keine Zeile. Die gesäuberte Fassung ist die, die in D1, in der 202-Antwort und im Pending-JSON steht. Es gibt kein Feld, das `info` in eine Befehlszeile setzt. mc-stack säubert vor Hologramm und MOTD noch einmal genauso und setzt den Text nie in eine Befehlszeile.
 
 Solange der Ingest noch keine `vip_worlds` schickt, füllt `pickVipWorlds` die Slots weiter aus `servers`-Keys (`WORLD_RE` in `src/mc-vip.js`). Diese Fallback-Slots haben `owner:false` und keine Buttons. `placeholder:true`, wenn weder Ingest noch Fallback Keys liefern.
 
 ### Mutationen (Browser → Worker → D1)
 
-Jede erfolgreiche Mutation antwortet `202` mit `{ok:true, request_id, op, status:"pending"}`. Sie führt am Spiel nichts aus. `request_id` erzeugt der Worker (UUID), außer der Client schickt eine (8–64 Zeichen `[A-Za-z0-9_.:-]`). Gleiche Id und gleicher Body: `200 {duplicate:true}`. Gleiche Id, anderer Body: `409`.
+Jede erfolgreiche Mutation antwortet `202` mit `{ok:true, request_id, op, status:"pending"}`. Sie führt am Spiel nichts aus. `request_id` erzeugt der Worker (UUID), außer der Client schickt eine (8–64 Zeichen `[A-Za-z0-9_.:-]`).
+
+Die Idempotenz gilt nur für dieselbe `discord_id`. Unique ist `(discord_id, request_id)`, nicht `request_id` allein. Dieselbe Id und derselbe Body desselben Nutzers: `200 {duplicate:true}` mit der eigenen Zeile. Dieselbe Id und ein anderer Body desselben Nutzers: `409`. Dieselbe Id eines anderen Nutzers ist ein neuer Auftrag, `202`, und ändert die fremde Zeile nicht. Die Antwort nennt weder die fremde `discord_id` noch deren Welt oder `info`. Die Zeilen-`id` fürs Ack vergibt der Worker selbst und ist global eindeutig, damit zwei gleiche `request_id` verschiedener Nutzer nicht kollidieren.
 
 | Aufruf | Body | `op` |
 | --- | --- | --- |
@@ -193,7 +199,7 @@ Abgelehnt:
 - Weder Owner noch Mitglied, oder der Ingest kennt die Welt nicht: 403 `not_member`. Der Fallback aus `servers` ohne `owner_uuid` ist nicht schaltbar. Ein Mitglied, das schreibt: 403 `owner`.
 - Einladen des Owners, Einladen eines Namens der schon Mitglied ist, Entfernen eines Namens der kein Mitglied ist: 409.
 - Mehr als 12 Mitglieder, `info` länger als 120: 400.
-- Zweites offenes Power-Kommando für dieselbe Welt (Status `pending`): 409 `{reason:"busy"}`.
+- Zweites offenes Power-Kommando für dieselbe Welt, solange die erste Zeile `pending` und jünger als 10 Minuten ist: 409 `{reason:"busy"}`. Eine Zeile mit Status `expired` blockiert nicht.
 
 Rate-Limit, nur diese vier Routen, getrennt von Gebot/Shop:
 
@@ -202,6 +208,10 @@ Rate-Limit, nur diese vier Routen, getrennt von Gebot/Shop:
 - Darüber `429` mit `{error, retry_after_s}`.
 
 **Offen mit Craft:** ob der Server ein eigenes, engeres Limit für Welt-Starts hat. Die Website-Limits sind die Obergrenze, die der Worker immer erzwingt. Ein strengeres Limit im Spiel wird über Ack `rejected` sichtbar, nicht durch ein zweites Stillschweigen.
+
+### Pending läuft nach 10 Minuten ab
+
+Beim Lesen der Pending-Liste und vor dem `busy`-Check setzt der Worker jede Zeile mit Status `pending` und `created_at` älter als 10 Minuten auf `expired`. `GET /api/mc-vip/commands/pending` liefert diese Zeilen nicht. Ein neues Power-Kommando derselben Welt ist danach wieder `202`, nicht `409`. `accepted`, `confirmed`, `rejected`, `failed` und `denied` laufen nicht in `expired` um. Der Client sieht `expired` in seinem eigenen `pending`-Feld und kann neu senden.
 
 ### Wie der Befehl zum Server kommt
 
@@ -214,8 +224,11 @@ Browser (Cookie, Origin)
   → nur dann INSERT mc_vip_commands (status pending)
   → 202 request_id
 mc-stack / Creepy, Header x-ingest-token = Worker-Secret MC_INGEST_TOKEN, nie aus dem Browser
-  → GET /api/mc-vip/commands/pending?since=<ms>
-  → mappt op auf die eigene, nicht öffentliche API
+  → GET /api/mc-vip/commands/pending?since=<ms>   (ohne expired)
+  → prüft beim Ausführen erneut Owner, Rang und Link
+  → sonst Ack status denied, reason denied, und führt nichts aus
+  → sonst mappt op auf die eigene, nicht öffentliche API
+  → info nur als Datenfeld, nie in einer Befehlszeile
   → POST /api/mc-vip/commands/ack
   → nächster POST /api/mc-ingest mit vip_worlds
 Browser
@@ -245,11 +258,11 @@ Pending-Antwort, nur mit gültigem `x-ingest-token`, sonst 401:
 }
 ```
 
-Ack-Body: `{"acks":[{"id":"<request_id>","status":"accepted"|"rejected"|"failed"|"confirmed","reason":"…"}]}`. `reason` max. 120 Zeichen, wird gespeichert und auf Deutsch angezeigt, wenn er in der festen Liste steht (`busy`, `offline`, `full`, `unknown_player`, `denied`); sonst der generische Satz „Der Server hat den Auftrag abgelehnt.“ Roh-Grund aus dem Spiel wird nicht ungefiltert gerendert, wenn er nicht in der Liste ist. Erster Endstatus gewinnt, ein zweites Ack derselben Id ändert nichts (`updated: 0`), wie bei Shop-Orders.
+Ack-Body: `{"acks":[{"id":"<zeilen-id>","status":"accepted"|"rejected"|"failed"|"confirmed"|"denied","reason":"…"}]}`. `id` ist die Zeilen-`id` aus der Pending-Antwort, nicht die `request_id` des Clients. `reason` max. 120 Zeichen, wird gespeichert und auf Deutsch angezeigt, wenn er in der festen Liste steht (`busy`, `offline`, `full`, `unknown_player`, `denied`); sonst der generische Satz „Der Server hat den Auftrag abgelehnt.“ Roh-Grund aus dem Spiel wird nicht ungefiltert gerendert, wenn er nicht in der Liste ist. Erster Endstatus gewinnt, ein zweites Ack derselben Zeile ändert nichts (`updated: 0`), wie bei Shop-Orders. `denied` ist der Endstatus, wenn mc-stack beim Ausführen Owner, Rang oder Link nicht mehr bestätigt. Die Prüfung auf der Website beim Einreihen ersetzt das nicht: zwischen Queue und Ausführung kann der Rang weg sein.
 
 ### Zustand vom Server (Ingest)
 
-Optionales Feld auf `POST /api/mc-ingest`, ersetzt die VIP-Liste komplett wenn es da ist; fehlt es, bleibt die letzte Liste:
+Optionales Feld auf `POST /api/mc-ingest`. Eintrag so, Beispiel mit einer Welt:
 
 ```json
 {
@@ -268,7 +281,11 @@ Optionales Feld auf `POST /api/mc-ingest`, ersetzt die VIP-Liste komplett wenn e
 }
 ```
 
-Höchstens 30 Welten pro Push. Ungültige Zeilen fallen weg, der Rest wird geschrieben. `players` ist entweder eine Namensliste oder eine Zahl (wie `playerCount` heute). Der öffentliche Serverstatus auf `/` zeigt VIP-Welten nur als „online/offline + Spielerzahl“, ohne Mitgliederliste. Die Mitgliederliste sehen nur Owner und Mitglieder dieser Welt, und nur über `GET /api/mc-vip`.
+- Feld fehlt: die gespeicherte VIP-Liste bleibt, einschließlich einer schon geleerten Liste.
+- Feld ist `[]`: die Liste wird geleert. `GET /api/mc-vip` hat keine Slots aus `vip_worlds` mehr (`placeholder: true`, solange auch kein Fallback-Key da ist). Offene Kommandos bleiben in der Queue und laufen nach 10 Minuten auf `expired` oder kommen per Ack `denied` zurück. Sie werden durch das leere Array nicht gelöscht.
+- Feld ist ein Array mit Einträgen: es ersetzt die Liste komplett. Höchstens 30 Welten. Ungültige Zeilen fallen weg, der Rest wird geschrieben. Kein Array (Objekt, String, `null`): dieser Teil wird mit 400 abgelehnt und die alte Liste bleibt.
+
+`players` ist entweder eine Namensliste oder eine Zahl (wie `playerCount` heute). Der öffentliche Serverstatus auf `/` zeigt VIP-Welten nur als „online/offline + Spielerzahl“, ohne Mitgliedernamen. Owner und Mitglied sehen die Mitgliederliste über `GET /api/mc-vip`. Ein Fremder sieht sie nicht.
 
 **Offen mit Craft:**
 
@@ -281,7 +298,7 @@ Höchstens 30 Welten pro Push. Ungültige Zeilen fallen weg, der Rest wird gesch
 
 ### D1, in Folge-PR 2
 
-Neue Tabelle in `schema.sql` (frische e2e-DB) und in `migrations/0013_vip_commands.sql` (bestehende Produktions-D1). Spalten in derselben Art wie `mc_bids_pending`: `id`, `op`, `world_id`, `actor_uuid`, `actor_name`, `discord_id`, `name`, `info`, `source` (`web`), `created_at`, `status`, `reason`, `acked_at`, `ip`. Index auf `(status, created_at)` und `(discord_id, created_at)`. Kein Passwort, kein Rohbefehl.
+Neue Tabelle in `schema.sql` (frische e2e-DB) und in `migrations/0013_vip_commands.sql` (bestehende Produktions-D1). Spalten: `id` (Worker-UUID, Primary Key), `request_id`, `op`, `world_id`, `actor_uuid`, `actor_name`, `discord_id`, `name`, `info`, `source` (`web`), `created_at`, `status`, `reason`, `acked_at`, `ip`. Unique auf `(discord_id, request_id)`. Weiterer Index auf `(status, created_at)`. Kein Passwort, kein Rohbefehl, keine Spalte für eine zusammengesetzte Befehlszeile. `info` liegt nur gesäubert in der eigenen Spalte.
 
 ---
 
@@ -351,32 +368,36 @@ Die Umsetzung sind drei PRs, in dieser Reihenfolge. Sie laufen in derselben CI w
 2. Rolle `owner`, wenn diese UUID `owner_uuid` der Welt ist. Rolle `member`, wenn der verknüpfte Minecraft-Name in `members` steht. Sonst `403 {reason:"not_member"}`.
 3. Bei 403 wird nicht in `mc_vip_commands` geschrieben.
 4. Schreiben verlangt Rolle `owner`. Ein Mitglied bekommt `403 {reason:"owner"}`, wieder ohne Zeile.
-5. `GET /api/mc-vip` enthält nur Welten mit Rolle `owner` oder `member`. Eine fremde Welt fehlt in der Liste, statt ihre Mitglieder zu zeigen.
+5. `GET /api/mc-vip` enthält die Welt für Owner und für Mitglied, in beiden Fällen mit `info` und `members`. Ein Fremder bekommt diese Welt nicht, und die Antwort enthält keinen Namen aus `members`.
 
 - [ ] Unit: kein VIP-Key → `placeholder: true`. Key `vip1` ohne Owner → Slot, nicht aufrufbar. `vip_worlds` mit `owner_uuid` der Session → Rolle `owner`. Name in `members` → Rolle `member`. Weder noch → die Welt fehlt.
 - [ ] Drei Sessions, alle Rang VIP, alle verlinkt: Owner, Mitglied (Name steht in `members`), Fremder (Rang VIP, nicht in `members`).
 - [ ] Owner `POST …/power {"state":"start"}` → 202, genau eine Zeile `pending`, `actor_uuid` ist die UUID aus `mc_links`, nicht aus dem Body. Zweites Power auf derselben Welt → 409 `busy`.
-- [ ] Mitglied `POST …/power` → 403 `owner`, Zeilenzahl bleibt 0. Mitglied `GET /api/mc-vip` → die Welt ist drin, `owner: false`.
-- [ ] Fremder `POST …/power`, auch mit `mc_uuid` des Owners im Body → 403 `not_member`, Zeilenzahl bleibt 0. Fremder `GET /api/mc-vip` → diese Welt fehlt.
+- [ ] Mitglied `POST …/power` → 403 `owner`, Zeilenzahl bleibt 0. Mitglied `GET /api/mc-vip` → die Welt ist drin, `owner: false`, `members` enthält den Mitgliedsnamen.
+- [ ] Fremder `POST …/power`, auch mit `mc_uuid` des Owners im Body → 403 `not_member`, Zeilenzahl bleibt 0. Fremder `GET /api/mc-vip` → diese Welt fehlt, und der Körper enthält den Mitgliedsnamen nicht.
 - [ ] Owner einer anderen Welt, der dort weder Owner noch Mitglied ist → derselbe 403 `not_member`.
 - [ ] Ohne Cookie → 401. Mit Cookie, ohne Rang VIP/MVP → 403 `rank`.
-- [ ] Gleicher `request_id`, gleicher Body → 200 `duplicate`. Gleicher `request_id`, anderes `info` → 409. Viertes Power in einer Stunde für dieselbe Welt → 429.
+- [ ] Gleicher `request_id` und gleicher Body derselben `discord_id` → 200 `duplicate`, ohne zweite Zeile. Gleicher `request_id` und anderes `info` derselben `discord_id` → 409. Dieselbe `request_id` einer anderen `discord_id` → 202, zweite Zeile, die erste bleibt `pending`. Weder 200 noch 409 enthält die fremde `discord_id` oder deren `info`.
+- [ ] Zeile `pending` mit `created_at` vor 11 Minuten: der nächste Pending-GET setzt sie auf `expired` und liefert sie nicht. Ein neues Power auf derselben Welt ist 202, nicht 409 `busy`. Eine `confirmed`-Zeile desselben Alters bleibt `confirmed`.
+- [ ] `POST …/info` mit `"Hallo\n§cWelt"` speichert `HalloWelt`. Pending-JSON hat dieses `info` als eigenes Feld und keine Befehlszeile. Nur `§c` ergibt 400 und keine Zeile.
+- [ ] Ack `denied` mit reason `denied` setzt die Zeile auf `denied`. Ein zweites Ack ändert sie nicht.
+- [ ] Viertes Power in einer Stunde für dieselbe Welt → 429.
 - [ ] `GET …/commands/pending` ohne Header → 401. Mit Header `x-ingest-token` gleich dem Worker-Secret → das Item, `op` ist `world.start`, kein Rohbefehl. Dieselbe URL mit `?token=` statt Header → 401.
 - [ ] `GET /vip` und `GET /mc/vip.js` enthalten den Test-Token nicht.
 - [ ] Ack `confirmed`, zweites Ack `failed` → Status bleibt `confirmed`. Body `{"command":"op Nils"}` → 400, keine Zeile.
-- [ ] Ingest `vip_worlds` ersetzt die Liste. Ein Ingest ohne das Feld lässt sie stehen.
+- [ ] Ingest mit `vip_worlds`-Einträgen ersetzt die Liste. Ein Ingest ohne das Feld lässt sie stehen. `vip_worlds: []` leert sie, der folgende `GET /api/mc-vip` hat diese Slots nicht. `vip_worlds: {}` antwortet 400 und lässt die bisherige Liste stehen.
 
 ### Folge-PR 3 — VIP-Verwaltungs-UI
 
 **Nach Folge-PR 2.** **Dateien:** `public/mc/vip.js`, `public/mc/vip.css`, `scripts/e2e_ui.py`. Die API aus PR 2 bleibt die einzige Schreibstelle. Die Seite prüft die Rolle nicht selbst nach: sie zeigt, was `GET /api/mc-vip` hergibt, und der Worker lehnt falsche Posts ab.
 
-**Tut:** Für Slots mit `owner: true`: Schalter „Starten“ / „Stoppen“, Feld Info mit Speichern, Mitglied hinzufügen und Entfernen. Nach 202 zeigt die Karte „wird bestätigt“, bis `pending` leer ist oder ein Ack-Grund aus der festen Liste als Satz daneben steht. 403/409/429 als Satz, kein `alert`. Für `member: true` und `owner: false`: Status und Info-Text, keine Schalter und kein Mitglieder-Formular. Turnstile braucht es hier nicht. Origin-Prüfung bleibt serverseitig in PR 2.
+**Tut:** Für Slots mit `owner: true`: Schalter „Starten“ / „Stoppen“, Feld Info mit Speichern, Mitglied hinzufügen und Entfernen. Nach 202 zeigt die Karte „wird bestätigt“, bis `pending` leer ist oder ein Ack-Grund aus der festen Liste als Satz daneben steht, einschließlich `denied` und `expired`. 403/409/429 als Satz, kein `alert`. Für `member: true` und `owner: false`: Status, Info und die Mitgliederliste als Text. Keine Schalter und kein Formular zum Einladen oder Entfernen. Turnstile braucht es hier nicht. Origin-Prüfung bleibt serverseitig in PR 2.
 
 **Tut nicht:** keine Seed-, Modus- oder Gamerule-Felder. Kein zweiter Weg, der die Queue umgeht. Kein Ingest-Token im Frontend.
 
 - [ ] UI 1440 px und 390 px, Owner-Session: Stoppen trifft den Power-POST, die Karte zeigt „wird bestätigt“, nach erneutem GET mit `online: false` steht „offline“.
-- [ ] Dieselbe Seite als Mitglied: Status sichtbar, `form`-Count 0, kein Starten/Stoppen.
-- [ ] Dieselbe Seite als Fremder mit VIP-Rang: diese Welt fehlt, kein Formular.
+- [ ] Dieselbe Seite als Mitglied: Status, Info und der Mitgliedsname sichtbar, `form`-Count 0, kein Starten/Stoppen.
+- [ ] Dieselbe Seite als Fremder mit VIP-Rang: diese Welt fehlt, der Mitgliedsname kommt im HTML nicht vor, kein Formular.
 - [ ] Name `Bad Name!` geht nicht raus. Der Server lehnt dasselbe Muster noch einmal ab (PR 2).
 - [ ] Ohne Rang: Katalog, Grund `rank`, `link` oder `login`, keine Slot-Buttons.
 - [ ] Schalter und Entfernen sind per Tab erreichbar, Fokus sichtbar.
@@ -413,6 +434,6 @@ Nicht in diesem Rework: Portfolio, Gästebuch, MineRush spielbar machen, Wiki-Te
 
 - Navigation, ein Look, Pixel-Schrift, Slots, MC-Buttons, Item-Icons: Folge-PR 1.
 - PvP nur auf `/pvp`, glatte Preislinien, 3D-Köpfe folgen der Maus: ebenfalls Folge-PR 1. Die Geldmenge bleibt eine Stufe.
-- VIP-API, D1-Warteschlange, Rate-Limits, kein öffentliches RCON: Folge-PR 2. Ingest-Token nur als Worker-Secret. Jede VIP-Aktion prüft serverseitig Owner oder Mitglied, mit e2e für Owner, Mitglied und Fremden.
+- VIP-API, D1-Warteschlange, Rate-Limits, kein öffentliches RCON: Folge-PR 2. Ingest-Token nur als Worker-Secret. Jede VIP-Aktion prüft serverseitig Owner oder Mitglied, mit e2e für Owner, Mitglied und Fremden. `request_id` ist nur pro `discord_id` eindeutig. Pending wird nach 10 Minuten `expired`. mc-stack prüft beim Ausführen erneut und antwortet sonst `denied`. `info` wird von `§` und Zeilenumbrüchen gesäubert und steht nie in einer Befehlszeile. Mitglieder lesen die Welt inklusive Mitgliederliste, Fremde nicht. `vip_worlds: []` leert die Liste, ein fehlendes Feld lässt sie stehen.
 - Verwaltungs-UI: Folge-PR 3. Sie verlässt sich nicht auf ausgeblendete Buttons als einzige Prüfung.
 - Bestand mit Schwächen: Abschnitt „Bestandsaufnahme“. Offene Craft-Punkte sperren Folge-PR 2.
