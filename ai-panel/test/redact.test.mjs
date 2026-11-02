@@ -81,3 +81,57 @@ test("sessionKind classifies runs, CLI sessions and everything else", () => {
   assert.equal(sessionKind("20260101_120000_aaaaaa"), "other");
   assert.equal(sessionKind(""), "other");
 });
+
+// The review found these coming through unredacted; each one is a shape a transcript really has.
+const inlineCases = [
+  ["JSON object", '{"api_key":"hunter2abc"}', "hunter2abc"],
+  ["JSON with space", '"password": "Passw0rd!"', "Passw0rd!"],
+  ["bare assignment", "client_secret=s3cr3t-value", "s3cr3t-value"],
+  ["query parameter", "https://x.dev/cb?token=abc123def", "abc123def"],
+  ["second query parameter", "https://x.dev/cb?state=1&api_key=keyvalue123", "keyvalue123"],
+  ["panel header", "X-Hermes-Panel-Secret: s3cr3tvalue", "s3cr3tvalue"],
+  ["api key header", "X-Api-Key: abcdef123456", "abcdef123456"],
+];
+
+for (const [name, input, secret] of inlineCases) {
+  test(`redacts ${name} inline`, () => {
+    const out = redactText(input);
+    assert.ok(out.includes(MASK), `expected a mask in ${JSON.stringify(out)}`);
+    assert.ok(!out.includes(secret), `${secret} survived: ${out}`);
+    assert.match(out, /\[redacted\]/);
+  });
+}
+
+test("redactValue masks the value of a credential-named field", () => {
+  const out = redactValue({
+    api_key: "hunter2",
+    password: "pw12",
+    client_secret: "abc",
+    authorization: "Basic xyz",
+    nested: { refresh_token: "refresh-me" },
+    message_count: 3,
+    input_tokens: 1200,
+    enabled: true,
+    title: "Deploy check",
+  });
+  assert.equal(out.api_key, MASK);
+  assert.equal(out.password, MASK);
+  assert.equal(out.client_secret, MASK);
+  assert.equal(out.authorization, MASK);
+  assert.equal(out.nested.refresh_token, MASK);
+  // Counts, flags and ordinary text are not touched.
+  assert.equal(out.message_count, 3);
+  assert.equal(out.input_tokens, 1200);
+  assert.equal(out.enabled, true);
+  assert.equal(out.title, "Deploy check");
+});
+
+test("ordinary prose with credential words but no value survives", () => {
+  for (const text of [
+    "the token expired, please log in again",
+    "password policy updated",
+    "run_9f2c1a4b completed in 12.4s",
+  ]) {
+    assert.equal(redactText(text), text);
+  }
+});

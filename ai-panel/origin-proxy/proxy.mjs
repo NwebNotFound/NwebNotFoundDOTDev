@@ -326,12 +326,15 @@ async function handleCrew(req, res, url, route) {
     return;
   }
 
-  // Always ask the gateway for one full window and page locally: the cap then holds even if
-  // the upstream ignores limit/offset (it does support limit today, it does not support offset).
   const path0 = `/p/${route.bot}/api/sessions`;
+  // Transcripts page at the gateway, which supports limit/offset/order (it does not support a
+  // bot-side filter). Ask for one row above the cap: that extra row is the honest "older
+  // messages exist" signal, and the response still never carries more than the cap.
+  // The session *list* is paged here instead, because the run/CLI filter has to be applied
+  // before the window is cut — otherwise page 2 of `filter=run` would be a different window.
   const upstreamPath = isList
-    ? `${path0}?limit=${CREW_PAGE_MAX}`
-    : `${path0}/${encodeURIComponent(route.sessionId)}/messages?limit=${CREW_PAGE_MAX}`;
+    ? `${path0}?limit=${CREW_PAGE_MAX}&offset=0&order=recent`
+    : `${path0}/${encodeURIComponent(route.sessionId)}/messages?limit=${limit + 1}&offset=${offset}&order=latest`;
 
   const got = await gatewayGet(bearer, upstreamPath);
   if (!got.ok) {
@@ -344,26 +347,36 @@ async function handleCrew(req, res, url, route) {
   const arrayFrom = (obj, key) => (Array.isArray(obj?.[key]) ? obj[key] : Array.isArray(obj) ? obj : []);
   const rawRows = isList ? arrayFrom(payload, "sessions") : arrayFrom(payload, "messages");
   let rows = rawRows.map(isList ? normalizeSession : normalizeMessage).filter(Boolean);
+  let hasMore;
+  let total;
   if (isList) {
     rows.sort((a, b) => (b.last_active || 0) - (a.last_active || 0));
     if (filter !== "all") rows = rows.filter((r) => r.kind === filter);
+    total = rows.length;
+    hasMore = rows.length > offset + limit;
+  } else {
+    // The gateway anchors `offset` at the newest message and returns the window oldest-first,
+    // so the page the client asked for is the *tail* of the window; the extra row at the head
+    // proves there is an older page.
+    hasMore = rows.length > limit;
+    rows = rows.length > limit ? rows.slice(rows.length - limit) : rows;
   }
 
-  const page = rows.slice(offset, offset + limit);
+  const page = isList ? rows.slice(offset, offset + limit) : rows;
   const body = {
     bot: route.bot,
     session_id: route.sessionId,
     [isList ? "sessions" : "messages"]: page,
-    total: rows.length,
     limit,
     offset,
-    has_more: rows.length > offset + page.length,
-    // The upstream call was capped, so a full window means "there may be more upstream".
+    has_more: hasMore,
+    // A full upstream window means "there may be more than we can see", not "this is all".
     truncated: rawRows.length >= CREW_PAGE_MAX,
   };
+  if (isList) body.total = total;
 
   sendJson(res, 200, redactValue(body));
-  console.log(`${req.method} ${url.pathname} 200 ${page.length}/${rows.length} (crew ${route.kind})`);
+  console.log(`${req.method} ${url.pathname} 200 ${page.length}/(${total ?? "?"}) (crew ${route.kind})`);
 }
 
 function upstreamFor(pathname) {
@@ -398,6 +411,16 @@ const server = http.createServer(async (req, res) => {
   const crew = crewRoute(url.pathname);
   if (crew) {
     await handleCrew(req, res, url, crew);
+    return;
+  }
+
+  // Everything else under /gw/p/<bot>/api/sessions* is refused rather than passed through: the
+  // generic passthrough does not redact, and a near-miss (trailing slash, a dotted id, no
+  // /messages) would otherwise return raw transcript text.
+  if (/^\/gw\/p\/[a-z0-9][a-z0-9_-]{0,31}\/api\/sessions(\/|$)/.test(url.pathname)) {
+    res.writeHead(404, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ error: "not_found" }));
+    console.warn(`${req.method} ${url.pathname} 404 (not a crew route)`);
     return;
   }
 
