@@ -8,7 +8,9 @@
   const ICON = /^[a-z0-9_]{1,48}$/;
   const NAME = /^[A-Za-z0-9_]{1,16}$/;
   const COLOR = /^[0-9a-f]$/;
-  const WID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  // Anzeige akzeptiert jede Blob-Welt-ID (nur harmlose Zeichen), Aktionen nur echte UUIDs.
+  const WID = /^[A-Za-z0-9_-]{1,64}$/;
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   const RANKL = { vip: "VIP", mvp: "MVP", builder: "Builder", admin: "Admin", default: "Spieler" };
   // Gleiche Liste wie LOG_ACTION im Worker, als Fallback wenn nur action ankommt.
   const ACTL = {
@@ -43,7 +45,7 @@
     const vis = s.visibility === "private" ? "privat" : "für Freunde";
     const meta = [owner ? (s.owner ? "Deine Welt" : "Besitzer " + owner) : "", NF(s.players || 0) + max + " Spieler" + tps, vis].filter(Boolean).join(" · ");
     const info = (s.info || "").trim() ? `<p class="mut vip-world-info">${E(s.info)}</p>` : "";
-    const acts = manage
+    const acts = manage && UUID.test(s.id)
       ? `<div class="vip-world-acts">${s.online ? "" : `<button class="btn sm sec" type="button" data-act="start" data-id="${s.id}">Starten</button>`}<button class="btn sm sec" type="button" data-act="visibility" data-id="${s.id}" data-vis="${s.visibility === "private" ? "friends" : "private"}">${s.visibility === "private" ? "Auf Freunde" : "Auf privat"}</button></div>`
       : "";
     return `<article class="g vip-world${manage ? " vip-aw" : ""}">${slot(s.online ? "grass_block" : "barrier")}<div><b>${E(s.label) || "VIP-Welt"}</b>${tag}<p class="mut vip-world-meta">${E(meta)}</p>${info}${acts}</div></article>`;
@@ -121,7 +123,7 @@
   const run = async (btn) => {
     const id = btn.getAttribute("data-id") || "";
     const kind = btn.getAttribute("data-act");
-    if (!WID.test(id) || (kind !== "start" && kind !== "visibility")) return;
+    if (!UUID.test(id) || (kind !== "start" && kind !== "visibility")) return;
     const path = "/api/mc-vip/worlds/" + encodeURIComponent(id) + (kind === "start" ? "/start" : "/visibility");
     const body = kind === "start" ? { request_id: rid() } : { request_id: rid(), visibility: btn.getAttribute("data-vis") === "private" ? "private" : "friends" };
     const label = btn.textContent;

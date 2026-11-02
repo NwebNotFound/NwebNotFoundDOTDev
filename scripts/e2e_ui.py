@@ -269,8 +269,8 @@ with sync_playwright() as p:
             ],
             "stats": {"money": 12, "playtime": 3660, "kills": 2, "deaths": 1, "blocks_mined": 40},
             "worlds": {"placeholder": False, "slots": [
-                {"id": "vip_1", "label": "VIP-Welt 1", "online": True, "players": 2, "max": 8, "tps": 20},
-                {"id": "vip-2", "label": XSS, "online": False, "players": 0, "max": None, "tps": 18.2},
+                {"id": "aaaaaaaa-1111-4111-8111-111111111111", "label": "VIP-Welt 1", "online": True, "players": 2, "max": 8, "tps": 20},
+                {"id": "bbbbbbbb-2222-4222-8222-222222222222", "label": XSS, "online": False, "players": 0, "max": None, "tps": 18.2},
             ]},
             "profile": "javascript:alert(1)",
         })))
