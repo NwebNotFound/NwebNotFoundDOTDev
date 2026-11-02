@@ -24,11 +24,11 @@ const authReady = (env) => !!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET
 /* ---------- gemeinsames CSS ---------- */
 const BASE_CSS = `@view-transition{navigation:auto}
 *,*::before,*::after{box-sizing:border-box}html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+body{margin:0;font-family:var(--ds-font-sans,-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif);background:var(--bg);color:var(--fg);line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
 a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 img{max-width:100%;display:block}
-.wrap{width:min(1080px,100% - 2.5rem);margin-inline:auto}
-.nav{position:sticky;top:0;z-index:50;background:var(--navbg);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
+.wrap{width:var(--ds-container,min(1080px,100% - 2.5rem));margin-inline:auto}
+.nav{position:sticky;top:0;z-index:50;padding-top:env(safe-area-inset-top);background:var(--navbg);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
 .nav .wrap{display:flex;align-items:center;gap:1.4rem;height:52px}
 .brand{white-space:nowrap;font-weight:600;color:var(--fg);font-size:1.02rem;margin-right:auto;display:flex;align-items:center;gap:.5rem}.brand:hover{text-decoration:none}
 .nav a.l{color:var(--mut);font-size:.86rem}.nav a.l:hover,.nav a.l[aria-current]{color:var(--fg);text-decoration:none}
@@ -36,11 +36,11 @@ img{max-width:100%;display:block}
 .acct img{width:26px;height:26px;border-radius:50%}
 .only-s{display:none}.um{position:relative}.um>button{display:flex;min-height:44px;align-items:center;gap:.5rem;background:transparent;border:0;color:var(--fg);font:inherit;font-size:.82rem;padding:.25rem .5rem .25rem .25rem;border-radius:99px;cursor:pointer;transition:background .2s}
 .um>button:hover,.um>button[aria-expanded=true]{background:var(--line)}.um .chev{width:10px;height:10px;opacity:.6;transition:transform .25s}.um>button[aria-expanded=true] .chev{transform:rotate(180deg)}
-.menu{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:var(--menubg,var(--card));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:14px;padding:.4rem;box-shadow:0 20px 50px -20px var(--shadow);opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top right;pointer-events:none;transition:opacity .18s ease,transform .18s ease;z-index:60}
+.menu{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:var(--menubg,var(--card));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:var(--ds-radius-xl,14px);padding:.4rem;box-shadow:0 20px 50px -20px var(--shadow);opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top right;pointer-events:none;transition:opacity var(--ds-duration,180ms) ease,transform var(--ds-duration,180ms) ease;z-index:60}
 .menu.open{opacity:1;transform:none;pointer-events:auto}.menu .hd{padding:.55rem .7rem .6rem;border-bottom:1px solid var(--line);margin-bottom:.3rem}.menu .hd b{display:block;font-size:.88rem}.menu .hd span{font-size:.75rem;color:var(--mut)}
 .menu a{display:flex;align-items:center;gap:.6rem;padding:.6rem .7rem;border-radius:9px;color:var(--fg);font-size:.88rem}.menu a:hover,.menu a:focus-visible{background:var(--line);text-decoration:none;outline:none}.menu a.out{color:#ff453a}
-@media (max-width:640px){.menu{position:fixed;left:.75rem;right:.75rem;top:60px;min-width:0}.menu a{padding:.8rem .8rem;font-size:.95rem}}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:0;border-radius:980px;min-height:44px;padding:0 1.25rem;line-height:1.2;white-space:nowrap;max-width:100%;font:inherit;font-size:.95rem;font-weight:500;cursor:pointer;background:var(--acc);color:var(--accfg);transition:transform .2s ease,opacity .2s ease,background .2s}
+@media (max-width:640px){.menu{position:fixed;left:max(.75rem,env(safe-area-inset-left));right:max(.75rem,env(safe-area-inset-right));top:calc(60px + env(safe-area-inset-top));min-width:0}.menu a{padding:.8rem .8rem;font-size:.95rem}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--ds-space-2,8px);border:0;border-radius:var(--ds-radius-full,980px);min-height:44px;padding:0 1.25rem;line-height:1.2;white-space:nowrap;max-width:100%;font:inherit;font-size:.95rem;font-weight:500;cursor:pointer;background:var(--acc);color:var(--accfg);transition:transform var(--ds-duration,180ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)),opacity var(--ds-duration,180ms) ease,background var(--ds-duration,180ms)}
 .btn:hover{text-decoration:none;transform:translateY(-1px)}.btn:active{transform:scale(.98)}
 .btn.sec{background:transparent;color:var(--link);box-shadow:inset 0 0 0 1px currentColor}
 .btn.sm{min-height:36px;padding:0 .95rem;font-size:.84rem;position:relative}.btn.sm::before{content:"";position:absolute;inset:-4px -2px}
@@ -50,38 +50,41 @@ img{max-width:100%;display:block}
 .mut{color:var(--mut)}
 .eyebrow{font-size:.85rem;font-weight:600;color:var(--acc2);letter-spacing:.02em;margin:0 0 .6rem}
 h1,h2,h3{letter-spacing:-.025em;line-height:1.08;margin:0}
-.h-xl{font-size:clamp(2.6rem,8vw,5rem);font-weight:700}
+.h-xl{font-size:var(--ds-text-display,clamp(2.6rem,8vw,5rem));font-weight:var(--ds-weight-bold,700)}
 .h-l{font-size:clamp(2rem,5vw,3.2rem);font-weight:700}
 .lead{font-size:clamp(1.1rem,2.4vw,1.4rem);color:var(--mut);max-width:40ch;margin:1.1rem auto 0}
-section{padding:clamp(3.5rem,9vw,7rem) 0}
+section{padding:var(--ds-section-space,clamp(3.5rem,9vw,7rem)) 0}
 .center{text-align:center}
 .grid{display:grid;gap:1.1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
-.card{background:var(--card);border-radius:22px;padding:clamp(1.4rem,3vw,2rem);border:1px solid var(--line);transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s}
-a.card{color:inherit;display:block}a.card:hover{text-decoration:none;transform:translateY(-4px);box-shadow:0 18px 40px -18px var(--shadow)}
+.card{background:var(--card);border-radius:var(--ds-radius-2xl,22px);padding:clamp(1.4rem,3vw,2rem);border:1px solid var(--line);transition:transform var(--ds-duration-slow,320ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)),box-shadow var(--ds-duration-slow,320ms)}
+a.card{color:inherit;display:block}a.card:hover{text-decoration:none;transform:translateY(-4px);box-shadow:var(--ds-shadow-2,0 18px 40px -18px var(--shadow))}
 .card h3{font-size:1.3rem;margin-bottom:.45rem}.card p{margin:.3rem 0;color:var(--mut)}
 .more{color:var(--link);font-weight:500;margin-top:.9rem;display:inline-block}
-footer{border-top:1px solid var(--line);padding:2rem 0 2.6rem;font-size:.78rem;color:var(--mut)}
+footer{border-top:1px solid var(--line);padding:2rem 0 calc(2.6rem + env(safe-area-inset-bottom));font-size:.78rem;color:var(--mut)}
 footer .wrap{display:flex;flex-wrap:wrap;gap:.6rem 1.4rem;justify-content:space-between}
-input,textarea{width:100%;padding:.8rem 1rem;margin:.35rem 0 1rem;background:var(--field);color:var(--fg);border:1px solid var(--line);border-radius:12px;font:inherit;transition:border-color .2s,box-shadow .2s}
+input,textarea{width:100%;padding:.8rem 1rem;margin:.35rem 0 1rem;background:var(--field);color:var(--fg);border:1px solid var(--line);border-radius:var(--ds-radius-lg,12px);font:inherit;transition:border-color var(--ds-duration,180ms),box-shadow var(--ds-duration,180ms)}
 input:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 4px var(--ring)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.js .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.2,.8,.2,1),transform .8s cubic-bezier(.2,.8,.2,1)}
+.js .reveal{opacity:0;transform:translateY(24px);transition:opacity var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)),transform var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1))}
 .js .reveal.in{opacity:1;transform:none}
 .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
-@media (max-width:420px){.nav .wrap{gap:.55rem!important}.nav a.l{font-size:.76rem!important}.brand{font-size:.95rem}}@media (max-width:640px){.only-s{display:inline}.nav .wrap{gap:.9rem}.nav a.l{font-size:.8rem}.hide-s{display:none}}
+@media (max-width:420px){.nav .wrap{gap:.55rem!important}.nav a.l{font-size:.76rem!important}.brand{font-size:.95rem}}@media (max-width:640px){.only-s{display:inline}.nav .wrap{gap:.9rem}.nav a.l{font-size:.8rem}.hide-s{display:none}input,textarea,select{font-size:16px}}@media (pointer:coarse){.nav a.l,.btn.sm{min-height:44px;display:inline-flex;align-items:center}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.js .reveal{opacity:1;transform:none}@view-transition{navigation:none}}`;
 
-const PORT_CSS = `:root{--bg:#fbfbfd;--fg:#1d1d1f;--mut:#6e6e73;--link:#0066cc;--acc:#0071e3;--acc2:#bf4800;--accfg:#fff;--card:#fff;--line:rgba(0,0,0,.08);--navbg:rgba(251,251,253,.72);--field:#fff;--ring:rgba(0,113,227,.18);--shadow:rgba(0,0,0,.25);color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#000;--fg:#f5f5f7;--mut:#a1a1a6;--link:#2997ff;--acc:#0a84ff;--acc2:#ff9f0a;--card:#1c1c1e;--line:rgba(255,255,255,.1);--navbg:rgba(0,0,0,.7);--field:#1c1c1e;--ring:rgba(10,132,255,.3);--shadow:rgba(0,0,0,.9)}}
-.hero{padding-top:clamp(4.5rem,12vw,9rem)}
+// Farben, Abstände, Typo, Radien und Schatten: siehe DESIGN.md und /design/tokens.css.
+// Dieses Stylesheet benutzt nur noch die Aliasnamen (--bg, --fg, --acc, ...), die tokens.css
+// auf die --ds-*-Tokens abbildet. Auch der Dark-Mode kommt von dort (prefers-color-scheme).
+const PORT_CSS = `.hero{padding-top:clamp(4.5rem,12vw,9rem)}
 .grad{background:linear-gradient(90deg,#0071e3,#a855f7 50%,#ff6b35);-webkit-background-clip:text;background-clip:text;color:transparent}
-.alt{background:var(--alt,#f5f5f7)}@media (prefers-color-scheme:dark){.alt{--alt:#0b0b0c}}
-.tag{display:inline-block;font-size:.72rem;font-weight:600;padding:.2rem .6rem;border-radius:99px;background:var(--line);color:var(--mut);margin-bottom:.8rem}
+.alt{background:var(--alt,var(--ds-surface-2,#f5f5f7))}
+.tag{display:inline-block;font-size:.72rem;font-weight:600;padding:.2rem .6rem;border-radius:var(--ds-radius-full,99px);background:var(--line);color:var(--mut);margin-bottom:.8rem}
 .entry{display:flex;gap:.9rem;padding:1.1rem 0;border-bottom:1px solid var(--line)}
 .entry:last-child{border:0}.av{width:40px;height:40px;border-radius:50%;flex:none;background:var(--line);display:grid;place-items:center;font-weight:600;color:var(--mut);overflow:hidden}
 .entry p{margin:.25rem 0 0;white-space:pre-wrap;word-break:break-word}`;
 
-const MC_CSS = `:root{--bg:#0b0f0c;--fg:#eef5ef;--mut:#93a39a;--link:#7ee787;--acc:#4ade80;--acc2:#4ade80;--accfg:#052e12;--card:rgba(255,255,255,.04);--line:rgba(255,255,255,.09);--navbg:rgba(11,15,12,.72);--field:rgba(255,255,255,.05);--ring:rgba(74,222,128,.25);--shadow:rgba(0,0,0,.9);--menubg:#141a16;color-scheme:dark}
+// Minecraft-Sub-Theme: Palette, Pixel-Schrift, Slots und Bevels stehen als --ds-mc-* in
+// /design/tokens.css (html.mc) und werden in /mc/ds.css auf die Altnamen --c-* gemappt.
+const MC_CSS = `:root{--menubg:#141a16}
 
 .px{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:0}
 
@@ -95,7 +98,7 @@ const MC_CSS = `:root{--bg:#0b0f0c;--fg:#eef5ef;--mut:#93a39a;--link:#7ee787;--a
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:1rem;margin-top:1.6rem}
 .mcgrid{grid-template-columns:repeat(2,1fr)}@media(min-width:700px){.mcgrid{grid-template-columns:repeat(3,1fr)}}@media(min-width:1000px){.mcgrid{grid-template-columns:repeat(5,1fr)}}
 .stat .k{font-size:.8rem;color:var(--mut)}.stat .v{font-size:1.6rem;font-weight:700;margin-top:.2rem}
-.bar{height:6px;background:var(--line);border-radius:3px;margin-top:.6rem;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.bar{height:6px;background:var(--line);border-radius:3px;margin-top:.6rem;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1))}
 .addr{display:inline-flex;align-items:center;gap:.6rem;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.5rem .5rem .5rem 1rem;margin-top:2rem;max-width:100%}
 .addr code{font-size:1rem;overflow:hidden;text-overflow:ellipsis}
 .steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
@@ -144,7 +147,7 @@ function shell({ title, desc, css, nav, body, head = "", footer, loginBase = "",
   return `<!doctype html><html lang="de"${css === MC_CSS ? ' class="mc"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${themeColor}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
-<script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/mc/ds.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>` : ""}${head}</head><body>
+<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/design/minecraft.css?v=${AV}"><link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/mc/ds.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>` : ""}${head}</head><body>
 <header class="nav"><div class="wrap">${nav}<div class="acct" id="acct"></div></div></header>
 <main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}${ACCT_JS(loginBase)}</body></html>`;
 }
@@ -285,7 +288,7 @@ const PICKUP_BODY = `<section class="sec"><div class="wrap" id="pu"><p class="ey
 const PROFILE_PB_CSS = `<style>
 #pb .mch{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:1.5rem;align-items:center;padding:clamp(1.2rem,3vw,1.6rem);background:var(--card);border:1px solid var(--line);border-radius:22px}
 #pb .mch-model{position:relative;height:min(400px,55vw);display:grid;place-items:center}
-#pb .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchInMain .8s ease forwards}
+#pb .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchInMain var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)) forwards}
 #pb .mch-model.ready .mch-fb{opacity:0;transition:opacity .4s}
 #pb .mch-fb{max-height:280px;image-rendering:pixelated;filter:drop-shadow(0 12px 24px rgba(0,0,0,.2))}
 #pb .mch-info{min-width:0}

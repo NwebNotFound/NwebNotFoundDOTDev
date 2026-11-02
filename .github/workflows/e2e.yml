@@ -26,6 +26,8 @@ jobs:
         run: npm i -g wrangler
       - name: Icon-Referenzcheck
         run: node scripts/icon-check.mjs
+      - name: Kontrast-Gate (WCAG AA)
+        run: node scripts/contrast-check.mjs
       - name: e2e
         env:
           E2E_SCREENS_DIR: ${{ runner.temp }}/screens/qa

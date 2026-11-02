@@ -1,29 +1,38 @@
-/* NwebNotFound MC – Design-System. Einzige Quelle für Farben, Radius, Rahmen, Schatten, Abstände, Typo.
+/* NwebNotFound MC – Komponenten des Minecraft-Sub-Themes (siehe DESIGN.md §1.3).
+   Farben, Abstände, Typo, Radien und Schatten kommen aus /design/tokens.css (Block html.mc);
+   hier stehen nur noch die Abbildungen auf die gewachsenen Namen (--c-*, --s*, --t*) und die Regeln.
    Alle Regeln sind auf html.mc gescoped und überschreiben damit ältere Seiten-Styles. */
 @font-face{font-family:"Monocraft";src:url(/mc/fonts/Monocraft.woff2) format("woff2");font-weight:400;font-display:swap}
 @font-face{font-family:"Monocraft";src:url(/mc/fonts/Monocraft-Bold.woff2) format("woff2");font-weight:700;font-display:swap}
 html.mc{
-  /* Farben: Deepslate bei Nacht */
-  --c-bg:#0c0e13;--c-s1:#13161e;--c-s2:#191d27;--c-s3:#212635;--c-s4:#2a3043;
-  --c-line:#262c3b;--c-line2:#353d52;--c-fg:#e9edf5;--c-mut:#8e98ad;--c-dim:#5f6880;
-  --c-acc:#5fe36d;--c-acc-d:#2f8a3a;--c-acc-bg:rgba(95,227,109,.12);--c-gold:#ffb941;--c-red:#ff6161;--c-red-bg:rgba(255,97,97,.12);--c-dia:#53e2df;--c-purple:#a986ff;
+  /* Vollständiger Minecraft-Tokensatz: /design/minecraft.css (--mc-*, DESIGN.md §10).
+     Die gewachsenen Namen (--c-*, --s*, --t*) bleiben als Aliasse erhalten, weil die Regeln
+     unten sie benutzen; Fallbacks halten die Seite heil, falls das Token-Sheet fehlt. */
+  --c-bg:var(--mc-background,#0c0e13);--c-s1:var(--mc-surface-1,#13161e);--c-s2:var(--mc-surface-2,#191d27);--c-s3:var(--mc-surface-3,#212635);--c-s4:var(--mc-surface-4,#2a3043);
+  --c-line:var(--mc-line,#262c3b);--c-line2:var(--mc-line-strong,#353d52);--c-fg:var(--mc-text,#e9edf5);--c-mut:var(--mc-text-muted,#8e98ad);--c-dim:var(--mc-text-dim,#7c859e);
+  --c-acc:var(--mc-grass,#5fe36d);--c-acc-d:var(--mc-grass-deep,#2f8a3a);--c-acc-bg:var(--mc-grass-weak,rgba(95,227,109,.12));--c-gold:var(--mc-gold,#ffb941);--c-red:var(--mc-redstone,#ff6161);--c-red-bg:var(--mc-redstone-weak,rgba(255,97,97,.12));--c-dia:var(--mc-diamond,#53e2df);--c-purple:var(--mc-amethyst,#a986ff);
   /* Form */
-  --r:6px;--r-sm:4px;--b:2px;
-  --sh-1:inset 0 1px 0 rgba(255,255,255,.035);--sh-2:inset 0 1px 0 rgba(255,255,255,.04),0 10px 30px -18px rgba(0,0,0,.8);
-  /* Abstände */
-  --s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.5rem;--s6:2rem;--s7:3rem;
-  /* Typo */
-  --f-body:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;--f-px:"Monocraft",ui-monospace,Menlo,monospace;
-  --t-xs:.75rem;--t-sm:.875rem;--t-md:1rem;--t-lg:1.25rem;--t-xl:clamp(1.4rem,3.6vw,1.9rem);--t-2xl:clamp(2rem,7vw,3.6rem);
+  --r:var(--mc-radius,4px);--r-sm:var(--mc-radius-sm,2px);--b:var(--mc-border-width,2px);
+  --sh-1:var(--mc-shadow-1);--sh-2:var(--mc-shadow-2);
+  /* Abstaende */
+  --s1:var(--mc-space-1,.25rem);--s2:var(--mc-space-2,.5rem);--s3:var(--mc-space-3,.75rem);--s4:var(--mc-space-4,1rem);--s5:var(--mc-space-5,1.5rem);--s6:var(--mc-space-6,2rem);--s7:var(--mc-space-8,3rem);
+  /* Typo: Pixel nur fuer Ueberschriften/Zahlen, Fliesstext bleibt System-Sans */
+  --f-body:var(--mc-font-body,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif);--f-px:var(--mc-font-pixel,"Monocraft",ui-monospace,Menlo,monospace);
+  --t-xs:var(--mc-text-xs,.75rem);--t-sm:var(--mc-text-sm,.875rem);--t-md:var(--mc-text-base,1rem);--t-lg:var(--mc-text-lg,1.125rem);--t-xl:clamp(1.4rem,3.6vw,1.9rem);--t-2xl:clamp(2rem,7vw,3.6rem);
+  /* Motion: 150-250ms, respektiert prefers-reduced-motion ueber die Tokens */
+  --t-dur-fast:var(--mc-duration-fast,150ms);--t-dur:var(--mc-duration,200ms);--t-dur-slow:var(--mc-duration-slow,250ms);--t-ease:var(--mc-ease,cubic-bezier(.2,.8,.2,1));--t-px-shadow:var(--mc-pixel-shadow,0 2px 0 rgba(0,0,0,.55));
   /* Altvariablen auf Tokens umbiegen */
-  --bg:var(--c-bg);--fg:var(--c-fg);--mut:var(--c-mut);--link:var(--c-acc);--acc:var(--c-acc);--acc2:var(--c-acc);--accfg:#06210b;--card:var(--c-s1);--line:var(--c-line);--navbg:rgba(12,14,19,.92);--field:var(--c-s2);--ring:rgba(95,227,109,.3);--menubg:var(--c-s2);--gold:var(--c-gold);--pf:var(--f-px);
-  /* Vanilla-GUI (Slots, Inventar-Rahmen) */
-  --mc-slot:#8b8b8b;--mc-slot-dim:#6d6d6d;--mc-slot-lo:#373737;--mc-slot-hi:rgba(255,255,255,.2);
-  --mc-frame:#161922;--mc-edge:#030406;
-  --mc-inset-panel:inset 2px 2px 0 #343a48,inset -2px -2px 0 #07080c;
-  --mc-inset-slot:inset 2px 2px 0 var(--mc-slot-lo),inset -2px -2px 0 var(--mc-slot-hi);
-  --mc-raised:0 14px 32px -22px rgba(0,0,0,.92);
-  --mc-hover-glow:0 0 28px -10px rgba(95,227,109,.32);
+  --bg:var(--c-bg);--fg:var(--c-fg);--mut:var(--c-mut);--link:var(--c-acc);--acc:var(--c-acc);--acc2:var(--c-acc);--accfg:var(--mc-on-grass,#06210b);--card:var(--c-s1);--line:var(--c-line);--navbg:var(--mc-navbar,rgba(12,14,19,.92));--field:var(--c-s2);--ring:var(--ds-ring,rgba(95,227,109,.3));--menubg:var(--c-s2);--gold:var(--c-gold);--pf:var(--f-px);
+  /* Vanilla-GUI (Slots, Inventar-Rahmen, Item-Frames) */
+  --mc-slot:var(--mc-slot-bg,#8b8b8b);--mc-slot-dim:var(--mc-slot-bg-empty,#6d6d6d);--mc-slot-lo:var(--mc-slot-shadow,#373737);--mc-slot-hi:var(--mc-slot-highlight,rgba(255,255,255,.2));
+  --mc-frame:var(--mc-frame-bg,#161922);--mc-edge:var(--mc-frame-edge,#030406);
+  --mc-inset-panel:var(--mc-bevel-panel,inset 2px 2px 0 #343a48,inset -2px -2px 0 #07080c);
+  --mc-inset-slot:var(--mc-bevel-slot,inset 2px 2px 0 #373737,inset -2px -2px 0 rgba(255,255,255,.2));
+  --mc-raised:var(--mc-bevel-raised,0 14px 32px -22px rgba(0,0,0,.92));
+  --mc-hover-glow:var(--mc-glow,0 0 28px -10px rgba(95,227,109,.32));
+  /* Block-Texturen als dezenter Akzent (pixelated, nie hinter Fliesstext) */
+  --mc-tex:var(--mc-texture,url("/mc-icon/v2/deepslate"));--mc-tex2:var(--mc-texture-2,url("/mc-icon/v2/stone"));
+  --mc-tex-size:var(--mc-texture-size,48px);--mc-tex-op:var(--mc-texture-opacity,.09);--mc-tex-fade:var(--mc-texture-fade,linear-gradient(180deg,#000,transparent 88%));
   color-scheme:dark;background:var(--c-bg)}
 html.mc body{background:var(--c-bg);color:var(--c-fg);font-family:var(--f-body);background-image:radial-gradient(120% 80% at 50% -20%,rgba(83,226,223,.06),transparent 55%)}
 html.mc *,html.mc *::before,html.mc *::after{box-sizing:border-box}
@@ -66,7 +75,7 @@ html.mc .nl .l[aria-current=page]::after{content:"";position:absolute;left:var(-
 html.mc .g,html.mc .card,html.mc .dc,html.mc .steps li,html.mc .pod>div,html.mc .empty-st{background:linear-gradient(180deg,var(--c-s2) 0%,var(--c-s1) 100%);border:2px solid var(--mc-edge);border-radius:var(--r-sm);box-shadow:var(--mc-inset-panel),var(--mc-raised);backdrop-filter:none;-webkit-backdrop-filter:none;color:inherit}
 html.mc .g.pad,html.mc .dc,html.mc .card{padding:var(--s5)}
 @media(max-width:600px){html.mc .g.pad,html.mc .dc,html.mc .card{padding:var(--s4)}}
-html.mc a.g{transition:border-color .18s ease,background .18s ease,box-shadow .18s ease,transform .18s ease}
+html.mc a.g{transition:border-color var(--t-dur) var(--t-ease),background var(--t-dur) var(--t-ease),box-shadow var(--t-dur) var(--t-ease),transform var(--t-dur) var(--t-ease)}
 html.mc a.g:hover,html.mc a.g:focus-visible{text-decoration:none}
 @media(hover:hover) and (pointer:fine){
   html.mc a.g:hover{transform:translateY(-2px);border-color:var(--c-line2);background:linear-gradient(180deg,var(--c-s3) 0%,var(--c-s2) 100%);box-shadow:var(--mc-inset-panel),var(--mc-hover-glow),var(--mc-raised)}
@@ -91,7 +100,7 @@ html.mc .pixbg::before{content:"";position:absolute;inset:0;background:url(/mc-i
 html.mc .pixbg::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,var(--c-line2),transparent);top:auto;width:auto;image-rendering:auto}
 
 /* ---------- Buttons ---------- */
-html.mc .btn{font-family:var(--f-body);font-weight:600;font-size:var(--t-sm);min-height:44px;padding:0 var(--s4);display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);border-radius:var(--r-sm);border:var(--b) solid var(--c-acc-d);background:var(--c-acc);color:#06210b;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25);text-shadow:none;transform:none;transition:background .15s,border-color .15s}
+html.mc .btn{font-family:var(--f-body);font-weight:600;font-size:var(--t-sm);min-height:44px;padding:0 var(--s4);display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);border-radius:var(--r-sm);border:var(--b) solid var(--c-acc-d);background:var(--c-acc);color:#06210b;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25);text-shadow:none;transform:none;transition:background var(--t-dur-fast) var(--t-ease),border-color var(--t-dur-fast) var(--t-ease)}
 html.mc .btn:hover{background:#7df08a;border-color:var(--c-acc);color:#06210b;transform:none;text-decoration:none}
 html.mc .btn:active{box-shadow:inset 0 2px 0 rgba(0,0,0,.25);transform:translateY(1px)}
 @media(prefers-reduced-motion:reduce){html.mc .btn:active{transform:none}}
@@ -107,7 +116,7 @@ html.mc .btn[disabled]{background:var(--c-s2);border-color:var(--c-line);color:v
 html.mc .tabs,html.mc .seg{display:inline-flex;gap:2px;padding:3px;background:var(--c-s1);border:var(--b) solid var(--c-line);border-radius:var(--r);box-shadow:none;max-width:100%;overflow-x:auto;scrollbar-width:none}
 html.mc .tabs{display:flex}
 html.mc .tabs::-webkit-scrollbar,html.mc .seg::-webkit-scrollbar{display:none}
-html.mc .tabs button,html.mc .seg button{flex:none;min-height:40px;padding:0 var(--s4);border:0;border-radius:var(--r-sm);background:transparent;color:var(--c-mut);font-family:var(--f-body);font-size:var(--t-sm);font-weight:600;box-shadow:none;cursor:pointer;transition:background .15s,color .15s}
+html.mc .tabs button,html.mc .seg button{flex:none;min-height:40px;padding:0 var(--s4);border:0;border-radius:var(--r-sm);background:transparent;color:var(--c-mut);font-family:var(--f-body);font-size:var(--t-sm);font-weight:600;box-shadow:none;cursor:pointer;transition:background var(--t-dur-fast) var(--t-ease),color var(--t-dur-fast) var(--t-ease)}
 html.mc .tabs button:hover,html.mc .seg button:hover{color:var(--c-fg);background:var(--c-s2)}
 html.mc .tabs button[aria-selected=true],html.mc .seg button[aria-pressed=true]{background:var(--c-s3);color:var(--c-fg);box-shadow:inset 0 -2px 0 var(--c-acc)}
 html.mc .seg{margin-top:var(--s3)}
@@ -151,8 +160,28 @@ html.mc .ic{display:inline-grid;place-items:center;width:32px;height:32px;flex:n
 html.mc .ic img,html.mc .mi,html.mc .slot img,html.mc .pslot img,html.mc .poi img{image-rendering:pixelated;image-rendering:crisp-edges}
 html.mc .mi{filter:none}
 
+/* ---------- Pixel-Akzente (DESIGN.md §10.4): blockige Unterstreichung, Item-Frame, Blocktextur-Streifen ----------
+   Alles aus --mc-*: Farbe (--mc-grass), Raster (8px), Dauer (--mc-duration*). Keine Bilder hinter Text. */
+html.mc :is(.hub-h,.hub-h2,.h-l,.mch-name){position:relative}
+html.mc :is(.hub-h,.hub-h2,.h-l,.mch-name)::after{content:"";display:block;width:min(100%,72px);height:8px;margin-top:var(--s3);background:repeating-linear-gradient(90deg,var(--c-acc) 0 8px,transparent 8px 16px);opacity:.85;image-rendering:pixelated}
+html.mc :is(.center,.hero) :is(.hub-h,.hub-h2,.h-l)::after{margin-inline:auto}
+html.mc .hub-h2::after{width:min(100%,40px);height:4px;margin-top:var(--s2)}
+html.mc .eyb::before,html.mc .eyebrow::before{content:"";display:inline-block;width:8px;height:8px;margin-right:var(--s2);background:var(--mc-gold);vertical-align:baseline;image-rendering:pixelated}
+/* Item-Frame: Holzrahmen um ein Objekt, 2px-Bevel innen — fuer Adresse, grosse Slots, Podest */
+html.mc .mc-item-frame,html.mc .slot.big,html.mc .slot.huge{position:relative;background:var(--mc-frame);border:2px solid var(--mc-dirt-deep);border-radius:var(--r-sm);padding:var(--mc-item-frame-inset,6px);box-shadow:inset 0 0 0 2px var(--mc-dirt),var(--mc-inset-panel)}
+html.mc .slot.big .ic,html.mc .slot.huge .ic{background:transparent;border:0;box-shadow:none}
+html.mc .addr{background:var(--mc-frame);border:2px solid var(--mc-dirt-deep);border-radius:var(--r-sm);box-shadow:inset 0 0 0 2px var(--mc-dirt),var(--mc-inset-panel);padding:var(--s2) var(--s2) var(--s2) var(--s4)}
+html.mc .addr code{font-family:var(--f-px);font-size:var(--t-sm);letter-spacing:0}
+/* Blocktextur als dezenter Streifen (Abschnittstrenner, Fussleiste) — nie hinter Fliesstext */
+html.mc .mc-block-band{height:24px;background-image:var(--mc-tex),var(--mc-tex2);background-size:var(--mc-tex-size) var(--mc-tex-size),var(--mc-tex-size) var(--mc-tex-size);background-position:0 0,24px 24px;background-repeat:repeat;image-rendering:pixelated;opacity:.5}
+html.mc footer{position:relative}
+html.mc footer::before{content:"";position:absolute;left:0;right:0;top:-1px;height:16px;background-image:var(--mc-tex);background-size:var(--mc-tex-size) var(--mc-tex-size);background-repeat:repeat;image-rendering:pixelated;opacity:var(--mc-tex-op);pointer-events:none;-webkit-mask:linear-gradient(180deg,#000,transparent);mask:linear-gradient(180deg,#000,transparent)}
+/* Inventar-Slots reagieren: 150ms, nur Transform/Glow */
+html.mc :is(.slot,.ivs,.pslot){transition:box-shadow var(--t-dur-fast) var(--t-ease),filter var(--t-dur-fast) var(--t-ease)}
+html.mc :is(a.g.q,a.slot,a.ivs):is(:hover,:focus-visible) :is(.slot,.ivs,.pslot){box-shadow:var(--mc-inset-slot),var(--mc-hover-glow)}
+
 /* ---------- Kleinteile ---------- */
-html.mc .pill,html.mc .tag,html.mc .soon,html.mc .todo,html.mc .wip{border-radius:var(--r-sm);border:1px solid var(--c-line2);background:var(--c-s2);box-shadow:none;font-family:var(--f-body);font-size:var(--t-xs);font-weight:700;letter-spacing:.02em;padding:.2rem .5rem}
+html.mc .pill,html.mc .tag,html.mc .soon,html.mc .todo,html.mc .wip{border-radius:var(--r-sm);border:1px solid var(--c-line2);background:var(--c-s2);box-shadow:none;font-family:var(--f-px);font-size:var(--t-xs);font-weight:700;letter-spacing:.02em;padding:.2rem .5rem}
 html.mc .tag.ts{color:var(--c-acc);border-color:rgba(95,227,109,.35);background:var(--c-acc-bg)}
 html.mc .tag.tr{color:var(--c-red);border-color:rgba(255,97,97,.35);background:var(--c-red-bg)}
 html.mc .tag.tw,html.mc .tag.tb,html.mc .todo{color:var(--c-gold);border-color:rgba(255,185,65,.35);background:rgba(255,185,65,.1)}
@@ -306,8 +335,8 @@ html.mc #fbc .pom{display:flex;flex-direction:column;gap:.2rem}
 /* Profil-Held (Skin + Stat-Kacheln) */
 html.mc #pb .mch{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:var(--s6);align-items:center;padding:var(--s6)}
 html.mc #pb .mch-model{position:relative;height:400px;display:grid;place-items:center}
-html.mc #pb .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchIn .8s ease forwards}
-html.mc #pb .mch-model.ready .mch-fb{opacity:0;transition:opacity .4s}
+html.mc #pb .mch-model canvas{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;animation:mchIn var(--t-dur-slow) var(--t-ease) forwards}
+html.mc #pb .mch-model.ready .mch-fb{opacity:0;transition:opacity var(--t-dur-slow) var(--t-ease)}
 html.mc #pb .mch-fb{max-height:300px;image-rendering:pixelated;filter:drop-shadow(0 16px 28px rgba(0,0,0,.45))}
 html.mc #pb .mch-model::after{content:"";position:absolute;bottom:18px;left:50%;width:46%;height:16px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(rgba(0,0,0,.45),transparent 70%);z-index:-1}
 @keyframes mchIn{to{opacity:1}}
@@ -322,7 +351,7 @@ html.mc #pb .mch-tile .nd{font-size:.7rem;color:var(--c-dim);margin-top:.15rem}
 @media(prefers-reduced-motion:reduce){html.mc #pb .mch-model canvas{animation:none;opacity:1}html.mc #pb .mch-tile:hover{transform:none}}
 
 /* ---------- Einheitliches Hover-/Fokus-Highlight (ein Token für alle klickbaren Zeilen & Buttons) ---------- */
-html.mc{--hl-bg:var(--c-s3);--hl-fg:var(--c-fg);--hl-ring:inset 0 0 0 2px var(--c-acc-d);--hl-t:background-color .12s ease,box-shadow .12s ease,color .12s ease}
+html.mc{--hl-bg:var(--c-s3);--hl-fg:var(--c-fg);--hl-ring:inset 0 0 0 2px var(--c-acc-d);--hl-t:background-color var(--t-dur-fast) var(--t-ease),box-shadow var(--t-dur-fast) var(--t-ease),color var(--t-dur-fast) var(--t-ease)}
 html.mc :is(a.lrow,a.mrow,.il .ir,a.ir,a.g,a.card,.menu a,.ac a,.tabs button,.seg button,.um>button,.btn,.po,.hl){transition:var(--hl-t)}
 html.mc :is(a.lrow,a.mrow,.il .ir,a.ir,a.g,a.card,.menu a,.ac a,.tabs button,.seg button,.um>button,.btn.sec,.btn.sm:not(.go):not(.discord),.po.hl,.hl):is(:hover,:focus-visible),
 html.mc .ac a[aria-selected=true],html.mc .um>button[aria-expanded=true]{background:var(--hl-bg);color:var(--hl-fg);box-shadow:var(--hl-ring);transform:none;text-decoration:none;outline:none}
@@ -360,7 +389,7 @@ html.mc .bbuy label{display:grid;gap:var(--s1);font-size:var(--t-sm);color:var(-
 html.mc .nbur{display:none}
 html.mc .nl .ng{position:relative;display:flex;align-items:center}
 html.mc .nl .ngb{appearance:none;border:0;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:500;color:var(--c-mut);display:inline-flex;align-items:center;gap:.35rem;min-height:44px}
-html.mc .nl .ngb .chev{transition:transform .15s ease;opacity:.7}
+html.mc .nl .ngb .chev{transition:transform var(--t-dur-fast) var(--t-ease);opacity:.7}
 html.mc .nl .ng.open>.ngb .chev{transform:rotate(180deg)}
 html.mc .nl .ngb:is(:hover,:focus-visible),html.mc .nl .ng.open>.ngb{color:var(--c-fg)}
 html.mc .nl .ngb[data-cur]{color:var(--c-fg);font-weight:600}
@@ -379,7 +408,7 @@ html.mc .nl :is(.l,.ngb,.ngm a):focus-visible{outline:2px solid var(--c-acc);out
 @media(max-width:900px){
   html.mc .nav .wrap{flex-wrap:wrap}
   html.mc .nbur{order:2;display:inline-grid;align-content:center;gap:4px;width:44px;height:44px;padding:0 11px;background:var(--c-s2);border:2px solid var(--mc-edge);box-shadow:var(--mc-inset-panel);cursor:pointer}
-  html.mc .nbur span{display:block;height:2px;background:var(--c-fg);transition:transform .15s ease,opacity .15s ease}
+  html.mc .nbur span{display:block;height:2px;background:var(--c-fg);transition:transform var(--t-dur-fast) var(--t-ease),opacity var(--t-dur-fast) var(--t-ease)}
   html.mc .nav.open .nbur span:nth-child(1){transform:translateY(6px) rotate(45deg)}
   html.mc .nav.open .nbur span:nth-child(2){opacity:0}
   html.mc .nav.open .nbur span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}

@@ -1,0 +1,133 @@
+/* NwebNotFound — Minecraft theme tokens (mc.nwebnotfound.dev and the Minecraft block on the site).
+   Spec: DESIGN.md §10. This is a *second, complete token set*, not a palette override of the
+   portfolio theme: everything the Minecraft surface draws (block accents, inventory slots, item
+   frames, pixel headings, motion) reads an --mc-* token from this file.
+
+   Reuse: a later Gacha surface under mc.nwebnotfound.dev consumes the same --mc-* names; add new
+   tokens here (never in a component) so both surfaces stay in one theme.
+
+   Rules that this file encodes:
+   - 8pt spacing grid: every --mc-space-* is a multiple of 4px, 8px is the default step.
+   - Body text always uses the system sans stack (--mc-font-body). The pixel face is headings,
+     numbers and labels only — never a paragraph.
+   - Interactive motion stays between 150 ms and 250 ms; reduced motion zeroes it.
+   - Every text pair below is asserted by scripts/contrast-check.mjs (WCAG AA). */
+
+html.mc {
+  color-scheme: dark;
+
+  /* ---- palette: Minecraft materials, used as borders, accents and state ---- */
+  --mc-grass: #5fe36d;
+  --mc-grass-deep: #2f8a3a;
+  --mc-grass-weak: rgba(95, 227, 109, 0.12);
+  --mc-dirt: #8a5a34;
+  --mc-dirt-deep: #6b4a2b;
+  --mc-stone: #8b8b8b;
+  --mc-stone-dim: #6d6d6d;
+  --mc-diamond: #53e2df;
+  --mc-redstone: #ff6161;
+  --mc-redstone-weak: rgba(255, 97, 97, 0.12);
+  --mc-gold: #ffb941;
+  --mc-gold-weak: rgba(255, 185, 65, 0.1);
+  --mc-amethyst: #a986ff;
+  --mc-obsidian: #120d1f;
+
+  /* ---- surfaces and text (deepslate, not the portfolio greys) ---- */
+  --mc-background: #0c0e13;
+  --mc-surface-1: #13161e;
+  --mc-surface-2: #191d27;
+  --mc-surface-3: #212635;
+  --mc-surface-4: #2a3043;
+  --mc-line: #262c3b;
+  --mc-line-strong: #353d52;
+  --mc-text: #e9edf5;
+  --mc-text-muted: #8e98ad;
+  --mc-text-dim: #7c859e;
+  --mc-on-grass: #06210b;
+  --mc-navbar: rgba(12, 14, 19, 0.92);
+
+  /* ---- block / inventory look (vanilla GUI bevels, no images, no gradients) ---- */
+  --mc-border-width: 2px;
+  --mc-frame-bg: #161922;
+  --mc-frame-edge: #030406;
+  --mc-slot-bg: #8b8b8b;
+  --mc-slot-bg-empty: #6d6d6d;
+  --mc-slot-shadow: #373737;
+  --mc-slot-highlight: rgba(255, 255, 255, 0.2);
+  --mc-slot-size: 40px;
+  --mc-slot-gap: 4px;
+  --mc-item-size: 40px;
+  --mc-item-frame-inset: 6px;
+  --mc-bevel-panel: inset 2px 2px 0 #343a48, inset -2px -2px 0 #07080c;
+  --mc-bevel-slot: inset 2px 2px 0 var(--mc-slot-shadow), inset -2px -2px 0 var(--mc-slot-highlight);
+  --mc-bevel-raised: 0 14px 32px -22px rgba(0, 0, 0, 0.92);
+  --mc-glow: 0 0 28px -10px rgba(95, 227, 109, 0.32);
+  --mc-radius: 4px;
+  --mc-radius-sm: 2px;
+  --mc-radius-slot: 0;
+
+  /* ---- block textures used as subtle accents (pixelated, never behind running text) ---- */
+  --mc-texture: url("/mc-icon/v2/deepslate");
+  --mc-texture-2: url("/mc-icon/v2/stone");
+  --mc-texture-size: 48px;
+  --mc-texture-opacity: 0.09;
+  --mc-texture-fade: linear-gradient(180deg, #000, transparent 88%);
+
+  /* ---- spacing: same 4/8 grid as the rest of the site ---- */
+  --mc-space-1: 0.25rem;
+  --mc-space-2: 0.5rem;
+  --mc-space-3: 0.75rem;
+  --mc-space-4: 1rem;
+  --mc-space-5: 1.5rem;
+  --mc-space-6: 2rem;
+  --mc-space-8: 3rem;
+  --mc-space-10: 4rem;
+  --mc-space-12: 6rem;
+  --mc-container: min(1080px, 100% - 2.5rem);
+
+  /* ---- type: pixel headings, system body ---- */
+  --mc-font-pixel: "Monocraft", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  --mc-font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mc-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --mc-text-2xs: 0.6875rem;
+  --mc-text-xs: 0.75rem;
+  --mc-text-sm: 0.875rem;
+  --mc-text-base: 1rem;
+  --mc-text-lg: 1.125rem;
+  --mc-text-xl: 1.375rem;
+  --mc-text-2xl: 1.75rem;
+  --mc-text-3xl: 2.25rem;
+  --mc-leading-tight: 1.15;
+  --mc-leading-snug: 1.3;
+  --mc-leading-body: 1.6;
+  --mc-weight-regular: 400;
+  --mc-weight-medium: 500;
+  --mc-weight-semibold: 600;
+  --mc-weight-bold: 700;
+  --mc-pixel-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+
+  /* ---- motion: 150–250 ms, opacity/transform only ---- */
+  --mc-duration-fast: 150ms;
+  --mc-duration: 200ms;
+  --mc-duration-slow: 250ms;
+  --mc-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ---- focus: visible on every surface, 3:1 against the background ---- */
+  --mc-focus-ring: 2px solid var(--mc-grass);
+  --mc-focus-offset: 2px;
+
+  /* ---- shadows ---- */
+  --mc-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --mc-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
+  --mc-shadow-3: 0 14px 32px -22px rgba(0, 0, 0, 0.92);
+
+  background: var(--mc-background);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.mc {
+    --mc-duration-fast: 0ms;
+    --mc-duration: 0ms;
+    --mc-duration-slow: 0ms;
+  }
+}

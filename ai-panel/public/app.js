@@ -65,15 +65,59 @@ function confirmAction(title, text, okLabel = "Bestätigen") {
     $("#modal-title").textContent = title;
     $("#modal-text").textContent = text;
     $("#modal-ok").textContent = okLabel;
-    modal.classList.remove("hidden");
     const done = (value) => {
-      modal.classList.add("hidden");
       $("#modal-ok").onclick = null;
       $("#modal-cancel").onclick = null;
+      modal.onclose = null;
+      if (modal.open) modal.close();
       resolve(value);
     };
     $("#modal-ok").onclick = () => done(true);
     $("#modal-cancel").onclick = () => done(false);
+    // Esc fires `cancel` then `close`; without this the promise would never settle.
+    modal.onclose = () => done(false);
+    modal.showModal();
+    $("#modal-ok").focus();
+  });
+}
+
+// The "new bot" flow used to be a browser prompt() (blocking, unstyled, not reachable with a
+// keyboard on iOS). This is the same dialog pattern as confirmAction, with a real form field.
+function askBotName() {
+  return new Promise((resolve) => {
+    const dialog = $("#bot-dialog");
+    const form = $("#bot-form");
+    const input = $("#bot-name");
+    const error = $("#bot-name-error");
+    $("#bot-create").disabled = false;
+    input.value = "";
+    error.classList.add("hidden");
+
+    const done = (value) => {
+      form.onsubmit = null;
+      $("#bot-cancel").onclick = null;
+      dialog.onclose = null;
+      if (dialog.open) dialog.close();
+      resolve(value);
+    };
+    const submit = (e) => {
+      e.preventDefault();
+      const name = input.value.trim().toLowerCase();
+      if (!/^[a-z0-9][a-z0-9_-]{1,31}$/.test(name)) {
+        error.textContent = "Bitte 2–32 Zeichen: a–z, 0–9, - oder _, am Anfang ein Buchstabe oder eine Zahl.";
+        error.classList.remove("hidden");
+        input.setAttribute("aria-invalid", "true");
+        input.focus();
+        return;
+      }
+      done(name);
+    };
+    form.onsubmit = submit;
+    $("#bot-cancel").onclick = () => done(null);
+    dialog.onclose = () => done(null);
+    input.removeAttribute("aria-invalid");
+    dialog.showModal();
+    input.focus();
   });
 }
 
@@ -114,6 +158,7 @@ async function api(path, { method = "GET", body } = {}) {
     const err = new Error("unauthorized");
     err.status = 401;
     throw err;
+
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok && !data.confirm_required) {
@@ -395,8 +440,10 @@ function toolBlock(name) {
 }
 
 function approvalCard(runId, event) {
-  const card = el("div", { class: "approval" });
-  card.append(el("div", { class: "title", text: "Freigabe nötig" }));
+  const card = el("div", { class: "approval", role: "group", "aria-label": "Freigabe nötig" });
+  const title = el("div", { class: "title" });
+  title.append(el("span", { class: "warn-dot", "aria-hidden": "true" }), document.createTextNode("Freigabe nötig"));
+  card.append(title);
   const what = event.command || event.message || event.description;
   if (what) card.append(el("pre", { text: String(typeof what === "string" ? what : JSON.stringify(what, null, 2)).slice(0, 4000) }));
 
@@ -851,7 +898,7 @@ async function saveSoul() {
 }
 
 async function newBot() {
-  const name = prompt("Name des neuen Bots (a-z, 0-9, -):");
+  const name = await askBotName();
   if (!name) return;
   try {
     const res = await api("/api/bots", { method: "POST", body: { name, description: "" } });
@@ -1061,6 +1108,91 @@ function closeDrawer() {
   document.body.classList.remove("drawer-open");
 }
 
+// Swipe gestures for the bot/history drawer (mobile only, DESIGN.md §8 “Drawer”):
+//   - drag in from the left screen edge to open, drag left to close
+//   - the drawer follows the finger while dragging, then snaps to the nearer edge
+// A short horizontal movement keeps clicks and vertical scrolling untouched: the gesture only
+// starts after 10px of mostly-horizontal travel, and a vertical dominant move cancels it.
+function initDrawerSwipe() {
+  const sidebar = $("#sidebar");
+  const EDGE = 24; // px from the left edge that starts the gesture
+  const COMMIT = 0.35; // fraction of the drawer width that decides open or closed
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  let drag = null;
+
+  const width = () => sidebar.getBoundingClientRect().width || 300;
+  const isOpen = () => document.body.classList.contains("drawer-open");
+  const mobile = () => window.innerWidth <= 860;
+
+  const settle = (open) => {
+    sidebar.style.transition = "";
+    sidebar.style.transform = "";
+    document.body.classList.remove("drawer-drag");
+    document.body.classList.toggle("drawer-open", open);
+  };
+
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!mobile() || !e.isPrimary) return;
+      const open = isOpen();
+      if (!open && e.clientX > EDGE) return;
+      // Inside the open drawer only a drag that starts on the rail itself may close it, so that
+      // tapping a session or a nav item keeps working.
+      if (open && !sidebar.contains(e.target)) return;
+      if (open && e.target.closest("button, a, input, textarea, select, label, summary")) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, open, active: false };
+    },
+    { passive: true },
+  );
+
+  document.addEventListener(
+    "pointermove",
+    (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.active) {
+        if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
+          drag = null;
+          return;
+        }
+        if (Math.abs(dx) < 10) return;
+        if (drag.open ? dx > 0 : dx < 0) {
+          drag = null;
+          return;
+        }
+        drag.active = true;
+        document.body.classList.add("drawer-drag");
+        if (!reduce?.matches) sidebar.style.transition = "none";
+      }
+      const w = width();
+      sidebar.style.transform = `translateX(${Math.max(-w, Math.min(0, drag.open ? dx : dx - w))}px)`;
+    },
+    { passive: true },
+  );
+
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.active) {
+      drag = null;
+      return;
+    }
+    const dx = e.clientX - drag.x;
+    const travelled = drag.open ? -dx : dx;
+    const open = drag.open ? travelled < width() * COMMIT : travelled > width() * COMMIT;
+    drag = null;
+    settle(open);
+  };
+  document.addEventListener("pointerup", end, { passive: true });
+  document.addEventListener("pointercancel", () => {
+    if (!drag) return;
+    const wasOpen = drag.open;
+    drag = null;
+    settle(wasOpen);
+  });
+}
+
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("ai-theme", theme);
@@ -1098,6 +1230,7 @@ async function logoutAll() {
     /* ignore */
   }
   showLogin();
+
 }
 
 function wire() {
@@ -1115,6 +1248,10 @@ function wire() {
   $("#btn-menu").onclick = openDrawer;
   $("#btn-close-sidebar").onclick = closeDrawer;
   $("#scrim").onclick = closeDrawer;
+  initDrawerSwipe();
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.body.classList.contains("drawer-open")) closeDrawer();
+  });
 
   $("#side-nav").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-view]");

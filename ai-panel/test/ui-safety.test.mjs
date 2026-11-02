@@ -79,3 +79,13 @@ test("signed-out UI shows a login screen instead of redirecting (no reload loop)
   assert.match(html, /id="login-screen"/);
   assert.match(html, /href="\/auth\/login"/);
 });
+
+test("the two light token blocks in app.css stay identical", async () => {
+  const css = await read("app.css");
+  const grab = (re) => (css.match(re) || [])[1];
+  const tokens = (block) => Object.fromEntries([...block.matchAll(/(--ds-[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+  const explicit = grab(/(\[data-theme="light"\]\s*\{[\s\S]*?\n\})/);
+  const media = grab(/(html:not\(\[data-theme\]\)\s*\{[\s\S]*?\n  \})/);
+  assert.ok(explicit && media, "both light blocks exist");
+  assert.deepEqual(tokens(media), tokens(explicit), "light tokens: [data-theme] and prefers-color-scheme must match");
+});
