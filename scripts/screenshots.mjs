@@ -101,10 +101,15 @@ async function startServers() {
     }
   }
 
+  // Ports follow the URLs, so a second checkout on this machine cannot be mistaken for this one.
+  const sitePort = new URL(SITE).port || "80";
+  const mcPort = new URL(MC).port || "80";
+  const panelPort = new URL(PANEL).port || "80";
+
   // Two Workers because the site is host-routed: the Worker decides the surface from the host name.
-  serve("npx", ["wrangler", "dev", "--port", "8790", "--local", "--ip", "127.0.0.1", "--local-upstream", "nwebnotfound.dev", "--persist-to", path.join(persist, "site")]);
-  serve("npx", ["wrangler", "dev", "--port", "8791", "--local", "--ip", "127.0.0.1", "--local-upstream", "mc.nwebnotfound.dev", "--persist-to", path.join(persist, "mc")]);
-  serve("node", [path.join("ai-panel", "scripts", "dev-server.mjs")], { PORT: "8788" });
+  serve("npx", ["wrangler", "dev", "--port", sitePort, "--local", "--ip", "127.0.0.1", "--local-upstream", "nwebnotfound.dev", "--persist-to", path.join(persist, "site")]);
+  serve("npx", ["wrangler", "dev", "--port", mcPort, "--local", "--ip", "127.0.0.1", "--local-upstream", "mc.nwebnotfound.dev", "--persist-to", path.join(persist, "mc")]);
+  serve("node", [path.join("ai-panel", "scripts", "dev-server.mjs")], { PORT: panelPort });
 
   await Promise.all([reachable(`${SITE}/`), reachable(`${MC}/`), reachable(`${PANEL}/`)]);
 }
