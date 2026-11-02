@@ -1,0 +1,140 @@
+/* crew.css — the styles owned by the Crew-Runs view (public/crew.js, src/crew.js).
+   Everything here uses the design tokens from the design-system PR (--ds-* and the legacy
+   aliases it keeps: --border, --text-dim, --bg-elev, --accent-weak, --radius). app.css keeps
+   the shared shell only; a token retune never needs an edit in this file. */
+
+/* ---------- Crew-Runs (read-only) ----------
+   Mobile-first list over the bots' sessions. Nothing in this view writes, so there is no
+   primary button and no destructive colour: one accent for the selected chip and the card
+   focus/hover, everything else neutral. Tokens only, 8pt rhythm, 44px targets on touch. */
+
+.crew-view { gap: 16px; }
+/* One reading column, like the chat thread: at 1280px a full-width card row reads as a table
+   and the title/badge pair drifts apart. 880px keeps the list tight without shrinking mobile. */
+.crew-view > .view-head,
+.crew-view > .crew-note,
+.crew-view > .crew-controls,
+.crew-view > .crew-range,
+.crew-view > .crew-list,
+.crew-view > .crew-more,
+.crew-view > .crew-transcript { width: 100%; max-width: 880px; }
+.crew-note { margin: 0; font-size: 12.5px; color: var(--text-dim); }
+
+.crew-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.crew-field { display: grid; gap: 4px; }
+.crew-field-label { font-size: 12.5px; color: var(--text-dim); }
+.crew-field select { min-width: 160px; }
+
+.crew-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.chip:hover { background: var(--bg-hover); color: var(--text); }
+.chip.active { background: var(--accent-weak); border-color: var(--accent); color: var(--text); font-weight: 600; }
+.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.crew-range { margin: 0; font-size: 12.5px; }
+.crew-list { display: grid; gap: 8px; }
+
+.crew-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  color: var(--text);
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+.crew-card:hover { border-color: var(--accent); background: var(--bg-hover); }
+.crew-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.crew-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.crew-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-weak);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.crew-badge.kind-cli,
+.crew-badge.kind-other { background: rgba(127, 127, 127, 0.16); }
+.crew-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.crew-meta { font-size: 12.5px; color: var(--text-dim); }
+.crew-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.crew-empty { padding: 16px; border: 1px dashed var(--border); border-radius: var(--radius); font-size: 13px; }
+
+.crew-transcript {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+}
+.crew-transcript-head h3 { margin: 0; font-size: 15.5px; font-weight: 600; overflow-wrap: anywhere; }
+.crew-messages { display: grid; gap: 8px; }
+.crew-msg {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.crew-msg-head { font-size: 11.5px; letter-spacing: 0.2px; text-transform: uppercase; color: var(--text-dim); }
+.crew-msg-body {
+  margin: 0;
+  max-height: 420px;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.crew-msg.role-user .crew-msg-body,
+.crew-msg.role-assistant .crew-msg-body { font-family: var(--sans); font-size: 14px; }
+
+.crew-more { justify-self: start; min-height: 36px; }
+
+@media (max-width: 860px) {
+  .crew-controls { gap: 8px; }
+  .crew-field { width: 100%; }
+  /* 16px keeps mobile Safari from zooming on focus; 44px is the touch minimum. */
+  .crew-field select { width: 100%; min-height: 44px; font-size: 16px; }
+  .chip { min-height: 44px; padding: 0 16px; font-size: 14px; }
+  .crew-card { padding: 14px 12px; }
+  .crew-title { white-space: normal; overflow-wrap: anywhere; }
+  .crew-transcript { padding: 12px; }
+  .crew-more { width: 100%; min-height: 44px; }
+}
