@@ -2,6 +2,7 @@
 // Reine VIP-Helfer (ohne Worker). Wird von scripts/e2e.mjs importiert und kann allein laufen.
 import assert from "node:assert/strict";
 import { isVipWorldKey, pickVipWorlds, vipStats, vipWorldLabel, vipCatalog, vipRankView, normU } from "../src/mc-vip.js";
+import { sanitizeInfo, cleanWorlds, cleanLog } from "../src/mc-vip-cmd.js";
 
 const worlds = {
   lobby: { online: true, players: ["Nils"], max: 20, tps: 20 },
@@ -57,6 +58,16 @@ assert.equal(vipCatalog("admin")[0].yours, false);
 assert.equal(normU("0F3C2A1B-4D5E-6F70-8192-A3B4C5D6E7F8"), "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8");
 assert.equal(normU("0f3c2a1b4d5e6f708192a3b4c5d6e7f8"), "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8");
 assert.equal(normU("nicht-uuid"), null);
+assert.equal(sanitizeInfo("Hallo\n§cWelt"), "HalloWelt");
+assert.equal(sanitizeInfo("A\u200bB\u202eC"), "ABC");
+assert.equal(sanitizeInfo("x".repeat(200)).length, 120);
+assert.equal(cleanWorlds({ id: "nope" }).error.includes("Array"), true);
+assert.equal(cleanWorlds([{ id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", owner_uuid: "11111111-2222-3333-4444-555555555555", visibility: "public", invites: [{ name: "Steve", role: "trusted" }] }]).worlds.length, 0);
+assert.equal(cleanWorlds([{ id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", owner_uuid: "11111111-2222-3333-4444-555555555555", info: "Hallo\n§cWelt", invites: [{ name: "Steve", role: "mod" }, { name: "Alex", role: "member" }] }]).worlds[0].info, "HalloWelt");
+assert.deepEqual(cleanWorlds([{ id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", owner_uuid: "11111111-2222-3333-4444-555555555555" }]).worlds[0].visibility, "friends");
+assert.equal(cleanLog({ action: "start" }).error.includes("Array"), true);
+assert.equal(cleanLog([{ world_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", admin: "100000000000000001", owner: "11111111-2222-3333-4444-555555555555", action: "set_visibility", created_at: 10 }]).log[0].action, "set_visibility");
+assert.equal(cleanLog([{ world_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", admin: "1", owner: "11111111-2222-3333-4444-555555555555", action: "start", created_at: 10 }]).log.length, 0);
 assert.deepEqual(vipRankView("vip", "&6"), { rank: "vip", color: "6", label: "VIP" });
 assert.deepEqual(vipRankView("MVP", "&d"), { rank: "mvp", color: "d", label: "MVP" });
 assert.equal(vipRankView("admin", "&c"), null);

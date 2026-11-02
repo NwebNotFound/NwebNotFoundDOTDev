@@ -106,7 +106,7 @@ function isoFrom(at) {
   if (!Number.isFinite(n)) return null;
   return new Date(n < 1e12 ? n * 1000 : n).toISOString();
 }
-async function loadWorlds(env) {
+async function loadWorlds(env, viewer) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
   let servers = null, at = null;
   if (row?.data) {
@@ -115,6 +115,22 @@ async function loadWorlds(env) {
       servers = d.servers && typeof d.servers === "object" ? d.servers : null;
       at = d.servers_at || row.updated_at || null;
     } catch { servers = null; }
+  }
+  const synced = await env.DB.prepare("SELECT data, updated_at FROM mc_blobs WHERE kind = 'vip_worlds'").first().catch(() => null);
+  if (synced?.data) {
+    let list = [];
+    try { list = JSON.parse(synced.data); } catch { list = []; }
+    if (Array.isArray(list) && list.length) {
+      const name = String(viewer?.name || "").toLowerCase();
+      const mine = list.filter((w) => viewer?.admin || normU(w.owner_uuid) === viewer?.uuid || (w.invites || []).some((i) => String(i.name || "").toLowerCase() === name));
+      const slots = mine.slice(0, 3).map((w) => ({
+        id: w.id, label: w.label || "VIP-Welt", visibility: w.visibility === "private" ? "private" : "friends",
+        online: !!w.online, players: w.players || 0, max: w.max ?? null, tps: w.tps ?? null, info: w.info || "",
+        owner_name: w.owner_name || null, owner: normU(w.owner_uuid) === viewer?.uuid,
+        members: (w.invites || []).map((i) => ({ name: i.name, role: i.role === "trusted" ? "trusted" : "member" })),
+      }));
+      return { placeholder: slots.length === 0, updated_at: synced.updated_at, slots };
+    }
   }
   const slots = pickVipWorlds(servers);
   if (!slots.length) return { placeholder: true, slots: [] };
@@ -148,7 +164,7 @@ export async function vipApi(env, user) {
   }
   return {
     access: true, reason: null, catalog: vipCatalog(raw), note: VIP_NOTE,
-    player, stats, stats_at, worlds: await loadWorlds(env), profile: "/profile",
+    player, stats, stats_at, worlds: await loadWorlds(env, { uuid, name: link.mc_name, admin: raw === "admin" }), profile: "/profile",
   };
 }
 export const vipBody = () => `<link rel="stylesheet" href="/mc/ranks.css?v=${AV}"><link rel="stylesheet" href="/mc/vip.css?v=${AV}"><section class="hero vip-hero"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Community</p><h1 class="hub-h">VIP.</h1><p class="sub">Rang, Vorteile von VIP und MVP, und der Status der VIP-Welten. Das eigene Panel gibt es nur mit verknüpftem Account und dem Rang VIP oder MVP.</p></div></section><section class="sec vip-sec"><div class="hub-wrap" id="vip" aria-live="polite"><div class="g pad mut">Lade Panel…</div></div></section><script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/vip.js?v=${AV}" defer></script>`;

@@ -3,6 +3,7 @@ import { cleanEconomy, economyStatements, economyApi } from "./mc-economy.js";
 import { cleanRanks, rankStatements } from "./mc-ranks.js";
 import { cleanPvp, pvpStatements, pvpApi, pvpPlayerApi, pvpBody } from "./mc-pvp.js";
 import { vipApi, vipBody } from "./mc-vip.js";
+import { makeVip } from "./mc-vip-cmd.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { headResponse, skinResponse, validSkinUrl } from "./mc-head.js";
@@ -687,6 +688,7 @@ async function mcIngest(req, env) {
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
+let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
   const d = row ? JSON.parse(row.data) : {}, now = Date.now(), iso = (t) => t ? new Date(t).toISOString() : null;
@@ -853,6 +855,7 @@ export default {
 
     if (p.startsWith("/api/feedback")) { const r = FB().route(p, req, env, url); if (r) return r; }
     if (p.startsWith("/api/mc-")) { const r = TRADE().route(p, req, env, url); if (r) return r; }
+    if (p.startsWith("/api/mc-vip/") || p.startsWith("/api/mc-vip-")) { const r = await VIPQ().route(p, req, env, url); if (r) return r; }
     if (p === "/api/mc-status") return mcStatus(ctx, env);
     if (p === "/api/me") return me(req, env);
     if (p === "/api/mc-ingest") return mcIngest(req, env);
