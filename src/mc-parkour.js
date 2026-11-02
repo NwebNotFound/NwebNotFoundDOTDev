@@ -28,6 +28,17 @@ export function cleanCourseIcon(v) {
 }
 // Fallback-Anzeigename aus der ID: cave_rush → „Cave Rush“ (nie Unterstriche anzeigen)
 export const prettyCourse = (k) => String(k).split("_").filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") || String(k);
+// Bekannte Kurse ohne echtes Icon (paper ist der graue Platzhalter).
+const COURSE_ICON = { house_climb: "ladder" };
+// Anzeige: Slug-Namen (house_climb) hübsch, paper bei bekannten Kursen durch ein richtiges Icon ersetzen. Rohdaten in der DB bleiben.
+export function presentCourse(course, name, icon) {
+  const raw = typeof name === "string" ? name.trim() : "";
+  const slugLike = !raw || raw === course || (raw.includes("_") && !/\s/.test(raw));
+  const display = slugLike ? prettyCourse(raw && raw !== course ? raw : course) : raw;
+  const stored = typeof icon === "string" && ICON.test(icon) ? icon : "";
+  const ic = stored && !(stored === PK_ICON_DEFAULT && COURSE_ICON[course]) ? stored : (COURSE_ICON[course] || PK_ICON_DEFAULT);
+  return { name: display, icon: ic };
+}
 // → { rows, rejected, names } oder null (Feld fehlt = keine Änderung)
 export function cleanParkour(a, now = Date.now()) {
   if (a === undefined || a === null) return null;
@@ -54,7 +65,7 @@ export async function parkourApi(env) {
   const { results } = await env.DB.prepare("SELECT course, mc_uuid, mc_name, time_ms, set_at FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY course ORDER BY time_ms, set_at, mc_uuid) AS rk FROM mc_parkour) WHERE rk <= 10 ORDER BY course, rk").all().catch(() => ({ results: [] }));
   const { results: nm } = await env.DB.prepare("SELECT course, course_name, course_icon FROM mc_parkour_courses").all().catch(() => ({ results: [] }));
   const N = Object.fromEntries(nm.map((r) => [r.course, r])), course_names = {}, course_icons = {};
-  const courses = {}; for (const r of results) { const c = N[r.course]; course_names[r.course] = c?.course_name || prettyCourse(r.course); course_icons[r.course] = c?.course_icon && ICON.test(c.course_icon) ? c.course_icon : PK_ICON_DEFAULT; (courses[r.course] ||= []).push({ rank: courses[r.course].length + 1, course_name: course_names[r.course], course_icon: course_icons[r.course], mc_uuid: r.mc_uuid, mc_name: r.mc_name, time_ms: r.time_ms, set_at: r.set_at }); }
+  const courses = {}; for (const r of results) { const c = N[r.course], shown = presentCourse(r.course, c?.course_name, c?.course_icon); course_names[r.course] = shown.name; course_icons[r.course] = shown.icon; (courses[r.course] ||= []).push({ rank: courses[r.course].length + 1, course_name: shown.name, course_icon: shown.icon, mc_uuid: r.mc_uuid, mc_name: r.mc_name, time_ms: r.time_ms, set_at: r.set_at }); }
   return { courses, course_names, course_icons };
 }
 const CSS = `<style>
@@ -71,7 +82,7 @@ export const parkourBody = () => `${CSS}<section class="hero" style="padding-bot
 const F=ms=>{ms=Math.max(0,Math.round(+ms||0));const m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000),x=ms%1000;return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(x).padStart(3,'0')};
 const HEAD=(n,s)=>'<img alt="" width="'+s+'" height="'+s+'" loading="lazy" src="/mc-head/'+encodeURIComponent(n)+'/'+s+'?v=5" onerror="this.src=\\'/mc-head/MHF_Steve/'+s+'?v=5\\'">';
 const MI=(id,s)=>'<img class="mi" alt="" width="'+s+'" height="'+s+'" style="image-rendering:pixelated" src="/mc-icon/v2/'+encodeURIComponent(id)+'" onerror="this.onerror=null;this.src=\\'/mc-icon/v2/paper\\'">';
-let D={},NM={},IC={};const P=k=>String(k).split('_').filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')||k,T=k=>NM[k]||P(k),I=k=>/^[a-z0-9_]{1,48}$/.test(IC[k]||'')?IC[k]:'paper';
+let D={},NM={},IC={};const P=k=>String(k).split('_').filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')||k,nice=n=>{if(n==null||n==='')return'';const s=String(n);return s.includes('_')&&!/\\s/.test(s)?P(s):s},T=k=>nice(NM[k])||P(k),I=k=>{let v=IC[k]||'';if(k==='house_climb'&&(!v||v==='paper'))v='ladder';return /^[a-z0-9_]{1,48}$/.test(v)?v:'paper'};
 const Q=()=>{let q=new URLSearchParams(location.search).get('course');if(!q){q=location.hash.slice(1);try{q=decodeURIComponent(q)}catch(e){}}return q?q.trim().toLowerCase().replace(/[\\s-]+/g,'_').replace(/^_+|_+$/g,''):''};
 const BOARD=k=>'<div class="g pkg" id="pk-'+E(k)+'" data-course="'+E(k)+'"><div class="pkh"><span class="slot">'+MI(I(k),26)+'</span><h2><a href="/parkour?course='+encodeURIComponent(k)+'">'+E(T(k))+'</a></h2><small>Top '+D[k].length+'</small></div>'+D[k].map(x=>{const n=x.mc_name||'Unbekannt';return '<div class="pkr p'+x.rank+'"><span class="rk">'+x.rank+'</span><span class="slot">'+HEAD(x.mc_name||'MHF_Steve',32)+'</span><span class="n">'+(x.mc_name?'<a href="/spieler/'+encodeURIComponent(n)+'">'+E(n)+'</a>':E(n))+'<small>'+E(new Date(x.set_at).toLocaleDateString('de-DE',{dateStyle:'medium'}))+'</small></span><b class="tm">'+F(x.time_ms)+'</b></div>'}).join('')+'</div>';
 function draw(){const K=Object.keys(D).sort((a,b)=>T(a).localeCompare(T(b),'de')||a.localeCompare(b));if(!K.length){R.innerHTML='<div class="g empty-st" id="pk-empty"><div class="big">'+MI('feather',56)+'</div><h2 class="hub-h2">Noch keine Zeiten</h2><p class="mut">Lauf in der Lobby einen Parkour-Kurs und hol dir Platz 1.</p></div>';return}

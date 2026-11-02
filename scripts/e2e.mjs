@@ -478,6 +478,15 @@ try {
     ok(r.j?.parkour === 1 && ic.course_icon === "golden_boots", "Ungültiges Icon 'bad icon!' → gespeichertes golden_boots bleibt", JSON.stringify(ic) + r.t);
     await ing([e0({ course: "cave_rush", mc_uuid: PU(3), time_ms: 35000, course_icon: "feather" })]);
     ok((await req("/api/mc-parkour")).j.course_names.cave_rush === "Cave Rush II", "Nur Icon gesendet → Name bleibt");
+    await ing([e0({ course: "house_climb", mc_uuid: PU(50), mc_name: "Kai", time_ms: 7896, course_name: "house_climb", course_icon: "paper" })]);
+    let hc = (await req("/api/mc-parkour")).j;
+    ok(hc.course_names.house_climb === "House Climb" && hc.courses.house_climb[0].course_name === "House Climb" && hc.course_icons.house_climb === "ladder" && hc.courses.house_climb[0].course_icon === "ladder", "house_climb: Slug und paper → House Climb + Leiter", JSON.stringify({ n: hc.course_names.house_climb, i: hc.course_icons.house_climb }));
+    let raw = sqlRows("SELECT course_name, course_icon FROM mc_parkour_courses WHERE course='house_climb'")[0];
+    ok(raw.course_name === "house_climb" && raw.course_icon === "paper", "house_climb: Rohdaten bleiben Slug und paper", JSON.stringify(raw));
+    await ing([e0({ course: "house_climb", mc_uuid: PU(50), time_ms: 7000, course_icon: "oak_stairs" })]);
+    ok((await req("/api/mc-parkour")).j.course_icons.house_climb === "oak_stairs", "house_climb: echtes Icon schlägt den Leiter-Fallback");
+    await ing([e0({ course: "house_climb", mc_uuid: PU(50), time_ms: 7000, course_icon: "paper" })]);
+    ok((await req("/api/mc-parkour")).j.course_icons.house_climb === "ladder" && (await req("/api/mc-parkour")).j.course_names.house_climb === "House Climb", "house_climb: paper wieder → Leiter, Name bleibt House Climb");
     { const q = await req("/parkour?course=cave_rush"); ok(q.s === 200 && q.t.includes("/api/mc-parkour") && !q.t.includes("onerror=alert"), "GET /parkour?course=… → 200, Name nicht im Server-HTML"); }
     { const m = await req("/parkour", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes("/api/mc-parkour")), "/parkour nur auf mc-Domain", m.s); }
   }
@@ -591,7 +600,10 @@ try {
       ok(!/<script>|<style| style=/.test(sec.slice(0, sec.indexOf("</section>"))), "/pvp-Inhalt ohne Inline-Script/-Style");
       ok(pg.t.includes('href="/pvp"'), "PvP in der MC-Navigation"); }
     { const pg = await req("/spieler/Nils"); ok(pg.s === 200 && pg.t.includes('id="pvp-pl"') && pg.t.includes('data-name="Nils"') && pg.t.includes("/mc/pvp.js"), "Spielerseite hat PvP-Block (extern)"); }
-    { const js = await req("/mc/pvp.js"); ok(js.s === 200 && js.t.includes("E(p.favorite_kit)") && js.t.includes("p.matches<5") && !/style=|\.style\./.test(js.t), "pvp.js: Kit escaped, Quote erst ab 5 Kämpfen, keine Inline-Styles"); }
+    { const js = await req("/mc/pvp.js"); ok(js.s === 200 && js.t.includes("E(p.favorite_kit)") && !js.t.includes(">Unent.") && !js.t.includes("['Unentschieden'") && js.t.includes("ohne Unentschieden") && !js.t.includes("p.matches<5") && js.t.includes("Siege / Kämpfe") && !/style=|\.style\./.test(js.t), "pvp.js: keine Unentschieden-Spalte, Quote auch unter 5 Kämpfen, Kit escaped"); }
+    { const p3 = fs.readFileSync(ROOT + "public/mc/player3d.js", "utf8"); ok(p3.includes("pointermove") && p3.includes("head.rotation.y") && p3.includes("head.rotation.x") && p3.includes("(tx-cx)*.08") && p3.includes("pf-model"), "Profil-3D: Kopf folgt der Maus, geglättet"); }
+    { const it = fs.readFileSync(ROOT + "public/mc/item.js", "utf8"); ok(it.includes("function mono") && it.includes("3600000") && it.includes("const med") && !it.includes("'H'+"), "Preisverlauf: Stunden-Median und monotone Kurve, keine Stufenlinie"); }
+    { const lb = await req("/leaderboards"); ok(lb.s === 200 && lb.t.includes("Survival-Kills") && lb.t.includes("['pvp','PvP']") && !lb.t.includes("K/D") && lb.t.includes(">Survival<") && lb.t.includes(">Arena<") && lb.t.includes("nicht die PvP-Arena"), "Bestenlisten: Survival-Kills, PvP-Tab, kein K/D"); }
     sql("DELETE FROM mc_pvp_stats"); sql("DELETE FROM mc_player_ranks"); }
   console.log("H) VIP-Panel");
   { const noPriv = (j) => j && j.access === false && !("stats" in j) && !("worlds" in j) && !("player" in j) && !JSON.stringify(j).includes("diamond_sword") && !JSON.stringify(j).includes("weight");

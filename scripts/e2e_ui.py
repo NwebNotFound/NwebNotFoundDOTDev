@@ -2,7 +2,7 @@
 import os
 # UI-Prüfung gegen das lokale wrangler dev aus e2e.mjs (wird von dort aufgerufen). argv: BASE COOKIE
 import json
-import sys, re
+import sys, re, time
 from urllib.parse import unquote
 from playwright.sync_api import sync_playwright
 BASE, COOKIE = sys.argv[1], sys.argv[2]
@@ -49,6 +49,8 @@ with sync_playwright() as p:
         ok(pg.locator("#rsn").count() == 1 and "neue Preise" in pg.inner_text("#rsn"), f"{w}px Markt: Hinweis 'neue Preise'")
         ok(pg.locator(".mrow .rmk").count() >= 1 and "neue Preise" in pg.locator(".mrow .rmk text").first.text_content(), f"{w}px Markt: Reset-Linie in Top/Flop-Sparkline")
         t = go("/markt/copper_ingot"); pg.locator("#cw svg").wait_for(timeout=10000)
+        curve = pg.get_attribute("#cw path[fill='none']", "d") or ""
+        ok("C" in curve and "H" not in curve and "V" not in curve, f"{w}px Item: glatte Kurve statt Stufe", curve[:90])
         mk = pg.locator("#cw .rmk")
         ok(mk.count() == 1 and mk.locator("text").text_content() == "neue Preise", f"{w}px Item: vertikale Linie 'neue Preise'")
         ok("Monocraft" in pg.eval_on_selector("#cw .rmk text", "e=>getComputedStyle(e).fontFamily"), f"{w}px Item: Marker in Pixel-Schrift", pg.eval_on_selector("#cw .rmk text", "e=>getComputedStyle(e).fontFamily"))
@@ -109,17 +111,17 @@ with sync_playwright() as p:
         PR = '{"rank":2,"mc_uuid":"' + U1x + '","mc_name":"Nils","time_ms":49530,"set_at":"2026-10-31T20:00:00Z"}'
         pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body='{"courses":{"cave_rush":[' + PR + ']},"course_names":{"cave_rush":"Cave Rush"},"course_icons":{"cave_rush":"lantern"}}'))
         pg.goto("https://" + H + "/profile", wait_until="domcontentloaded"); pg.locator("#t-minispiele").wait_for(timeout=20000); pg.click("#t-minispiele")
-        pk = pg.locator(".dcard", has_text="Top-10-Platzierungen").first; pk.wait_for(timeout=10000)
+        pk = pg.locator(".pk-card").first; pk.wait_for(timeout=10000)
         L = pk.evaluate("""c=>{const R=e=>e.getBoundingClientRect(),h=c.querySelector('h3'),s=h.querySelector('small'),r=c.querySelector('.prow'),ic=R(r.querySelector('.ic')),n=R(r.querySelector('.n')),rk=r.querySelector('.pk-rk'),tm=R(r.querySelector('.pk-tm')||r.querySelector('b')),cs=getComputedStyle(c);
           const t=document.createRange();t.selectNodeContents(h.firstChild);const tr=t.getBoundingClientRect();
           return {title:h.firstChild.textContent,sep:(R(s).left-tr.right>=6)||(R(s).top>=tr.bottom-1),row:Math.abs((ic.top+ic.bottom)/2-(n.top+n.bottom)/2)<4&&n.left>=ic.right+8,rk:!!rk&&rk.textContent==='#2'&&tm.left-R(rk).right>=8&&Math.abs((R(rk).top+R(rk).bottom)/2-(tm.top+tm.bottom)/2)<4,pad:parseFloat(cs.paddingLeft)===(innerWidth>=640?24:16)&&parseFloat(cs.paddingTop)===(innerWidth>=640?24:16),fit:R(r).right<=R(c).right&&[...c.querySelectorAll('.prow')].every(x=>x.scrollWidth<=x.clientWidth)}}""")
-        ok(L["title"] == "Parkour" and L["sep"] and "Cave Rush" in pk.inner_text(), f"{w}px Profil-Parkour: Titel und Untertitel getrennt", L)
+        ok(L["title"] == "Parkour" and L["sep"] and "Cave Rush" in pk.inner_text() and "Beste Platzierung" in pk.inner_text() and "pk-one" in (pk.get_attribute("class") or ""), f"{w}px Profil-Parkour: einzelne Platzierung als Karte", L)
         ok(L["row"] and L["rk"] and L["pad"] and L["fit"], f"{w}px Profil-Parkour: Icon/Name/Rang/Zeit als Zeile mit Abständen", L)
         heads = pg.eval_on_selector_all("#pb .dcard h3", "hs=>hs.filter(h=>h.querySelector('small')).map(h=>{const s=h.querySelector('small').getBoundingClientRect(),t=document.createRange();t.selectNodeContents(h.firstChild);const r=t.getBoundingClientRect();return [h.firstChild.textContent,(s.left-r.right>=6)||(s.top>=r.bottom-1)]})")
         ok(heads and all(x[1] for x in heads), f"{w}px Profil: alle Karten-Titel vom Untertitel getrennt", heads)
         pk.scroll_into_view_if_needed(); pk.screenshot(path=f"{SH}/local-profil-parkour-{w}.png"); 
         pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded"); pg.locator("#t-minispiele").wait_for(timeout=20000); pg.click("#t-minispiele")
-        sp = pg.locator(".dcard", has_text="Top-10-Platzierungen").first; sp.wait_for(timeout=10000)
+        sp = pg.locator(".pk-card").first; sp.wait_for(timeout=10000)
         S = sp.evaluate("""c=>{const R=e=>e.getBoundingClientRect(),h=c.querySelector('h3'),s=R(h.querySelector('small')),t=document.createRange();t.selectNodeContents(h.firstChild);const tr=t.getBoundingClientRect(),rk=R(c.querySelector('.pk-rk')),tm=R(c.querySelector('.pk-tm'));return [getComputedStyle(h).display,(s.left-tr.right>=6)||(s.top>=tr.bottom-1),tm.left-rk.right>=8,document.querySelectorAll('link[href*="/mc/profile.css"]').length]}""")
         ok(S[0] == "flex" and S[1] and S[2] and S[3] == 1 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px /spieler: Karten-Styles aus profile.css, Parkour-Karte sauber", S)
         sp.scroll_into_view_if_needed(); sp.screenshot(path=f"{SH}/local-spieler-parkour-{w}.png"); pg.unroute("**/api/mc-parkour")
@@ -194,7 +196,8 @@ with sync_playwright() as p:
         hs = pg.eval_on_selector_all(".pkr", "els=>els.map(e=>e.getBoundingClientRect().height)"); ok(max(hs) < 70, f"{w}px Parkour: Zeilen einzeilig", hs)
         pg.screenshot(path=f"{SH}/local-parkour-{w}.png", full_page=True)
         go("/parkour"); pg.locator(".pkg").first.wait_for(timeout=10000); n = pg.locator(".pkg").count(); hs = pg.locator(".pkh h2").all_inner_texts()
-        ok(n >= 3 and "Cave Rush II" in hs and "kurs1" not in hs and "<img src=x onerror=alert(1)>" in hs and "Nether Run" in hs and not any("_" in h for h in hs) and not any("_" in b for b in pg.locator(".pkt .btn").all_inner_texts()), f"{w}px Parkour: ein Board pro Kurs mit Anzeigenamen (escaped), Fallback hübsche ID, keine Unterstriche", hs)
+        ok(n >= 3 and "Cave Rush II" in hs and "House Climb" in hs and "kurs1" not in hs and "house_climb" not in hs and "<img src=x onerror=alert(1)>" in hs and "Nether Run" in hs and not any("_" in h for h in hs) and not any("_" in b for b in pg.locator(".pkt .btn").all_inner_texts()), f"{w}px Parkour: ein Board pro Kurs mit Anzeigenamen (escaped), Fallback hübsche ID, keine Unterstriche", hs)
+        ok(pg.locator(".pkg[data-course=house_climb] .pkh img[src='/mc-icon/v2/ladder']").count() == 1, f"{w}px Parkour: house_climb Leiter statt grauem paper")
         ok(pg.locator(".pkg[data-course=icon_ok] .pkh img[src='/mc-icon/v2/golden_boots']").count() == 1 and pg.locator(".pkg[data-course=icon_bad] .pkh img[src='/mc-icon/v2/paper']").count() == 1, f"{w}px Parkour: Kurs-Icon (golden_boots / paper)")
         ok(pg.locator(".pkg img[onerror*=alert]").count() == 0, f"{w}px Parkour: course_name nicht als HTML gerendert")
         pg.screenshot(path=f"{SH}/local-parkour-alle-{w}.png", full_page=True)
@@ -269,6 +272,62 @@ with sync_playwright() as p:
         pins = pg.evaluate("""() => { const R = e => e.getBoundingClientRect(); return [...document.querySelectorAll('#vip .g')].flatMap(card => [...card.querySelectorAll('.slot')].map(s => { const a = R(card), b = R(s); return [b.left-a.left, b.top-a.top, a.right-b.right]; })); }""")
         ok(pins and all(x >= 12 and y >= 12 and r >= 12 for x, y, r in pins), f"{w}px VIP-Panel: Slots in Karten, Welten und Stats eingerückt", pins[:6])
         pg.locator(".vip-me").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-vip-panel-{w}.png", full_page=True); pg.unroute("**/api/mc-vip")
+        now_s = int(time.time()); hour = 3600
+        def bucket(back):
+            return (now_s // hour - back) * hour
+        hist, ticks = [], []
+        for i, back in enumerate(range(48, 4, -3)):
+            if i % 2 == 0: hist.append([bucket(back), 16.0 + (i % 4) * 0.05, 15.9, 16.3, 3])
+            else: hist.append([bucket(back), 4.75, 4.75, 4.75, 0])
+        for back in range(46, 5, -5):
+            ticks.append([bucket(back) + 90, 16.14, 4.75, 0])
+        flint = {"item": {"item": "flint", "buy_price": 16.2, "sell_price": 4.75, "base_price": 10, "buy_locked": 0, "sell_locked": 0, "volume_24h_qty": 8, "volume_24h_cp": 120, "trades_24h": 3, "change_24h_pct": 1, "updated_at": now_s, "has_hist": 1}, "price_reset_at": None, "history": hist, "ticks": ticks}
+        def pvp_route(r):
+            u = r.request.url.split("?")[0].rstrip("/")
+            if u.endswith("/api/mc-pvp"):
+                r.fulfill(status=200, content_type="application/json", body=json.dumps({"players": [
+                    {"uuid": "u1", "name": "Nils", "wins": 2, "losses": 1, "draws": 0, "matches": 3, "winrate_pct": 67, "favorite_kit": None, "rank": None},
+                    {"uuid": "u2", "name": "Gast", "wins": 1, "losses": 0, "draws": 0, "matches": 1, "winrate_pct": 100, "favorite_kit": "axe", "rank": None},
+                ]}))
+            elif u.endswith("/api/mc-pvp/Nils"):
+                r.fulfill(status=200, content_type="application/json", body=json.dumps({"uuid": "u1", "name": "Nils", "wins": 1, "losses": 1, "draws": 0, "matches": 2, "winrate_pct": None, "favorite_kit": "crystal", "rank": None}))
+            else:
+                r.fallback()
+        pg.route("**/api/mc-pvp**", pvp_route)
+        pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps({"courses": {"house_climb": [{"rank": 1, "mc_uuid": U1x, "mc_name": "Nils", "time_ms": 7896, "set_at": "2026-11-01T17:54:04.541Z", "course_name": "house_climb", "course_icon": "paper"}]}, "course_names": {"house_climb": "house_climb"}, "course_icons": {"house_climb": "paper"}})))
+        pg.route("**/api/mc-market/flint", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(flint)))
+        go("/profile"); pg.locator("#t-minispiele").wait_for(timeout=20000); pg.click("#t-minispiele")
+        pg.locator(".pk-card.pk-one").wait_for(timeout=10000)
+        ptxt = pg.inner_text("#p-minispiele")
+        ok("House Climb" in ptxt and "house_climb" not in ptxt and "Unentschieden" not in ptxt and "50 %" in ptxt, f"{w}px Profil: House Climb, Quote bei 2 Kämpfen, kein Unentschieden", ptxt[:420])
+        ok(pg.locator(".pk-card.pk-one img[src='/mc-icon/v2/ladder']").count() == 1 and pg.locator(".pvp-arena .slotbox").count() == 3, f"{w}px Profil: Leiter-Icon, PvP-Karte ohne Unentschieden")
+        pg.locator(".pk-card").screenshot(path=f"{SH}/local-house-climb-{w}.png")
+        src3 = pg.evaluate("async () => await (await fetch('/mc/player3d.js')).text()")
+        ok("pointermove" in src3 and "head.rotation.y" in src3 and "(tx-cx)*.08" in src3, f"{w}px 3D-Kopf folgt der Maus")
+        go("/pvp"); pg.locator(".pvp-t").wait_for(timeout=10000)
+        head, bodyp = pg.locator(".pvp-t thead").inner_text(), pg.inner_text(".pvp-t")
+        ok("Unent" not in head and "Unentschieden" not in bodyp and "100 %" in bodyp and "Gast" in bodyp, f"{w}px PvP-Tabelle: Quote auch bei einem Kampf", head)
+        go("/leaderboards"); pg.locator("#tabs [data-k=pvp]").wait_for(timeout=10000)
+        tb = pg.locator("#tabs").inner_text()
+        low = tb.casefold()
+        ok("survival-kills" in low and "pvp" in low and "k/d" not in low and "arena" in low, f"{w}px Bestenlisten-Tabs nach Thema", tb)
+        pg.click("#tabs [data-k=kills]"); pg.wait_for_timeout(200)
+        ok("Survival" in pg.locator("#lbh").inner_text() and "Arena" in pg.locator("#lbh").inner_text(), f"{w}px Hinweis: Survival-Kills sind nicht die Arena", pg.locator("#lbh").inner_text())
+        pg.click("#tabs [data-k=pvp]"); pg.locator("#out .pod").wait_for(timeout=10000)
+        out = pg.inner_text("#out")
+        ok("Gast" in out and "100 %" in out and "Siege" in out and pg.locator("#seg").is_hidden(), f"{w}px PvP-Tab: Siege und Quote, Woche/Gesamt ausgeblendet", out[:240])
+        ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px PvP-Tab: kein horizontales Scrollen")
+        go("/markt/flint"); pg.locator("#cw path[fill='none']").wait_for(timeout=10000)
+        dln = pg.get_attribute("#cw path[fill='none']", "d") or ""
+        ok("C" in dln and "H" not in dln and "V" not in dln, f"{w}px Flint: monotone Kurve", dln[:80])
+        labels = pg.evaluate("""() => { const svg=document.querySelector('#cw svg'); const vb=svg.viewBox.baseVal.width; return [...svg.querySelectorAll('text')].filter(t => +t.getAttribute('x') > vb*0.72).map(t => t.textContent); }""")
+        nums = []
+        for lab in labels:
+            try: nums.append(float(str(lab).replace(".", "").replace(",", ".")))
+            except ValueError: pass
+        ok(nums and min(nums) > 8, f"{w}px Flint: Flipflop-Snapshots nicht als Zacken in der Skala", labels)
+        pg.locator("#cw").screenshot(path=f"{SH}/local-preis-glatt-{w}.png")
+        pg.unroute("**/api/mc-pvp**"); pg.unroute("**/api/mc-parkour"); pg.unroute("**/api/mc-market/flint")
         errs = [e for e in errs if e.strip() != "Event"]
         ok(not errs, f"{w}px keine Konsolen-/JS-Fehler", errs[:3])
         ctx.close()
