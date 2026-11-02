@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> Dieses Dokument ist der Plan. Es ändert keinen Worker, kein Schema und kein Frontend. Jede Phase darunter ist ein eigener, reviewbarer PR gegen `main`. Nicht mergen, bevor die Phase ihre eigenen e2e-Checks grün hat.
+> Dieses Dokument ist der Plan. Es ändert keinen Worker, kein Schema und kein Frontend. Die Umsetzung sind drei Folge-PRs gegen `main` (Menüs und Layout, VIP-API, VIP-UI). Jeder davon hat seine eigenen e2e-Checks grün, bevor er mergt.
 
 **Goal:** `mc.nwebnotfound.dev` so umbauen, dass Nils den Minecraft-Bereich bedienen kann: eine Navigation nach Aufgaben, ein einheitlicher Minecraft-Look, PvP nur auf der PvP-Seite, glatte Preislinien, 3D-Köpfe die der Maus folgen, und ein VIP-Panel mit Discord-Login, das eigene Welten verwaltet, ohne RCON oder Admin nach außen zu geben.
 
@@ -13,7 +13,8 @@
 ## Global Constraints
 
 - Hosts bleiben: Portfolio `nwebnotfound.dev`, Minecraft `mc.nwebnotfound.dev`. `/auth/*` auf dem MC-Host leitet weiter auf den Apex um. Cookie bleibt `HttpOnly; Secure; SameSite=Lax; Domain=.nwebnotfound.dev`.
-- Kein RCON, kein Admin-Port, kein Shared Secret und keine Befehlszeichenkette im Browser oder in öffentlichem JSON. Der Client sendet nur ein festes `op` aus der Whitelist plus typisierte Argumente.
+- Kein RCON, kein Admin-Port und keine Befehlszeichenkette im Browser oder in öffentlichem JSON. Der Client sendet nur ein festes `op` aus der Whitelist plus typisierte Argumente.
+- `MC_INGEST_TOKEN` liegt nur als Cloudflare-Worker-Secret (`wrangler secret`). Er steht nicht in `wrangler.jsonc`, nicht im Git, nicht im HTML und nicht in `public/mc/`. Pending und Ack vergleichen ausschließlich `env.MC_INGEST_TOKEN` mit dem Header `x-ingest-token`. Query, Cookie oder Body reichen nicht.
 - Geld bleibt ganzzahlige Cent. Die Website entscheidet keine Beträge; maßgeblich ist der Server (siehe `INGEST.md`).
 - Neue MC-Oberflächen: keine Emojis, keine Inline-Styles, keine `<style>`-Blöcke im Seiteninhalt. Icons nur über `/mc-icon/v2/<id>` (pixelig). Überschriften Monocraft (`--f-px`), Fließtext die Systemschrift (`--f-body`). Tokens nur aus `public/mc/ds.css`.
 - PvP-Stats (Siege, Niederlagen, Kämpfe, Quote, Lieblings-Kit, Arena-Tab) stehen nur auf `/pvp`. Nicht auf `/leaderboards`, `/profile`, `/spieler` oder `/spieler/<name>`.
@@ -21,7 +22,8 @@
 - 3D-Köpfe folgen der Maus nur bei feinem Zeiger (`(hover:hover) and (pointer:fine)`). `prefers-reduced-motion`, grober Zeiger und schmale Viewports bleiben beim Standbild (`STATIC()` in `public/mc/player3d.js`). Der Loop pausiert außerhalb des Bildschirms und bei verstecktem Tab (Stand nach #34).
 - Deutschsprachige UI. Freitext immer über die bestehende Escape-Funktion (`MC.E` bzw. `esc` im Worker).
 - Portfolio (`/`, `/guestbook`, `/profile` auf dem Apex, `/api/guestbook`) ist nicht Teil dieses Reworks.
-- `NwebNotFound/mc-stack` wird hier nicht implementiert. Die Website plant gegen die Schnittstelle in diesem Dokument. Punkte mit der Markierung **Offen mit Craft** blockieren Phase 7 und 8, nicht Phase 1–6.
+- `NwebNotFound/mc-stack` wird hier nicht implementiert. Die Website plant gegen die Schnittstelle in diesem Dokument. Punkte mit der Markierung **Offen mit Craft**, die das JSON ändern, blockieren Folge-PR 2, nicht Folge-PR 1.
+- Jede VIP-Aktion prüft serverseitig, ob die UUID aus `mc_links` der Session Owner oder Mitglied der Welt ist. Der Browser und der Request-Body entscheiden das nicht. Ein e2e-Fall in Folge-PR 2 deckt Owner, Mitglied und Fremden ab.
 
 ---
 
@@ -79,7 +81,7 @@ Apple-ruhig in der Fläche, Minecraft in den Objekten. Nicht umgekehrt.
 
 ## Bestandsaufnahme
 
-Stand `main` (`src/worker.js` Fetch, Host `mc.nwebnotfound.dev`). Schwäche ist der Grund, die Route in den Rework zu nehmen. „Bleibt“ heißt: Inhalt und URL bleiben, die Hülle (Navigation, Typo, Slots) zieht in Phase 1–3 mit.
+Stand `main` (`src/worker.js` Fetch, Host `mc.nwebnotfound.dev`). Schwäche ist der Grund, die Route in den Rework zu nehmen. „Bleibt“ heißt: Inhalt und URL bleiben, die Hülle (Navigation, Typo, Slots) zieht in Folge-PR 1 mit.
 
 ### Seiten
 
@@ -116,7 +118,7 @@ Stand `main` (`src/worker.js` Fetch, Host `mc.nwebnotfound.dev`). Schwäche ist 
 | `GET /api/mc-leaderboards` | öffentlich | UI ignoriert Kategorien `kd`, `kdr`, `k_d`, `kill_death`, `pvp` und alles, was mit `pvp` anfängt. Daten dürfen in D1 bleiben. |
 | `GET /api/mc-pvp`, `GET /api/mc-pvp/<name>` | öffentlich | Nur `public/mc/pvp.js` auf `/pvp` ruft sie auf. |
 | `GET /api/mc-parkour` | öffentlich | Parkour-Seite und die Parkour-Zeile im Profil/auf der Spielerseite. Die Spielerseite darf Parkour behalten. |
-| `GET /api/mc-vip` | Cookie, `private, no-store`, POST 405 | Phase 6 erweitert die Leseform. Schreiben kommt nicht auf diese GET-Route. |
+| `GET /api/mc-vip` | Cookie, `private, no-store`, POST 405 | Folge-PR 2 erweitert die Leseform und filtert auf Owner oder Mitglied. Schreiben liegt auf eigenen Routen, nicht auf diesem GET. |
 | `GET /api/mc-market`, `GET /api/mc-market/<item>`, `GET /api/mc-economy` | öffentlich | Charts. Economy-JSON bleibt Tageswerte. |
 | `GET/POST /api/mc-shops*`, `/api/mc-auctions*`, `/api/mc-bid`, `/api/mc-shop-order`, Pending/Ack | wie `INGEST.md` | Vorbild für die VIP-Queue. Rate-Limit heute: 5/min und 30/h pro Discord, 10/min und 60/h pro IP, gemeinsam für Gebot und Bestellung. |
 | `POST /api/mc-ingest` | `x-ingest-token`, max. 8 MB, kein Rate-Limit | Einziger Weg, auf dem Spielzustand in D1 kommt. VIP-Status später als weiteres optionales Feld, alte Payloads bleiben gültig. |
@@ -140,8 +142,8 @@ Zugang zum Verwalten, alle Bedingungen:
 1. Session gültig, sonst 401 `{error, reason:"login"}`.
 2. `mc_links` für diese `discord_id`: `verified = 1`, `has_role = 1`, Name `^[A-Za-z0-9_]{1,16}$`, UUID kanonisch. Sonst 403 `{reason:"link"}`.
 3. `mc_player_ranks.rank` ist `vip` oder `mvp`. Builder und Admin bekommen 403 `{reason:"rank"}` und sehen nur den öffentlichen Katalog. **Offen mit Craft:** ob Admin das Panel doch benutzen soll. Bis dahin: nein. Admins schalten Welten am Server, nicht in diesem Formular.
-4. Die verlinkte UUID ist `owner_uuid` der Welt. Mitglieder dürfen lesen, was der Ingest über sie hergibt, aber nicht schalten oder einladen. **Offen mit Craft:** Co-Owner. Bis dahin: genau ein Owner.
-5. `mc_uuid` aus dem Body wird ignoriert. Die UUID kommt aus `mc_links`, wie bei `bidder_uuid` heute.
+4. **Welt-Check, jede VIP-Aktion, nur auf dem Worker.** Nach Session, Link und Rang lädt der Worker die Welt aus dem letzten `vip_worlds`-Stand. Die UUID aus `mc_links` ist `owner_uuid` (Rolle `owner`) oder sie steht über den verknüpften Namen in `members` (Rolle `member`). Sonst `403 {reason:"not_member"}` und keine Zeile in `mc_vip_commands`. `mc_uuid`, `owner` oder `members` aus dem Body werden ignoriert. Ein Fallback-Slot aus `servers` ohne `owner_uuid` hat keine Rolle und ist nicht aufrufbar.
+5. Schreiben (Power, Info, Einladen, Entfernen) verlangt zusätzlich Rolle `owner`. Ein Mitglied besteht den Welt-Check und bekommt danach `403 {reason:"owner"}`, ebenfalls ohne neue Zeile. Lesen liefert Owner und Mitglied nur die Welten, in denen sie eine der beiden Rollen haben. **Offen mit Craft:** Co-Owner. Bis dahin gibt es genau einen Owner, und nur der schreibt.
 
 Lese-URL bleibt `GET /api/mc-vip` (Cookie, `cache-control: private, no-store`). Ohne Zugang dieselbe Hülle wie heute: `{access:false, reason, catalog, note}` und keine Weltenliste. Mit Zugang zusätzlich:
 
@@ -188,7 +190,7 @@ Abgelehnt:
 
 - Unbekanntes `op`, freier Befehlstext, `state` außer `start`/`stop`: 400.
 - Welt-Id oder Name passt nicht auf das Muster: 400.
-- Welt gehört dem Spieler nicht, oder der Ingest kennt sie nicht: 404. Der Fallback aus `servers` ohne `owner_uuid` ist nicht schaltbar.
+- Weder Owner noch Mitglied, oder der Ingest kennt die Welt nicht: 403 `not_member`. Der Fallback aus `servers` ohne `owner_uuid` ist nicht schaltbar. Ein Mitglied, das schreibt: 403 `owner`.
 - Einladen des Owners, Einladen eines Namens der schon Mitglied ist, Entfernen eines Namens der kein Mitglied ist: 409.
 - Mehr als 12 Mitglieder, `info` länger als 120: 400.
 - Zweites offenes Power-Kommando für dieselbe Welt (Status `pending`): 409 `{reason:"busy"}`.
@@ -205,10 +207,13 @@ Rate-Limit, nur diese vier Routen, getrennt von Gebot/Shop:
 
 ```
 Browser (Cookie, Origin)
-  → Worker prüft Session, Link, Rang, Owner, Rate-Limit, op-Whitelist
-  → INSERT mc_vip_commands (status pending)
+  → Worker prüft Session, Link, Rang
+  → Worker prüft serverseitig: UUID der Session ist Owner oder Mitglied dieser Welt
+  → beim Schreiben zusätzlich: Rolle ist Owner
+  → Rate-Limit, op-Whitelist
+  → nur dann INSERT mc_vip_commands (status pending)
   → 202 request_id
-mc-stack / Creepy, nur mit x-ingest-token, nicht aus dem Browser
+mc-stack / Creepy, Header x-ingest-token = Worker-Secret MC_INGEST_TOKEN, nie aus dem Browser
   → GET /api/mc-vip/commands/pending?since=<ms>
   → mappt op auf die eigene, nicht öffentliche API
   → POST /api/mc-vip/commands/ack
@@ -217,7 +222,7 @@ Browser
   → GET /api/mc-vip sieht pending, danach den neuen Stand
 ```
 
-Der Worker öffnet in diesem Plan keine Verbindung zum Spiel. Es gibt keinen Pfad, auf dem ein Besucher Host, Port, Passwort oder eine Rohzeile wie `op Nils` setzt.
+Der Worker öffnet in diesem Plan keine Verbindung zum Spiel. Es gibt keinen Pfad, auf dem ein Besucher Host, Port, Passwort oder eine Rohzeile wie `op Nils` setzt. Das Ingest-Token ist nur das Worker-Secret `MC_INGEST_TOKEN`. Der Worker liest es aus `env`, legt es in keine Response und akzeptiert es nur als Header `x-ingest-token`. Die lokale e2e-Datei `.dev.vars` bleibt untracked; der dortige Testwert `e2e-token` darf in keiner ausgelieferten Seite vorkommen.
 
 **Offen mit Craft:** falls die API ein HTTP-Endpunkt ist, den der Worker aufrufen soll, statt zu pollen. Dann: Worker-Secrets `MC_STACK_URL` und `MC_STACK_TOKEN`, `fetch` nur serverseitig, Timeout 3 s, die Zeile bleibt `pending` bis das Ack da ist, die URL steht nie im HTML oder in `/api/me`. Bis Craft das festlegt, gilt ausschließlich Polling, weil Gebote und Shop-Orders schon so laufen (`GET /api/mc-bids/pending`, `POST /api/mc-bids/ack`).
 
@@ -263,7 +268,7 @@ Optionales Feld auf `POST /api/mc-ingest`, ersetzt die VIP-Liste komplett wenn e
 }
 ```
 
-Höchstens 30 Welten pro Push. Ungültige Zeilen fallen weg, der Rest wird geschrieben. `players` ist entweder eine Namensliste oder eine Zahl (wie `playerCount` heute). Der öffentliche Serverstatus auf `/` zeigt VIP-Welten nur als „online/offline + Spielerzahl“, ohne Mitgliederliste. Die Mitgliederliste steht nur im Panel des Owners.
+Höchstens 30 Welten pro Push. Ungültige Zeilen fallen weg, der Rest wird geschrieben. `players` ist entweder eine Namensliste oder eine Zahl (wie `playerCount` heute). Der öffentliche Serverstatus auf `/` zeigt VIP-Welten nur als „online/offline + Spielerzahl“, ohne Mitgliederliste. Die Mitgliederliste sehen nur Owner und Mitglieder dieser Welt, und nur über `GET /api/mc-vip`.
 
 **Offen mit Craft:**
 
@@ -272,9 +277,9 @@ Höchstens 30 Welten pro Push. Ungültige Zeilen fallen weg, der Rest wird gesch
 - Inhalt von „Infos“ über das eine Feld `info` hinaus (MOTD, Seed, Spielmodus, Gamerules). Alles weitere ist draußen, bis es ein benanntes Feld gibt.
 - Ob An/Aus die Welt entlädt, nur die Whitelist schließt oder den Proxy-Server abmeldet. Die Website sendet `start`/`stop` und zeigt danach das, was der Ingest unter `online` meldet. Sie rät nicht.
 - Mitglieder-Obergrenze und Welten pro Owner. Website-Default: 3 Welten sichtbar, 12 Mitglieder. Der Server darf weniger akzeptieren und per Ack ablehnen.
-- Scoreboard-Neuaufbau. Bis das Dokument da ist, bleibt `v_leaderboards` / `leaderboards` aus `INGEST.md` der Vertrag. Ein späterer Mapper schreibt in `mc_leaderboards`. Kategorien, die PvP sind, bekommen auf `/leaderboards` keinen Tab (Phase 3). Die PvP-Seite liest weiter `pvp_stats` bzw. `GET /api/mc-pvp`.
+- Scoreboard-Neuaufbau. Bis das Dokument da ist, bleibt `v_leaderboards` / `leaderboards` aus `INGEST.md` der Vertrag. Liegt es vor dem Merge von Folge-PR 2, mappt derselbe PR in `mc_leaderboards`. Es gibt dafür keinen vierten PR. PvP-Kategorien bekommen keinen Tab (Folge-PR 1). Die PvP-Seite liest weiter `pvp_stats` bzw. `GET /api/mc-pvp`.
 
-### D1, wenn Phase 7 soweit ist
+### D1, in Folge-PR 2
 
 Neue Tabelle in `schema.sql` (frische e2e-DB) und in `migrations/0013_vip_commands.sql` (bestehende Produktions-D1). Spalten in derselben Art wie `mc_bids_pending`: `id`, `op`, `world_id`, `actor_uuid`, `actor_name`, `discord_id`, `name`, `info`, `source` (`web`), `created_at`, `status`, `reason`, `acked_at`, `ip`. Index auf `(status, created_at)` und `(discord_id, created_at)`. Kein Passwort, kein Rohbefehl.
 
@@ -294,173 +299,120 @@ Keine dieser Dateien ändert dieser Plan-PR.
 | `public/mc/common.js` | `spark()` zeichnet dieselbe monotone Kubik wie der Item-Chart. |
 | `public/mc/item.js` | `mono` behalten, `<style>` nach CSS ziehen. |
 | `public/mc/economy.js` | Stufen-Graph der Geldmenge behalten. |
-| `src/mc-vip.js`, `public/mc/vip.js`, `public/mc/vip.css` | Lese-Panel, später Formulare, die nur die vier Mutationen aufrufen. |
+| `src/mc-vip.js`, `public/mc/vip.js`, `public/mc/vip.css` | Folge-PR 2: Lese-API und Queue. Folge-PR 3: Formulare, die nur die vier Mutationen aufrufen. |
 | `src/mc-trade.js` als Vorbild, neue Funktionen daneben in `src/mc-vip.js` | Pending, Ack, Rate-Limit. Nicht in die Shop-Routen mischen. |
 | `schema.sql`, `migrations/0013_vip_commands.sql` | Queue-Tabelle. |
-| `INGEST.md` | `vip_worlds` und die Pending-Routen, sobald Phase 7 mergt. Nicht in diesem Plan-PR. |
+| `INGEST.md` | `vip_worlds` und die Pending-Routen, in Folge-PR 2. Nicht in diesem Plan-PR. |
 | `scripts/e2e.mjs`, `scripts/e2e_ui.py` | Assertions der jeweiligen Phase. Aufruf bleibt `node scripts/e2e.mjs`. |
 
-`MCP.games` in `public/mc/player3d.js` holt heute `/api/mc-pvp/<name>` für Profil und Spielerseite. Nach Phase 3 holt es nur noch Parkour. Die PvP-Seite hat einen eigenen Fetch.
+`MCP.games` in `public/mc/player3d.js` holt heute `/api/mc-pvp/<name>` für Profil und Spielerseite. Nach Folge-PR 1 holt es nur noch Parkour. Die PvP-Seite hat einen eigenen Fetch.
 
 ---
 
-## Phasen
+## Drei Folge-PRs
 
-Jede Phase ist ein PR. Sie baut auf der vorherigen auf, außer wo „parallel zu“ steht. Ein PR mischt nicht „Nav“ und „VIP-Schreiben“. Tests der Phase laufen in derselben CI wie heute (`e2e` Workflow). Bestehende Checks bleiben grün; Assertions, die PvP auf Profil oder Bestenliste erwarten, werden in Phase 3 umgeschrieben, nicht auskommentiert.
+Die Umsetzung sind drei PRs, in dieser Reihenfolge. Sie laufen in derselben CI wie heute (`.github/workflows/e2e.yml`). Bestehende Checks bleiben grün. Eine Assertion, die der PR falsch macht, wird in demselben PR ersetzt, nicht auskommentiert. Kein vierter PR für Scoreboards, PvP, Charts oder Köpfe: das liegt in PR 1 bzw. im Ingest von PR 2.
 
-### Phase 1 — Navigation
+### Folge-PR 1 — Menüs und Layout
 
-**Dateien:** `src/mc-hub.js`, `public/mc/ds.css`, `src/worker.js` nur `ACCT_JS` und der Footer-Link auf Feedback (darf bleiben, zusätzlich zum Menü). **Test:** `scripts/e2e_ui.py`.
+**Dateien:** `src/mc-hub.js`, `public/mc/ds.css`, `public/mc/profile.css`, `public/mc/pvp.css`, `public/mc/economy.css`, `public/mc/common.js`, `public/mc/item.js`, `public/mc/player3d.js`, `public/mc/pvp.js`, `src/mc-players.js`, `src/worker.js` (Nav, `ACCT_JS`, `LEADERBOARDS_MC`, `PROFILE_BODY`, ausgelagerte Inline-CSS). **Tests:** `scripts/e2e.mjs`, `scripts/e2e_ui.py`.
 
-**Tut:** Gruppen und Ziele aus der Tabelle oben. Eine Quelle. Hover/Klick-Verhalten ohne die 500-ms-Regel. Handy-Drawer inklusive Konto. Startkacheln in derselben Reihenfolge. Aktuelle Seite markiert, auch auf Unterrouten. Horizontal-Scroller aus `HUB_CSS` löschen.
+**Tut:**
 
-**Tut nicht:** keine neuen Daten, keine VIP-Buttons, kein Chart, kein Entfernen von PvP-Blöcken (das ist Phase 3, sonst reviewt ein PR zwei Themen).
+- Gruppen und Ziele aus der Tabelle oben. Eine Quelle. Hover/Klick ohne die 500-ms-Regel. Handy-Drawer inklusive Konto. Startkacheln in derselben Reihenfolge. Aktuelle Seite markiert, auch auf Unterrouten. Den Horizontal-Scroller aus `HUB_CSS` löschen.
+- MC-Button, Tabs als Slot-Reihe, Bestenlisten-Podium und Profil-Karten auf die Chest-Tokens. Item-Chart ohne `<style>` im HTML. Kontrast der Rang-Badges (≥ 4.5:1 im hellen Sonderfall) bleibt.
+- PvP-Zahlen nur noch auf `/pvp`. Arena-Tab, PvP-Fetch und Quote-Podium von `/leaderboards` weg. Winrate-KPI und `.pvp-arena` aus dem Profil weg. `#pvp-pl` und die Winrate-Zeile von `/spieler/<name>` weg. Survival-Kills, Tode und Parkour-Bestzeit bleiben. `GET /api/mc-pvp` speist nur `/pvp`. Leaderboard-Keys `pvp*` und `kd`/`kdr`/`k_d`/`kill_death` erzeugen keinen Tab. Die Quote-Formel (Best of 3, auch unter 5 Kämpfen) bleibt.
+- `mono` aus `public/mc/item.js` nach `public/mc/common.js`. Sparkline und Item-Chart benutzen sie (monotone Kubik, `C`-Befehle, Steigung 0 bei Vorzeichenwechsel). Der Zacken-Filter aus #34 bleibt. `public/mc/economy.js` bleibt eine Stufe pro Tag.
+- `look()` an jeder Live-Büste (`.pf-model`, `.pod-model`, Online-Liste auf `/`). Grenzen und Pause wie nach #34. Unter 640 px, bei grobem Zeiger und bei `prefers-reduced-motion` bleibt das Standbild.
 
-- [ ] UI-Test 1440 px: Menübutton Community öffnet per Klick, zweiter Klick schließt, Eintrag „Spieler“ hat `href="/spieler"`, Escape schließt.
-- [ ] UI-Test 1440 px: Maus verlässt das offene Panel, nach dem kurzen Delay ist es zu. Ein Klick auf den Gruppenbutton innerhalb des Delays schließt nicht „von selbst“ gegen den Klick.
-- [ ] UI-Test 390 px: Burger öffnet die Liste, Konto enthält Profil, VIP und Bestellungen (eingeloggte Session wie die bestehenden e2e-Cookies), Wiki enthält `/wiki/befehle`, Fokus liegt nach Escape wieder auf dem Burger.
-- [ ] UI-Test beide Breiten: auf `/pvp` ist Minispiele markiert und der PvP-Link `aria-current=page`. Auf `/markt/diamond` ist Markt markiert. Auf `/vip` ist Mein Konto markiert, nicht Community.
-- [ ] Ausgeloggt: Konto ist ein Discord-Link auf `nwebnotfound.dev/auth/discord/login`, kein toter Button.
-- [ ] `node scripts/e2e.mjs` grün, inklusive der bisherigen API-Checks.
+**Tut nicht:** keine VIP-Queue, keine VIP-Formulare, kein neuer Ingest-Vertrag. `/vip` bleibt das bisherige Read-only-Panel, nur in der Gruppe Mein Konto.
 
-### Phase 2 — Eine Oberfläche
+- [ ] UI 1440 px: Community öffnet per Klick und schließt beim zweiten Klick, „Spieler“ hat `href="/spieler"`, Escape schließt. Nach dem Verlassen des Panels schließt der kurze Delay. Ein Klick auf den Gruppenbutton schließt nicht gegen den Klick.
+- [ ] UI 390 px: Burger öffnet die Liste, Konto enthält Profil, VIP und Bestellungen, Wiki enthält `/wiki/befehle`, Fokus liegt nach Escape auf dem Burger.
+- [ ] Beide Breiten: `/pvp` markiert Minispiele, `/markt/diamond` markiert Markt, `/vip` markiert Mein Konto und nicht Community. Ausgeloggt ist Konto der Discord-Login-Link.
+- [ ] `/leaderboards`, `/profile`, `/markt/diamond`, `/vip`: kein `style=` und kein `<style>` in `main`. Buttons mindestens 44 px hoch bei 390 px. Nav-Icons sind `/mc-icon/v2/…`.
+- [ ] Ingest mit `pvp_stats` und Leaderboard-Key `pvp`: `/leaderboards` enthält nicht `data-k="pvp"` und nicht „Siegquote“. `/pvp` enthält die Tabelle. `/profile` und `/spieler/Nils` enthalten nicht „PvP-Winrate“, nicht „Lieblings-Kit“, nicht `#pvp-pl`. Parkour bleibt, wenn eine Zeit im Ingest liegt.
+- [ ] Sparkline auf `/markt` enthält `C`. Der Diamond-Chart enthält `C`. Eine einzelne volumenlose Zacke zwischen nahen Nachbarn fehlt, ein Ausreißer mit Volumen bleibt. `#econ-card` behält `H`/`V` und die Tages-Tabelle.
+- [ ] Reine Funktion: Zeiger in der Mitte ergibt 0/0, am Rand ist die Gier bei 1 gekappt, ebenso der Nick. `look` bricht nicht mehr an `pf-model` ab. UI 1440 px: `.pf-model` auf `/profile`. UI 390 px: das `data-look` des Feinzeiger-Pfads fehlt.
 
-**Dateien:** `public/mc/ds.css`, `public/mc/profile.css`, `public/mc/pvp.css`, `public/mc/economy.css`, Inline-Blöcke aus `src/worker.js` und `public/mc/item.js` dahin verschieben. **Test:** `scripts/e2e_ui.py`.
+### Folge-PR 2 — VIP-API und D1-Warteschlange
 
-**Tut:** MC-Button, Tabs als Slot-Reihe, Bestenlisten-Podium und Profil-Karten auf die Chest-Tokens. Item-Chart ohne `<style>` im HTML. Kontrast der Rang-Badges (≥ 4.5:1 im hellen Sonderfall) bleibt, der bestehende Check in `scripts/e2e.mjs` bleibt.
+**Gesperrt, bis die Offen-Punkte, die das JSON ändern, beantwortet sind** (`id`, `owner_uuid`, Polling gegen Worker-`fetch`). Ein Kommentar von Craft an PR #35 oder ein Abschnitt in deren API-Dokument reicht. Abweichende Namen werden 1:1 übernommen, dann erst gebaut.
 
-**Tut nicht:** keine neuen Farben außerhalb der Tokens. Keine Funktion an PvP oder VIP ändern.
+**Dateien:** `src/mc-vip.js`, `src/worker.js` (Routen, Ingest-Feld), `schema.sql`, `migrations/0013_vip_commands.sql`, `INGEST.md`, `scripts/e2e.mjs`, `scripts/vip-unit.mjs`. **Keine** Verwaltungs-Formulare; die bleiben Folge-PR 3. `GET /api/mc-vip` darf die erweiterte JSON-Form schon liefern.
 
-- [ ] Auf `/leaderboards`, `/profile`, `/markt/diamond`, `/vip`: kein `style=`-Attribut im `main`, kein `<style>` in `main`.
-- [ ] Buttons auf diesen Seiten haben die gemeinsame Klasse und mindestens 44 px Höhe bei 390 px.
-- [ ] Ein Icon im Menü und auf der Startkachel ist `/mc-icon/v2/…`, kein Emoji-Zeichen in der Nav.
-- [ ] `prefers-reduced-motion`: kein Transform auf Karten-Hover (die Media-Query in `ds.css` bleibt wirksam).
+**Tut:** die vier Mutationen, Pending-GET, Ack-POST, Rate-Limits, Idempotenz, op-Whitelist, Ingest-Feld `vip_worlds`. Token-Fehler 401. Kein freies Feld `command`. Liegt Crafts Scoreboard-Dokument vor, mappt dieser PR es auf `money` / `playtime` / `blocks_mined` / `kills` / `distance`. PvP-Zahlen landen nur in `mc_pvp_stats`.
 
-### Phase 3 — PvP nur auf `/pvp`
+**Ingest-Token.** `MC_INGEST_TOKEN` ist ausschließlich ein Worker-Secret. Produktion setzt ihn mit `wrangler secret put MC_INGEST_TOKEN`, nicht als `var` in `wrangler.jsonc` und nicht in einer committeten Datei. Der Worker vergleicht nur den Header `x-ingest-token` mit `env.MC_INGEST_TOKEN`. Dieselbe Regel gilt für Pending und Ack der VIP-Queue und für den bestehenden `POST /api/mc-ingest`. Ein Token in Query, Cookie oder JSON-Body ist 401. Die Response von `/`, `/vip` und `/mc/vip.js` enthält den Token nicht. Lokal schreibt `scripts/e2e.mjs` den Testwert in `.dev.vars` und löscht die Datei danach wieder; `.dev.vars` bleibt gitignored.
 
-**Dateien:** `src/worker.js` (`LEADERBOARDS_MC`, `PROFILE_BODY`), `src/mc-players.js`, `public/mc/pvp.js`, `public/mc/player3d.js` (`MCP.games`). **Test:** `scripts/e2e.mjs`, `scripts/e2e_ui.py`.
+**Welt-Check.** Jede VIP-Route (Lesen einer Welt, Power, Info, Mitglied hinzu, Mitglied weg) macht das auf dem Server, nach dem Auflösen der Session:
 
-**Tut:** Arena-Tab, PvP-Fetch und Quote-Podium von `/leaderboards` entfernen. Winrate-KPI und `.pvp-arena` aus dem Profil entfernen. `#pvp-pl`, das Nachladen in `pvp.js` und die Winrate-Zeile von `/spieler/<name>` entfernen. Survival-Kills, Tode, Parkour-Bestzeit bleiben, wo sie sind. `GET /api/mc-pvp` bleibt und speist nur `/pvp`. Leaderboard-Kategorien `pvp*` und `kd`/`kdr`/`k_d`/`kill_death` erzeugen keinen Tab, auch wenn der Ingest sie schickt.
+1. UUID nur aus `mc_links` der `discord_id`. Body-Felder `mc_uuid`, `discord_id`, `owner`, `members` zählen nicht.
+2. Rolle `owner`, wenn diese UUID `owner_uuid` der Welt ist. Rolle `member`, wenn der verknüpfte Minecraft-Name in `members` steht. Sonst `403 {reason:"not_member"}`.
+3. Bei 403 wird nicht in `mc_vip_commands` geschrieben.
+4. Schreiben verlangt Rolle `owner`. Ein Mitglied bekommt `403 {reason:"owner"}`, wieder ohne Zeile.
+5. `GET /api/mc-vip` enthält nur Welten mit Rolle `owner` oder `member`. Eine fremde Welt fehlt in der Liste, statt ihre Mitglieder zu zeigen.
 
-**Tut nicht:** die PvP-Tabelle auf `/pvp` nicht umbauen, Quote-Formel nicht ändern (Best of 3, Quote auch unter 5 Kämpfen, #34).
+- [ ] Unit: kein VIP-Key → `placeholder: true`. Key `vip1` ohne Owner → Slot, nicht aufrufbar. `vip_worlds` mit `owner_uuid` der Session → Rolle `owner`. Name in `members` → Rolle `member`. Weder noch → die Welt fehlt.
+- [ ] Drei Sessions, alle Rang VIP, alle verlinkt: Owner, Mitglied (Name steht in `members`), Fremder (Rang VIP, nicht in `members`).
+- [ ] Owner `POST …/power {"state":"start"}` → 202, genau eine Zeile `pending`, `actor_uuid` ist die UUID aus `mc_links`, nicht aus dem Body. Zweites Power auf derselben Welt → 409 `busy`.
+- [ ] Mitglied `POST …/power` → 403 `owner`, Zeilenzahl bleibt 0. Mitglied `GET /api/mc-vip` → die Welt ist drin, `owner: false`.
+- [ ] Fremder `POST …/power`, auch mit `mc_uuid` des Owners im Body → 403 `not_member`, Zeilenzahl bleibt 0. Fremder `GET /api/mc-vip` → diese Welt fehlt.
+- [ ] Owner einer anderen Welt, der dort weder Owner noch Mitglied ist → derselbe 403 `not_member`.
+- [ ] Ohne Cookie → 401. Mit Cookie, ohne Rang VIP/MVP → 403 `rank`.
+- [ ] Gleicher `request_id`, gleicher Body → 200 `duplicate`. Gleicher `request_id`, anderes `info` → 409. Viertes Power in einer Stunde für dieselbe Welt → 429.
+- [ ] `GET …/commands/pending` ohne Header → 401. Mit Header `x-ingest-token` gleich dem Worker-Secret → das Item, `op` ist `world.start`, kein Rohbefehl. Dieselbe URL mit `?token=` statt Header → 401.
+- [ ] `GET /vip` und `GET /mc/vip.js` enthalten den Test-Token nicht.
+- [ ] Ack `confirmed`, zweites Ack `failed` → Status bleibt `confirmed`. Body `{"command":"op Nils"}` → 400, keine Zeile.
+- [ ] Ingest `vip_worlds` ersetzt die Liste. Ein Ingest ohne das Feld lässt sie stehen.
 
-- [ ] `e2e.mjs`: Ingest mit `pvp_stats` und einem Leaderboard-Key `pvp`. `GET /leaderboards`-HTML enthält nicht `data-k="pvp"` und nicht „Siegquote“. `GET /pvp` enthält die Tabelle und den Spielernamen.
-- [ ] UI 1440 px, eingeloggt: `/profile` und `/spieler/Nils` enthalten nicht „PvP-Winrate“, nicht „Lieblings-Kit“, nicht `#pvp-pl`. Parkour-Zeile ist noch da, wenn der Ingest eine Zeit hat.
-- [ ] `/pvp` bei 390 px: Tabelle scrollbar, Kopfzeile Siege/Niederlagen/Quote sichtbar, Link auf `/spieler/<name>` bleibt (die Zielseite zeigt nur keine Arena-Zahlen).
+### Folge-PR 3 — VIP-Verwaltungs-UI
 
-### Phase 4 — Glatte Preislinien
+**Nach Folge-PR 2.** **Dateien:** `public/mc/vip.js`, `public/mc/vip.css`, `scripts/e2e_ui.py`. Die API aus PR 2 bleibt die einzige Schreibstelle. Die Seite prüft die Rolle nicht selbst nach: sie zeigt, was `GET /api/mc-vip` hergibt, und der Worker lehnt falsche Posts ab.
 
-**Dateien:** `mono` aus `public/mc/item.js` nach `public/mc/common.js` ziehen. `spark()` und der Item-Chart rufen beide `mono` auf. **Test:** `scripts/e2e_ui.py` und `scripts/e2e.mjs` lesen das SVG nach dem Markt-Ingest.
+**Tut:** Für Slots mit `owner: true`: Schalter „Starten“ / „Stoppen“, Feld Info mit Speichern, Mitglied hinzufügen und Entfernen. Nach 202 zeigt die Karte „wird bestätigt“, bis `pending` leer ist oder ein Ack-Grund aus der festen Liste als Satz daneben steht. 403/409/429 als Satz, kein `alert`. Für `member: true` und `owner: false`: Status und Info-Text, keine Schalter und kein Mitglieder-Formular. Turnstile braucht es hier nicht. Origin-Prüfung bleibt serverseitig in PR 2.
 
-**Tut:** Jede Preis-Sparkline (Startseite, `/markt`) als monotone Kubik (`C`-Befehle), dieselbe Steigungslogik wie `mono`: Steigung 0 bei Vorzeichenwechsel, Klammern damit die Kurve nicht über den nächsten Punkt hinausschwingt. Fläche folgt der Kurve. Tooltip und Reset-Strich „neue Preise“ bleiben an echten Samples. Der Item-Chart bleibt inhaltlich der Chart aus #34 (Zacken-Filter: eine volumenlose Zacke zwischen ähnlichen Nachbarn fällt, ein Crash mit Folge oder Umsatz bleibt).
+**Tut nicht:** keine Seed-, Modus- oder Gamerule-Felder. Kein zweiter Weg, der die Queue umgeht. Kein Ingest-Token im Frontend.
 
-**Tut nicht:** `public/mc/economy.js` nicht glätten. Die Geldmenge ist ein Wert pro Kalendertag; eine Spline würde Tage erfinden.
-
-- [ ] Nach Markt-Ingest enthält die Sparkline auf `/markt` einen Pfad mit `C` und nicht nur `M`/`L`.
-- [ ] Der Item-Chart-Pfad für Diamond enthält `C`. Ein Testpunkt mit einem einzelnen Ausreißer ohne Volumen zwischen zwei nahen Nachbarn fehlt in der Serie; ein Ausreißer mit Volumen bleibt (die Regel steht schon in `series()`).
-- [ ] `#econ-card` auf `/markt` enthält weiter den Stufenpfad (`H`/`V`) und die Tages-Tabelle.
-
-### Phase 5 — 3D-Köpfe folgen der Maus
-
-**Dateien:** `public/mc/player3d.js`, CSS nur wenn die Büste einen festen Rahmen braucht. **Test:** reine Funktion in `scripts/e2e.mjs` (ohne WebGL) und ein UI-Check, dass das Profil-Canvas bei 1440 px existiert.
-
-**Tut:** `look()` an jede Live-Instanz hängen, die `live3d` erzeugt (Profil `.pf-model`, Podium `.pod-model`, Online-Liste auf `/`). Grenzen bleiben die heutigen: Kopf-Gier ±0.85 der normalisierten Zeigerposition, Nick ±0.55, Körper-Gier zusätzlich ±0.35 der X-Komponente, Nachziehen 0.08 pro Frame. Pause wenn der Tab versteckt ist oder die Büste den Viewport verlässt. Zoom und Pan bleiben aus.
-
-**Tut nicht:** Standbild-Pfad nicht „reparieren“. Bei `max-width: 640px`, `hover: none` oder `prefers-reduced-motion` weiter ein Frame als `<img>`, kein `pointermove`.
-
-- [ ] Reine Funktion: Zeiger in der Mitte → Ziel 0/0. Zeiger am rechten Rand der Formel → Gier gekappt bei 1, nicht darüber. Dieselbe Kappung für Nick.
-- [ ] UI 1440 px auf `/profile` (Session mit verknüpftem Spieler): `.pf-model` ist da. UI 390 px: kein dauerhaftes Canvas-Loop-Attribut, das nur der Feinzeiger setzt (die Seite setzt `data-look` nur im Feinzeiger-Pfad; bei 390 px fehlt es).
-- [ ] Code-Review-Check im PR: `look` wird nicht mehr von `classList.contains('pf-model')` abgebrochen.
-
-Phase 4 und Phase 5 dürfen parallel zu Phase 2 liegen, nachdem Phase 1 mergt. Phase 3 vor Phase 2, damit Phase 2 keine PvP-Karten restylt, die Phase 3 löscht.
-
-### Phase 6 — VIP lesen, gegen die abstrakte Form
-
-**Dateien:** `src/mc-vip.js`, `public/mc/vip.js`, `public/mc/vip.css`, `scripts/vip-unit.mjs`. **Test:** Unit über den bestehenden Aufruf `import "./vip-unit.mjs"` in `e2e.mjs`, plus UI.
-
-**Tut:** `GET /api/mc-vip` kann die erweiterte Slot-Form aus diesem Plan aus einem `vip_worlds`-Ingest füllen. Ohne das Feld bleibt `pickVipWorlds`. UI: Status, Info-Text, Mitglieder nur für den Owner, als Text. Buttons für An/Aus, Speichern und Einladen sind nicht im DOM, solange Phase 8 nicht mergt. Kein Formular (der heutige e2e-Check „VIP: kein Formular“ bleibt in dieser Phase wahr).
-
-**Tut nicht:** keine Tabelle `mc_vip_commands`, kein POST außer dem bestehenden 405 auf `/api/mc-vip`.
-
-- [ ] Unit: Snapshot ohne VIP-Key → `placeholder: true`. Snapshot `vip1` online → ein Slot, `owner: false`. Ingest `vip_worlds` mit `owner_uuid` der Session → `owner: true`, Mitgliederliste, Info.
-- [ ] Fremde UUID sieht die Mitgliederliste nicht.
-- [ ] UI eingeloggt als VIP: Welten-Status sichtbar, `form`-Count 0, PvP-Wörter nicht im Panel.
-- [ ] UI ohne Rang: Katalog, Grund `rank` oder `link` oder `login`, keine Slot-Buttons.
-
-Diese Phase darf parallel zu Phase 2–5 laufen, nachdem Phase 1 das VIP-Ziel unter Mein Konto gelegt hat.
-
-### Phase 7 — Befehlswarteschlange
-
-**Gesperrt, bis die Offen-Punkte mit der Markierung „ändert das JSON“ beantwortet sind** (`id`, `owner_uuid`, Polling vs. Worker-`fetch`). Ein Kommentar von Craft am Plan-PR oder ein Abschnitt in deren API-Dokument reicht. Danach die Namen 1:1 übernehmen, wenn sie von diesem Plan abweichen, und erst dann implementieren.
-
-**Dateien:** `src/mc-vip.js`, `schema.sql`, `migrations/0013_vip_commands.sql`, `INGEST.md`, `scripts/e2e.mjs`. Kein UI-Umbau außer dem, was Phase 8 braucht; diese Phase kann die Routen ohne Buttons testen.
-
-**Tut:** die vier Mutationen, Pending-GET, Ack-POST, Rate-Limits, Idempotenz, Whitelist. Ingest-Feld `vip_worlds` schreiben. Token-Fehler 401. Kein Feld `command` mit freiem Text.
-
-- [ ] Ohne Cookie → 401. Mit Cookie, ohne Rang → 403. Mit Rang, fremde Welt → 404.
-- [ ] Owner `POST …/power {"state":"start"}` → 202, Zeile `pending`. Zweites Power auf derselben Welt → 409 `busy`.
-- [ ] Gleicher `request_id`, gleicher Body → 200 `duplicate`. Gleicher `request_id`, anderes `info` → 409.
-- [ ] 4. Power innerhalb einer Stunde für dieselbe Welt → 429.
-- [ ] `GET …/commands/pending` ohne Token → 401. Mit Token liegt das Item da, `op` ist `world.start`, kein weiteres String-Feld mit einem Rohbefehl.
-- [ ] Ack `confirmed`, zweites Ack `failed` → Status bleibt `confirmed`.
-- [ ] Body `{"op":"op","command":"op Nils"}` auf jeder VIP-Route → 400, keine Zeile.
-- [ ] Ingest `vip_worlds` ersetzt die Liste; ein Ingest ohne das Feld lässt sie stehen.
-
-### Phase 8 — VIP-Bedienung
-
-**Nach Phase 7.** **Dateien:** `public/mc/vip.js`, `public/mc/vip.css`, `scripts/e2e_ui.py`.
-
-**Tut:** Für Slots mit `owner: true`: Schalter An/Aus (beschriftet „Starten“ / „Stoppen“, nicht ein roher Befehl), Feld Info mit Speichern, Mitglied hinzufügen (Name) und Entfernen. Nach 202 zeigt die Karte „wird bestätigt“ bis `GET /api/mc-vip` die Zeile nicht mehr in `pending` hat oder der Ack einen Satz aus der festen Grund-Liste liefert. Fehler 403/409/429 als Satz neben der Karte, kein `alert`. Turnstile ist hier nicht nötig: die Aktion ist an die Discord-Session und den Rang gebunden, nicht an anonyme Posts. Origin-Prüfung bleibt serverseitig.
-
-**Tut nicht:** keine Mitgliederverwaltung für `owner: false`. Keine Seed-, Modus- oder Gamerule-Felder.
-
-- [ ] UI 1440 px und 390 px, VIP-Session: Stoppen sendet den Power-POST (Route abfangen), die Karte zeigt „wird bestätigt“, nach gemocktem erneutem GET mit `online: false` steht „offline“.
-- [ ] Name `Bad Name!` wird nicht abgeschickt; der Client lässt nur `^[A-Za-z0-9_]{1,16}$` zu. Der Server lehnt dasselbe noch einmal ab (Phase 7).
-- [ ] Spieler ohne Rang sieht weiterhin kein Formular.
-- [ ] Tastatur: Schalter und Entfernen-Buttons per Tab erreichbar, sichtbarer Fokus.
-
-### Phase 9 — Scoreboards, wenn Craft sie neu dokumentiert
-
-**Gesperrt auf das API-Dokument.** **Dateien:** der Ingest-Mapper in `src/worker.js` (heute die `v_leaderboards`-Normalisierung), `INGEST.md`, Tests in `e2e.mjs`. Die Seiten bleiben.
-
-**Tut:** neue Felder auf die bestehenden Listen `money`, `playtime`, `blocks_mined`, `kills`, `distance` abbilden. PvP-Zahlen nur in `mc_pvp_stats` und auf `/pvp`. Unbekannte Survival-Kategorien dürfen einen eigenen Tab behalten, PvP-Kategorien nicht.
-
-**Tut nicht:** keine zweite Bestenliste und keine PvP-Quote auf dem Podium.
+- [ ] UI 1440 px und 390 px, Owner-Session: Stoppen trifft den Power-POST, die Karte zeigt „wird bestätigt“, nach erneutem GET mit `online: false` steht „offline“.
+- [ ] Dieselbe Seite als Mitglied: Status sichtbar, `form`-Count 0, kein Starten/Stoppen.
+- [ ] Dieselbe Seite als Fremder mit VIP-Rang: diese Welt fehlt, kein Formular.
+- [ ] Name `Bad Name!` geht nicht raus. Der Server lehnt dasselbe Muster noch einmal ab (PR 2).
+- [ ] Ohne Rang: Katalog, Grund `rank`, `link` oder `login`, keine Slot-Buttons.
+- [ ] Schalter und Entfernen sind per Tab erreichbar, Fokus sichtbar.
+- [ ] Ein abgefangener Power-POST der Mitglieder-Session kommt beim UI nicht vor, weil kein Button da ist. Der API-Fall „Mitglied schreibt → 403“ bleibt der Test aus PR 2 und wird hier nicht durch das Ausblenden ersetzt.
 
 ---
 
-## Testplan (über alle Phasen)
+## Testplan
 
-Lokal und in CI derselbe Einstieg: `node scripts/e2e.mjs`. Der startet `wrangler dev` mit frischer D1 aus `schema.sql` unter `.wrangler/e2e`, Token `e2e-token`, und ruft `scripts/e2e_ui.py` (Playwright 1.64.1, Chromium, Breiten 390 und 1440, Host-Header `mc.nwebnotfound.dev`). Keine Produktionsdaten.
+Lokal und in CI: `node scripts/e2e.mjs`. Das startet `wrangler dev` mit frischer D1 aus `schema.sql` unter `.wrangler/e2e` und ruft `scripts/e2e_ui.py` (Playwright 1.64.1, Chromium, 390 px und 1440 px, Host `mc.nwebnotfound.dev`). Keine Produktionsdaten. Der Test-Token liegt nur in der untracked `.dev.vars` dieses Laufs.
 
-Jeder Phasen-PR:
+Jeder der drei PRs:
 
-1. Bestehende API-Fälle in `e2e.mjs` bleiben (Ingest 401, Markt, Gebot, Ack, Parkour, Ränge).
-2. Neue Fälle der Phase stehen direkt unter dem vorhandenen Abschnitt, mit derselben `ok()`-Form, nicht in einem zweiten Runner.
-3. UI-Fälle nutzen die vorhandenen Helfer `go()` und die Session-Cookies. Neue Selektoren sind stabile Ids (`#vip`, `#pvp`, `#econ-card`), keine Text-Fragmente aus dem Marketing.
-4. Eine Phase, die eine alte Assertion falsch macht (PvP-Tab, VIP-Formular ab Phase 8), ersetzt die Assertion in demselben PR.
-5. `node scripts/icon-check.mjs` bleibt im Workflow vor dem e2e. Neue Icons sind vorhandene Item-Ids, keine neuen PNG, außer ein späterer PR braucht ein Texture-Loch (nicht Teil dieses Plans).
+1. Bestehende API-Fälle bleiben (Ingest 401, Markt, Gebot, Ack, Parkour, Ränge).
+2. Neue Fälle stehen in `scripts/e2e.mjs` bzw. `scripts/e2e_ui.py`, in der vorhandenen `ok()`-Form.
+3. UI-Selektoren sind Ids (`#vip`, `#pvp`, `#econ-card`).
+4. `node scripts/icon-check.mjs` bleibt davor. Neue Icons sind vorhandene Item-Ids.
 
-Manuell, einmal pro Phasen-PR, weil WebGL und echtes Hover im Headless unzuverlässig sind: Desktop-Menü mit Maus und Tastatur, Handy-Breite 390 im Browser, Profil-Kopf folgt dem Zeiger und steht still bei „Bewegung reduzieren“. Das ersetzt nicht die Assertions oben.
+Der Welt-Check wird in Folge-PR 2 gegen die API geprüft, mit drei Cookies (Owner, Mitglied, Fremder), nicht nur darüber, ob ein Button fehlt. Folge-PR 3 prüft zusätzlich, dass die Oberfläche dieselbe Aufteilung zeigt.
+
+Manuell, einmal pro PR, weil WebGL und echtes Hover im Headless unzuverlässig sind: Menü mit Maus und Tastatur, Breite 390, Profil-Kopf folgt dem Zeiger und steht still bei „Bewegung reduzieren“.
 
 ---
 
 ## Reihenfolge
 
-1. Phase 1 Navigation.
-2. Phase 3 PvP-Schnitt, danach Phase 2 Oberfläche. Phase 4 und 5 parallel dazu, nach Phase 1.
-3. Phase 6 VIP lesen, sobald Phase 1 das Menüziel gelegt hat. Parallel zu 2–5.
-4. Phase 7 und 8 erst nach den offenen Craft-Punkten, die das JSON ändern.
-5. Phase 9 wenn das Scoreboard-Dokument da ist. Unabhängig von VIP, abhängig von Phase 3 (damit neue PvP-Keys nicht wieder einen Tab erzeugen).
+1. Folge-PR 1, Menüs und Layout, inklusive PvP-Schnitt, glatter Preislinien und Maus-Köpfe.
+2. Folge-PR 2, VIP-API und D1-Queue, sobald die offenen JSON-Punkte mit Craft geklärt sind. Darin der serverseitige Owner-/Mitglieder-Check und das Ingest-Token als Worker-Secret.
+3. Folge-PR 3, VIP-Verwaltungs-UI, auf der API aus PR 2.
 
 Nicht in diesem Rework: Portfolio, Gästebuch, MineRush spielbar machen, Wiki-Texte zu Ende schreiben, Economy-Regeln, Whitelist, ein öffentlicher Admin.
 
 ## Selbst-Check gegen den Auftrag
 
-- Navigation nach Server, Wirtschaft, Minispiele, Community, Wiki, Konto: Phase 1, Tabelle oben.
-- Mobil und Desktop, ein Stil, Pixel-Schrift, Slots, MC-Buttons, Item-Icons: Phase 1 und 2.
-- VIP mit Discord-Login, eigene Welten, An/Aus, Infos, Mitglieder, Status: Phase 6 lesen, Phase 7 Queue, Phase 8 UI. Auth ist die bestehende Session plus Rang.
-- Abstrakte API, Rate-Limits, kein öffentliches RCON: Abschnitt „VIP“. Offene Punkte sind dort markiert und sperren Phase 7/8.
-- Bestand mit Schwächen: Abschnitt „Bestandsaufnahme“.
-- Kleine PRs plus Playwright: Phasen 1–9 und der Testplan.
-- PvP nur auf `/pvp`: Phase 3. Glatte Preislinien: Phase 4, Item-Chart bleibt, Geldmenge bleibt Stufe. 3D-Köpfe folgen der Maus: Phase 5, auf dem Profil ist es schon da und wird auf die anderen Büsten ausgeweitet.
+- Navigation, ein Look, Pixel-Schrift, Slots, MC-Buttons, Item-Icons: Folge-PR 1.
+- PvP nur auf `/pvp`, glatte Preislinien, 3D-Köpfe folgen der Maus: ebenfalls Folge-PR 1. Die Geldmenge bleibt eine Stufe.
+- VIP-API, D1-Warteschlange, Rate-Limits, kein öffentliches RCON: Folge-PR 2. Ingest-Token nur als Worker-Secret. Jede VIP-Aktion prüft serverseitig Owner oder Mitglied, mit e2e für Owner, Mitglied und Fremden.
+- Verwaltungs-UI: Folge-PR 3. Sie verlässt sich nicht auf ausgeblendete Buttons als einzige Prüfung.
+- Bestand mit Schwächen: Abschnitt „Bestandsaufnahme“. Offene Craft-Punkte sperren Folge-PR 2.
