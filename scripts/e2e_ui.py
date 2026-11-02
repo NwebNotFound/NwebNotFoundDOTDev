@@ -80,6 +80,7 @@ with sync_playwright() as p:
         go("/spieler/Nils"); pg.wait_for_timeout(400); pg.screenshot(path=f"{SH}/local-spieler-{w}.png", full_page=True)
         t = go("/wiki/befehle"); ok(pg.locator(".wiki-hero-meta .eyb").count() == 1, f"{w}px Wiki-Artikel: Meta-Zeile")
         t = go("/profile")
+        pg.locator(".pf-hd .m3d").wait_for(timeout=20000)
         ok(pg.locator(".pf-hd .pf-name").count() > 0 and pg.locator(".pf-hd .m3d").count() == 1, f"{w}px Profil: Minecraft-Header mit 3D-Modell", pg.inner_text("#pb")[:260])
         pg.locator(".inv").wait_for(state="visible", timeout=20000)
         ok(pg.locator(".inv .iv-pane").count() >= 1 and pg.locator(".inv .ivs").count() >= 41, f"{w}px Profil: volles Inventar-Layout")
