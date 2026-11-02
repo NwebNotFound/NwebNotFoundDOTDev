@@ -9,7 +9,7 @@ import { once } from "node:events";
 
 import { handle } from "../src/index.js";
 import { createSession, SESSION_COOKIE, CSRF_COOKIE } from "../src/auth.js";
-import { resetCache } from "../src/store.js";
+import { resetCache, PanelStore, revokedBefore } from "../src/store.js";
 import { startMockHermes, PANEL_SECRET, discordFetch, cookiesFrom, cookieHeader } from "./helpers.mjs";
 
 const HOST = "https://ai.nwebnotfound.dev";
@@ -207,6 +207,49 @@ test("logout is POST-only and needs the csrf token", async () => {
   assert.match(cleared, /nnf_ai_csrf=;.*Max-Age=0/);
 });
 
+test("logout invalidates the cached revocation marker right away", async () => {
+  resetCache();
+  const map = new Map();
+  const storage = {
+    async get(k) {
+      return map.get(k);
+    },
+    async put(k, v) {
+      map.set(k, v);
+    },
+    async delete(k) {
+      if (Array.isArray(k)) for (const x of k) map.delete(x);
+      else map.delete(k);
+    },
+    async list({ prefix = "" } = {}) {
+      return new Map([...map].filter(([k]) => k.startsWith(prefix)));
+    },
+  };
+  const doStore = new PanelStore({ storage }, {});
+  const envWithStore = {
+    ...env,
+    PANEL_STORE: { idFromName: (n) => n, get: () => ({ fetch: (url, init) => doStore.fetch(new Request(url, init)) }) },
+  };
+  const writeMarker = (before) =>
+    doStore.fetch(new Request("https://panel-store/revoked", { method: "POST", body: JSON.stringify({ before }) }));
+  try {
+    assert.equal(await revokedBefore(envWithStore), 0, "the empty marker is cached");
+    await writeMarker(1700000000);
+    assert.equal(await revokedBefore(envWithStore), 0, "another isolate's write is not seen yet");
+
+    const out = await call("/auth/logout", { method: "POST", e: envWithStore });
+    assert.equal(out.status, 200);
+    assert.equal(await revokedBefore(envWithStore), 1700000000, "the logout dropped the stale value");
+
+    const all = await call("/api/logout-all", { method: "POST", e: envWithStore });
+    assert.equal(all.status, 200);
+    const marker = (await body(all)).revoked_before;
+    assert.equal(await revokedBefore(envWithStore), marker, "sign out everywhere stores the fresh marker");
+  } finally {
+    resetCache();
+  }
+});
+
 test("me returns the user, csrf token and bots", async () => {
   const data = await body(await call("/api/me"));
   assert.equal(data.user.id, ALLOWED);
@@ -378,12 +421,38 @@ test("sessions list and messages", async () => {
 test("usage aggregates per bot and tolerates a missing OpenRouter key", async () => {
   const data = await body(await call("/api/usage"));
   assert.equal(data.openrouter.available, false);
+  assert.equal(data.openrouter.error, "Kein OpenRouter-Key");
+  assert.equal(data.prices_error, "Kein OpenRouter-Key", "prices degrade the same generic way");
   assert.ok(data.per_bot.length >= 4);
   const cf = data.per_bot.find((b) => b.bot === "cloudflare");
   assert.equal(cf.sessions, 1);
   assert.ok(cf.cost_usd > 0);
   assert.ok(data.daily.length >= 1);
   assert.ok(Array.isArray(data.prices));
+});
+
+test("usage keeps upstream error text server-side", async () => {
+  const realFetch = globalThis.fetch;
+  const outerErr = console.error;
+  const logged = [];
+  globalThis.fetch = async (url, init) => {
+    if (String(url).startsWith("https://openrouter.ai/")) throw new Error("getaddrinfo ENOTFOUND openrouter.ai");
+    return realFetch(url, init);
+  };
+  console.error = (...args) => logged.push(args.map(String).join(" "));
+  let data;
+  try {
+    data = await body(await call("/api/usage", { e: { ...env, OPENROUTER_API_KEY: "sk-or-test-key" } }));
+  } finally {
+    globalThis.fetch = realFetch;
+    console.error = outerErr;
+  }
+  assert.equal(data.openrouter.error, "Upstream-Fehler");
+  assert.equal(data.prices_error, "Upstream-Fehler");
+  const asText = JSON.stringify(data);
+  assert.doesNotMatch(asText, /ENOTFOUND|getaddrinfo/);
+  assert.doesNotMatch(asText, /sk-or-test-key/, "the OpenRouter key never reaches the browser");
+  assert.match(logged.join("\n"), /ENOTFOUND/, "the real reason still reaches the Worker log");
 });
 
 test("request log records the calls without secrets", async () => {

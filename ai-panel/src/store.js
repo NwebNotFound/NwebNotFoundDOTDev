@@ -13,7 +13,9 @@ import * as rl from "./ratelimit.js";
 import * as log from "./log.js";
 
 const LOG_MAX = 200;
-const REVOKED_CACHE_MS = 30_000;
+// Deliberately short: an isolate that cannot be told about a logout re-reads the marker
+// within five seconds, so "sign out everywhere" bites almost immediately everywhere.
+export const REVOKED_CACHE_TTL_MS = 5_000;
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -141,11 +143,27 @@ export async function logRecent(env, limit = 50) {
   }
 }
 
-const revokedCache = new Map();
+const revokedCache = new Map(); // marker key → { value, expires }
+const REVOKED_KEY = "revoked";
+
+function rememberRevoked(value) {
+  revokedCache.set(REVOKED_KEY, { value, expires: Date.now() + REVOKED_CACHE_TTL_MS });
+  return value;
+}
+
+/**
+ * Drop the cached revocation marker now instead of waiting for the TTL. A plain logout clears
+ * this isolate's entry; `all: true` ("sign out everywhere") clears every entry, so no cached
+ * pre-logout value survives anywhere in this isolate. Other isolates are covered by the TTL.
+ */
+export function invalidateRevokedCache({ all = false } = {}) {
+  if (all) revokedCache.clear();
+  else revokedCache.delete(REVOKED_KEY);
+}
 
 /** Epoch seconds; sessions issued at or before this are dead. Cached briefly. */
 export async function revokedBefore(env) {
-  const cached = revokedCache.get("v");
+  const cached = revokedCache.get(REVOKED_KEY);
   if (cached && cached.expires > Date.now()) return cached.value;
   const s = stub(env);
   if (!s) return 0;
@@ -154,7 +172,7 @@ export async function revokedBefore(env) {
     if (!res.ok) throw new Error(`store ${res.status}`);
     const data = await res.json();
     const value = Number(data.before) || 0;
-    revokedCache.set("v", { value, expires: Date.now() + REVOKED_CACHE_MS });
+    revokedCache.set(REVOKED_KEY, { value, expires: Date.now() + REVOKED_CACHE_TTL_MS });
     return value;
   } catch {
     return cached ? cached.value : 0;
@@ -164,20 +182,21 @@ export async function revokedBefore(env) {
 /** Invalidate every session issued so far. Returns the new marker. */
 export async function revokeAll(env) {
   const before = Math.floor(Date.now() / 1000);
+  // Sign out everywhere: every cached entry goes first, then only the fresh marker is put back.
+  invalidateRevokedCache({ all: true });
   const s = stub(env);
-  revokedCache.set("v", { value: before, expires: Date.now() + REVOKED_CACHE_MS });
-  if (!s) return before;
+  if (!s) return rememberRevoked(before);
   try {
     const res = await s.fetch("https://panel-store/revoked", { method: "POST", body: JSON.stringify({ before }) });
     if (!res.ok) throw new Error(`store ${res.status}`);
     const data = await res.json();
-    return Number(data.before) || before;
+    return rememberRevoked(Number(data.before) || before);
   } catch {
-    return before;
+    return rememberRevoked(before);
   }
 }
 
-/** Test seam: forget the cached revocation marker. */
+/** Test seam: forget every cached revocation marker. */
 export function resetCache() {
   revokedCache.clear();
 }

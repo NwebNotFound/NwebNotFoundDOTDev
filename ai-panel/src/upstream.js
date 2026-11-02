@@ -157,17 +157,27 @@ export async function pipeSse(res) {
 const OPENROUTER = "https://openrouter.ai/api/v1";
 
 async function openrouter(env, path) {
-  if (!env.OPENROUTER_API_KEY) return { status: 501, data: null, error: "OPENROUTER_API_KEY not set" };
+  if (!env.OPENROUTER_API_KEY) return { status: 501, data: null, error: "not_configured" };
   try {
     const res = await fetch(`${OPENROUTER}${path}`, {
       headers: { authorization: `Bearer ${env.OPENROUTER_API_KEY}` },
       signal: AbortSignal.timeout(15_000),
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return { status: res.status, data: null, error: `OpenRouter ${res.status}` };
+    if (!res.ok) {
+      console.error(JSON.stringify({ ai_panel_upstream: { where: "openrouter", path, status: res.status } }));
+      return { status: res.status, data: null, error: "upstream_error" };
+    }
     return { status: res.status, data };
   } catch (err) {
-    return { status: 502, data: null, error: String(err && err.message) };
+    // The text of a fetch failure (host, TLS, timeout) stays in the Worker log; the browser
+    // only ever receives the generic code, which the router may translate.
+    console.error(
+      JSON.stringify({
+        ai_panel_upstream: { where: "openrouter", path, status: 502, detail: String(err?.message || err).slice(0, 300) },
+      }),
+    );
+    return { status: 502, data: null, error: "upstream_error" };
   }
 }
 

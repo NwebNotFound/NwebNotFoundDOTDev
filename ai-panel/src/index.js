@@ -77,6 +77,24 @@ function upstreamFailure(err) {
   return json({ error: status === 503 ? "upstream_not_configured" : "upstream_unreachable" }, status);
 }
 
+/**
+ * Usage data comes from OpenRouter, not from the Hermes origin, so it has its own error path.
+ * Only a closed set of codes may reach the browser: the two upstream.js returns are translated
+ * to a human message, anything else is logged here and collapsed into the same generic text.
+ */
+const USAGE_ERRORS = { not_configured: "Kein OpenRouter-Key", upstream_error: "Upstream-Fehler" };
+const GENERIC_UPSTREAM_ERROR = "Upstream-Fehler";
+
+function usageError(res, where) {
+  const code = res && res.error;
+  if (!code) return null;
+  if (USAGE_ERRORS[code]) return USAGE_ERRORS[code];
+  console.error(
+    JSON.stringify({ ai_panel_upstream: { where, status: Number(res?.status) || 0, detail: String(code).slice(0, 300) } }),
+  );
+  return GENERIC_UPSTREAM_ERROR;
+}
+
 // ---------------------------------------------------------------------------------------
 // Auth routes
 // ---------------------------------------------------------------------------------------
@@ -134,6 +152,9 @@ async function handleCallback(req, env, url) {
 function handleLogout(req, env, url) {
   if (req.method !== "POST") return json({ error: "method_not_allowed", hint: "POST with X-CSRF-Token" }, 405);
   if (!auth.csrfOk(req, url)) return json({ error: "csrf_failed" }, 403);
+  // Drop this isolate's cached revocation marker right away: after a logout the next request
+  // must re-read the store instead of serving a value cached before the sign-out.
+  store.invalidateRevokedCache();
   const headers = new Headers(SECURITY_HEADERS);
   headers.set("content-type", "application/json; charset=utf-8");
   headers.set("cache-control", "no-store");
@@ -144,6 +165,7 @@ function handleLogout(req, env, url) {
 
 /** Sign out everywhere: bump the store marker so every issued cookie stops validating. */
 async function handleLogoutAll(env) {
+  // revokeAll clears every cached marker for the user before it writes the fresh one.
   const before = await store.revokeAll(env);
   const headers = new Headers(SECURITY_HEADERS);
   headers.set("content-type", "application/json; charset=utf-8");
@@ -552,7 +574,7 @@ async function usage(env) {
     generated_at: new Date().toISOString(),
     openrouter: {
       available: Boolean(creditData || keyData),
-      error: credits.error || key.error || null,
+      error: usageError(credits, "usage_credits") || usageError(key, "usage_key"),
       total_credits: num(creditData?.total_credits),
       total_usage: num(creditData?.total_usage),
       limit: num(keyData?.limit),
@@ -566,7 +588,7 @@ async function usage(env) {
     daily: [...daily.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([day, cost]) => ({ day, cost_usd: round(cost) })),
     recent_requests: recent.slice(0, 25),
     prices,
-    prices_error: modelsRes.error || null,
+    prices_error: usageError(modelsRes, "usage_models"),
   });
 }
 

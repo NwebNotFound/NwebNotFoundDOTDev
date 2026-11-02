@@ -4,7 +4,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { PanelStore, rateTake, logAppend, logRecent, revokedBefore, revokeAll, resetCache } from "../src/store.js";
+import {
+  PanelStore,
+  rateTake,
+  logAppend,
+  logRecent,
+  revokedBefore,
+  revokeAll,
+  invalidateRevokedCache,
+  resetCache,
+  REVOKED_CACHE_TTL_MS,
+} from "../src/store.js";
 import { LIMITS, reset as resetLocal } from "../src/ratelimit.js";
 
 function fakeStorage() {
@@ -154,5 +164,60 @@ test("revokeAll sets the marker the helpers read back", async () => {
   const before = await revokeAll(env);
   assert.ok(before > 0);
   assert.equal(await revokedBefore(env), before);
+  resetCache();
+});
+
+// The marker cache is a per-isolate shortcut for a value that changes on logout. A stale entry
+// must die at the logout call, not at the TTL, and the TTL itself must stay short.
+
+/** Write the marker behind the cache's back — what another isolate's revokeAll would do. */
+async function writeMarker(env, before) {
+  await env.PANEL_STORE.get("panel").fetch("https://panel-store/revoked", {
+    method: "POST",
+    body: JSON.stringify({ before }),
+  });
+}
+
+test("the revocation cache lives at most five seconds", () => {
+  assert.ok(REVOKED_CACHE_TTL_MS > 0, "the cache must have a TTL");
+  assert.ok(REVOKED_CACHE_TTL_MS <= 5_000, `TTL ${REVOKED_CACHE_TTL_MS} ms exceeds the 5 s cap`);
+});
+
+test("a logout drops the cached marker immediately", async () => {
+  resetCache();
+  const env = { PANEL_STORE: fakeNamespace() };
+  assert.equal(await revokedBefore(env), 0, "the empty marker is cached");
+
+  await writeMarker(env, 1700000000);
+  assert.equal(await revokedBefore(env), 0, "served from the cache until the logout");
+
+  invalidateRevokedCache();
+  assert.equal(await revokedBefore(env), 1700000000, "re-read right after the logout");
+  resetCache();
+});
+
+test("sign out everywhere clears every cached marker and keeps the fresh one", async () => {
+  resetCache();
+  const env = { PANEL_STORE: fakeNamespace() };
+  assert.equal(await revokedBefore(env), 0);
+  await writeMarker(env, 1700000000);
+
+  const before = await revokeAll(env);
+  assert.ok(before > 1700000000, "the new marker is now");
+  assert.equal(await revokedBefore(env), before, "no stale entry survives the call");
+  resetCache();
+});
+
+test("without an explicit logout the marker still expires within the TTL", async (t) => {
+  resetCache();
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const env = { PANEL_STORE: fakeNamespace() };
+  assert.equal(await revokedBefore(env), 0);
+
+  await writeMarker(env, 1700000000);
+  assert.equal(await revokedBefore(env), 0, "still cached");
+
+  t.mock.timers.tick(REVOKED_CACHE_TTL_MS + 1);
+  assert.equal(await revokedBefore(env), 1700000000, "stale entry is gone after the TTL");
   resetCache();
 });
