@@ -51,3 +51,26 @@ CREATE INDEX IF NOT EXISTS idx_mc_pt_ts ON mc_price_ticks(ts);
 CREATE TABLE IF NOT EXISTS mc_economy_daily (day TEXT PRIMARY KEY, money_supply_cp INTEGER NOT NULL, minted_cp INTEGER, burned_cp INTEGER, net_cp INTEGER, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS mc_player_ranks (uuid TEXT PRIMARY KEY, name TEXT NOT NULL, rank TEXT NOT NULL, color TEXT NOT NULL, weight INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS mc_pvp_stats (uuid TEXT PRIMARY KEY, name TEXT NOT NULL, wins INTEGER NOT NULL, losses INTEGER NOT NULL, draws INTEGER NOT NULL, matches INTEGER NOT NULL, winrate_pct INTEGER, favorite_kit TEXT, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS mc_vip_commands (
+  id TEXT PRIMARY KEY,
+  request_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  world_id TEXT NOT NULL,
+  actor_uuid TEXT NOT NULL,
+  actor_name TEXT NOT NULL,
+  owner_uuid TEXT NOT NULL,
+  discord_id TEXT NOT NULL,
+  name TEXT,
+  role TEXT,
+  visibility TEXT,
+  info TEXT,
+  source TEXT NOT NULL DEFAULT 'web',
+  created_at INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  reason TEXT,
+  acked_at INTEGER,
+  ip TEXT,
+  UNIQUE (discord_id, request_id)
+);
+CREATE INDEX IF NOT EXISTS idx_vip_cmd_status ON mc_vip_commands(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_vip_cmd_world ON mc_vip_commands(world_id, status);

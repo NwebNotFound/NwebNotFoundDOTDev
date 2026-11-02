@@ -260,4 +260,12 @@ Lesen: `GET /api/mc-economy` → `{updated_at, days:[…]}` (letzte 90 Tage, äl
 ## VIP-Panel (`GET /api/mc-vip`, Seite `/vip`)
 Nur lesen. Zugang zum eigenen Panel haben eingeloggte Discord-User, deren `mc_links`-Zeile `verified` und `has_role` ist und deren Rang in `mc_player_ranks` `vip` oder `mvp` ist. Alle anderen bekommen die öffentliche Ränge-Übersicht, ohne Stats und ohne Weltenstatus. `POST` antwortet mit 405. Die Antwort ist `private, no-store`.
 
-VIP-Welten kommen nicht aus einer eigenen Tabelle. Die Seite nimmt aus dem bestehenden `servers`-Snapshot höchstens drei Keys, die auf `vip`, `vip1`, `vip_1`, `vip-2`, `vipwelt`, `vip_world`, `vip_world_3` (und dieselbe Form) passen. Lobby, Survival und andere Keys zählen nicht. Fehlt so ein Key, zeigt das Panel den Platzhalter „bald verfügbar“. Es gibt keinen RCON- oder Schreibpfad.
+VIP-Welten kommen nicht aus einer eigenen Tabelle, solange kein Sync da ist. Die Seite nimmt dann aus dem bestehenden `servers`-Snapshot höchstens drei Keys, die auf `vip`, `vip1`, `vip_1`, `vip-2`, `vipwelt`, `vip_world`, `vip_world_3` (und dieselbe Form) passen. Lobby, Survival und andere Keys zählen nicht. Fehlt so ein Key, zeigt das Panel den Platzhalter „bald verfügbar“.
+
+## VIP-Queue und Sync
+
+Führend ist `docs/vip-api.md` in `NwebNotFound/mc-stack`. Auth der drei mc-stack-Pfade ist der Ingest-Header `x-ingest-token`, sonst 401. Der Browser sendet `op` über den Pfad. Gespeichert und an mc-stack ausgeliefert wird `action` (`start`, `set_visibility`, `invite`, `uninvite`). `world_id` ist eine UUID. Zeiten sind Millisekunden.
+
+- `POST /api/mc-vip/worlds/<uuid>/start|visibility|members` und `DELETE .../members/<name>`: Discord-Session und Origin. Gründe `not_linked`, `no_rank`, `not_owner`, `not_trusted`. Admins verwalten ohne 403. `trusted` darf nur `start`. `visibility` nur `friends` oder `private`.
+- `GET /api/mc-vip-commands/pending` und `POST /api/mc-vip-commands/ack`: Ack mit `request_id` und `discord_id`. `expired` setzt nur mc-stack, und erst ab 600000 ms nach `created_at`.
+- `POST /api/mc-vip-worlds`: ersetzt `vip_worlds` und/oder `vip_admin_log`, wenn der Schlüssel gesetzt ist. Einladungen stehen unter `invites` (`member` oder `trusted`). Fehlt ein Schlüssel, bleibt dieser Stand. `POST /api/mc-ingest` schreibt diese Tabellen nicht. `info` wird von `\p{Cc}`, `\p{Cf}` und `§`-Codes gesäubert.
