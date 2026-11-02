@@ -292,6 +292,9 @@ a:hover { text-decoration: underline; }
 }
 .msg-meta .who { font-weight: 650; color: var(--text-dim); }
 
+/* Paged transcript: the control that pulls the page above the oldest visible row. */
+.thread-more { display: flex; justify-content: center; padding: 4px 0 16px; }
+
 .hero {
   max-width: 640px;
   margin: 12vh auto 0;

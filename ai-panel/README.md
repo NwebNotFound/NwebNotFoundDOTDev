@@ -32,7 +32,7 @@ test/              node:test unit + e2e (mock Hermes, no network)
 ## Develop
 
 ```bash
-npm test          # 122 tests: unit + e2e against a mock Hermes on 127.0.0.1
+npm test          # 137 tests: unit + e2e against a mock Hermes on 127.0.0.1
 npm run check     # node --check on every module
 npx wrangler dev  # needs .dev.vars (never committed)
 ```
@@ -84,6 +84,20 @@ The browser never sees any of them. See `docs/ai-panel-tunnel.md` for the exact 
 - The SPA never builds markup from strings: markdown and highlighting produce data, and the DOM
   is built with `textContent`/`createTextNode`. Links are limited to http(s), mailto and
   site-relative URLs.
+
+## Chat history storage
+
+- One row per key: `msg:<conv>:<seq>` (plus `mmeta:<conv>` for the byte/count budget and
+  `mrun:<conv>:<run_id>` for "one final answer per run"). No value may approach the Durable
+  Object's per-key limit, which a whole transcript in one key did.
+- Budget per thread: `CONVERSATION_BYTES_MAX` (4 MiB) and `CONVERSATION_ROWS_MAX` rows; the oldest
+  rows are dropped first, `dropped` in the API says how many.
+- The conversation list keeps the newest 100 threads; a thread that falls out of it is deleted
+  together with its rows, run index and meta key.
+- `GET /api/bots/<bot>/conversations/<id>/messages?limit=&before=` returns
+  `{messages, has_more, next_before, total}` — newest page by default, older pages via `before`.
+- `/api/health` is public but answers `{ok}` only; bot names, origin state and `session_version`
+  need a valid session.
 
 ## Not deployed by this branch
 

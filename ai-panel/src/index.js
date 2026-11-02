@@ -814,11 +814,19 @@ export async function route(request, env, ctx) {
   const method = request.method.toUpperCase();
 
   if (path === "/api/health") {
+    // Liveness is public so the browser can tell "panel down" from "tunnel down". Everything
+    // else here (which bots exist, whether the store is bound, the session version) is
+    // internal detail and only goes to a signed-in user.
+    if (method !== "GET") return json({ error: "method_not_allowed" }, 405);
+    const revokedNow = await store.revokedBefore(env);
+    const who = await auth.currentUser(env, request, { revokedBefore: revokedNow });
+    if (!who) return json({ ok: true });
     // The panel's own view plus the origin proxy's: a red "tunnel/gateway" dot here is what the
     // UI shows when things are down, instead of a generic "Load failed" in the chat.
     const [health, bots] = await Promise.all([up.proxyHealth(env), up.botList(env)]);
     return json({
       ok: true,
+      authenticated: true,
       upstream: Boolean(up.origin(env)),
       origin: { reachable: Boolean(health), gateway: Boolean(health?.gateway) },
       auth: Boolean(env.DISCORD_CLIENT_ID && env.SESSION_SECRET && env.ALLOWED_DISCORD_ID),
@@ -921,7 +929,13 @@ export async function route(request, env, ctx) {
   if (convMatch) {
     const conversationId = convMatch[1];
     if (method === "GET") {
-      return json({ bot, conversation_id: conversationId, messages: await store.messageList(env, { conversationId }) });
+      // Paged: `limit` rows, newest page by default, `before=<seq>` for the page above it.
+      const page = await store.messageList(env, {
+        conversationId,
+        limit: Number(url.searchParams.get("limit")) || store.MESSAGE_PAGE_DEFAULT,
+        before: Number(url.searchParams.get("before")) || 0,
+      });
+      return json({ bot, ...page });
     }
     if (method === "POST") {
       const body = (await readJson(request)) || {};

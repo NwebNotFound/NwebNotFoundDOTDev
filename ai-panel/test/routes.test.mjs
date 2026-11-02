@@ -8,7 +8,7 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 
 import { handle } from "../src/index.js";
-import { createSession, SESSION_COOKIE, CSRF_COOKIE } from "../src/auth.js";
+import { createSession, sign, SESSION_COOKIE, CSRF_COOKIE } from "../src/auth.js";
 import { resetCache, PanelStore, revokedBefore } from "../src/store.js";
 import { startMockHermes, PANEL_SECRET, discordFetch, cookiesFrom, cookieHeader } from "./helpers.mjs";
 
@@ -70,11 +70,20 @@ function call(path, { method = "GET", body, cookies = {}, csrf = true, origin = 
 
 const body = (res) => res.json();
 
-test("health is public and reports configuration plus the origin's view", async () => {
+test("health is public but only says {ok} without a session", async () => {
   const res = await handle(new Request(`${HOST}/api/health`), env);
   assert.equal(res.status, 200);
   const data = await body(res);
+  assert.deepEqual(data, { ok: true }, "no bots, no session_version, nothing internal leaks");
+  assert.equal(res.headers.get("cache-control")?.includes("no-store"), true, "not cacheable across users");
+});
+
+test("health with a session reports configuration plus the origin's view", async () => {
+  const res = await call("/api/health");
+  assert.equal(res.status, 200);
+  const data = await body(res);
   assert.equal(data.ok, true);
+  assert.equal(data.authenticated, true);
   assert.equal(data.upstream, true);
   assert.equal(data.origin.reachable, true, "the proxy's /health answered");
   assert.equal(data.origin.gateway, true);
@@ -87,6 +96,29 @@ test("health is public and reports configuration plus the origin's view", async 
     ["cloudflare", "default", "discord", "homelab", "minecraft"],
   );
   assert.equal(data.bots.slice(0, 3).join(","), "cloudflare,minecraft,default", "routing source wins the order");
+});
+
+test("health with a forged or expired session still only says {ok}", async () => {
+  const forged = await handle(
+    new Request(`${HOST}/api/health`, { headers: { cookie: cookieHeader({ [SESSION_COOKIE]: "not-a-session" }) } }),
+    env,
+  );
+  assert.deepEqual(await body(forged), { ok: true }, "a garbage cookie sees nothing internal");
+
+  // correctly signed, but past its exp
+  const old = Math.floor(Date.now() / 1000) - 8 * 24 * 60 * 60;
+  const expired = await sign(env.SESSION_SECRET, {
+    u: ALLOWED,
+    n: "Nils",
+    v: "1",
+    iat: old,
+    exp: old + 60,
+  });
+  const res = await handle(
+    new Request(`${HOST}/api/health`, { headers: { cookie: cookieHeader({ [SESSION_COOKIE]: expired }) } }),
+    env,
+  );
+  assert.deepEqual(await body(res), { ok: true }, "an expired session sees nothing internal");
 });
 
 test("static assets fall through to ASSETS and still get the security headers", async () => {
@@ -462,6 +494,61 @@ test("a second message continues the same conversation and keeps its title", asy
     messages.messages.filter((m) => m.role === "user").map((m) => m.content),
     ["erste frage", "zweite frage"],
   );
+});
+
+test("history survives a fresh login: a new session sees the same threads", async () => {
+  const started = await body(
+    await call("/api/bots/discord/runs", { method: "POST", body: { input: "nach dem re-login" } }),
+  );
+  await (await call(`/api/bots/discord/runs/${started.run_id}/events`)).text();
+
+  // What /auth/callback mints on a new login: an unrelated session cookie for the same user.
+  const nowS = Math.floor(Date.now() / 1000);
+  const fresh = await sign(env.SESSION_SECRET, { u: ALLOWED, n: "Nils", v: "1", iat: nowS - 30, exp: nowS + 3600 });
+  assert.notEqual(fresh, session, "it really is a different session");
+
+  const list = await body(await call("/api/bots/discord/conversations", { sessionCookie: fresh }));
+  const conv = list.conversations.find((c) => c.id === started.conversation_id);
+  assert.ok(conv, "the thread is listed for the new session");
+  assert.equal(conv.title, "nach dem re-login");
+
+  const page = await body(
+    await call(`/api/bots/discord/conversations/${started.conversation_id}/messages`, { sessionCookie: fresh }),
+  );
+  assert.deepEqual(page.messages.map((m) => m.role), ["user", "tool", "assistant"], "the transcript is intact");
+  assert.equal(page.messages.at(-1).content, "fertig");
+  assert.equal(page.has_more, false);
+});
+
+test("the transcript endpoint pages with before/limit", async () => {
+  const started = await body(
+    await call("/api/bots/homelab/runs", { method: "POST", body: { input: "erste" } }),
+  );
+  await (await call(`/api/bots/homelab/runs/${started.run_id}/events`)).text();
+
+  const all = await body(await call(`/api/bots/homelab/conversations/${started.conversation_id}/messages?limit=50`));
+  assert.equal(all.messages.length, 3);
+
+  const newest = await body(
+    await call(`/api/bots/homelab/conversations/${started.conversation_id}/messages?limit=1`),
+  );
+  assert.equal(newest.messages.length, 1);
+  assert.equal(newest.has_more, true, "there are older rows");
+  assert.equal(newest.next_before, newest.messages[0].seq);
+
+  const older = await body(
+    await call(
+      `/api/bots/homelab/conversations/${started.conversation_id}/messages?limit=50&before=${newest.next_before}`,
+    ),
+  );
+  assert.equal(older.messages.length, 2, "the page above it");
+  assert.equal(older.has_more, false);
+  assert.ok(older.messages.every((m) => m.seq < newest.next_before), "strictly older rows");
+});
+
+test("a formatting-only message does not break the store", async () => {
+  const res = await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "  " } });
+  assert.ok([200, 400].includes(res.status), "no 500 for whitespace input");
 });
 
 test("chat history survives a dropped stream through the poll fallback", async () => {

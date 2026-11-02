@@ -805,24 +805,57 @@ async function openConversation(conv) {
   try {
     const data = await api(botPath(`/conversations/${encodeURIComponent(conv.id)}/messages`));
     clear(thread);
-    for (const row of data.messages || []) {
-      if (row.role === "user") {
-        thread.append(userMessage(row.content));
-      } else if (row.role === "assistant") {
-        const shell = assistantShell();
-        shell.thinking.remove();
-        renderMarkdownInto(shell.answer, row.content || "");
-        thread.append(shell.node);
-      } else {
-        thread.append(transcriptEventRow(row));
-      }
-    }
+    appendTranscript(thread, data.messages || []);
+    if (data.has_more && data.next_before) thread.prepend(olderMessagesButton(conv, data.next_before));
     if (!thread.firstChild) thread.append(el("div", { class: "mut", text: "Keine Nachrichten." }));
     scrollToBottom(true);
     loadConversations();
   } catch (err) {
     clear(thread).append(el("div", { class: "mut", text: `Chat: ${describeError(err).text}` }));
   }
+}
+
+/** Render transcript rows into a container, in store order (oldest first). */
+function appendTranscript(container, rows) {
+  for (const row of rows) {
+    if (row.role === "user") {
+      container.append(userMessage(row.content));
+    } else if (row.role === "assistant") {
+      const shell = assistantShell();
+      shell.thinking.remove();
+      renderMarkdownInto(shell.answer, row.content || "");
+      container.append(shell.node);
+    } else {
+      container.append(transcriptEventRow(row));
+    }
+  }
+}
+
+/** The transcript is paged: this pulls the page above the oldest visible row. */
+function olderMessagesButton(conv, before) {
+  const wrap = el("div", { class: "thread-more" });
+  const btn = el("button", { class: "ghost sm", text: "Ältere Nachrichten laden" });
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.textContent = "lade…";
+    const thread = $("#messages");
+    const heightBefore = thread.scrollHeight;
+    try {
+      const data = await api(botPath(`/conversations/${encodeURIComponent(conv.id)}/messages?before=${before}`));
+      const frag = document.createDocumentFragment();
+      appendTranscript(frag, data.messages || []);
+      thread.insertBefore(frag, wrap);
+      if (data.has_more && data.next_before) wrap.replaceWith(olderMessagesButton(conv, data.next_before));
+      else wrap.remove();
+      // Keep the row the user was looking at in place instead of jumping to the top.
+      thread.scrollTop += thread.scrollHeight - heightBefore;
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = `Ältere laden: ${describeError(err).text}`;
+    }
+  };
+  wrap.append(btn);
+  return wrap;
 }
 
 /** A persisted tool/approval row: compact, muted, no markdown. */
@@ -1209,6 +1242,13 @@ async function loadHealth() {
   if (!node) return;
   try {
     const h = await api("/api/health");
+    // Unauthenticated health is only {ok} — no origin detail, so it cannot say more than "up".
+    if (!h.authenticated) {
+      node.dataset.state = "unknown";
+      node.textContent = "…";
+      node.title = "Nicht angemeldet";
+      return;
+    }
     const reachable = Boolean(h.origin?.reachable);
     const gateway = Boolean(h.origin?.gateway);
     node.dataset.state = reachable && gateway ? "ok" : reachable ? "warn" : "down";
