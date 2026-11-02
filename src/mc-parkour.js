@@ -28,6 +28,17 @@ export function cleanCourseIcon(v) {
 }
 // Fallback-Anzeigename aus der ID: cave_rush → „Cave Rush“ (nie Unterstriche anzeigen)
 export const prettyCourse = (k) => String(k).split("_").filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") || String(k);
+// Bekannte Kurse ohne echtes Icon (paper ist der graue Platzhalter).
+const COURSE_ICON = { house_climb: "ladder" };
+// Anzeige: Slug-Namen (house_climb) hübsch, paper bei bekannten Kursen durch ein richtiges Icon ersetzen. Rohdaten in der DB bleiben.
+export function presentCourse(course, name, icon) {
+  const raw = typeof name === "string" ? name.trim() : "";
+  const slugLike = !raw || raw === course || (raw.includes("_") && !/\s/.test(raw));
+  const display = slugLike ? prettyCourse(raw && raw !== course ? raw : course) : raw;
+  const stored = typeof icon === "string" && ICON.test(icon) ? icon : "";
+  const ic = stored && !(stored === PK_ICON_DEFAULT && COURSE_ICON[course]) ? stored : (COURSE_ICON[course] || PK_ICON_DEFAULT);
+  return { name: display, icon: ic };
+}
 // → { rows, rejected, names } oder null (Feld fehlt = keine Änderung)
 export function cleanParkour(a, now = Date.now()) {
   if (a === undefined || a === null) return null;
@@ -54,7 +65,7 @@ export async function parkourApi(env) {
   const { results } = await env.DB.prepare("SELECT course, mc_uuid, mc_name, time_ms, set_at FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY course ORDER BY time_ms, set_at, mc_uuid) AS rk FROM mc_parkour) WHERE rk <= 10 ORDER BY course, rk").all().catch(() => ({ results: [] }));
   const { results: nm } = await env.DB.prepare("SELECT course, course_name, course_icon FROM mc_parkour_courses").all().catch(() => ({ results: [] }));
   const N = Object.fromEntries(nm.map((r) => [r.course, r])), course_names = {}, course_icons = {};
-  const courses = {}; for (const r of results) { const c = N[r.course]; course_names[r.course] = c?.course_name || prettyCourse(r.course); course_icons[r.course] = c?.course_icon && ICON.test(c.course_icon) ? c.course_icon : PK_ICON_DEFAULT; (courses[r.course] ||= []).push({ rank: courses[r.course].length + 1, course_name: course_names[r.course], course_icon: course_icons[r.course], mc_uuid: r.mc_uuid, mc_name: r.mc_name, time_ms: r.time_ms, set_at: r.set_at }); }
+  const courses = {}; for (const r of results) { const c = N[r.course], shown = presentCourse(r.course, c?.course_name, c?.course_icon); course_names[r.course] = shown.name; course_icons[r.course] = shown.icon; (courses[r.course] ||= []).push({ rank: courses[r.course].length + 1, course_name: shown.name, course_icon: shown.icon, mc_uuid: r.mc_uuid, mc_name: r.mc_name, time_ms: r.time_ms, set_at: r.set_at }); }
   return { courses, course_names, course_icons };
 }
 const CSS = `<style>

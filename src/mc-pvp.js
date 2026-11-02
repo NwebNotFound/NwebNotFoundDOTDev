@@ -34,7 +34,15 @@ export function pvpStatements(env, rows, now) {
   return st;
 }
 const SEL = "SELECT p.uuid, p.name, p.wins, p.losses, p.draws, p.matches, p.winrate_pct, p.favorite_kit, r.rank, r.color FROM mc_pvp_stats p LEFT JOIN mc_player_ranks r ON r.uuid = p.uuid";
-const pub = (x) => ({ uuid: x.uuid, name: x.name, wins: x.wins, losses: x.losses, draws: x.draws, matches: x.matches, winrate_pct: x.winrate_pct, favorite_kit: x.favorite_kit, rank: pubRank(x.rank, x.color) });
+// Öffentliche Quote: gespeicherter Wert, sonst Siege/(Siege+Niederlagen). Clients zeigen nur die Zahl.
+export function pvpQuote(x) {
+  if (x.winrate_pct != null && x.winrate_pct !== "") return x.winrate_pct;
+  const m = +x.matches || 0;
+  if (!(m > 0)) return 0;
+  const d = (+x.wins || 0) + (+x.losses || 0);
+  return Math.round((100 * (+x.wins || 0)) / (d || m));
+}
+const pub = (x) => ({ uuid: x.uuid, name: x.name, wins: x.wins, losses: x.losses, draws: x.draws, matches: x.matches, winrate_pct: pvpQuote(x), favorite_kit: x.favorite_kit, rank: pubRank(x.rank, x.color) });
 export async function pvpApi(env) {
   const { results } = await env.DB.prepare(SEL + " ORDER BY p.wins DESC, p.winrate_pct IS NULL, p.winrate_pct DESC, lower(p.name) LIMIT 500").all().catch(() => ({ results: [] }));
   return { players: results.map(pub) };
