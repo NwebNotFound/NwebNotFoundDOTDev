@@ -89,7 +89,7 @@ async function reachable(url, timeoutMs = 120_000) {
 }
 
 async function startServers() {
-  const persist = path.join(ROOT, ".wrangler", "screens");
+  const persist = path.join(ROOT, ".wrangler", "screens-" + process.pid);
   await rm(persist, { recursive: true, force: true });
 
   // Fresh local D1 per run so the pages render their real (empty) states instead of a 500.
@@ -102,22 +102,14 @@ async function startServers() {
     }
   }
 
-  // The panel needs a Hermes-shaped backend for the chat, drawer and approval screenshots.
-  const { origin } = await startMockHermes();
-  panelEnv = {
-    HERMES_ORIGIN: origin,
-    HERMES_PANEL_SECRET: "screens-panel-secret",
-    SESSION_SECRET: "screens-session-secret-0123456789abcdef",
-    ALLOWED_DISCORD_ID: "111111111111111111",
-    PANEL_BOTS: "cloudflare,minecraft,discord,homelab",
-  };
+  // The panel is captured signed-out: the login screen is the state a visitor sees.
 
   // Two Workers because the site is host-routed: the Worker decides the surface from the host name.
   serve("npx", ["wrangler", "dev", "--port", "8790", "--local", "--ip", "127.0.0.1", "--local-upstream", "nwebnotfound.dev", "--persist-to", path.join(persist, "site")]);
   serve("npx", ["wrangler", "dev", "--port", "8791", "--local", "--ip", "127.0.0.1", "--local-upstream", "mc.nwebnotfound.dev", "--persist-to", path.join(persist, "mc")]);
   serve("node", [path.join("ai-panel", "scripts", "dev-server.mjs")], { PORT: "8788" });
 
-  await Promise.all([reachable(`${SITE}/`), reachable(`${MC}/`), reachable(`${PANEL}/login`)]);
+  await Promise.all([reachable(`${SITE}/`), reachable(`${MC}/`), reachable(`${PANEL}/`)]);
 }
 
 const PAGES = [
@@ -125,7 +117,7 @@ const PAGES = [
   { group: "site", name: "guestbook", url: `${SITE}/guestbook`, fullPage: true },
   { group: "mc", name: "mc-home", url: `${MC}/`, fullPage: true },
   { group: "mc", name: "mc-wiki", url: `${MC}/wiki`, fullPage: true },
-  { group: "panel", name: "panel-login", url: `${PANEL}/login`, fullPage: false },
+  { group: "panel", name: "panel-login", url: `${PANEL}/`, fullPage: false },
 ];
 
 async function shoot(browser, page, file) {

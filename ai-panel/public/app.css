@@ -976,39 +976,14 @@ dialog.modal input[aria-invalid="true"] { border-color: var(--danger); }
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
 
-/* ---------- login (login.html, served at /login) ----------
-   The screen a signed-out visitor lands on. No script: theme comes from prefers-color-scheme. */
+/* Auth gate: hide the app shell until /api/me succeeds; show the login card when signed out. */
+html[data-auth="pending"] #app,
+html[data-auth="out"] #app { display: none; }
+.login-screen { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.login-screen[hidden] { display: none; }
+.login-card { display: grid; gap: 16px; text-align: center; padding: 32px; border-radius: 16px;
+  border: 1px solid var(--border, rgba(127,127,127,.25)); background: var(--panel, transparent); max-width: 360px; width: 100%; }
+.login-btn { display: inline-block; padding: 12px 18px; border-radius: 10px; background: #5865f2; color: #fff;
+  text-decoration: none; font-weight: 600; }
+.model-picker:empty { display: none; }
 
-.login-page { display: grid; place-items: center; min-height: 100dvh; padding: var(--ds-space-4); background: var(--bg); }
-
-.login-card {
-  width: 100%;
-  max-width: 380px;
-  padding: var(--ds-space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--ds-radius-xl);
-  background: var(--bg-elev);
-  box-shadow: var(--ds-shadow-2);
-}
-
-.login-card .brand { margin-bottom: var(--ds-space-4); font-size: var(--ds-text-md); }
-.login-card h1 { margin: 0 0 var(--ds-space-2); font-size: var(--ds-text-2xl); line-height: var(--ds-leading-tight); letter-spacing: -0.02em; }
-.login-card p { margin: 0 0 var(--ds-space-4); color: var(--text-dim); font-size: var(--ds-text-md); }
-.login-card .login-cta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0 var(--ds-space-4);
-  border-radius: var(--ds-radius-md);
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: var(--ds-weight-semibold);
-  text-decoration: none;
-  transition: opacity var(--ds-duration) var(--ds-ease-out), transform var(--ds-duration) var(--ds-ease-out);
-}
-.login-card .login-cta:hover { opacity: 0.9; transform: translateY(-1px); text-decoration: none; }
-.login-card .login-cta:active { transform: scale(0.99); }
-.login-card .login-note { margin: var(--ds-space-4) 0 0; font-size: var(--ds-text-xs); color: var(--text-faint); }
-.login-card .login-fine { margin: var(--ds-space-3) 0 0; padding-top: var(--ds-space-3); border-top: 1px solid var(--border-soft); font-size: var(--ds-text-xs); color: var(--text-faint); }
-.login-plan { display: inline-flex; align-items: center; gap: 6px; margin-bottom: var(--ds-space-3); padding: 2px 8px; border-radius: var(--ds-radius-full); background: var(--accent-weak); color: var(--accent); font-size: var(--ds-text-2xs); font-weight: var(--ds-weight-semibold); }

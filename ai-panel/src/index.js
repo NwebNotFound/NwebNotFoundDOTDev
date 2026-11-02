@@ -72,7 +72,9 @@ function upstreamProblem(where, status, data) {
 }
 
 function upstreamFailure(err) {
-  const status = err instanceof up.UpstreamError ? err.status : 502;
+  let status = err instanceof up.UpstreamError ? err.status : 502;
+  // Never forward an upstream 401/403: the browser would treat it as its own session expiring.
+  if (status === 401 || status === 403 || !status) status = 502;
   console.error(JSON.stringify({ ai_panel_upstream: { where: "transport", status, detail: String(err?.message || err).slice(0, 300) } }));
   return json({ error: status === 503 ? "upstream_not_configured" : "upstream_unreachable" }, status);
 }
@@ -630,14 +632,6 @@ export async function route(request, env, ctx) {
   if (path === "/auth/login") return handleLogin(request, env);
   if (path === "/auth/callback") return handleCallback(request, env, url);
   if (path === "/auth/logout") return handleLogout(request, env, url);
-
-  // Signed-out landing page. It is static and script-free, so it must be its own URL: `/auth/login`
-  // is the OAuth start and has to stay a redirect (the SPA sends people here on a 401).
-  if (path === "/login") {
-    if (!env.ASSETS?.fetch) return new Response("Not found", { status: 404 });
-    const target = new URL("/login.html", url);
-    return env.ASSETS.fetch(new Request(target.toString(), { method: "GET", headers: request.headers }));
-  }
 
   if (!path.startsWith("/api/")) {
     if (env.ASSETS?.fetch) return env.ASSETS.fetch(request);

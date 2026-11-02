@@ -31,13 +31,14 @@ test("the SPA only imports local modules (CSP has no external script-src)", asyn
   }
 });
 
-test("index.html loads one module script and no inline code", async () => {
+test("index.html loads theme.js + one module script and no inline code", async () => {
   const html = await read("index.html");
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
-  assert.equal(scripts.length, 1, "exactly one script tag");
-  assert.match(scripts[0][1], /src="\/app\.js"/);
-  assert.match(scripts[0][1], /type="module"/);
-  assert.equal(scripts[0][2].trim(), "", "no inline script body");
+  assert.equal(scripts.length, 2, "theme.js + app.js");
+  assert.match(scripts[0][1], /src="\/theme\.js"/);
+  assert.match(scripts[1][1], /src="\/app\.js"/);
+  assert.match(scripts[1][1], /type="module"/);
+  for (const s of scripts) assert.equal(s[2].trim(), "", "no inline script body");
   assert.doesNotMatch(html, /<style\b/, "no inline style block");
   assert.doesNotMatch(html, /\son[a-z]+\s*=/i, "no inline event handlers");
   assert.doesNotMatch(html, /\sstyle="/, "no inline style attributes");
@@ -71,15 +72,12 @@ test("markdown and highlight are pure modules (no DOM access)", async () => {
   }
 });
 
-test("login.html is script-free and CSP-compatible", async () => {
-  const html = await read("login.html");
-  assert.doesNotMatch(html, /<script\b/i, "no script tags at all");
-  assert.doesNotMatch(html, /<style\b/, "no inline style block");
-  assert.doesNotMatch(html, /\son[a-z]+\s*=/i, "no inline event handlers");
-  assert.doesNotMatch(html, /\sstyle="/, "no inline style attributes");
-  assert.doesNotMatch(html, /(?:href|src)="https?:/i, "no external resources");
-  assert.match(html, /<link rel="stylesheet" href="\/app\.css"/);
-  assert.match(html, /href="\/auth\/login"/, "the CTA starts the Discord flow");
+test("signed-out UI shows a login screen instead of redirecting (no reload loop)", async () => {
+  const src = await read("app.js");
+  assert.doesNotMatch(src, /location\.href\s*=\s*["']\/auth\/login["']/);
+  const html = await read("index.html");
+  assert.match(html, /id="login-screen"/);
+  assert.match(html, /href="\/auth\/login"/);
 });
 
 test("the two light token blocks in app.css stay identical", async () => {
