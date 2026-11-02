@@ -46,7 +46,7 @@
     const meta = [owner ? (s.owner ? "Deine Welt" : "Besitzer " + owner) : "", NF(s.players || 0) + max + " Spieler" + tps, vis].filter(Boolean).join(" · ");
     const info = (s.info || "").trim() ? `<p class="mut vip-world-info">${E(s.info)}</p>` : "";
     const acts = manage && UUID.test(s.id)
-      ? `<div class="vip-world-acts">${s.online ? "" : `<button class="btn sm sec" type="button" data-act="start" data-id="${s.id}">Starten</button>`}<button class="btn sm sec" type="button" data-act="visibility" data-id="${s.id}" data-vis="${s.visibility === "private" ? "friends" : "private"}">${s.visibility === "private" ? "Auf Freunde" : "Auf privat"}</button></div>`
+      ? `<div class="vip-world-acts">${s.online ? "" : `<button class="btn sm sec" type="button" data-act="start" data-id="${E(s.id)}">Starten</button>`}<button class="btn sm sec" type="button" data-act="visibility" data-id="${E(s.id)}" data-vis="${s.visibility === "private" ? "friends" : "private"}">${s.visibility === "private" ? "Auf Freunde" : "Auf privat"}</button></div>`
       : "";
     return `<article class="g vip-world${manage ? " vip-aw" : ""}">${slot(s.online ? "grass_block" : "barrier")}<div><b>${E(s.label) || "VIP-Welt"}</b>${tag}<p class="mut vip-world-meta">${E(meta)}</p>${info}${acts}</div></article>`;
   };
@@ -57,12 +57,19 @@
     if (!html) return `${head}<div class="g vip-soon">${slot("barrier", true)}<p class="tag tw">bald verfügbar</p><p class="mut">Bis zu drei VIP-Welten sind geplant. Sobald der Server sie meldet, steht hier der Status.</p></div></section>`;
     return `${head}<div class="vip-worlds">${html}</div></section>`;
   };
+  const ADMIN_PAGE = 12;
   const adminWorlds = (w) => {
     const slots = w && Array.isArray(w.slots) ? w.slots : [];
     const head = `<section class="vip-block" id="vip-admin-worlds"><h2 class="hub-h2">Alle VIP-Welten</h2>`;
-    const html = slots.map((s) => world(s, true)).filter(Boolean).join("");
+    const html = slots.map((s, i) => {
+      const one = world(s, true);
+      return one && i >= ADMIN_PAGE ? one.replace('class="g vip-world vip-aw"', 'class="g vip-world vip-aw is-extra"') : one;
+    }).filter(Boolean).join("");
     if (!html) return `${head}<div class="g vip-soon">${slot("barrier", true)}<p class="tag tw">keine Welten</p><p class="mut">Der Server hat noch keine VIP-Welten gemeldet.</p></div></section>`;
-    return `${head}<div class="vip-aworlds">${html}</div></section>`;
+    const more = slots.length > ADMIN_PAGE
+      ? `<button class="btn sm sec vip-more" type="button" data-more="1" aria-expanded="false">Alle ${NF(slots.length)} Welten zeigen</button>`
+      : "";
+    return `${head}<div class="vip-aworlds" id="vip-aworlds">${html}</div>${more}</section>`;
   };
   const when = (iso) => {
     if (!iso) return "–";
@@ -140,11 +147,23 @@
       say("Zu viele Aktionen in der letzten Stunde. Bitte später erneut versuchen.", true);
     } else {
       const why = (r.j && (r.j.reason || r.j.error)) || "";
+      // Rang zwischenzeitlich entzogen: Ansicht neu laden, damit keine veralteten Admin-Buttons bleiben.
+      if (r.status === 403) await load();
       say(ERR[why] || (why ? String(why).slice(0, 120) : "Die Aktion ist fehlgeschlagen. Versuch es gleich noch einmal."), true);
     }
   };
   T.addEventListener("click", (ev) => {
-    const btn = ev.target.closest ? ev.target.closest("button[data-act]") : null;
+    if (!ev.target.closest) return;
+    const more = ev.target.closest("button[data-more]");
+    if (more && T.contains(more)) {
+      const box = document.getElementById("vip-aworlds");
+      if (!box) return;
+      const open = box.classList.toggle("is-open");
+      more.setAttribute("aria-expanded", open ? "true" : "false");
+      more.textContent = open ? "Weniger anzeigen" : "Alle Welten zeigen";
+      return;
+    }
+    const btn = ev.target.closest("button[data-act]");
     if (!btn || btn.disabled || !T.contains(btn)) return;
     ev.preventDefault();
     run(btn);

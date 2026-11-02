@@ -166,10 +166,15 @@ async function loadWorlds(env, viewer) {
     try { list = JSON.parse(synced.data); } catch { list = []; }
     if (Array.isArray(list) && list.length) {
       const name = String(viewer?.name || "").toLowerCase();
-      const isMine = (i) => (i.uuid && normU(i.uuid) === viewer?.uuid) || (i.name && String(i.name).toLowerCase() === name);
+      // Vertrag: UUID bevorzugt, Name nur wenn der Eintrag keine UUID hat.
+      const isMine = (i) => !!i && (i.uuid ? normU(i.uuid) === viewer?.uuid : !!i.name && String(i.name).toLowerCase() === name);
+      const owns = (w) => normU(w.owner_uuid) === viewer?.uuid;
       const all = list.filter((w) => w && typeof w === "object" && normU(w.id));
-      // Admin sieht alle Welten. VIP/MVP sehen eigene und eingeladene Welten, höchstens drei.
-      const visible = admin ? all : all.filter((w) => normU(w.owner_uuid) === viewer?.uuid || (Array.isArray(w.invites) && w.invites.some(isMine)));
+      // Admin sieht alle Welten. VIP/MVP sehen eigene zuerst, dann eingeladene, höchstens drei.
+      const visible = admin ? all : [
+        ...all.filter(owns),
+        ...all.filter((w) => !owns(w) && Array.isArray(w.invites) && w.invites.some(isMine)),
+      ];
       const slots = (admin ? visible : visible.slice(0, 3)).map((w) => worldSlot(w, viewer)).filter(Boolean);
       return { placeholder: slots.length === 0, updated_at: synced.updated_at, slots };
     }
@@ -233,4 +238,4 @@ export async function vipApi(env, user) {
   if (admin) out.admin_log = await loadAdminLog(env);
   return out;
 }
-export const vipBody = () => `<link rel="stylesheet" href="/mc/ranks.css?v=${AV}"><link rel="stylesheet" href="/mc/vip.css?v=${AV}"><section class="hero vip-hero"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Community</p><h1 class="hub-h">VIP.</h1><p class="sub">Rang, Vorteile von VIP und MVP, und der Status der VIP-Welten. Das eigene Panel gibt es nur mit verknüpftem Account und dem Rang VIP, MVP oder Admin.</p></div></section><section class="sec vip-sec"><div class="hub-wrap" id="vip" aria-live="polite"><div class="g pad mut">Lade Panel…</div></div></section><script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/vip.js?v=${AV}" defer></script>`;
+export const vipBody = () => `<link rel="stylesheet" href="/mc/ranks.css?v=${AV}"><link rel="stylesheet" href="/mc/vip.css?v=${AV}"><section class="hero vip-hero"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Community</p><h1 class="hub-h">VIP.</h1><p class="sub">Rang, Vorteile von VIP, MVP und Admin, und der Status der VIP-Welten. Das eigene Panel gibt es nur mit verknüpftem Account und dem Rang VIP, MVP oder Admin.</p></div></section><section class="sec vip-sec"><div class="hub-wrap" id="vip" aria-live="polite"><div class="g pad mut">Lade Panel…</div></div></section><script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/vip.js?v=${AV}" defer></script>`;

@@ -305,6 +305,7 @@ with sync_playwright() as p:
                 {"at": "2026-11-01T18:00:00Z", "action": "set_visibility", "action_label": "Sichtbarkeit geändert", "admin_name": "Nils", "owner_name": "Seller", "world_id": WIDA, "detail": "private"},
             ]},
         })))
+        MANYBASE = {"access": True, "reason": None, "note": "", "admin": True, "player": {"name": "Nils", "rank": "admin", "color": "c", "label": "Admin"}, "catalog": [], "stats": {}, "admin_log": {"updated_at": None, "entries": []}}
         adlg0 = len(dlg)
         go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000); ah = pg.inner_html("#vip"); at = pg.inner_text("#vip")
         ok(pg.locator(".vip-admin-tag").count() == 1 and "Admin-Ansicht" in at and pg.locator(".vip-card.is-you.is-admin").count() == 1, f"{w}px VIP-Admin: Badge und eigene Karte", at[:200])
@@ -326,6 +327,14 @@ with sync_playwright() as p:
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('nicht ändern')", timeout=10000)
         ok(len(dlg) == adlg0 and "Du darfst diese Welt nicht ändern." in pg.locator("#vip-say").inner_text(), f"{w}px VIP-Admin: Fehler als Meldung, kein Dialog", pg.locator("#vip-say").inner_text())
         pg.unroute("**/api/mc-vip/worlds/**"); pg.unroute("**/api/mc-vip")
+        many = dict(MANYBASE, worlds={"placeholder": False, "slots": [{"id": "11111111-2222-4333-8444-%012d" % i, "label": "Welt %d" % i, "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Gast%d" % i, "owner": False, "visibility": "friends", "info": ""} for i in range(14)]})
+        pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(many)))
+        go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000); pg.wait_for_timeout(300)
+        ok(pg.locator("#vip-admin-worlds .vip-world:visible").count() == 12 and pg.locator("#vip-admin-worlds button[data-more]").count() == 1, f"{w}px VIP-Admin: 12 Welten, Rest hinter 'Mehr anzeigen'", pg.locator("#vip-admin-worlds .vip-world:visible").count())
+        pg.click("#vip-admin-worlds button[data-more]"); pg.wait_for_timeout(200)
+        ok(pg.locator("#vip-admin-worlds .vip-world:visible").count() == 14 and pg.get_attribute("#vip-admin-worlds button[data-more]", "aria-expanded") == "true" and "Weniger anzeigen" in pg.inner_text("#vip-admin-worlds button[data-more]"), f"{w}px VIP-Admin: alle Welten nach Klick", pg.locator("#vip-admin-worlds .vip-world:visible").count())
+        ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Admin: viele Welten ohne Overflow/Inline-Styles")
+        pg.unroute("**/api/mc-vip")
         now_s = int(time.time()); hour = 3600
         def bucket(back):
             return (now_s // hour - back) * hour

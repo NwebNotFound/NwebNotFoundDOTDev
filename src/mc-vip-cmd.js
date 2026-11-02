@@ -165,7 +165,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     const world = (list || []).find((w) => w.id === id);
     if (!world) return a.admin ? json({ error: "Welt nicht gefunden" }, 404) : deny(403, action === "start" ? "not_trusted" : "not_owner");
     // Vertrag: trusted wird bevorzugt über die UUID geprüft, der Name ist nur der Fallback.
-    const invite = (world.invites || []).find((i) => (i.uuid && normU(i.uuid) === a.uuid) || (i.name && i.name.toLowerCase() === a.name.toLowerCase()));
+    const invite = (world.invites || []).find((i) => (i.uuid ? normU(i.uuid) === a.uuid : !!i.name && i.name.toLowerCase() === a.name.toLowerCase()));
     const isOwner = world.owner_uuid === a.uuid;
     const isAdmin = a.admin === true;
     // Admin darf jede Welt verwalten, der Owner seine eigene, trusted nur starten.

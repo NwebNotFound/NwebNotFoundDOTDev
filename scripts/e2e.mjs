@@ -627,6 +627,10 @@ try {
     const adm = await req("/api/mc-vip", { cookie: c1 });
     ok(adm.j?.access === true && adm.j?.admin === true && adm.j?.player?.rank === "admin" && adm.j.player.color === "c" && !("uuid" in (adm.j.player || {})) && adm.j?.catalog?.length === 3 && adm.j.catalog[2].rank === "admin" && adm.j.catalog[2].yours === true && adm.j?.worlds?.placeholder === true, "Admin sieht das Panel samt Admin-Karte", adm.t.slice(0, 240));
     ok(Array.isArray(adm.j?.admin_log?.entries) && adm.j.admin_log.entries.length === 0 && !JSON.stringify(adm.j).includes("weight") && !JSON.stringify(adm.j).includes("secretvip"), "Admin: leeres Protokoll, keine internen Felder", adm.t.slice(0, 240));
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }, { uuid: U2, name: "Seller", rank: "default", color: "&7", weight: 0 }] } });
+    { const dflt = await req("/api/mc-vip", { cookie: c2 });
+      ok(dflt.j?.access === false && dflt.j?.reason === "rank" && dflt.j?.own_rank?.rank === "default" && !("admin" in dflt.j) && !("admin_log" in dflt.j) && !("worlds" in dflt.j), "default bleibt gesperrt, kein Protokoll", dflt.t.slice(0, 200)); }
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }, { uuid: U2, name: "Seller", rank: "builder", color: "&a", weight: 80 }] } });
     { const bld = await req("/api/mc-vip", { cookie: c2 });
       ok(bld.j?.access === false && bld.j?.reason === "rank" && bld.j?.own_rank?.rank === "builder" && bld.j.own_rank.color === "a" && noPriv(bld.j) && !("admin" in bld.j) && !("admin_log" in bld.j), "Builder bleibt gesperrt, kein Protokoll", bld.t.slice(0, 200)); }
     sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.skin_url', 'https://textures.minecraft.net/texture/secretvip') WHERE mc_uuid = '${U1}'`);
