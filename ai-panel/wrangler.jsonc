@@ -6,8 +6,13 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    // Auth + API must hit the Worker first; otherwise the SPA fallback serves index.html
+    // for browser navigations to /auth/login and /auth/callback -> endless reload loop.
+    "run_worker_first": ["/api/*", "/auth/*"]
   },
+  "workers_dev": false,
+  "preview_urls": false,
   "routes": [
     { "pattern": "ai.nwebnotfound.dev", "custom_domain": true }
   ],

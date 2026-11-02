@@ -721,3 +721,14 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--text-dim); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* Auth gate: hide the app shell until /api/me succeeds; show the login card when signed out. */
+html[data-auth="pending"] #app,
+html[data-auth="out"] #app { display: none; }
+.login-screen { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.login-screen[hidden] { display: none; }
+.login-card { display: grid; gap: 16px; text-align: center; padding: 32px; border-radius: 16px;
+  border: 1px solid var(--border, rgba(127,127,127,.25)); background: var(--panel, transparent); max-width: 360px; width: 100%; }
+.login-btn { display: inline-block; padding: 12px 18px; border-radius: 10px; background: #5865f2; color: #fff;
+  text-decoration: none; font-weight: 600; }
+.model-picker:empty { display: none; }

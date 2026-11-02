@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de" data-theme="dark">
+<html lang="de" data-theme="dark" data-auth="pending">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -7,9 +7,17 @@
     <meta name="robots" content="noindex, nofollow" />
     <meta name="color-scheme" content="dark light" />
     <title>AI Panel</title>
+    <script src="/theme.js"></script>
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
+    <main id="login-screen" class="login-screen" hidden>
+      <div class="login-card">
+        <div class="brand"><span class="dot"></span> AI Panel</div>
+        <p>Bitte mit Discord anmelden.</p>
+        <a class="login-btn" href="/auth/login">Mit Discord anmelden</a>
+      </div>
+    </main>
     <div class="app" id="app">
       <aside class="sidebar" id="sidebar" aria-label="Navigation">
         <div class="side-head">
