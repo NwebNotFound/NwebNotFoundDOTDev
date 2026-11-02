@@ -1,6 +1,6 @@
 // End-to-end: the real Worker handler against a real local mock Hermes (HTTP, not stubs).
 // Covers login → session → chat run → SSE → approve/steer/stop → jobs → models → soul →
-// sessions → usage → log, plus the CSRF and allow-list refusals.
+// sessions → usage → log, plus CSRF, the allow-list, session revocation and the headers.
 
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -9,6 +9,7 @@ import { once } from "node:events";
 
 import { handle } from "../src/index.js";
 import { createSession, SESSION_COOKIE, CSRF_COOKIE } from "../src/auth.js";
+import { resetCache } from "../src/store.js";
 import { startMockHermes, PANEL_SECRET, discordFetch, cookiesFrom, cookieHeader } from "./helpers.mjs";
 
 const HOST = "https://ai.nwebnotfound.dev";
@@ -20,9 +21,14 @@ let env;
 let session;
 
 const origLog = console.log;
+const origErr = console.error;
 console.log = (...args) => {
   if (typeof args[0] === "string" && args[0].startsWith('{"ai_panel"')) return;
   origLog(...args);
+};
+console.error = (...args) => {
+  if (typeof args[0] === "string" && args[0].startsWith('{"ai_panel_upstream"')) return;
+  origErr(...args);
 };
 
 before(async () => {
@@ -36,6 +42,7 @@ before(async () => {
     HERMES_PANEL_SECRET: PANEL_SECRET,
     PANEL_BOTS: "cloudflare,minecraft,discord,homelab",
     PANEL_HOST: "ai.nwebnotfound.dev",
+    SESSION_VERSION: "1",
     ASSETS: { fetch: async () => new Response("<html>spa</html>", { headers: { "content-type": "text/html" } }) },
   };
   session = await createSession(env, { id: ALLOWED, name: "Nils" });
@@ -43,10 +50,11 @@ before(async () => {
 
 after(async () => {
   console.log = origLog;
+  console.error = origErr;
   await mock.close();
 });
 
-function call(path, { method = "GET", body, cookies = {}, csrf = true, origin = true, sessionCookie = session } = {}) {
+function call(path, { method = "GET", body, cookies = {}, csrf = true, origin = true, sessionCookie = session, e = env } = {}) {
   const headers = {};
   const jar = { [SESSION_COOKIE]: sessionCookie, [CSRF_COOKIE]: CSRF, ...cookies };
   const cookieStr = cookieHeader(jar);
@@ -56,7 +64,7 @@ function call(path, { method = "GET", body, cookies = {}, csrf = true, origin = 
   if (origin) headers.origin = HOST;
   return handle(
     new Request(`${HOST}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }),
-    env,
+    e,
   );
 }
 
@@ -69,13 +77,28 @@ test("health is public and reports configuration", async () => {
   assert.equal(data.ok, true);
   assert.equal(data.upstream, true);
   assert.equal(data.auth, true);
-  assert.deepEqual(data.bots, ["cloudflare", "minecraft", "discord", "homelab"]);
+  assert.equal(data.store, false, "no Durable Object binding in tests");
+  assert.equal(data.session_version, "1");
+  assert.deepEqual(data.bots, ["cloudflare", "minecraft", "discord", "homelab", "default"]);
 });
 
-test("static assets fall through to ASSETS", async () => {
+test("static assets fall through to ASSETS and still get the security headers", async () => {
   const res = await handle(new Request(`${HOST}/`), env);
   assert.equal(res.status, 200);
   assert.match(await res.text(), /spa/);
+  assert.match(res.headers.get("content-security-policy"), /default-src 'self'/);
+});
+
+test("every response carries CSP with frame-ancestors 'none'", async () => {
+  for (const path of ["/api/health", "/api/me"]) {
+    const res = await call(path);
+    const csp = res.headers.get("content-security-policy") || "";
+    assert.match(csp, /frame-ancestors 'none'/, `${path} has frame-ancestors`);
+    assert.match(csp, /script-src 'self'/);
+    assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval/);
+    assert.equal(res.headers.get("x-frame-options"), "DENY");
+    assert.equal(res.headers.get("x-content-type-options"), "nosniff");
+  }
 });
 
 test("api without a session is 401", async () => {
@@ -92,6 +115,7 @@ test("discord oauth: login → callback → session cookie", async () => {
     assert.equal(location.host, "discord.com");
     assert.equal(location.searchParams.get("client_id"), "1566865767029284884");
     assert.equal(location.searchParams.get("redirect_uri"), "https://ai.nwebnotfound.dev/auth/callback");
+    assert.equal(location.searchParams.get("prompt"), null, "prompt=none removed");
     const state = location.searchParams.get("state");
     const jar = cookiesFrom(login);
     assert.ok(jar.nnf_ai_state);
@@ -167,11 +191,28 @@ test("mutating requests need the csrf header", async () => {
   assert.equal((await body(res)).error, "csrf_failed");
 });
 
+test("logout is POST-only and needs the csrf token", async () => {
+  const get = await call("/auth/logout");
+  assert.equal(get.status, 405, "GET logout must not sign anyone out");
+
+  const noToken = await call("/auth/logout", { method: "POST", csrf: false });
+  assert.equal(noToken.status, 403);
+  assert.equal((await body(noToken)).error, "csrf_failed");
+
+  const ok = await call("/auth/logout", { method: "POST" });
+  assert.equal(ok.status, 200);
+  assert.equal((await body(ok)).ok, true);
+  const cleared = ok.headers.getSetCookie().join("\n");
+  assert.match(cleared, /nnf_ai=;.*Max-Age=0/);
+  assert.match(cleared, /nnf_ai_csrf=;.*Max-Age=0/);
+});
+
 test("me returns the user, csrf token and bots", async () => {
   const data = await body(await call("/api/me"));
   assert.equal(data.user.id, ALLOWED);
   assert.equal(data.csrf, CSRF);
-  assert.equal(data.bots.length, 4);
+  assert.ok(data.bots.includes("cloudflare"));
+  assert.ok(data.bots.includes("default"), "live profiles are allowed, not just PANEL_BOTS");
 });
 
 test("me mints a csrf cookie when it is missing", async () => {
@@ -182,12 +223,13 @@ test("me mints a csrf cookie when it is missing", async () => {
   assert.equal(set[CSRF_COOKIE], data.csrf);
 });
 
-test("bots list marks which allow-listed bots exist", async () => {
+test("bots list comes from the live profile list", async () => {
   const data = await body(await call("/api/bots"));
-  assert.equal(data.bots.length, 4);
-  assert.equal(data.bots[0].name, "cloudflare");
-  assert.equal(data.bots[0].exists, true);
-  assert.ok(data.others.includes("default"));
+  const names = data.bots.map((b) => b.name);
+  assert.ok(names.includes("cloudflare"));
+  assert.ok(names.includes("default"));
+  assert.equal(data.bots.find((b) => b.name === "cloudflare").exists, true);
+  assert.equal(data.others, undefined, "no dead 'others' bucket");
 });
 
 test("bot creation validates the name", async () => {
@@ -197,7 +239,14 @@ test("bot creation validates the name", async () => {
   assert.equal(good.status, 200);
   const data = await body(good);
   assert.equal(data.ok, true);
-  assert.equal(data.panel_enabled, false);
+  assert.equal(data.panel_enabled, true, "a bot created in the panel is usable without a redeploy");
+});
+
+test("a bot created in the panel works immediately, no PANEL_BOTS edit", async () => {
+  const soul = await call("/api/bots/research/soul");
+  assert.equal(soul.status, 200);
+  const jobs = await call("/api/bots/research/jobs");
+  assert.equal(jobs.status, 200);
 });
 
 test("chat run: start, stream events, approve, steer, stop", async () => {
@@ -229,6 +278,16 @@ test("chat run: start, stream events, approve, steer, stop", async () => {
 
   const stop = await call(`/api/bots/cloudflare/runs/${run_id}/stop`, { method: "POST", body: {} });
   assert.equal(stop.status, 200);
+});
+
+test("a run can continue an existing session", async () => {
+  const started = await call("/api/bots/cloudflare/runs", {
+    method: "POST",
+    body: { input: "weiter", session_id: "20260101_120000_aaaaaa" },
+  });
+  assert.equal(started.status, 200);
+  const upstream = mock.state.requests.filter((r) => r.path === "/gw/p/cloudflare/v1/runs").at(-1);
+  assert.equal(upstream.body.session_id, "20260101_120000_aaaaaa");
 });
 
 test("quick chat proxies the chat/completions stream", async () => {
@@ -319,7 +378,7 @@ test("sessions list and messages", async () => {
 test("usage aggregates per bot and tolerates a missing OpenRouter key", async () => {
   const data = await body(await call("/api/usage"));
   assert.equal(data.openrouter.available, false);
-  assert.equal(data.per_bot.length, 4);
+  assert.ok(data.per_bot.length >= 4);
   const cf = data.per_bot.find((b) => b.bot === "cloudflare");
   assert.equal(cf.sessions, 1);
   assert.ok(cf.cost_usd > 0);
@@ -340,20 +399,23 @@ test("unknown bot and unknown route are 404", async () => {
   assert.equal((await call("/api/bots/cloudflare/nope")).status, 404);
 });
 
-test("upstream failure surfaces as 502, not a 500", async () => {
+test("upstream failure surfaces as a generic 502, not a 500", async () => {
   const broken = { ...env, HERMES_ORIGIN: "http://127.0.0.1:1" };
   const res = await handle(
     new Request(`${HOST}/api/bots`, { headers: { cookie: cookieHeader({ [SESSION_COOKIE]: session }) } }),
     broken,
   );
   assert.equal(res.status, 502);
-  assert.equal((await body(res)).error, "upstream_unreachable");
+  const data = await body(res);
+  assert.equal(data.error, "upstream_unreachable");
+  assert.equal(data.detail, undefined);
+  assert.doesNotMatch(JSON.stringify(data), /ECONNREFUSED|127\.0\.0\.1/);
 });
 
-test("an upstream 401 is a 502 for the panel, not a session expiry", async () => {
+test("an upstream 401 is a 502 for the panel and leaks no upstream text", async () => {
   const srv = createServer((req, res) => {
     res.writeHead(401, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: "bad key" }));
+    res.end(JSON.stringify({ error: "bad key sk-live-do-not-leak" }));
   });
   srv.listen(0, "127.0.0.1");
   await once(srv, "listening");
@@ -364,8 +426,28 @@ test("an upstream 401 is a 502 for the panel, not a session expiry", async () =>
       { ...env, HERMES_ORIGIN: url },
     );
     assert.equal(res.status, 502);
-    assert.equal((await body(res)).error, "upstream_auth_failed");
+    const data = await body(res);
+    assert.equal(data.error, "profiles_unavailable");
+    assert.doesNotMatch(JSON.stringify(data), /sk-live-do-not-leak|bad key/);
   } finally {
     await new Promise((r) => srv.close(r));
   }
+});
+
+test("a session from an older SESSION_VERSION is refused", async () => {
+  const old = await createSession(env, { id: ALLOWED, name: "Nils" });
+  const res = await call("/api/me", { sessionCookie: old, e: { ...env, SESSION_VERSION: "2" } });
+  assert.equal(res.status, 401);
+});
+
+test("logout-all revokes every issued session", async () => {
+  resetCache();
+  const mine = await createSession(env, { id: ALLOWED, name: "Nils" });
+  assert.equal((await call("/api/me", { sessionCookie: mine })).status, 200);
+  const out = await call("/api/logout-all", { method: "POST", sessionCookie: mine });
+  assert.equal(out.status, 200);
+  assert.ok((await body(out)).revoked_before > 0);
+  const after = await call("/api/me", { sessionCookie: mine });
+  assert.equal(after.status, 401, "the old cookie no longer authenticates");
+  resetCache();
 });

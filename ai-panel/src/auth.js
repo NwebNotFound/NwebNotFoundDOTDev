@@ -99,14 +99,25 @@ export function clearCookie(name) {
   return `${name}=; Path=/; Max-Age=0; Secure; SameSite=Lax; HttpOnly`;
 }
 
-/** The signed-in user, or null. Never throws on a malformed cookie. */
-export async function currentUser(env, req) {
+/** The signed-in user, or null. Never throws on a malformed cookie.
+ *
+ * `revokedBefore` (epoch seconds, from the store) kills every session issued at or before it —
+ * that is what /api/logout-all bumps. `env.SESSION_VERSION` is the manual hard reset: change
+ * the var and every existing cookie stops validating.
+ */
+export async function currentUser(env, req, { revokedBefore = 0 } = {}) {
   if (!env.SESSION_SECRET) return null;
   const token = parseCookies(req)[SESSION_COOKIE];
   const payload = await verify(env.SESSION_SECRET, token);
   if (!payload || !payload.u) return null;
   if (!safeEq(payload.u, env.ALLOWED_DISCORD_ID || "")) return null; // belt and braces
+  if (String(payload.v ?? "") !== sessionVersion(env)) return null; // revoked by version bump
+  if (Number(payload.iat || 0) <= Number(revokedBefore || 0)) return null; // revoked by logout-all
   return { id: String(payload.u), name: String(payload.n || ""), avatar: payload.a || null, exp: payload.exp };
+}
+
+export function sessionVersion(env) {
+  return String(env.SESSION_VERSION || "1");
 }
 
 export async function createSession(env, user) {
@@ -115,6 +126,7 @@ export async function createSession(env, user) {
     u: user.id,
     n: user.name,
     a: user.avatar || null,
+    v: sessionVersion(env),
     iat: now,
     exp: now + SESSION_SECONDS,
   });
@@ -127,7 +139,6 @@ export function authorizeUrl(env, state) {
     redirect_uri: callbackUrl(env),
     scope: "identify",
     state,
-    prompt: "none",
   });
   return `https://discord.com/oauth2/authorize?${q}`;
 }

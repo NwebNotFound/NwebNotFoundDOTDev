@@ -4,17 +4,50 @@
 
 const JSON_TIMEOUT_MS = 25_000;
 
-export function bots(env) {
+const BOT_NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+const BOTS_TTL_MS = 60_000;
+const botsCache = new Map(); // origin → {names, expires}
+
+/** The static seed from wrangler.jsonc. Used as the fallback and always kept in the list. */
+export function staticBots(env) {
   return String(env.PANEL_BOTS || "cloudflare,minecraft,discord,homelab")
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter((s) => BOT_NAME.test(s));
 }
 
-const BOT_NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+/**
+ * The bots the panel accepts: the live profile list from the dashboard (so a bot created in
+ * the panel works without a redeploy), unioned with PANEL_BOTS, every name pattern-checked.
+ * Cached per isolate for a minute; a dashboard hiccup falls back to the static list.
+ */
+export async function botList(env, { fresh = false } = {}) {
+  const key = origin(env) || "none";
+  const cached = botsCache.get(key);
+  if (!fresh && cached && cached.expires > Date.now()) return cached.names;
+  if (!origin(env)) return staticBots(env);
+  try {
+    const { status, data } = await call(env, "dash", "/api/profiles");
+    if (status >= 400) throw new Error(`profiles ${status}`);
+    const rows = Array.isArray(data?.profiles) ? data.profiles : Array.isArray(data) ? data : [];
+    const live = rows.map((p) => String(p?.name || "")).filter((n) => BOT_NAME.test(n));
+    const names = [...new Set([...live, ...staticBots(env)])];
+    botsCache.set(key, { names, expires: Date.now() + BOTS_TTL_MS });
+    return names;
+  } catch {
+    const names = staticBots(env);
+    botsCache.set(key, { names, expires: Date.now() + 10_000 });
+    return names;
+  }
+}
 
-export function isBot(env, name) {
-  return typeof name === "string" && BOT_NAME.test(name) && bots(env).includes(name);
+export function invalidateBots(env) {
+  botsCache.delete(origin(env) || "none");
+}
+
+export async function isBot(env, name) {
+  if (typeof name !== "string" || !BOT_NAME.test(name)) return false;
+  return (await botList(env)).includes(name);
 }
 
 export function origin(env) {
@@ -98,8 +131,10 @@ export function sseHeaders(extra = {}) {
 export async function pipeSse(res) {
   const type = res.headers.get("content-type") || "";
   if (!res.ok && !type.includes("event-stream")) {
+    // Detail stays in the Worker log; the browser only learns that the upstream failed.
     const detail = (await res.text().catch(() => "")).slice(0, 500);
-    return new Response(JSON.stringify({ error: "upstream_error", status: res.status, detail }), {
+    console.error(JSON.stringify({ ai_panel_upstream: { status: res.status, detail } }));
+    return new Response(JSON.stringify({ error: "upstream_error" }), {
       status: 502,
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
     });
