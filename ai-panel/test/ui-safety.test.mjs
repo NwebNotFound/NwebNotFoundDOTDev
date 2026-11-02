@@ -70,3 +70,24 @@ test("markdown and highlight are pure modules (no DOM access)", async () => {
     assert.doesNotMatch(src, /\bwindow\./, `${name} must stay DOM-free`);
   }
 });
+
+test("login.html is script-free and CSP-compatible", async () => {
+  const html = await read("login.html");
+  assert.doesNotMatch(html, /<script\b/i, "no script tags at all");
+  assert.doesNotMatch(html, /<style\b/, "no inline style block");
+  assert.doesNotMatch(html, /\son[a-z]+\s*=/i, "no inline event handlers");
+  assert.doesNotMatch(html, /\sstyle="/, "no inline style attributes");
+  assert.doesNotMatch(html, /(?:href|src)="https?:/i, "no external resources");
+  assert.match(html, /<link rel="stylesheet" href="\/app\.css"/);
+  assert.match(html, /href="\/auth\/login"/, "the CTA starts the Discord flow");
+});
+
+test("the two light token blocks in app.css stay identical", async () => {
+  const css = await read("app.css");
+  const grab = (re) => (css.match(re) || [])[1];
+  const tokens = (block) => Object.fromEntries([...block.matchAll(/(--ds-[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+  const explicit = grab(/(\[data-theme="light"\]\s*\{[\s\S]*?\n\})/);
+  const media = grab(/(html:not\(\[data-theme\]\)\s*\{[\s\S]*?\n  \})/);
+  assert.ok(explicit && media, "both light blocks exist");
+  assert.deepEqual(tokens(media), tokens(explicit), "light tokens: [data-theme] and prefers-color-scheme must match");
+});

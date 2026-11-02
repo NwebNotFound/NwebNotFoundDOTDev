@@ -1,52 +1,168 @@
 /* AI Panel — ChatGPT/Claude-Code-flavoured shell. Dark by default, light via [data-theme=light].
-   No inline styles anywhere (the CSP forbids them), so every variant lives here. */
+   No inline styles anywhere (the CSP forbids them), so every variant lives here.
+
+   Design tokens (see ../DESIGN.md §1.2): the --ds-* block is the source of truth, the block at the
+   bottom aliases the names this stylesheet has always used onto it. Shared scale (spacing, type,
+   radii, motion) with the website; the panel keeps its own palette because it is a dark-first
+   operator console. */
 
 :root {
-  --bg: #0f1115;
-  --bg-elev: #16181d;
-  --bg-side: #0b0d11;
-  --bg-hover: #1d2026;
-  --border: #262a31;
-  --border-soft: #1e2228;
-  --text: #e8eaed;
-  --text-dim: #9aa0a8;
-  --text-faint: #6b7280;
-  --accent: #7c9cff;
-  --accent-ink: #0b0d11;
-  --accent-weak: rgba(124, 156, 255, 0.14);
-  --user-bubble: #1f2530;
-  --code-bg: #101318;
-  --code-head: #171b21;
-  --danger: #f87171;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  /* ---- colour: panel dark (default) ---- */
+  --ds-background: #0f1115;
+  --ds-surface: #16181d;
+  --ds-sidebar: #0b0d11;
+  --ds-hover: #1d2026;
+  --ds-border: #262a31;
+  --ds-border-soft: #1e2228;
+  --ds-foreground: #e8eaed;
+  --ds-muted-foreground: #9aa0a8;
+  /* 5.3:1 on --ds-background; the previous #6b7280 was 3.9:1 and failed AA. */
+  --ds-faint-foreground: #818896;
+  --ds-primary: #7c9cff;
+  --ds-primary-foreground: #0b0d11;
+  --ds-primary-weak: rgba(124, 156, 255, 0.14);
+  --ds-bubble: #1f2530;
+  --ds-code-background: #101318;
+  --ds-code-header: #171b21;
+  --ds-danger: #f87171;
+  --ds-success: #4ade80;
+  --ds-warning: #fbbf24;
+  --ds-ring: rgba(124, 156, 255, 0.45);
+  --ds-ring-strong: #7c9cff;
+  --ds-shadow-color: rgba(0, 0, 0, 0.35);
+  --ds-shadow-2: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+  /* ---- spacing: 4/8 grid ---- */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 24px;
+  --ds-space-6: 32px;
+  --ds-space-8: 48px;
+
+  /* ---- type ---- */
+  --ds-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  --ds-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --ds-text-2xs: 11px;
+  --ds-text-xs: 12px;
+  --ds-text-sm: 13px;
+  --ds-text-md: 14px;
+  --ds-text-base: 15px; /* panel density: one step below the website's 16px */
+  --ds-text-lg: 17px;
+  --ds-text-xl: 20px;
+  --ds-text-2xl: 24px;
+  --ds-leading-tight: 1.25;
+  --ds-leading-normal: 1.55;
+  --ds-weight-regular: 400;
+  --ds-weight-medium: 500;
+  --ds-weight-semibold: 600;
+  --ds-weight-bold: 700;
+
+  /* ---- radii ---- */
+  --ds-radius-xs: 6px;
+  --ds-radius-sm: 8px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 12px;
+  --ds-radius-xl: 16px;
+  --ds-radius-full: 999px;
+
+  /* ---- motion ---- */
+  --ds-duration-fast: 150ms;
+  --ds-duration: 200ms;
+  --ds-duration-slow: 250ms;
+  --ds-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ds-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-theme="light"] {
-  --bg: #ffffff;
-  --bg-elev: #f7f8fa;
-  --bg-side: #f4f5f7;
-  --bg-hover: #eceef2;
-  --border: #dfe3e8;
-  --border-soft: #e8ebef;
-  --text: #17191c;
-  --text-dim: #5c636b;
-  --text-faint: #8b929a;
-  --accent: #3355d8;
-  --accent-ink: #ffffff;
-  --accent-weak: rgba(51, 85, 216, 0.1);
-  --user-bubble: #eef1f6;
-  --code-bg: #f6f7f9;
-  --code-head: #eceef2;
-  --danger: #c02626;
-  --ok: #15803d;
-  --warn: #a16207;
-  --shadow: 0 10px 30px rgba(20, 25, 35, 0.12);
+  --ds-background: #ffffff;
+  --ds-surface: #f7f8fa;
+  --ds-sidebar: #f4f5f7;
+  --ds-hover: #eceef2;
+  --ds-border: #dfe3e8;
+  --ds-border-soft: #e8ebef;
+  --ds-foreground: #17191c;
+  --ds-muted-foreground: #5c636b;
+  /* 4.6:1 on --ds-hover; the previous #8b929a was 2.9:1 and failed AA. */
+  --ds-faint-foreground: #656c74;
+  --ds-primary: #3355d8;
+  --ds-primary-foreground: #ffffff;
+  --ds-primary-weak: rgba(51, 85, 216, 0.1);
+  --ds-bubble: #eef1f6;
+  --ds-code-background: #f6f7f9;
+  --ds-code-header: #eceef2;
+  --ds-danger: #c02626;
+  --ds-success: #15803d;
+  --ds-warning: #a16207;
+  --ds-ring: rgba(51, 85, 216, 0.35);
+  --ds-ring-strong: #3355d8;
+  --ds-shadow-color: rgba(20, 25, 35, 0.12);
+  --ds-shadow-2: 0 10px 30px rgba(20, 25, 35, 0.12);
+}
+
+/* login.html carries no script (CSP) and therefore no data-theme: it follows the OS preference.
+   Values identical to [data-theme="light"] above — a test asserts both blocks stay in sync. */
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) {
+    --ds-background: #ffffff;
+    --ds-surface: #f7f8fa;
+    --ds-sidebar: #f4f5f7;
+    --ds-hover: #eceef2;
+    --ds-border: #dfe3e8;
+    --ds-border-soft: #e8ebef;
+    --ds-foreground: #17191c;
+    --ds-muted-foreground: #5c636b;
+    --ds-faint-foreground: #656c74;
+    --ds-primary: #3355d8;
+    --ds-primary-foreground: #ffffff;
+    --ds-primary-weak: rgba(51, 85, 216, 0.1);
+    --ds-bubble: #eef1f6;
+    --ds-code-background: #f6f7f9;
+    --ds-code-header: #eceef2;
+    --ds-danger: #c02626;
+    --ds-success: #15803d;
+    --ds-warning: #a16207;
+    --ds-ring: rgba(51, 85, 216, 0.35);
+    --ds-ring-strong: #3355d8;
+    --ds-shadow-color: rgba(20, 25, 35, 0.12);
+    --ds-shadow-2: 0 10px 30px rgba(20, 25, 35, 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ds-duration-fast: 0ms;
+    --ds-duration: 0ms;
+    --ds-duration-slow: 0ms;
+  }
+}
+
+/* ---- legacy aliases: component rules below keep using these names ---- */
+:root {
+  --bg: var(--ds-background);
+  --bg-elev: var(--ds-surface);
+  --bg-side: var(--ds-sidebar);
+  --bg-hover: var(--ds-hover);
+  --border: var(--ds-border);
+  --border-soft: var(--ds-border-soft);
+  --text: var(--ds-foreground);
+  --text-dim: var(--ds-muted-foreground);
+  --text-faint: var(--ds-faint-foreground);
+  --accent: var(--ds-primary);
+  --accent-ink: var(--ds-primary-foreground);
+  --accent-weak: var(--ds-primary-weak);
+  --user-bubble: var(--ds-bubble);
+  --code-bg: var(--ds-code-background);
+  --code-head: var(--ds-code-header);
+  --danger: var(--ds-danger);
+  --ok: var(--ds-success);
+  --warn: var(--ds-warning);
+  --radius: var(--ds-radius-lg);
+  --radius-sm: var(--ds-radius-sm);
+  --mono: var(--ds-font-mono);
+  --sans: var(--ds-font-sans);
+  --shadow: var(--ds-shadow-2);
 }
 
 * { box-sizing: border-box; }
@@ -68,8 +184,8 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: var(--ds-text-base);
+  line-height: var(--ds-leading-normal);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -77,6 +193,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* Focus is always visible (DESIGN.md §2) — the panel had no focus ring at all. */
+:focus-visible {
+  outline: 2px solid var(--ds-ring-strong);
+  outline-offset: 2px;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--ds-ring-strong);
+  outline-offset: 1px;
+}
 
 .hidden { display: none !important; }
 .mut { color: var(--text-dim); }
@@ -225,16 +351,32 @@ a:hover { text-decoration: underline; }
 
 /* ---------- main ---------- */
 
-.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  /* Height of the floating glass header; content starts below it and scrolls underneath. */
+  --header-h: calc(60px + env(safe-area-inset-top));
+}
 
+/* Glass header: absolutely positioned over the scroll area so the thread really scrolls under it,
+   translucent + backdrop blur instead of an opaque bar. */
 .topbar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: var(--ds-space-2);
+  min-height: var(--header-h);
+  padding: calc(var(--ds-space-2) + env(safe-area-inset-top)) max(var(--ds-space-4), env(safe-area-inset-right))
+    var(--ds-space-2) max(var(--ds-space-4), env(safe-area-inset-left));
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
   flex: none;
 }
 .chat-title {
@@ -258,7 +400,7 @@ a:hover { text-decoration: underline; }
 
 .view { display: none; flex: 1; min-height: 0; }
 .view.active { display: flex; flex-direction: column; }
-.panel-view { overflow-y: auto; padding: 20px 20px 40px; gap: 14px; }
+.panel-view { overflow-y: auto; padding: calc(var(--header-h) + var(--ds-space-3)) var(--ds-space-5) var(--ds-space-8); gap: var(--ds-space-4); }
 
 /* ---------- thread ---------- */
 
@@ -266,7 +408,8 @@ a:hover { text-decoration: underline; }
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 26px 16px 8px;
+  padding: calc(var(--header-h) + var(--ds-space-4)) max(var(--ds-space-4), env(safe-area-inset-right)) var(--ds-space-2)
+    max(var(--ds-space-4), env(safe-area-inset-left));
   scroll-behavior: smooth;
 }
 
@@ -480,26 +623,55 @@ a:hover { text-decoration: underline; }
 .tool .state-ok { color: var(--ok); }
 .tool .state-err { color: var(--danger); }
 
+/* Approval card: a warning-tinted card, not an accent one — the accent is reserved for the primary
+   action. Buttons are stacked full width below 640px so the whole card is one column of 44px targets. */
 .approval {
-  margin: 0 0 12px;
-  padding: 12px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  background: var(--accent-weak);
+  margin: 0 0 var(--ds-space-3);
+  padding: var(--ds-space-3);
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--border));
+  border-left: 3px solid var(--warn);
+  border-radius: var(--ds-radius-lg);
+  background: color-mix(in srgb, var(--warn) 7%, var(--bg-elev));
+  box-shadow: var(--ds-shadow-1, 0 1px 2px rgb(0 0 0 / 0.25));
 }
-.approval .title { font-weight: 650; margin-bottom: 6px; }
+.approval .title {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  font-weight: 650;
+  margin-bottom: var(--ds-space-2);
+}
+.approval .warn-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 22%, transparent);
+}
 .approval pre {
-  margin: 0 0 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
+  margin: 0 0 var(--ds-space-3);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: var(--ds-radius-sm);
   background: var(--code-bg);
   font-family: var(--mono);
-  font-size: 12.3px;
+  font-size: var(--ds-text-xs);
   overflow-x: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.approval .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.approval .actions { display: grid; gap: var(--ds-space-2); }
+.approval .actions button {
+  width: 100%;
+  min-height: 44px;
+  font-size: var(--ds-text-md);
+  border-radius: var(--ds-radius-md);
+}
+
+@media (min-width: 640px) {
+  .approval .actions { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+  .approval .actions button { width: auto; min-height: 36px; font-size: var(--ds-text-sm); }
+}
 
 /* ---------- composer ---------- */
 
@@ -516,7 +688,7 @@ a:hover { text-decoration: underline; }
   background: var(--bg-elev);
   box-shadow: var(--shadow);
 }
-.composer:focus-within { border-color: var(--accent); }
+.composer:focus-within { border-color: var(--accent); box-shadow: var(--shadow), 0 0 0 3px var(--ds-ring); }
 .composer textarea {
   flex: 1;
   min-height: 24px;
@@ -643,12 +815,12 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--text-dim); }
 .log .s3 { color: var(--warn); }
 .log .s4, .log .s5 { color: var(--danger); }
 
-/* ---------- toast / modal ---------- */
+/* ---------- toast / dialog ---------- */
 
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 26px;
+  bottom: calc(26px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 60;
   padding: 9px 16px;
@@ -661,27 +833,58 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--text-dim); }
 }
 .toast.err { border-color: var(--danger); color: var(--danger); }
 
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.55);
+/* Native <dialog>. The element brings the focus trap, Esc and the backdrop; everything visual lives
+   here. On phones both dialogs become bottom sheets with full-width, stacked actions. */
+dialog.modal {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  max-width: 100vw;
+  max-height: 100dvh;
+  background: transparent;
+  color: var(--text);
 }
-.modal-box {
-  width: min(440px, 100%);
-  padding: 18px;
+dialog.modal::backdrop {
+  background: rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+dialog.modal .modal-box {
+  width: min(440px, calc(100vw - 2 * var(--ds-space-4)));
+  padding: var(--ds-space-5);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--ds-radius-xl);
   background: var(--bg-elev);
-  box-shadow: var(--shadow);
+  box-shadow: 0 24px 60px -24px rgb(0 0 0 / 0.55);
   display: grid;
-  gap: 10px;
+  gap: var(--ds-space-3);
+  animation: sheet-in var(--ds-duration) var(--ds-ease-out);
 }
-.modal-box h3 { margin: 0; }
-.modal-box p { margin: 0; color: var(--text-dim); white-space: pre-wrap; }
+dialog.modal h3 { margin: 0; font-size: var(--ds-text-lg); letter-spacing: -0.01em; }
+dialog.modal p { margin: 0; color: var(--text-dim); font-size: var(--ds-text-md); white-space: pre-wrap; }
+dialog.modal label { font-size: var(--ds-text-sm); }
+dialog.modal input {
+  min-height: 44px;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--ds-radius-md);
+  background: var(--bg);
+  font-size: 16px; /* 16px keeps iOS from zooming the page on focus */
+}
+dialog.modal input[aria-invalid="true"] { border-color: var(--danger); }
+.field-hint { margin: -6px 0 0; font-size: var(--ds-text-xs); color: var(--text-faint); }
+.field-error { margin: -6px 0 0; font-size: var(--ds-text-xs); color: var(--danger); }
+.modal-actions { display: flex; justify-content: flex-end; gap: var(--ds-space-2); margin-top: var(--ds-space-1); }
+.modal-actions button { min-height: 44px; padding-inline: var(--ds-space-4); border-radius: var(--ds-radius-md); }
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
 
 .scrim { display: none; }
 .only-mobile { display: none; }
@@ -689,8 +892,9 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--text-dim); }
 /* ---------- mobile ---------- */
 
 @media (max-width: 860px) {
-  .app { grid-template-columns: minmax(0, 1fr); }
+  .app { grid-template-columns: minmax(0, 1fr); touch-action: pan-y; }
   .only-mobile { display: grid; }
+  .main { --header-h: calc(64px + env(safe-area-inset-top)); }
   .sidebar {
     position: fixed;
     top: 0;
@@ -698,26 +902,113 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--text-dim); }
     left: 0;
     z-index: 50;
     width: min(86vw, 320px);
+    padding: calc(var(--ds-space-3) + env(safe-area-inset-top)) max(var(--ds-space-3), env(safe-area-inset-left))
+      calc(var(--ds-space-3) + env(safe-area-inset-bottom));
     transform: translateX(-102%);
-    transition: transform 0.22s ease;
+    transition: transform var(--ds-duration) var(--ds-ease-out);
     box-shadow: var(--shadow);
+    overscroll-behavior: contain;
   }
   body.drawer-open .sidebar { transform: none; }
+  /* While a finger is dragging the rail, JS owns the transform: no transition fighting it. */
+  body.drawer-drag .sidebar { transition: none; }
+  body.drawer-drag { user-select: none; -webkit-user-select: none; }
   body.drawer-open .scrim {
     display: block;
     position: fixed;
     inset: 0;
     z-index: 45;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgb(0 0 0 / 0.5);
+    backdrop-filter: blur(1.5px);
   }
-  .thread { padding: 16px 12px 4px; }
+  .thread {
+    padding: calc(var(--header-h) + var(--ds-space-3)) max(var(--ds-space-3), env(safe-area-inset-right)) var(--ds-space-2)
+      max(var(--ds-space-3), env(safe-area-inset-left));
+  }
   .msg.user .bubble { max-width: 88%; }
-  .composer-wrap { padding: 6px 10px calc(10px + env(safe-area-inset-bottom)); }
-  .model-picker { max-width: 150px; }
-  .panel-view { padding: 14px 12px 32px; }
+  .composer-wrap {
+    padding: var(--ds-space-2) max(var(--ds-space-3), env(safe-area-inset-right))
+      calc(var(--ds-space-3) + env(safe-area-inset-bottom)) max(var(--ds-space-3), env(safe-area-inset-left));
+  }
+  .composer textarea { font-size: 16px; } /* no iOS zoom on focus */
+  .model-picker { max-width: 132px; font-size: 16px; }
+  .panel-view {
+    padding: calc(var(--header-h) + var(--ds-space-2)) max(var(--ds-space-3), env(safe-area-inset-right))
+      calc(var(--ds-space-8) + env(safe-area-inset-bottom)) max(var(--ds-space-3), env(safe-area-inset-left));
+  }
   .log .line { grid-template-columns: 54px 36px 1fr; }
+
+  /* Bottom sheet instead of a floating box: thumb-reachable actions, safe-area padding. */
+  dialog.modal { inset: auto 0 0; margin: 0; width: 100%; }
+  dialog.modal .modal-box {
+    width: 100%;
+    max-width: none;
+    border-radius: var(--ds-radius-xl) var(--ds-radius-xl) 0 0;
+    border-bottom: 0;
+    padding: var(--ds-space-5) max(var(--ds-space-4), env(safe-area-inset-right))
+      calc(var(--ds-space-5) + env(safe-area-inset-bottom)) max(var(--ds-space-4), env(safe-area-inset-left));
+    animation: sheet-up var(--ds-duration) var(--ds-ease-out);
+  }
+  .modal-actions { flex-direction: column-reverse; gap: var(--ds-space-2); }
+  .modal-actions button { width: 100%; min-height: 48px; font-size: var(--ds-text-base); }
+}
+
+/* Touch targets: 44px minimum wherever the input is a finger, and 16px form text so mobile Safari
+   does not zoom the layout on focus (DESIGN.md §7). */
+@media (pointer: coarse) {
+  .icon,
+  .icon.tiny { width: 44px; height: 44px; font-size: 16px; }
+  .send { width: 44px; height: 44px; }
+  button.primary,
+  button.ghost,
+  button.danger,
+  .new-chat,
+  .nav-item,
+  .bot-item,
+  .session-item { min-height: 44px; }
+  .bot-item { padding-block: var(--ds-space-2); }
+  input:not([type="checkbox"]),
+  select,
+  textarea { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- login (login.html, served at /login) ----------
+   The screen a signed-out visitor lands on. No script: theme comes from prefers-color-scheme. */
+
+.login-page { display: grid; place-items: center; min-height: 100dvh; padding: var(--ds-space-4); background: var(--bg); }
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  padding: var(--ds-space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--ds-radius-xl);
+  background: var(--bg-elev);
+  box-shadow: var(--ds-shadow-2);
+}
+
+.login-card .brand { margin-bottom: var(--ds-space-4); font-size: var(--ds-text-md); }
+.login-card h1 { margin: 0 0 var(--ds-space-2); font-size: var(--ds-text-2xl); line-height: var(--ds-leading-tight); letter-spacing: -0.02em; }
+.login-card p { margin: 0 0 var(--ds-space-4); color: var(--text-dim); font-size: var(--ds-text-md); }
+.login-card .login-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--ds-space-4);
+  border-radius: var(--ds-radius-md);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: var(--ds-weight-semibold);
+  text-decoration: none;
+  transition: opacity var(--ds-duration) var(--ds-ease-out), transform var(--ds-duration) var(--ds-ease-out);
+}
+.login-card .login-cta:hover { opacity: 0.9; transform: translateY(-1px); text-decoration: none; }
+.login-card .login-cta:active { transform: scale(0.99); }
+.login-card .login-note { margin: var(--ds-space-4) 0 0; font-size: var(--ds-text-xs); color: var(--text-faint); }
+.login-card .login-fine { margin: var(--ds-space-3) 0 0; padding-top: var(--ds-space-3); border-top: 1px solid var(--border-soft); font-size: var(--ds-text-xs); color: var(--text-faint); }
+.login-plan { display: inline-flex; align-items: center; gap: 6px; margin-bottom: var(--ds-space-3); padding: 2px 8px; border-radius: var(--ds-radius-full); background: var(--accent-weak); color: var(--accent); font-size: var(--ds-text-2xs); font-weight: var(--ds-weight-semibold); }

@@ -160,16 +160,44 @@
 
     <div id="toast" class="toast hidden" role="status"></div>
 
-    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <!-- Native <dialog>: focus trap, Esc handling and the backdrop come from the element, so no
+         JS focus code and no browser prompt()/confirm(). Both sheets stack their buttons on phones. -->
+    <dialog id="modal" class="modal" aria-labelledby="modal-title">
       <div class="modal-box">
         <h3 id="modal-title">Bestätigen</h3>
         <p id="modal-text"></p>
-        <div class="row end">
-          <button id="modal-cancel" class="ghost sm">Abbrechen</button>
-          <button id="modal-ok" class="danger sm">Bestätigen</button>
+        <div class="modal-actions">
+          <button id="modal-cancel" type="button" class="ghost">Abbrechen</button>
+          <button id="modal-ok" type="button" class="danger">Bestätigen</button>
         </div>
       </div>
-    </div>
+    </dialog>
+
+    <dialog id="bot-dialog" class="modal" aria-labelledby="bot-dialog-title">
+      <form id="bot-form" class="modal-box" novalidate>
+        <h3 id="bot-dialog-title">Neuen Bot anlegen</h3>
+        <p>Ein Bot ist ein eigenes Hermes-Profil mit SOUL, Modell und Verlauf.</p>
+        <label for="bot-name">Name</label>
+        <input
+          id="bot-name"
+          name="name"
+          type="text"
+          inputmode="latin"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="z. B. discord"
+          aria-describedby="bot-name-hint bot-name-error"
+          required
+        />
+        <p class="field-hint" id="bot-name-hint">a–z, 0–9, - und _ · 2 bis 32 Zeichen</p>
+        <p class="field-error hidden" id="bot-name-error" role="alert"></p>
+        <div class="modal-actions">
+          <button id="bot-cancel" type="button" class="ghost">Abbrechen</button>
+          <button id="bot-create" type="submit" class="primary">Bot anlegen</button>
+        </div>
+      </form>
+    </dialog>
 
     <script src="/app.js" type="module"></script>
   </body>

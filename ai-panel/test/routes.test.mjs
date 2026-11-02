@@ -520,3 +520,25 @@ test("logout-all revokes every issued session", async () => {
   assert.equal(after.status, 401, "the old cookie no longer authenticates");
   resetCache();
 });
+
+test("/login serves the static login page with the security headers", async () => {
+  let requested = null;
+  const assets = {
+    fetch: async (req) => {
+      requested = new URL(req.url).pathname;
+      return new Response("<!doctype html><title>Anmelden</title>", {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    },
+  };
+  const res = await call("/login", { e: { ...env, ASSETS: assets } });
+  assert.equal(res.status, 200);
+  assert.equal(requested, "/login.html", "the Worker maps /login onto the static file");
+  assert.match(res.headers.get("content-security-policy") || "", /default-src 'self'/);
+  assert.equal(res.headers.get("x-frame-options"), "DENY");
+
+  // /auth/login stays the OAuth redirect, not the page.
+  const oauth = await call("/auth/login", { e: { ...env, ASSETS: assets } });
+  assert.equal(oauth.status, 302);
+  assert.match(oauth.headers.get("location") || "", /discord\.com\/oauth2\/authorize/);
+});
