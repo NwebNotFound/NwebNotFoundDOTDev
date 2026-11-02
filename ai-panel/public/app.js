@@ -6,6 +6,18 @@
 
 import { parseMarkdown } from "./markdown.js";
 import { highlight } from "./highlight.js";
+import {
+  approvalPayload,
+  approvalText,
+  describeError,
+  eventName,
+  isTerminalEvent,
+  isTerminalStatus,
+  reconnectDelay,
+  runStatusOf,
+  toolFailed,
+  toolOutputText,
+} from "./run-events.js";
 
 const state = {
   me: null,
@@ -14,6 +26,8 @@ const state = {
   bot: localStorage.getItem("ai-bot") || "cloudflare",
   view: "chat",
   sessionId: null,
+  conversationId: localStorage.getItem("ai-conversation") || null,
+  conversations: [],
   runId: null,
   abort: null,
   streaming: false,
@@ -373,8 +387,9 @@ function toolBlock(name) {
       body.append(el("div", { class: "tool-line" }, el("span", { class: "k", text: "Befehl" }), el("code", { class: "inline", text: text.slice(0, 4000) })));
     },
     output(value) {
-      if (value === undefined || value === null || value === "") return;
+      if (value === undefined || value === null || value === "" || typeof value === "boolean") return;
       const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      if (!text || text === "{}" || text === "[]" || text === '""') return;
       body.append(el("pre", { text: text.slice(0, 8000) }));
     },
     diff(value) {
@@ -394,14 +409,23 @@ function toolBlock(name) {
   };
 }
 
+function errorBlock(text, onRetry) {
+  const box = el("div", { class: "err-box" });
+  box.append(el("div", { class: "err-text", text }));
+  if (typeof onRetry === "function") {
+    box.append(el("button", { class: "ghost sm", text: "Erneut versuchen", onclick: onRetry }));
+  }
+  return box;
+}
+
 function approvalCard(runId, event) {
   const card = el("div", { class: "approval" });
   card.append(el("div", { class: "title", text: "Freigabe nötig" }));
-  const what = event.command || event.message || event.description;
-  if (what) card.append(el("pre", { text: String(typeof what === "string" ? what : JSON.stringify(what, null, 2)).slice(0, 4000) }));
+  const what = approvalText(event);
+  if (what) card.append(el("pre", { text: String(what).slice(0, 4000) }));
 
   const labels = { once: "Einmal erlauben", session: "Für diese Sitzung", always: "Immer", deny: "Ablehnen" };
-  const choices = Array.isArray(event.choices) && event.choices.length ? event.choices : ["once", "always", "deny"];
+  const choices = Array.isArray(event.choices) && event.choices.length ? event.choices : ["once", "session", "always", "deny"];
   const actions = el("div", { class: "actions" });
   for (const choice of choices) {
     actions.append(
@@ -409,14 +433,19 @@ function approvalCard(runId, event) {
         class: choice === "deny" ? "danger sm" : "primary sm",
         text: labels[choice] || choice,
         onclick: async () => {
+          // The gateway wants exactly {request_id, execution_generation, choice}; the event may
+          // name the id `prompt_id` instead. Refuse locally rather than sending a body that
+          // silently does nothing upstream.
+          const payload = approvalPayload(event, choice);
+          if (!payload.ok) {
+            actions.prepend(el("div", { class: "err-text", text: describeError({ message: payload.error }).text }));
+            return;
+          }
           try {
-            await api(botPath(`/runs/${runId}/approval`), {
-              method: "POST",
-              body: { choice, request_id: event.request_id },
-            });
+            await api(botPath(`/runs/${runId}/approval`), { method: "POST", body: payload.body });
             card.replaceWith(el("div", { class: "mut", text: `Freigabe: ${labels[choice] || choice}` }));
           } catch (err) {
-            toast(err.message, true);
+            toast(describeError(err).text, true);
           }
         },
       }),
@@ -453,112 +482,221 @@ async function send() {
   const cur = assistantShell();
   thread.append(cur.node);
   scrollToBottom(true);
+  await runInto(text, cur);
+}
 
+/** One attempt at answering `text` into an existing shell. */
+async function runInto(text, cur) {
   setStreaming(true);
+  state.following = true;
   try {
     if ($("#quick-mode").checked) await quickChat(text, cur);
     else await startRun(text, cur);
   } catch (err) {
-    cur.answer.append(el("div", { class: "mut", text: `Fehler: ${err.message}` }));
+    const info = describeError(err);
+    cur.answer.append(errorBlock(info.text, info.retryable ? () => retryInto(text, cur) : null));
   } finally {
+    state.following = false;
     setStreaming(false);
     state.runId = null;
     state.abort = null;
-    const cursor = cur.answer.querySelector(".cursor");
-    if (cursor) cursor.remove();
-    if (cur.sawThinking) {
-      cur.thinking.open = false;
-      cur.thinkSummary.textContent = "Gedacht";
-    }
-    scrollToBottom();
-    loadSessions();
+    finishShell(cur);
+    loadConversations();
   }
+}
+
+async function retryInto(text, cur) {
+  if (state.streaming) return;
+  clear(cur.answer);
+  clear(cur.tools);
+  cur.text = "";
+  cur.sawThinking = false;
+  state.runId = null;
+  await runInto(text, cur);
+}
+
+function finishShell(cur) {
+  const cursor = cur.answer.querySelector(".cursor");
+  if (cursor) cursor.remove();
+  if (cur.sawThinking) {
+    cur.thinking.open = false;
+    cur.thinkSummary.textContent = "Gedacht";
+  }
+  scrollToBottom();
 }
 
 async function startRun(text, cur) {
   const body = { input: text };
   if (state.sessionId) body.session_id = state.sessionId;
+  if (state.conversationId) body.conversation_id = state.conversationId;
   const data = await api(botPath("/runs"), { method: "POST", body });
   state.runId = data.run_id;
+  if (data.conversation_id) {
+    state.conversationId = data.conversation_id;
+    localStorage.setItem("ai-conversation", state.conversationId);
+  }
   if (data.session_id) state.sessionId = data.session_id;
+  if (!state.conversationId) loadConversations();
   await followRun(data.run_id, cur);
 }
 
+/**
+ * Follow a run to its end. The stream is the fast path; when it ends early — the Cloudflare edge
+ * gives up on a long approval wait, or the proxy restarts — the run itself is polled and the
+ * stream is resumed (by `seq` when the gateway supports it). The user never has to reload.
+ */
 async function followRun(runId, cur) {
   const controller = new AbortController();
   state.abort = controller;
   let tool = null;
+  let seq = null;
+  let terminal = false;
+  let attempt = 0;
+  let pollNotes = 0;
 
-  const res = await fetch(botPath(`/runs/${runId}/events`), {
-    headers: { accept: "text/event-stream" },
-    signal: controller.signal,
-  });
-  if (!res.ok || !res.body) throw new Error(`Stream nicht verfügbar (${res.status})`);
+  const handle = (event) => {
+    const name = eventName(event);
+    if (event?.seq !== undefined && event?.seq !== null) seq = String(event.seq);
 
-  await readSse(
-    res.body,
-    (event) => {
-      const name = event.event || event.type || "";
-
-      if (name.includes("thinking") || name.includes("reasoning")) {
-        const delta = event.delta ?? event.text ?? event.content ?? "";
-        if (delta) {
-          cur.sawThinking = true;
-          cur.thinkBody.append(document.createTextNode(String(delta)));
-          cur.thinkSummary.textContent = "Denkt…";
-        }
-        return;
+    if (name.includes("thinking") || name.includes("reasoning")) {
+      const delta = event.delta ?? event.text ?? event.content ?? "";
+      if (delta) {
+        cur.sawThinking = true;
+        cur.thinkBody.append(document.createTextNode(String(delta)));
+        cur.thinkSummary.textContent = "Denkt…";
       }
+      return;
+    }
 
-      if (name === "tool.started" || name === "tool.start") {
+    if (name === "tool.started" || name === "tool.start") {
+      tool = toolBlock(event.tool || event.tool_name || event.name || "tool");
+      tool.command(event.command ?? event.arguments ?? event.args ?? event.input);
+      cur.tools.append(tool.node);
+      return;
+    }
+
+    if (name === "tool.completed" || name === "tool.end" || name === "tool.failed" || name === "tool.error") {
+      if (!tool) {
         tool = toolBlock(event.tool || event.tool_name || event.name || "tool");
-        tool.command(event.command ?? event.arguments ?? event.args ?? event.input);
         cur.tools.append(tool.node);
+      }
+      // Output only ever comes from a payload field — never from `error`, which is a boolean
+      // on success and used to render as the literal "false".
+      tool.output(toolOutputText(event));
+      tool.diff(event.diff ?? event.patch);
+      tool.finish(!toolFailed(event));
+      tool = null;
+      return;
+    }
+
+    if (name === "approval.request" || name === "approval.requested") {
+      cur.tools.append(approvalCard(runId, event));
+      cur.approvalShown = true;
+      return;
+    }
+
+    if (name === "run.completed" || name === "run.finished") {
+      if (!cur.text && typeof event.output === "string") cur.text = event.output;
+      scheduleAnswer(cur);
+      return;
+    }
+
+    if (name === "run.failed" || name === "run.error") {
+      const info = describeError({ message: String(event.error || event.message || "run_failed") });
+      cur.answer.append(el("div", { class: "mut", text: `Der Run ist fehlgeschlagen: ${info.text}` }));
+      return;
+    }
+
+    if (name === "run.cancelled" || name === "run.stopped") {
+      cur.answer.append(el("div", { class: "mut", text: "Gestoppt." }));
+      return;
+    }
+
+    const delta = event.delta ?? event.text ?? "";
+    if (delta && (name.includes("delta") || name === "run.text" || name === "")) {
+      cur.text += String(delta);
+      scheduleAnswer(cur);
+    }
+  };
+
+  for (let round = 0; round < 20 && !controller.signal.aborted && !terminal; round += 1) {
+    try {
+      const q = seq ? `?since=${encodeURIComponent(seq)}` : "";
+      const res = await fetch(botPath(`/runs/${runId}/events${q}`), {
+        headers: { accept: "text/event-stream" },
+        signal: controller.signal,
+      });
+      if (res.status === 404) {
+        cur.answer.append(el("div", { class: "mut", text: "Diesen Run kennt das Gateway nicht mehr." }));
         return;
       }
+      if (!res.ok || !res.body) throw new Error(`Stream ${res.status}`);
+      attempt = 0;
+      await readSse(
+        res.body,
+        (event) => {
+          handle(event);
+          if (isTerminalEvent(event)) terminal = true;
+        },
+        controller.signal,
+        (id) => {
+          if (id) seq = id;
+        },
+      );
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      // Keep going: the poll below decides whether the run is really over.
+    }
 
-      if (name === "tool.completed" || name === "tool.end" || name === "tool.failed") {
-        const failed = name === "tool.failed" || event.ok === false || event.error;
-        if (!tool) {
-          tool = toolBlock(event.tool || event.tool_name || event.name || "tool");
-          cur.tools.append(tool.node);
-        }
-        tool.output(event.output ?? event.result ?? event.stdout ?? event.error);
-        tool.diff(event.diff ?? event.patch);
-        tool.finish(!failed);
-        tool = null;
-        return;
-      }
+    if (controller.signal.aborted || terminal) break;
 
-      if (name === "approval.request") {
-        cur.tools.append(approvalCard(runId, event));
-        return;
-      }
+    // The stream ended without a terminal event. Ask the run itself.
+    attempt += 1;
+    const snapshot = await pollRun(runId, cur);
+    if (snapshot.terminal) {
+      terminal = true;
+      break;
+    }
+    if (snapshot.pending && !cur.approvalShown) {
+      cur.tools.append(approvalCard(runId, snapshot.pending));
+      cur.approvalShown = true;
+    }
+    if (snapshot.failed && pollNotes === 0) {
+      pollNotes += 1;
+      cur.tools.append(el("div", { class: "mut", text: "Verbindung unterbrochen — Status wird weiter abgefragt." }));
+    }
+    await new Promise((resolve) => setTimeout(resolve, reconnectDelay(attempt)));
+  }
 
-      if (name === "run.completed" || name === "run.finished") {
-        if (!cur.text && typeof event.output === "string") cur.text = event.output;
-        scheduleAnswer(cur);
-        return;
-      }
+  if (!terminal && !controller.signal.aborted) {
+    cur.answer.append(
+      errorBlock("Verbindung zum Run ist dauerhaft weggebrochen.", () => {
+        if (state.streaming) return;
+        followRun(runId, cur).catch((err) => toast(describeError(err).text, true));
+      }),
+    );
+  }
+}
 
-      if (name === "run.failed" || name === "run.error") {
-        cur.answer.append(el("div", { class: "mut", text: "Der Run ist fehlgeschlagen." }));
-        return;
-      }
-
-      if (name === "run.cancelled" || name === "run.stopped") {
-        cur.answer.append(el("div", { class: "mut", text: "Gestoppt." }));
-        return;
-      }
-
-      const delta = event.delta ?? event.text ?? "";
-      if (delta && (name.includes("delta") || name === "run.text" || name === "")) {
-        cur.text += String(delta);
-        scheduleAnswer(cur);
-      }
-    },
-    controller.signal,
-  );
+/** Ask the gateway what a run is doing right now (the reconnect fallback). */
+async function pollRun(runId, cur) {
+  try {
+    const data = await api(botPath(`/runs/${runId}`));
+    const status = runStatusOf(data);
+    if (!cur.text && typeof data?.output === "string" && data.output) {
+      cur.text = data.output;
+      scheduleAnswer(cur);
+    }
+    if (status === "completed" || status === "finished" || status === "success") scheduleAnswer(cur);
+    if (isTerminalStatus(status) && !["completed", "finished", "success"].includes(status)) {
+      cur.answer.append(el("div", { class: "mut", text: `Run ${status}.` }));
+    }
+    const pending = data?.pending && data.pending.request_id ? { ...data.pending } : null;
+    return { terminal: isTerminalStatus(status), status, pending, failed: false };
+  } catch (err) {
+    if (err?.status === 404) return { terminal: true, status: "gone", pending: null, failed: false };
+    return { terminal: false, status: "", pending: null, failed: true };
+  }
 }
 
 async function quickChat(text, cur) {
@@ -588,7 +726,7 @@ async function stopRun() {
 }
 
 /** Minimal SSE reader: parses `data:` frames, ignores comments and [DONE]. */
-async function readSse(stream, onEvent, signal) {
+async function readSse(stream, onEvent, signal, onId) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -606,7 +744,12 @@ async function readSse(stream, onEvent, signal) {
         const frame = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
         for (const line of frame.split("\n")) {
-          if (!line.startsWith("data:")) continue;
+          if (line.startsWith("id:")) {
+            const id = line.slice(3).trim();
+            if (id && typeof onId === "function") onId(id);
+            continue;
+          }
+          if (!line.startsWith("data:")) continue; // comments (": ping") and event: lines
           const payload = line.slice(5).trim();
           if (!payload || payload === "[DONE]") continue;
           try {
@@ -626,64 +769,82 @@ async function readSse(stream, onEvent, signal) {
 // Sessions (sidebar history)
 // ---------------------------------------------------------------------------------------
 
-async function loadSessions() {
+async function loadConversations() {
   const list = clear($("#session-list"));
   try {
-    const data = await api(botPath("/sessions?limit=40"));
-    if (!data.sessions.length) {
+    const data = await api(botPath("/conversations?limit=40"));
+    state.conversations = data.conversations || [];
+    if (!state.conversations.length) {
       list.append(el("div", { class: "mut", text: "Noch keine Chats." }));
       return;
     }
-    for (const s of data.sessions) {
-      const item = el("button", { class: `session-item${s.id === state.sessionId ? " active" : ""}` });
-      item.append(el("span", { class: "t", text: s.title || s.id }));
-      const when = s.last_active ? new Date(s.last_active * 1000).toLocaleDateString("de-DE") : "";
-      item.append(el("span", { class: "m", text: [when, s.messages ? `${s.messages} Nachrichten` : ""].filter(Boolean).join(" · ") }));
-      item.onclick = () => openSession(s);
+    for (const conv of state.conversations) {
+      const item = el("button", { class: `session-item${conv.id === state.conversationId ? " active" : ""}` });
+      item.append(el("span", { class: "t", text: conv.title || conv.id }));
+      const when = conv.updated_at ? new Date(conv.updated_at).toLocaleDateString("de-DE") : "";
+      const parts = [conv.bot, when, conv.messages ? `${conv.messages} Nachrichten` : ""].filter(Boolean);
+      item.append(el("span", { class: "m", text: parts.join(" · ") }));
+      item.onclick = () => openConversation(conv);
       list.append(item);
     }
   } catch (err) {
-    list.append(el("div", { class: "mut", text: `Verlauf: ${err.message}` }));
+    list.append(el("div", { class: "mut", text: `Verlauf: ${describeError(err).text}` }));
   }
 }
 
-async function openSession(session) {
-  state.sessionId = session.id;
+/** Load one thread from the panel's own store (not from the gateway). */
+async function openConversation(conv) {
+  state.conversationId = conv.id;
+  state.sessionId = conv.session_id || null;
+  localStorage.setItem("ai-conversation", conv.id);
   state.view = "chat";
   switchView("chat");
-  $("#chat-title").textContent = session.title || session.id;
+  $("#chat-title").textContent = conv.title || conv.id;
   const thread = clear($("#messages"));
   thread.append(el("div", { class: "mut", text: "lade…" }));
   try {
-    const data = await api(botPath(`/sessions/${session.id}/messages`));
+    const data = await api(botPath(`/conversations/${encodeURIComponent(conv.id)}/messages`));
     clear(thread);
-    for (const m of data.messages) {
-      const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content, null, 2);
-      if (m.role === "user") {
-        thread.append(userMessage(text));
-      } else {
+    for (const row of data.messages || []) {
+      if (row.role === "user") {
+        thread.append(userMessage(row.content));
+      } else if (row.role === "assistant") {
         const shell = assistantShell();
         shell.thinking.remove();
-        shell.text = m.tool ? `\`${m.tool}\`\n\n${text}` : text;
-        renderMarkdownInto(shell.answer, shell.text);
+        renderMarkdownInto(shell.answer, row.content || "");
         thread.append(shell.node);
+      } else {
+        thread.append(transcriptEventRow(row));
       }
     }
+    if (!thread.firstChild) thread.append(el("div", { class: "mut", text: "Keine Nachrichten." }));
     scrollToBottom(true);
-    loadSessions();
+    loadConversations();
   } catch (err) {
-    clear(thread).append(el("div", { class: "mut", text: `Chat: ${err.message}` }));
+    clear(thread).append(el("div", { class: "mut", text: `Chat: ${describeError(err).text}` }));
   }
+}
+
+/** A persisted tool/approval row: compact, muted, no markdown. */
+function transcriptEventRow(row) {
+  const wrap = el("div", { class: "transcript-event" });
+  const label = row.kind === "approval" ? "Freigabe" : row.tool || "tool";
+  const suffix = row.kind === "approval" ? "" : row.ok === false ? " · fehlgeschlagen" : "";
+  wrap.append(el("div", { class: "mut", text: `${label}${suffix}` }));
+  if (row.content) wrap.append(el("pre", { class: "tool-log", text: String(row.content).slice(0, 4000) }));
+  return wrap;
 }
 
 function newChat() {
   state.sessionId = null;
+  state.conversationId = null;
   state.runId = null;
+  localStorage.removeItem("ai-conversation");
   $("#chat-title").textContent = "Neuer Chat";
   const thread = clear($("#messages"));
   thread.append(emptyState());
   if (window.innerWidth <= 860) closeDrawer();
-  loadSessions();
+  loadConversations();
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1039,6 +1200,54 @@ async function loadLog() {
 }
 
 // ---------------------------------------------------------------------------------------
+// Health + run history
+// ---------------------------------------------------------------------------------------
+
+/** Tunnel/proxy/gateway dot in the topbar. Silent when healthy, explicit when not. */
+async function loadHealth() {
+  const node = $("#health");
+  if (!node) return;
+  try {
+    const h = await api("/api/health");
+    const reachable = Boolean(h.origin?.reachable);
+    const gateway = Boolean(h.origin?.gateway);
+    node.dataset.state = reachable && gateway ? "ok" : reachable ? "warn" : "down";
+    node.textContent = reachable && gateway ? "online" : reachable ? "Gateway aus" : "Tunnel aus";
+    node.title = `Proxy ${reachable ? "erreichbar" : "nicht erreichbar"} · Gateway ${gateway ? "läuft" : "aus"}`;
+  } catch {
+    node.dataset.state = "down";
+    node.textContent = "Panel aus";
+    node.title = "Das Panel selbst antwortet nicht";
+  }
+}
+
+/** Runs started from the panel, persisted in the Durable Object. */
+async function loadRuns() {
+  const list = clear($("#run-list"));
+  try {
+    const data = await api("/api/runs?limit=50");
+    if (!data.runs.length) {
+      list.append(el("div", { class: "card mut", text: "Noch keine Runs." }));
+      return;
+    }
+    for (const run of data.runs) {
+      const when = run.started_at ? new Date(Number(run.started_at)).toLocaleString("de-DE") : "";
+      list.append(
+        el(
+          "div",
+          { class: "card" },
+          el("h3", { text: run.input || run.run_id }),
+          el("div", { class: "k", text: `${run.bot} · ${run.status}${run.error ? ` · ${run.error}` : ""}` }),
+          el("div", { class: "k", text: `${when} · ${run.run_id}` }),
+        ),
+      );
+    }
+  } catch (err) {
+    list.append(el("div", { class: "card mut", text: `Runs: ${describeError(err).text}` }));
+  }
+}
+
+// ---------------------------------------------------------------------------------------
 // Shell: views, drawer, theme, logout
 // ---------------------------------------------------------------------------------------
 
@@ -1050,6 +1259,7 @@ function switchView(view) {
   if (view === "cron") loadJobs();
   if (view === "usage") loadUsage();
   if (view === "log") loadLog();
+  if (view === "runs") loadRuns();
   if (window.innerWidth <= 860) closeDrawer();
 }
 
@@ -1132,7 +1342,7 @@ function wire() {
   $("#logout").onclick = logout;
   $("#btn-logout-all").onclick = logoutAll;
 
-  $("#btn-refresh-sessions").onclick = loadSessions;
+  $("#btn-refresh-sessions").onclick = loadConversations;
   $("#btn-new-bot").onclick = newBot;
   $("#btn-set-model").onclick = setModel;
   $("#btn-save-soul").onclick = saveSoul;
@@ -1143,6 +1353,7 @@ function wire() {
   $("#job-form").onsubmit = saveJob;
   $("#btn-usage-refresh").onclick = loadUsage;
   $("#btn-log-refresh").onclick = loadLog;
+  $("#btn-runs-refresh").onclick = loadRuns;
 
   window.addEventListener("resize", () => {
     if (window.innerWidth > 860) closeDrawer();
@@ -1181,10 +1392,17 @@ async function boot() {
 
   wire();
   renderBotList();
+  // newChat() clears the stored conversation id, so remember it first: a reload should reopen
+  // the thread the user was in.
+  const resume = state.conversationId;
   newChat();
   await loadModels();
   await loadBots().catch(() => {});
-  await loadSessions();
+  await loadConversations();
+  const resumeConv = resume ? state.conversations.find((c) => c.id === resume) : null;
+  if (resumeConv) await openConversation(resumeConv);
+  await loadHealth();
+  setInterval(loadHealth, 20_000);
 }
 
 boot();

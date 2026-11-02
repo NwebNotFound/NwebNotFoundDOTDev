@@ -70,16 +70,23 @@ function call(path, { method = "GET", body, cookies = {}, csrf = true, origin = 
 
 const body = (res) => res.json();
 
-test("health is public and reports configuration", async () => {
+test("health is public and reports configuration plus the origin's view", async () => {
   const res = await handle(new Request(`${HOST}/api/health`), env);
   assert.equal(res.status, 200);
   const data = await body(res);
   assert.equal(data.ok, true);
   assert.equal(data.upstream, true);
+  assert.equal(data.origin.reachable, true, "the proxy's /health answered");
+  assert.equal(data.origin.gateway, true);
   assert.equal(data.auth, true);
   assert.equal(data.store, false, "no Durable Object binding in tests");
   assert.equal(data.session_version, "1");
-  assert.deepEqual(data.bots, ["cloudflare", "minecraft", "discord", "homelab", "default"]);
+  // The proxy's list (profiles dir + default) comes first, the dashboard adds the rest.
+  assert.deepEqual(
+    [...data.bots].sort(),
+    ["cloudflare", "default", "discord", "homelab", "minecraft"],
+  );
+  assert.equal(data.bots.slice(0, 3).join(","), "cloudflare,minecraft,default", "routing source wins the order");
 });
 
 test("static assets fall through to ASSETS and still get the security headers", async () => {
@@ -313,14 +320,172 @@ test("chat run: start, stream events, approve, steer, stop", async () => {
 
   const approve = await call(`/api/bots/cloudflare/runs/${run_id}/approval`, { method: "POST", body: { choice: "once" } });
   assert.equal(approve.status, 200);
+  // The gateway's session authority takes exactly {request_id, execution_generation, choice};
+  // both ids are filled in from GET /v1/runs/<id> when the client did not send them.
+  const sent = mock.state.requests.filter((r) => r.path === `/gw/p/cloudflare/v1/runs/${run_id}/approval`).at(-1);
+  assert.deepEqual(Object.keys(sent.body).sort(), ["choice", "execution_generation", "request_id"]);
+  assert.deepEqual(sent.body, { request_id: "req_1", execution_generation: 3, choice: "once" });
+  assert.ok(
+    mock.state.requests.some((r) => r.path === `/gw/p/cloudflare/v1/runs/${run_id}` && r.method === "GET"),
+    "the pending control was resolved from the run",
+  );
   const badChoice = await call(`/api/bots/cloudflare/runs/${run_id}/approval`, { method: "POST", body: { choice: "yolo" } });
   assert.equal(badChoice.status, 400);
+
+  const resumed = await call(`/api/bots/cloudflare/runs/${run_id}/events?since=3`);
+  assert.equal(resumed.status, 200);
+  await resumed.text();
+  const resumedUpstream = mock.state.requests.filter((r) => r.path === `/gw/p/cloudflare/v1/runs/${run_id}/events`).at(-1);
+  assert.match(resumedUpstream.search, /since=3/, "a resume cursor is forwarded");
+
+  await (await call(`/api/bots/cloudflare/runs/${run_id}/events?since=../etc`)).text();
+  const junkCursor = mock.state.requests.filter((r) => r.path === `/gw/p/cloudflare/v1/runs/${run_id}/events`).at(-1);
+  assert.equal(junkCursor.search, "", "a non-numeric cursor is dropped");
 
   const steer = await call(`/api/bots/cloudflare/runs/${run_id}/steer`, { method: "POST", body: { input: "faster" } });
   assert.equal(steer.status, 200);
 
   const stop = await call(`/api/bots/cloudflare/runs/${run_id}/stop`, { method: "POST", body: {} });
   assert.equal(stop.status, 200);
+});
+
+test("approval uses the client's request_id and execution_generation when it has them", async () => {
+  const started = await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "approve me" } });
+  const { run_id } = await body(started);
+  const before = mock.state.requests.filter((r) => r.path.endsWith("/approval")).length;
+  mock.state.pendingControls = null;
+  try {
+    const res = await call(`/api/bots/cloudflare/runs/${run_id}/approval`, {
+      method: "POST",
+      body: { choice: "session", request_id: "req_from_client", execution_generation: 7 },
+    });
+    assert.equal(res.status, 200);
+    const sent = mock.state.requests.filter((r) => r.path.endsWith("/approval")).slice(before);
+    assert.equal(sent.length, 1);
+    assert.deepEqual(sent[0].body, { request_id: "req_from_client", execution_generation: 7, choice: "session" });
+  } finally {
+    mock.state.pendingControls = { request_id: "req_1", execution_generation: 3 };
+  }
+});
+
+test("an approval with no resolvable context is a 409 instead of a silent no-op", async () => {
+  const started = await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "no context" } });
+  const { run_id } = await body(started);
+  const before = mock.state.requests.filter((r) => r.path.endsWith("/approval")).length;
+  mock.state.pendingControls = null;
+  try {
+    const res = await call(`/api/bots/cloudflare/runs/${run_id}/approval`, { method: "POST", body: { choice: "once" } });
+    assert.equal(res.status, 409);
+    assert.equal((await body(res)).error, "approval_context_missing");
+    assert.equal(
+      mock.state.requests.filter((r) => r.path.endsWith("/approval")).length,
+      before,
+      "no approval was sent upstream",
+    );
+  } finally {
+    mock.state.pendingControls = { request_id: "req_1", execution_generation: 3 };
+  }
+});
+
+test("run history is persisted, listed per bot, and refreshed by polling", async () => {
+  const started = await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "history check" } });
+  const { run_id } = await body(started);
+
+  const listed = await body(await call("/api/runs?limit=20"));
+  const row = listed.runs.find((r) => r.run_id === run_id);
+  assert.ok(row, "the started run is in the history");
+  assert.equal(row.bot, "cloudflare");
+  assert.equal(row.input, "history check");
+
+  const fetched = await call(`/api/bots/cloudflare/runs/${run_id}`);
+  assert.equal((await body(fetched)).pending.request_id, "req_1", "the poll reports the pending control");
+
+  mock.state.runs.set(run_id, { status: "completed", output: "done" });
+  await body(await call(`/api/bots/cloudflare/runs/${run_id}`));
+  const refreshed = await body(await call("/api/runs?bot=cloudflare&limit=20"));
+  assert.equal(refreshed.runs.find((r) => r.run_id === run_id).status, "completed", "status refreshed by the poll");
+
+  const unknown = await call("/api/runs?bot=nope");
+  assert.equal(unknown.status, 404);
+});
+
+test("chat history: send, reload, and the transcript is still there", async () => {
+  const started = await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "Was ist der Status?" } });
+  assert.equal(started.status, 200);
+  const { run_id, conversation_id } = await body(started);
+  assert.match(conversation_id, /^c_/);
+
+  // The user message is stored at run start, before anything streams.
+  const early = await body(await call(`/api/bots/cloudflare/conversations/${conversation_id}/messages`));
+  assert.deepEqual(early.messages.map((m) => [m.role, m.content]), [["user", "Was ist der Status?"]]);
+
+  // The stream tap records tool row and final answer while the bytes go through untouched.
+  const events = await call(`/api/bots/cloudflare/runs/${run_id}/events`);
+  assert.equal(events.status, 200);
+  const streamed = await events.text();
+  assert.match(streamed, /run\.completed/, "the client still sees the raw stream");
+  assert.doesNotMatch(streamed, /: ping/, "the tap does not inject frames itself");
+
+  // "Reload": a fresh list call finds the thread and its full transcript.
+  const list = await body(await call("/api/bots/cloudflare/conversations"));
+  const conv = list.conversations.find((c) => c.id === conversation_id);
+  assert.ok(conv, "conversation listed after reload");
+  assert.equal(conv.title, "Was ist der Status?");
+  assert.equal(conv.bot, "cloudflare");
+
+  const full = await body(await call(`/api/bots/cloudflare/conversations/${conversation_id}/messages`));
+  assert.deepEqual(full.messages.map((m) => m.role), ["user", "tool", "assistant"]);
+  assert.equal(full.messages[1].tool, "terminal");
+  assert.equal(full.messages[1].content, "exit 0");
+  assert.equal(full.messages[2].content, "fertig");
+});
+
+test("a second message continues the same conversation and keeps its title", async () => {
+  const first = await body(
+    await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "erste frage" } }),
+  );
+  const second = await body(
+    await call("/api/bots/cloudflare/runs", {
+      method: "POST",
+      body: { input: "zweite frage", conversation_id: first.conversation_id },
+    }),
+  );
+  assert.equal(second.conversation_id, first.conversation_id, "same thread");
+
+  const list = await body(await call("/api/bots/cloudflare/conversations"));
+  const matches = list.conversations.filter((c) => c.id === first.conversation_id);
+  assert.equal(matches.length, 1, "no duplicate thread");
+  assert.equal(matches[0].title, "erste frage", "the title stays the first message");
+
+  const messages = await body(await call(`/api/bots/cloudflare/conversations/${first.conversation_id}/messages`));
+  assert.deepEqual(
+    messages.messages.filter((m) => m.role === "user").map((m) => m.content),
+    ["erste frage", "zweite frage"],
+  );
+});
+
+test("chat history survives a dropped stream through the poll fallback", async () => {
+  mock.state.streamDrops = true;
+  try {
+    const started = await body(
+      await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "poll me" } }),
+    );
+    const events = await call(`/api/bots/cloudflare/runs/${started.run_id}/events`);
+    await events.text(); // only run.started, then the upstream ends
+
+    mock.state.runs.set(started.run_id, { status: "completed", output: "per Poll fertig" });
+    const polled = await body(await call(`/api/bots/cloudflare/runs/${started.run_id}`));
+    assert.equal(polled.status, "completed");
+
+    const messages = await body(
+      await call(`/api/bots/cloudflare/conversations/${started.conversation_id}/messages`),
+    );
+    const last = messages.messages.at(-1);
+    assert.equal(last.role, "assistant");
+    assert.equal(last.content, "per Poll fertig", "the poll persisted the answer server-side");
+  } finally {
+    mock.state.streamDrops = false;
+  }
 });
 
 test("a run can continue an existing session", async () => {

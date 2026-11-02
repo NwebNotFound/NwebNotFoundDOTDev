@@ -200,6 +200,70 @@ test("an unreachable upstream is a generic 502 without internals", async () => {
   }
 });
 
+test("health reports the proxy, the gateway and the bots without leaking anything", async () => {
+  const res = await get("/health");
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.gateway, true, "the mock gateway answered");
+  assert.deepEqual(data.bots, ["default"], "the empty temp profiles dir yields default only");
+  assert.equal(data.keys, undefined);
+  assert.equal(data.secret, undefined);
+  assert.doesNotMatch(JSON.stringify(data), /key-for-/, "no key material in the health payload");
+});
+
+test("health needs the shared secret too", async () => {
+  const res = await fetch(`${proxyUrl}/health`);
+  assert.equal(res.status, 401, "the tunnel cannot be used to probe the host");
+});
+
+test("an idle event stream is kept alive through the proxy", async () => {
+  const holder = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    res.write('data: {"event":"run.started"}\n\n');
+    setTimeout(() => res.end(), 400);
+  });
+  holder.listen(0, "127.0.0.1");
+  await once(holder, "listening");
+  const gateway = `http://127.0.0.1:${holder.address().port}`;
+  const port = await freePort();
+  const proc = spawn(process.execPath, [PROXY], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      GATEWAY: gateway,
+      DASHBOARD: gateway,
+      PANEL_SECRET: SECRET,
+      HERMES_HOME: HERMES_HOME,
+      HERMES_KEY_CLOUDFLARE: KEYS.cloudflare,
+      SSE_PING_MS: "60",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("proxy did not start")), 8000);
+      proc.stdout.on("data", (buf) => {
+        if (buf.toString().includes("origin proxy on")) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    const res = await fetch(`http://127.0.0.1:${port}/gw/p/cloudflare/v1/runs/run_1/events`, {
+      headers: { "x-hermes-panel-secret": SECRET },
+    });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /text\/event-stream/);
+    const text = await res.text();
+    assert.match(text, /run\.started/, "the upstream frame is passed through");
+    assert.match(text, /: ping/, "an idle stream got keep-alive frames");
+  } finally {
+    proc.kill();
+    await new Promise((r) => holder.close(r));
+  }
+});
+
 test("the proxy refuses to start without a secret", async () => {
   const port = await freePort();
   const proc = spawn(process.execPath, [PROXY], {

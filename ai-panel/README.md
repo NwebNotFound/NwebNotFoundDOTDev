@@ -1,9 +1,10 @@
 # AI-Panel (ai.nwebnotfound.dev)
 
 Control panel for Nils' Hermes crew. One Cloudflare Worker, no dependencies, no build step.
-Chat with streamed thinking/tool events, approve/steer/stop, bots + SOUL, per-bot model
-switching, cron jobs, usage/cost and sessions — in a ChatGPT-style shell with a sidebar,
-markdown answers, highlighted code blocks and a phone drawer.
+Chat with streamed thinking/tool events, streaming that survives a dropped connection,
+approve/steer/stop, persistent chat history in the Durable Object, bots + SOUL, per-bot model
+switching, cron jobs, run history and usage/cost — in a ChatGPT-style shell with a sidebar,
+markdown answers, highlighted code blocks, a health dot and a phone drawer.
 
 - Plan: [`docs/plan.md`](docs/plan.md)
 - Tunnel + secrets setup: [`docs/ai-panel-tunnel.md`](docs/ai-panel-tunnel.md)
@@ -20,16 +21,18 @@ src/ratelimit.js   in-memory fallback limiter
 src/log.js         in-memory fallback request log
 public/index.html  shell
 public/app.js      SPA (chat, sidebar, panels)
+public/run-events.js pure stream helpers (approval body, tool output, terminal, backoff)
 public/markdown.js markdown -> data tree (no HTML strings)
 public/highlight.js syntax highlighting -> tokens
 origin-proxy/      loopback proxy that fronts gateway + dashboard for the tunnel
+origin-proxy/watchdog.ps1  runs/installs the three origin services as scheduled tasks
 test/              node:test unit + e2e (mock Hermes, no network)
 ```
 
 ## Develop
 
 ```bash
-npm test          # 84 tests: unit + e2e against a mock Hermes on 127.0.0.1
+npm test          # 122 tests: unit + e2e against a mock Hermes on 127.0.0.1
 npm run check     # node --check on every module
 npx wrangler dev  # needs .dev.vars (never committed)
 ```

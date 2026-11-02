@@ -52,6 +52,11 @@ const PANEL_SECRET = process.env.PANEL_SECRET || "";
 const API_SERVER_KEY = process.env.API_SERVER_KEY || "";
 const DASHBOARD_TOKEN = process.env.HERMES_DASHBOARD_SESSION_TOKEN || process.env.DASHBOARD_TOKEN || "";
 
+// Cloudflare's edge drops an idle connection after ~100 s. An approval wait can be silent for
+// minutes, so an SSE response that has sent nothing for this long gets a comment frame — the
+// browser's EventSource/fetch reader ignores comment lines.
+const SSE_PING_MS = Math.max(20, Number(process.env.SSE_PING_MS) || 15_000);
+
 if (!PANEL_SECRET || PANEL_SECRET.length < 16) {
   console.error("refusing to start: PANEL_SECRET missing or shorter than 16 chars");
   process.exit(1);
@@ -166,6 +171,23 @@ function secretOk(header) {
   return timingSafeEqual(given, secretBuf);
 }
 
+/** Liveness for the Worker's health page: nothing secret, no paths, no keys. */
+async function healthPayload() {
+  let gateway = false;
+  try {
+    const res = await fetch(`${GATEWAY}/health`, { signal: AbortSignal.timeout(1500) });
+    gateway = Boolean(res); // any answer, even a 404, means the port is listening
+  } catch {
+    gateway = false;
+  }
+  return {
+    ok: true,
+    uptime_s: Math.round(process.uptime()),
+    gateway,
+    bots: discoverBots(), // profiles dir + default: the same source the routing uses
+  };
+}
+
 const PROFILE = /^\/p\/([a-z0-9][a-z0-9_-]{0,31})(?=\/|$)/;
 
 function upstreamFor(pathname) {
@@ -178,7 +200,7 @@ function upstreamFor(pathname) {
   return null;
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const started = Date.now();
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
 
@@ -186,6 +208,12 @@ const server = http.createServer((req, res) => {
     res.writeHead(401, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "panel secret missing or wrong" }));
     console.warn(`${req.method} ${url.pathname} 401 (secret)`);
+    return;
+  }
+
+  if (url.pathname === "/health") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify(await healthPayload()));
     return;
   }
 
@@ -246,6 +274,25 @@ const server = http.createServer((req, res) => {
       }
       out["x-accel-buffering"] = "no";
       res.writeHead(up.statusCode || 502, out);
+
+      // Keep an idle event stream alive through the Cloudflare edge: a comment frame every
+      // SSE_PING_MS while the upstream says nothing. Comment lines never reach the client's
+      // event handlers, so this cannot confuse a consumer.
+      let ping = null;
+      if (String(up.headers["content-type"] || "").includes("text/event-stream")) {
+        ping = setInterval(() => {
+          if (res.writableEnded) return;
+          res.write(": ping\n\n");
+        }, SSE_PING_MS);
+        const stop = () => {
+          if (ping) clearInterval(ping);
+          ping = null;
+        };
+        up.on("end", stop);
+        up.on("close", stop);
+        res.on("close", stop);
+      }
+
       up.pipe(res);
       up.on("end", () => {
         console.log(`${req.method} ${url.pathname} ${up.statusCode} ${Date.now() - started}ms`);

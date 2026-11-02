@@ -13,6 +13,9 @@ import * as rl from "./ratelimit.js";
 import * as log from "./log.js";
 
 const LOG_MAX = 200;
+const RUN_MAX = 200;
+const CONVERSATION_MAX = 100;
+const MESSAGE_MAX = 400;
 // Deliberately short: an isolate that cannot be told about a logout re-reads the marker
 // within five seconds, so "sign out everywhere" bites almost immediately everywhere.
 export const REVOKED_CACHE_TTL_MS = 5_000;
@@ -68,6 +71,94 @@ export class PanelStore {
         return json({ ok: true, before });
       }
       return json({ before: (await storage.get("revoked_before")) || 0 });
+    }
+
+    // Run history: one small ring, merged by (bot, run_id), so a panel restart or a new
+    // isolate does not lose what was started from the chat.
+    if (url.pathname === "/runs") {
+      if (request.method === "POST") {
+        const row = await request.json().catch(() => null);
+        if (!row || !row.bot || !row.run_id) return json({ error: "bot_and_run_id_required" }, 400);
+        const rows = (await storage.get("runs")) || [];
+        const existing = rows.findIndex((r) => r.bot === row.bot && r.run_id === row.run_id);
+        const merged = { ...(existing >= 0 ? rows[existing] : {}), ...row, updated_at: Date.now() };
+        if (existing >= 0) rows[existing] = merged;
+        else rows.push(merged);
+        await storage.put("runs", rows.slice(-RUN_MAX));
+        return json({ ok: true, run: merged });
+      }
+      const bot = url.searchParams.get("bot") || "";
+      const limit = Math.max(1, Math.min(RUN_MAX, Number(url.searchParams.get("limit")) || 25));
+      const rows = (await storage.get("runs")) || [];
+      const filtered = rows.filter((r) => !bot || r.bot === bot).slice(-limit).reverse();
+      return json({ runs: filtered });
+    }
+
+    // Conversations: one row per chat thread, plus its messages. This is the panel's own chat
+    // history — the sidebar and the transcript survive a reload, a new isolate and a re-login.
+    if (url.pathname === "/conversations") {
+      if (request.method === "POST") {
+        const row = await request.json().catch(() => null);
+        if (!row || !row.bot || !row.id) return json({ error: "bot_and_id_required" }, 400);
+        const rows = (await storage.get("conversations")) || [];
+        const i = rows.findIndex((r) => r.id === row.id);
+        const merged = {
+          ...(i >= 0 ? rows[i] : { started_at: Date.now(), messages: 0 }),
+          ...row,
+          updated_at: Date.now(),
+        };
+        if (i >= 0) rows[i] = merged;
+        else rows.push(merged);
+        await storage.put("conversations", rows.slice(-CONVERSATION_MAX));
+        return json({ ok: true, conversation: merged });
+      }
+      const bot = url.searchParams.get("bot") || "";
+      const limit = Math.max(1, Math.min(CONVERSATION_MAX, Number(url.searchParams.get("limit")) || 30));
+      const rows = (await storage.get("conversations")) || [];
+      const filtered = rows
+        .filter((r) => !bot || r.bot === bot)
+        .sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))
+        .slice(0, limit);
+      return json({ conversations: filtered });
+    }
+
+    if (url.pathname === "/messages") {
+      const id = url.searchParams.get("conversation_id") || "";
+      if (request.method === "POST") {
+        const row = await request.json().catch(() => null);
+        if (!row || !row.conversation_id || !row.role) return json({ error: "conversation_id_and_role_required" }, 400);
+        const key = `msgs:${row.conversation_id}`;
+        const rows = (await storage.get(key)) || [];
+        const entry = {
+          seq: rows.length + 1,
+          role: String(row.role).slice(0, 20),
+          kind: String(row.kind || "message").slice(0, 20),
+          content: String(row.content ?? "").slice(0, 20_000),
+          tool: row.tool ? String(row.tool).slice(0, 80) : null,
+          ok: typeof row.ok === "boolean" ? row.ok : null,
+          run_id: row.run_id ? String(row.run_id).slice(0, 64) : null,
+          ts: Number(row.ts) || Date.now(),
+        };
+        // One final assistant row per run: the SSE tap and the poll fallback both report it.
+        const existing =
+          entry.role === "assistant" && entry.run_id
+            ? rows.findIndex((r) => r.role === "assistant" && r.run_id === entry.run_id)
+            : -1;
+        if (existing >= 0) rows[existing] = { ...rows[existing], ...entry, seq: rows[existing].seq };
+        else rows.push(entry);
+        await storage.put(key, rows.slice(-MESSAGE_MAX));
+        const convs = (await storage.get("conversations")) || [];
+        const ci = convs.findIndex((c) => c.id === row.conversation_id);
+        if (ci >= 0) {
+          convs[ci] = { ...convs[ci], updated_at: entry.ts, messages: rows.length };
+          await storage.put("conversations", convs);
+        }
+        return json({ ok: true, message: entry });
+      }
+      if (!id) return json({ error: "conversation_id_required" }, 400);
+      const limit = Math.max(1, Math.min(MESSAGE_MAX, Number(url.searchParams.get("limit")) || MESSAGE_MAX));
+      const rows = (await storage.get(`msgs:${id}`)) || [];
+      return json({ conversation_id: id, messages: rows.slice(-limit) });
     }
 
     return json({ error: "not_found" }, 404);
@@ -141,6 +232,186 @@ export async function logRecent(env, limit = 50) {
   } catch {
     return log.recent(limit);
   }
+}
+
+/** In-memory run ring for node --test / a binding-less dev server. */
+const runFallback = [];
+
+/**
+ * Remember a chat run (started, approved, stopped, finished). Merged by (bot, run_id) so callers
+ * only send what changed. Never throws: history is a convenience, not a precondition.
+ */
+export async function runRecord(env, row) {
+  const clean = { bot: String(row.bot || ""), run_id: String(row.run_id || "") };
+  // Only carry the fields the caller actually set: an update from the poll must not wipe the
+  // conversation id or the input of the row written at run start.
+  if (row.session_id !== undefined) clean.session_id = row.session_id ? String(row.session_id) : null;
+  if (row.conversation_id !== undefined) clean.conversation_id = row.conversation_id ? String(row.conversation_id) : null;
+  if (row.input !== undefined) clean.input = String(row.input || "").slice(0, 200);
+  clean.status = String(row.status || "started").slice(0, 40);
+  clean.error = row.error ? String(row.error).slice(0, 200) : null;
+  if (row.started_at !== undefined) clean.started_at = Number(row.started_at) || Date.now();
+  if (!clean.bot || !clean.run_id) return clean;
+  const s = stub(env);
+  if (!s) {
+    const i = runFallback.findIndex((r) => r.bot === clean.bot && r.run_id === clean.run_id);
+    const merged = { ...(i >= 0 ? runFallback[i] : {}), ...clean, updated_at: Date.now() };
+    if (i >= 0) runFallback[i] = merged;
+    else runFallback.push(merged);
+    if (runFallback.length > RUN_MAX) runFallback.splice(0, runFallback.length - RUN_MAX);
+    return merged;
+  }
+  try {
+    const res = await s.fetch("https://panel-store/runs", { method: "POST", body: JSON.stringify(clean) });
+    if (!res.ok) throw new Error(`store ${res.status}`);
+    return (await res.json()).run || clean;
+  } catch {
+    return clean;
+  }
+}
+
+/** Newest-first run history, optionally for one bot. */
+export async function runRecent(env, { bot = "", limit = 25 } = {}) {
+  const s = stub(env);
+  if (!s) {
+    return runFallback
+      .filter((r) => !bot || r.bot === bot)
+      .slice(-limit)
+      .reverse();
+  }
+  try {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (bot) q.set("bot", bot);
+    const res = await s.fetch(`https://panel-store/runs?${q}`);
+    if (!res.ok) throw new Error(`store ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.runs) ? data.runs : [];
+  } catch {
+    return runFallback.filter((r) => !bot || r.bot === bot).slice(-limit).reverse();
+  }
+}
+
+/** Test seam: forget the in-memory run ring. */
+export function resetRuns() {
+  runFallback.length = 0;
+}
+
+// ---------------------------------------------------------------------------------------
+// Conversations (chat history)
+// ---------------------------------------------------------------------------------------
+
+const conversationFallback = []; // {id, bot, title, started_at, updated_at, messages}
+const messageFallback = new Map(); // conversation id → rows
+
+/** Create or update a conversation row. Never throws. */
+export async function conversationUpsert(env, row) {
+  const clean = {
+    id: String(row.id || ""),
+    bot: String(row.bot || ""),
+    session_id: row.session_id ? String(row.session_id) : null,
+    run_id: row.run_id ? String(row.run_id) : null,
+    started_at: Number(row.started_at) || Date.now(),
+  };
+  // Only set a title when the caller supplies one: a follow-up message must not rename the thread.
+  if (row.title !== undefined) clean.title = String(row.title || "Neuer Chat").slice(0, 120);
+  if (!clean.id || !clean.bot) return clean;
+  const s = stub(env);
+  if (!s) {
+    const i = conversationFallback.findIndex((c) => c.id === clean.id);
+    const merged = { ...(i >= 0 ? conversationFallback[i] : { messages: 0 }), ...clean, updated_at: Date.now() };
+    if (i >= 0) conversationFallback[i] = merged;
+    else conversationFallback.push(merged);
+    return merged;
+  }
+  try {
+    const res = await s.fetch("https://panel-store/conversations", { method: "POST", body: JSON.stringify(clean) });
+    if (!res.ok) throw new Error(`store ${res.status}`);
+    return (await res.json()).conversation || clean;
+  } catch {
+    return clean;
+  }
+}
+
+/** Newest-first conversations, optionally for one bot. */
+export async function conversationList(env, { bot = "", limit = 30 } = {}) {
+  const s = stub(env);
+  if (!s) {
+    return conversationFallback
+      .filter((c) => !bot || c.bot === bot)
+      .sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))
+      .slice(0, limit);
+  }
+  try {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (bot) q.set("bot", bot);
+    const res = await s.fetch(`https://panel-store/conversations?${q}`);
+    if (!res.ok) throw new Error(`store ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.conversations) ? data.conversations : [];
+  } catch {
+    return conversationFallback.filter((c) => !bot || c.bot === bot).slice(0, limit);
+  }
+}
+
+/** Append one transcript row (user, assistant, tool, approval). Never throws. */
+export async function messageAppend(env, row) {
+  const clean = {
+    conversation_id: String(row.conversation_id || ""),
+    role: String(row.role || "assistant").slice(0, 20),
+    kind: String(row.kind || "message").slice(0, 20),
+    content: String(row.content ?? "").slice(0, 20_000),
+    tool: row.tool ? String(row.tool).slice(0, 80) : null,
+    ok: typeof row.ok === "boolean" ? row.ok : null,
+    run_id: row.run_id ? String(row.run_id) : null,
+    ts: Number(row.ts) || Date.now(),
+  };
+  if (!clean.conversation_id) return clean;
+  const s = stub(env);
+  if (!s) {
+    const rows = messageFallback.get(clean.conversation_id) || [];
+    const existing =
+      clean.role === "assistant" && clean.run_id
+        ? rows.findIndex((r) => r.role === "assistant" && r.run_id === clean.run_id)
+        : -1;
+    if (existing >= 0) rows[existing] = { ...rows[existing], ...clean };
+    else rows.push({ ...clean, seq: rows.length + 1 });
+    messageFallback.set(clean.conversation_id, rows.slice(-MESSAGE_MAX));
+    const conv = conversationFallback.find((c) => c.id === clean.conversation_id);
+    if (conv) {
+      conv.updated_at = clean.ts;
+      conv.messages = rows.length;
+    }
+    return clean;
+  }
+  try {
+    const res = await s.fetch("https://panel-store/messages", { method: "POST", body: JSON.stringify(clean) });
+    if (!res.ok) throw new Error(`store ${res.status}`);
+    return (await res.json()).message || clean;
+  } catch {
+    return clean;
+  }
+}
+
+/** The transcript of one conversation, oldest first. */
+export async function messageList(env, { conversationId, limit = MESSAGE_MAX } = {}) {
+  if (!conversationId) return [];
+  const s = stub(env);
+  if (!s) return (messageFallback.get(conversationId) || []).slice(-limit);
+  try {
+    const q = new URLSearchParams({ conversation_id: conversationId, limit: String(limit) });
+    const res = await s.fetch(`https://panel-store/messages?${q}`);
+    if (!res.ok) throw new Error(`store ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data.messages) ? data.messages : [];
+  } catch {
+    return messageFallback.get(conversationId) || [];
+  }
+}
+
+/** Test seam: forget the in-memory conversations. */
+export function resetConversations() {
+  conversationFallback.length = 0;
+  messageFallback.clear();
 }
 
 const revokedCache = new Map(); // marker key → { value, expires }
