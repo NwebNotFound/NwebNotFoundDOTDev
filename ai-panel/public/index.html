@@ -32,6 +32,7 @@
           <button data-view="cron" class="nav-item">Cron</button>
           <button data-view="usage" class="nav-item">Usage</button>
           <button data-view="runs" class="nav-item">Runs</button>
+          <button data-view="crew" class="nav-item">Crew-Runs</button>
           <button data-view="log" class="nav-item">Log</button>
         </nav>
 
@@ -164,6 +165,43 @@
             </div>
           </div>
           <div id="run-list" class="cards"></div>
+        </section>
+
+        <section id="view-crew" class="view panel-view crew-view">
+          <div class="view-head">
+            <h2>Crew-Runs</h2>
+            <div class="row">
+              <button id="btn-crew-refresh" class="ghost sm">Aktualisieren</button>
+              <button class="ghost sm back" data-view="chat">Zurück zum Chat</button>
+            </div>
+          </div>
+          <p class="crew-note">Nur Lesen — hier wird nichts gestartet, freigegeben oder gelöscht.</p>
+
+          <div class="crew-controls">
+            <label class="crew-field">
+              <span class="crew-field-label">Bot</span>
+              <select id="crew-bot" aria-label="Bot wählen"></select>
+            </label>
+            <div class="crew-filters" id="crew-filters" role="group" aria-label="Session-Typ">
+              <button class="chip active" type="button" data-crew-filter="all" aria-pressed="true">Alle</button>
+              <button class="chip" type="button" data-crew-filter="run" aria-pressed="false">API-Runs</button>
+              <button class="chip" type="button" data-crew-filter="cli" aria-pressed="false">CLI-Sessions</button>
+            </div>
+          </div>
+
+          <p class="crew-range mut" id="crew-range"></p>
+          <div id="crew-list" class="crew-list" aria-live="polite"></div>
+          <button id="btn-crew-more" class="ghost sm crew-more hidden" type="button">Mehr laden</button>
+
+          <section id="crew-transcript" class="crew-transcript hidden" aria-label="Transkript">
+            <div class="row space crew-transcript-head">
+              <h3 id="crew-transcript-title"></h3>
+              <button id="crew-transcript-close" class="ghost sm" type="button">Schließen</button>
+            </div>
+            <p class="crew-meta" id="crew-transcript-meta"></p>
+            <div id="crew-messages" class="crew-messages"></div>
+            <button id="btn-crew-msgs-more" class="ghost sm crew-more hidden" type="button">Mehr laden</button>
+          </section>
         </section>
 
         <section id="view-log" class="view panel-view">
