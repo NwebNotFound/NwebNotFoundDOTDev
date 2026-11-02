@@ -396,7 +396,9 @@ try {
   console.log("9c) Navigation, Theme, Seiten");
   const home = (await req("/")).t; ok(!/<nav class="nl"[^]*?href="\/profile">Profil<\/a>[^]*?<\/nav>/.test(home), "kein doppelter Profil-Tab in der Nav");
   { const port = await req("/", { testHost: "nwebnotfound.dev" }); const chip = (port.t.split("else if(d.user)")[1] || "").split("else if(d.available)")[0];
-    ok(port.s === 200 && chip.includes("createElement('img')") && chip.includes("httpsAvatar") && chip.includes("protocol!=='https:'") && !chip.includes("innerHTML") && !/onerror\s*=\s*["']/.test(chip), "Portfolio-Chip: Avatar nur als DOM-Property, nur https", chip.slice(0, 160)); }
+    ok(port.s === 200 && port.t.includes("protocol!=='https:'") && chip.includes("createElement('img')") && chip.includes("httpsAvatar(d.user.avatar)") && !chip.includes("innerHTML") && !/onerror\s*=\s*["']/.test(chip), "Portfolio-Chip: Avatar nur als DOM-Property, nur https", chip.slice(0, 160));
+    const mc = (port.t.split("if(k)")[1] || "").split("else if(d.user)")[0];
+    ok(mc.includes("httpsAvatar(d.user.avatar)") && !mc.includes("this.src=d.user.avatar") && !/av\.src=nm\?/.test(mc), "MC-Konto: Avatar nur über httpsAvatar", mc.slice(0, 180)); }
   ok(home.includes('href="/bestellungen"') && home.includes("item(orders,'Bestellungen')"), "Dropdown verlinkt zusammengelegte Bestellungen");
   for (const p of ["/bestellungen", "/abholungen"]) { const x = await req(p); ok(x.s === 200 && x.t.includes("/mc/orders.js"), p + " → 200, gemeinsame Liste"); }
   ok((await req("/markt/diamond")).t.includes('id="bbuy"'), "Item-Seite hat Bank-Kauf");

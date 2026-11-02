@@ -107,14 +107,14 @@ const REVEAL_JS = `<script>(()=>{const els=document.querySelectorAll('.reveal');
 // Account: auf MC füllt das die Gruppe „Mein Konto“ (eine Leiste). Auf dem Portfolio bleibt der Chip.
 // Kein Aufruf von /api/mc-vip. Rang und Welten bleiben auf der VIP-Seite.
 const ACCT_JS = (loginBase) => `<script>(async()=>{const el=document.getElementById('acct');const k=document.getElementById('konto');if(!el&&!k)return;try{const d=await(await fetch('/api/me',{credentials:'include'})).json();const nx=encodeURIComponent(location.href);
+const httpsAvatar=u=>{try{const x=new URL(String(u||''));if(x.protocol!=='https:'||x.username||x.password)return '';return x.href}catch(e){return ''}};
+const fb='/mc-head/MHF_Steve/64?v=5';
 if(k){if(el)el.replaceChildren();
-if(d.user){const nm=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?d.user.mc_name:'';const av=k.querySelector('.konto-av');if(av){av.src=nm?'/mc-head/'+nm+'/64?v=5':d.user.avatar;av.onerror=function(){this.onerror=null;this.src=d.user.avatar}}
+if(d.user){const nm=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?d.user.mc_name:'';const av=k.querySelector('.konto-av');if(av){const head=nm?'/mc-head/'+nm+'/64?v=5':'';av.src=head||httpsAvatar(d.user.avatar)||fb;av.onerror=function(){this.onerror=null;if(!String(this.src||'').endsWith(fb))this.src=fb}}
 const out=k.querySelector('a.out');if(out)out.href='${loginBase}/auth/discord/logout?next='+nx;if(window.mcNavMark)window.mcNavMark()}
 else if(d.available){k.outerHTML='<a class="l" id="konto" href="${loginBase}/auth/discord/login?next='+nx+'">Mit Discord anmelden</a>'}
 else{k.outerHTML='<span class="l" id="konto">Login bald</span>'}}
 else if(d.user){const n=String(d.user.name||''),un=String(d.user.username||'');
-const httpsAvatar=u=>{try{const x=new URL(String(u||''));if(x.protocol!=='https:'||x.username||x.password)return '';return x.href}catch(e){return ''}};
-const fb='/mc-head/MHF_Steve/64?v=5';
 const head=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?'/mc-head/'+d.user.mc_name+'/64?v=5':'';
 const pic=head||httpsAvatar(d.user.avatar)||fb;
 const um=document.createElement('div');um.className='um';

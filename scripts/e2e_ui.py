@@ -390,5 +390,37 @@ with sync_playwright() as p:
     ok(http["src"].endswith(FB) and "http://cdn.discordapp.com" not in http["src"], "Portfolio-Chip: http-Avatar fällt auf Steve zurück", http)
     good = chip("https://cdn.discordapp.com/embed/avatars/0.png")
     ok(good["src"].startswith("https://cdn.discordapp.com/") and good["attr"] is None and good["xss"] == 0, "Portfolio-Chip: https-Avatar bleibt gesetzt", good)
+    me = {"avatar": "", "mc_name": None}
+    def route_k(r):
+        u = r.request.url
+        if u.split("?", 1)[0].endswith("/api/me"):
+            r.fulfill(status=200, content_type="application/json", body=json.dumps({"available": True, "user": {"id": "1", "name": "Nils", "username": "nils", "avatar": me["avatar"], "mc_name": me["mc_name"]}}))
+            return
+        if "cdn.discordapp.com" in u:
+            r.fulfill(status=200, content_type="image/gif", body=GIF)
+            return
+        if u.startswith("https://" + H):
+            h = {k: v for k, v in r.request.all_headers().items() if not k.startswith(":")}; h["host"] = H
+            try: r.fulfill(response=r.fetch(url=BASE + u[len("https://" + H):], headers=h, max_redirects=0))
+            except Exception:
+                if "/mc-head/" not in u and "/mc-icon/" not in u: raise
+            return
+        r.continue_()
+    kctx = br.new_context(viewport={"width": 1280, "height": 800}); kpg = kctx.new_page(); kpg.route("**/*", route_k)
+    def konto(avatar, mc_name):
+        me["avatar"], me["mc_name"] = avatar, mc_name
+        kpg.goto("https://" + H + "/", wait_until="domcontentloaded", timeout=45000)
+        kpg.wait_for_function("() => { const s = document.querySelector('.konto-av') && document.querySelector('.konto-av').src || ''; return s.includes('MHF_Steve') || s.includes('discordapp.com') || /\\/mc-head\\/[A-Za-z0-9_]+\\//.test(s) }", timeout=10000)
+        src = kpg.locator(".konto-av").get_attribute("src") or kpg.evaluate("document.querySelector('.konto-av').src")
+        return {"src": src, "xss": kpg.evaluate("window.__xss || 0")}
+    kb = konto('"><img src=x onerror=window.__xss=1>', None)
+    ok(kb["xss"] == 0 and kb["src"].endswith(FB) and "onerror" not in kb["src"], "MC-Konto: Breakout-Avatar fällt auf Steve zurück", kb)
+    kj = konto("javascript:alert(1)", None)
+    ok(kj["xss"] == 0 and kj["src"].endswith(FB), "MC-Konto: javascript-URL fällt auf Steve zurück", kj)
+    kg = konto("https://cdn.discordapp.com/embed/avatars/0.png", None)
+    ok(kg["src"].startswith("https://cdn.discordapp.com/") and kg["xss"] == 0, "MC-Konto: https-Avatar bleibt gesetzt", kg)
+    kn = konto("javascript:alert(1)", "Nils")
+    ok(kn["xss"] == 0 and "/mc-head/Nils/" in kn["src"], "MC-Konto: gültiger MC-Name schlägt den Avatar", kn)
+    kctx.close()
     br.close()
 sys.exit(1 if fails else 0)
