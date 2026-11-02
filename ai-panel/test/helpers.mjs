@@ -151,6 +151,9 @@ export function startMockHermes() {
               { event: "thinking.delta", run_id: runEvents[1], delta: "überlege" },
               { event: "tool.started", run_id: runEvents[1], tool: "terminal" },
               { event: "tool.completed", run_id: runEvents[1], tool: "terminal", error: false, preview: "exit 0" },
+              ...(state.approvalInStream
+                ? [{ event: "approval.request", run_id: runEvents[1], request_id: "req_1", execution_generation: 3, command: "rm -rf /tmp/build", choices: ["once", "session", "always", "deny"] }]
+                : []),
               { event: "run.completed", run_id: runEvents[1], output: "fertig" },
             ];
         for (const [i, f] of frames.entries()) res.write(`id: ${i}\ndata: ${JSON.stringify(f)}\n\n`);
