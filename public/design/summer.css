@@ -1379,6 +1379,10 @@
 .sm-page-head--center .sm-lead {
   margin-inline: auto;
 }
+.sm-page-head .sm-back {
+  display: block;
+  margin-bottom: var(--sm-space-4);
+}
 .sm-back {
   display: inline-flex;
   align-items: center;

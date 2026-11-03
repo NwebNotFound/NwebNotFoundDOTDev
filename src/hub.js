@@ -507,8 +507,11 @@ ${feedNote(writingSeriesFeeds(series, t), t)}
 /* ---------- shell ---------- */
 
 function navLink(item, lang, active, t) {
-  const hasContent = item.path !== "/writing" || publishedWriting(WRITING).length > 0;
-  const soon = item.soon && !hasContent;
+  // A section is "soon" while it carries no content: `/writing` as soon as the index is empty, and
+  // `/music` + `/reviews` until they get their own source. The nav then dims the label and adds the
+  // small sun pixel (artboard `.nav a.soon`) instead of a yellow text badge.
+  const sectionReady = item.path === "/writing" && publishedWriting(WRITING).length > 0;
+  const soon = item.soon && !sectionReady;
   const cur = item.path === active ? ' aria-current="page"' : "";
   // A section that is not ready yet is dimmed and carries a small sun pixel (the artboard's
   // `.nav a.soon`), not a yellow text badge — the badge stays on the home tiles where there is room.
@@ -633,7 +636,7 @@ function homeBody(t, lang) {
 <section class="sm-hero"><div class="sm-wrap sm-hero__inner">
 <div class="sm-hero__text">
 <span class="sm-badge sm-badge--live sm-rise"><span class="sm-badge__dot"></span>${esc(t("home.eyebrow"))}</span>
-<h1 class="sm-display sm-rise">${esc(t("home.title"))}</h1>
+<h1 class="sm-display sm-rise">${esc(t("home.title"))}<br><span class="sm-display__soft">${esc(t("home.title2"))}</span></h1>
 <p class="sm-lead sm-rise">${esc(t("home.lead"))}</p>
 <p class="sm-hero__cta sm-rise"><a class="sm-btn" href="${href("/portfolio", lang)}">${esc(t("tile.portfolio.title"))} ${arrow}</a><a class="sm-btn sm-btn--soft" href="https://${MC_HOST}/">${esc(t("tile.minecraft.cta"))}</a></p>
 </div>
