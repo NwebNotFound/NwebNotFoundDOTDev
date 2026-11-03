@@ -21,6 +21,7 @@
 
 import { chromium } from "playwright";
 import { spawn, execSync } from "node:child_process";
+import fs from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -56,6 +57,9 @@ function serve(cmd, cmdArgs, extraEnv = {}) {
     cwd: ROOT,
     env: { ...process.env, ...extraEnv },
     stdio: ["ignore", "pipe", "pipe"],
+    // Own process group on POSIX so stopServers() can kill the whole tree; otherwise the wrangler
+    // child keeps the script's stdout pipes open and the process never exits.
+    detached: process.platform !== "win32",
     shell: process.platform === "win32",
   });
   child.stdout.on("data", () => {});
@@ -70,9 +74,36 @@ function stopServers() {
       if (process.platform === "win32") spawn("taskkill", ["/F", "/T", "/PID", String(child.pid)], { stdio: "ignore" });
       else process.kill(-child.pid, "SIGTERM");
     } catch {
-      /* already gone */
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        /* already gone */
+      }
     }
   }
+  restoreContent();
+}
+
+// The `writing` group needs content to render. The committed src/generated/content.js holds Nils'
+// real content (currently none), so the group builds the index from scripts/fixtures/content for the
+// run and puts the committed file back afterwards — never a fixture in a real deploy.
+const CONTENT_JS = path.join(ROOT, "src", "generated", "content.js");
+let contentBackedUp = false;
+function buildFixtureContent() {
+  if (fs.existsSync(CONTENT_JS)) {
+    fs.copyFileSync(CONTENT_JS, `${CONTENT_JS}.screens-bak`);
+    contentBackedUp = true;
+  }
+  execSync("node scripts/build-content.mjs --fixtures", { cwd: ROOT, stdio: "ignore" });
+}
+function restoreContent() {
+  if (!contentBackedUp) return;
+  try {
+    fs.renameSync(`${CONTENT_JS}.screens-bak`, CONTENT_JS);
+  } catch {
+    /* keep the backup on disk rather than losing the committed index */
+  }
+  contentBackedUp = false;
 }
 
 async function reachable(url, timeoutMs = 120_000) {
@@ -97,9 +128,11 @@ async function startServers() {
 
   // Only the servers whose group is requested are started (so `--only hub` needs neither the MC
   // Worker nor the panel, and a broken neighbour cannot block the run).
-  const needSite = GROUPS.includes("site") || GROUPS.includes("hub");
+  const needSite = GROUPS.includes("site") || GROUPS.includes("hub") || GROUPS.includes("writing");
   const needMc = GROUPS.includes("mc");
   const needPanel = GROUPS.includes("panel");
+
+  if (GROUPS.includes("writing")) buildFixtureContent();
 
   // Fresh local D1 per run so the pages render their real (empty) states instead of a 500.
   for (const dir of [needSite ? "site" : null, needMc ? "mc" : null].filter(Boolean)) {
@@ -154,6 +187,11 @@ const PAGES = [
   { group: "hub", name: "hub-about", url: `${SITE}/about`, fullPage: true, out: "docs/screens" },
   { group: "hub", name: "hub-soon", url: `${SITE}/writing`, fullPage: true, out: "docs/screens" },
   { group: "hub", name: "hub-home-en", url: `${SITE}/en`, fullPage: true, out: "docs/screens", schemes: ["light"], only: (vp) => vp.w === 390 },
+  // Writing (Phase 3a): list, post and chapter, light/dark at 390/1280, from the fixture build.
+  { group: "writing", name: "writing-list", url: `${SITE}/writing`, fullPage: true, out: "docs/screens" },
+  { group: "writing", name: "writing-post", url: `${SITE}/writing/test-fixture-hello`, fullPage: true, out: "docs/screens" },
+  { group: "writing", name: "writing-chapter", url: `${SITE}/writing/test-fixture-chapter-2`, fullPage: true, out: "docs/screens" },
+  { group: "writing", name: "writing-series", url: `${SITE}/writing/series/test-fixture-serie`, fullPage: true, out: "docs/screens", only: (vp) => vp.w === 1280 },
   { group: "mc", name: "mc-home", url: `${MC}/`, fullPage: false, waitUntil: "domcontentloaded", schemes: ["dark"] },
   { group: "mc", name: "mc-wiki", url: `${MC}/wiki`, fullPage: true, waitUntil: "domcontentloaded", schemes: ["dark"] },
   // Panel: signed out (login), chat with tool output, approval card, drawer open, new-bot dialog.
@@ -295,7 +333,7 @@ async function main() {
   if (SERVE) await startServers();
   else {
     const wanted = [];
-    if (GROUPS.includes("site") || GROUPS.includes("hub")) wanted.push(`${SITE}/`);
+    if (GROUPS.includes("site") || GROUPS.includes("hub") || GROUPS.includes("writing")) wanted.push(`${SITE}/`);
     if (GROUPS.includes("mc")) wanted.push(`${MC}/`);
     if (GROUPS.includes("panel")) wanted.push(`${PANEL}/login`);
     await Promise.all(wanted.map((url) => reachable(url, 20_000))).catch((err) => {

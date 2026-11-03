@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" width="480" height="270" role="img" aria-label="TEST PLACEHOLDER">
+  <!-- Test placeholder for the writing fixtures (scripts/fixtures/content). Not real artwork.
+       Content images live under /content-assets/ so the Markdown renderer can allow-list them;
+       replace or delete this file once Nils adds real images. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fd3ff" />
+      <stop offset="1" stop-color="#ddf3ff" />
+    </linearGradient>
+  </defs>
+  <rect width="480" height="270" fill="url(#sky)" />
+  <g fill="#ffd45e">
+    <rect x="196" y="36" width="88" height="88" />
+  </g>
+  <g fill="#ffffff">
+    <rect x="60" y="70" width="96" height="24" />
+    <rect x="84" y="52" width="56" height="24" />
+  </g>
+  <rect x="0" y="222" width="480" height="48" fill="#7fe0d3" />
+  <text x="240" y="150" text-anchor="middle" font-family="monospace" font-size="20" fill="#1f2a44" font-weight="bold">TEST PLACEHOLDER</text>
+</svg>

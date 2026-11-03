@@ -1352,3 +1352,230 @@
     forced-color-adjust: none;
   }
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Writing (docs/creative-hub-plan.md §8 "Writing", §9 phase 3a): list, reader, series chapter
+   navigation. Reuses the Phase 1 tokens only — no new colour, so the token-pair contrast gate keeps
+   covering the same pairs (light and summer night).
+   --------------------------------------------------------------------------------------------- */
+.sm-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm-space-2);
+  margin-top: var(--sm-space-6);
+}
+.sm-filters__label {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sm-muted-foreground);
+}
+.sm-filters__count {
+  margin-top: var(--sm-space-4);
+}
+.sm-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--sm-tap-dense);
+  padding: 0 var(--sm-space-3);
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-full);
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
+  font-size: var(--sm-text-sm);
+  text-decoration: none;
+}
+.sm-tag:hover {
+  border-color: var(--sm-border-strong);
+}
+.sm-tag--active,
+.sm-root .sm-tag[aria-current="true"] {
+  background: var(--sm-accent-lavender);
+  border-color: var(--sm-frame);
+  color: var(--sm-on-pastel);
+}
+.sm-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-1);
+  list-style: none;
+  margin: var(--sm-space-3) 0 0;
+  padding: 0;
+}
+.sm-tags li {
+  margin: 0;
+}
+.sm-post-grid {
+  display: grid;
+  gap: var(--sm-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  margin-top: var(--sm-space-5);
+}
+.sm-post-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm-space-2);
+  padding: var(--sm-space-5);
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-xl);
+  box-shadow: var(--sm-shadow-1);
+  color: var(--sm-foreground);
+}
+.sm-post-card__kind {
+  align-self: flex-start;
+}
+.sm-post-card__title {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-xl);
+  margin: 0;
+}
+.sm-root .sm-post-card__title a {
+  color: var(--sm-foreground);
+  text-decoration: none;
+}
+.sm-root .sm-post-card__title a:hover {
+  color: var(--sm-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sm-post-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-2);
+  margin: 0;
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+.sm-post-card__summary {
+  margin: 0;
+  color: var(--sm-muted-foreground);
+}
+.sm-post-header {
+  max-width: 68ch;
+}
+.sm-post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm-space-3);
+  margin-top: var(--sm-space-3);
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+.sm-note {
+  margin: var(--sm-space-6) 0;
+  padding: var(--sm-space-3) var(--sm-space-4);
+  background: var(--sm-surface-2);
+  border-left: var(--sm-pixel-step) solid var(--sm-accent-sun);
+  border-radius: 0 var(--sm-radius-md) var(--sm-radius-md) 0;
+  color: var(--sm-foreground);
+}
+.sm-note--archive {
+  border-left-color: var(--sm-warning);
+}
+.sm-prevnext {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sm-space-3);
+  margin-top: var(--sm-space-8);
+  padding-top: var(--sm-space-5);
+  border-top: 1px solid var(--sm-border);
+}
+.sm-prevnext__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm-space-1);
+  max-width: 46%;
+  min-height: var(--sm-tap);
+  color: var(--sm-link);
+  text-decoration: none;
+}
+.sm-prevnext__link--next {
+  margin-left: auto;
+  text-align: right;
+}
+.sm-prevnext__label {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sm-muted-foreground);
+}
+.sm-chapters {
+  display: grid;
+  gap: var(--sm-space-2);
+  list-style: none;
+  margin: var(--sm-space-6) 0 0;
+  padding: 0;
+}
+.sm-chapters__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sm-space-3);
+  padding: var(--sm-space-3) var(--sm-space-4);
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-lg);
+}
+.sm-chapters__num {
+  font-family: var(--sm-font-pixel);
+  color: var(--sm-lavender-ink);
+}
+.sm-chapters__link {
+  color: var(--sm-foreground);
+  font-weight: var(--sm-weight-semibold);
+  text-decoration: none;
+}
+.sm-chapters__link:hover {
+  color: var(--sm-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* Reader extras the base .sm-prose does not cover (phase 3a adds headings h4, code blocks, images). */
+.sm-prose h4 {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-lg);
+  margin-top: var(--sm-space-5);
+}
+.sm-prose pre {
+  margin: var(--sm-space-5) 0;
+  padding: var(--sm-space-4);
+  background: var(--sm-surface-2);
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-md);
+  overflow-x: auto;
+}
+.sm-prose pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  overflow-wrap: normal;
+}
+.sm-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--sm-radius-md);
+}
+.sm-prose ul ul,
+.sm-prose ul ol,
+.sm-prose ol ul,
+.sm-prose ol ol {
+  margin-top: var(--sm-space-2);
+}
+.sm-reader .sm-wrap {
+  max-width: var(--sm-container);
+}
+@media (max-width: 34rem) {
+  .sm-prevnext__link {
+    max-width: 100%;
+  }
+  .sm-prevnext__link--next {
+    text-align: left;
+  }
+}
+
