@@ -40,6 +40,13 @@ const state = {
 
 const $ = (sel) => document.querySelector(sel);
 
+// Number formatting for every figure the UI prints: de-DE (thousands separator, comma decimals),
+// with tabular-nums in the stylesheet so columns line up. The panel has no language switch today,
+// so de-DE is the only locale — an en-GB table would go here once one exists.
+const fmtInt = new Intl.NumberFormat("de-DE");
+const fmtCost = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const fmtPrice = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
 // ---------------------------------------------------------------------------------------
 // DOM helpers
 // ---------------------------------------------------------------------------------------
@@ -383,7 +390,8 @@ function renderBlock(block) {
       return q;
     }
     case "table":
-      return tableNode(block);
+      // A wide table on a 390px screen scrolls inside its own box instead of the page.
+      return el("div", { class: "table-wrap" }, tableNode(block));
     case "hr":
       return el("hr");
     default:
@@ -907,7 +915,7 @@ async function loadConversations() {
       const item = el("button", { class: `session-item${conv.id === state.conversationId ? " active" : ""}` });
       item.append(el("span", { class: "t", text: conv.title || conv.id }));
       const when = conv.updated_at ? new Date(conv.updated_at).toLocaleDateString("de-DE") : "";
-      const parts = [conv.bot, when, conv.messages ? `${conv.messages} Nachrichten` : ""].filter(Boolean);
+      const parts = [conv.bot, when, conv.messages ? `${fmtInt.format(conv.messages)} Nachrichten` : ""].filter(Boolean);
       item.append(el("span", { class: "m", text: parts.join(" · ") }));
       item.onclick = () => openConversation(conv);
       list.append(item);
@@ -1321,7 +1329,7 @@ async function deleteJob(job) {
 // Usage + log
 // ---------------------------------------------------------------------------------------
 
-const money = (v) => (v === null || v === undefined ? "—" : `$${Number(v).toFixed(4)}`);
+const money = (v) => (v === null || v === undefined ? "—" : `$${fmtCost.format(Number(v) || 0)}`);
 const metric = (label, value) =>
   el("div", { class: "stat" }, el("div", { class: "k", text: label }), el("div", { class: "v", text: value }));
 
@@ -1358,7 +1366,7 @@ async function loadUsage() {
           el("b", { class: "grow", text: b.bot }),
           el("div", { class: "meter-wrap" }, meter),
           el("span", { class: "num", text: money(b.cost_usd) }),
-          el("span", { class: "k nowrap", text: `${b.sessions} Sessions · ${b.input_tokens + b.output_tokens} Tokens` }),
+          el("span", { class: "k nowrap", text: `${fmtInt.format(b.sessions)} Sessions · ${fmtInt.format(b.input_tokens + b.output_tokens)} Tokens` }),
         ),
       );
     }
@@ -1377,7 +1385,7 @@ async function loadUsage() {
         bar.style.animationDelay = `${(i * 0.03).toFixed(2)}s`;
         chart.append(bar);
       });
-      daily.append(chart, el("p", { class: "mut small bars-caption", text: `${days.length} Tage · Höchstwert ${money(max)}` }));
+      daily.append(chart, el("p", { class: "mut small bars-caption", text: `${fmtInt.format(days.length)} Tage · Höchstwert ${money(max)}` }));
     }
 
     const recent = clear($("#usage-recent"));
@@ -1389,7 +1397,7 @@ async function loadUsage() {
           { class: "card" },
           el("h3", { text: r.title || r.id }),
           el("div", { class: "k", text: `${r.bot} · ${r.model || "?"}` }),
-          el("div", { class: "k", text: `${money(r.cost_usd)} · ${r.input_tokens}+${r.output_tokens} Tokens` }),
+          el("div", { class: "k", text: `${money(r.cost_usd)} · ${fmtInt.format(r.input_tokens)}+${fmtInt.format(r.output_tokens)} Tokens` }),
         ),
       );
     }
@@ -1397,7 +1405,7 @@ async function loadUsage() {
     const prices = clear($("#usage-prices"));
     if (!u.prices.length) prices.append(el("div", { class: "card mut", text: u.prices_error || "keine Preise" }));
     for (const p of u.prices) {
-      prices.append(el("div", { class: "card" }, el("h3", { text: p.name }), el("div", { class: "k", text: `in ${p.prompt ?? "?"} · out ${p.completion ?? "?"}` })));
+      prices.append(el("div", { class: "card" }, el("h3", { text: p.name }), el("div", { class: "k", text: `in ${p.prompt === null || p.prompt === undefined ? "?" : fmtPrice.format(p.prompt)} · out ${p.completion === null || p.completion === undefined ? "?" : fmtPrice.format(p.completion)}` })));
     }
   } catch (err) {
     clear(cards).append(el("div", { class: "card mut", text: `Usage: ${err.message}` }));
@@ -1427,7 +1435,7 @@ async function loadLog() {
           el("span", { text: (e.ts || "").slice(11, 19) }),
           el("span", { class: `lv s${String(e.status)[0]}`, text: String(e.status) }),
           el("span", { text: `${e.path}${e.bot ? ` · ${e.bot}` : ""}` }),
-          el("span", { class: "c-ms", text: `${e.ms}ms` }),
+          el("span", { class: "c-ms", text: `${fmtInt.format(e.ms)} ms` }),
           el("span", { class: "c-method", text: e.method }),
         ),
       );
@@ -1512,25 +1520,41 @@ const VIEW_TITLES = {
 };
 
 function switchView(view) {
-  state.view = view;
-  for (const node of document.querySelectorAll(".view")) node.classList.toggle("active", node.id === `view-${view}`);
-  for (const btn of document.querySelectorAll(".nav-item")) btn.classList.toggle("active", btn.dataset.view === view);
-  // The glass header shows the current view's name (mockup), and remembers the chat title while
-  // another view is open so it can be restored on the way back.
-  const title = $("#chat-title");
-  if (view === "chat") {
-    title.textContent = state.chatTitle || "Neuer Chat";
-  } else {
-    state.chatTitle = title.textContent;
-    title.textContent = VIEW_TITLES[view] || "AI Panel";
+  const apply = () => {
+    state.view = view;
+    for (const node of document.querySelectorAll(".view")) node.classList.toggle("active", node.id === `view-${view}`);
+    for (const btn of document.querySelectorAll(".nav-item")) btn.classList.toggle("active", btn.dataset.view === view);
+    // The glass header shows the current view's name (mockup), and remembers the chat title while
+    // another view is open so it can be restored on the way back.
+    const title = $("#chat-title");
+    if (view === "chat") {
+      title.textContent = state.chatTitle || "Neuer Chat";
+    } else {
+      state.chatTitle = title.textContent;
+      title.textContent = VIEW_TITLES[view] || "AI Panel";
+    }
+    if (view === "bots") loadBots().catch(() => {});
+    if (view === "cron") loadJobs();
+    if (view === "usage") loadUsage();
+    if (view === "log") loadLog();
+    if (view === "runs") loadRuns();
+    if (view === "crew") crewView.open();
+    if (window.innerWidth <= 860) closeDrawer();
+  };
+
+  // Soft SPA view transition (CSS View Transitions API): content cross-fades while the topbar and
+  // the sidebar keep their place (view-transition-name in app.css). Feature-checked, skipped when
+  // reduced motion is on, and skipped on phones where the drawer animation is the transition.
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  if (typeof document.startViewTransition === "function" && !reduced && window.innerWidth > 860) {
+    try {
+      document.startViewTransition(apply);
+      return;
+    } catch {
+      /* fall through to a plain switch */
+    }
   }
-  if (view === "bots") loadBots().catch(() => {});
-  if (view === "cron") loadJobs();
-  if (view === "usage") loadUsage();
-  if (view === "log") loadLog();
-  if (view === "runs") loadRuns();
-  if (view === "crew") crewView.open();
-  if (window.innerWidth <= 860) closeDrawer();
+  apply();
 }
 
 function openDrawer() {

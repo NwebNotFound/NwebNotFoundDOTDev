@@ -14,6 +14,9 @@ export const FILTERS = [
   { id: "cli", label: "CLI-Sessions" },
 ];
 
+// de-DE grouping for the count/range labels (the panel has no language switch yet).
+const NUM_DE = new Intl.NumberFormat("de-DE");
+
 const KIND_LABEL = { run: "Run", cli: "CLI", other: "Session" };
 
 export function kindLabel(kind) {
@@ -43,7 +46,7 @@ export function formatTime(epoch) {
 
 export function messageCountLabel(count) {
   const n = Number(count) || 0;
-  return n === 1 ? "1 Nachricht" : `${n} Nachrichten`;
+  return n === 1 ? "1 Nachricht" : `${NUM_DE.format(n)} Nachrichten`;
 }
 
 /** One row of the list, as a button so it is keyboard- and touch-reachable. */
@@ -100,7 +103,7 @@ export function rangeLabel({ shown, total, offset }) {
   const start = total ? offset + 1 : 0;
   const end = offset + shown;
   if (!shown) return "keine Einträge";
-  return `Zeige ${start}–${end} von ${total || end}${total > end ? "" : " (Ende)"}`;
+  return `Zeige ${NUM_DE.format(start)}–${NUM_DE.format(end)} von ${NUM_DE.format(total || end)}${total > end ? "" : " (Ende)"}`;
 }
 
 /**

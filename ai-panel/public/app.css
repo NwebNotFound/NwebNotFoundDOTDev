@@ -95,6 +95,9 @@
   --ds-line: rgba(255, 255, 255, 0.08);
   --ds-line-strong: rgba(255, 255, 255, 0.16);
   --ds-face-ink: #1f2a44;
+  /* View-transition timing (see the block near the end of this file). */
+  --vt-dur-out: 180ms;
+  --vt-dur-in: 240ms;
   color-scheme: dark;
 
   /* ---- spacing: 4/8 grid ---- */
@@ -1278,6 +1281,29 @@ label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(-
 #btn-theme:hover { transform: rotate(-12deg) scale(1.06); background: var(--bg-side); }
 #btn-theme svg { animation: pop-spin 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
+/* ---------- SPA view transitions ----------
+   switchView() wraps the DOM change in document.startViewTransition when the browser has it. The
+   topbar and the rail carry their own view-transition-name, so they keep their place while only
+   the content cross-fades. Feature-checked in JS; reduced motion turns the animation off. */
+.topbar { view-transition-name: app-topbar; }
+.sidebar { view-transition-name: app-rail; }
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation: vt-leave var(--vt-dur-out) ease both; }
+  ::view-transition-new(root) { animation: vt-enter var(--vt-dur-in) cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+}
+@keyframes vt-leave { to { opacity: 0; transform: translateY(6px); } }
+@keyframes vt-enter { from { opacity: 0; transform: translateY(10px); } }
+
+/* ---------- long content: wrap or clip, never overflow ---------- */
+.md .table-wrap { margin: 0 0 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.md .table-wrap table { margin: 0; }
+.md code.inline { overflow-wrap: anywhere; }
+.bot-card h3 { overflow-wrap: anywhere; }
+.card .v, .stat .v { font-variant-numeric: tabular-nums; }
+/* One cell of the log row may be a very long path: clip it with an ellipsis, never overflow. */
+.log .line > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Cron: one row per job — clock, name/schedule, state chip, toggle; actions underneath. */
 .panel.job {
   display: grid;
@@ -1327,6 +1353,9 @@ label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(-
   .panel.job > .chip { grid-column: 1 / 2; }
   .panel.job > .toggle { grid-column: 2 / 3; justify-self: end; }
   .meter-wrap { flex: 1 1 100%; }
+  /* Long bot names / token counts wrap under the meter instead of squeezing the row. */
+  .li { flex-wrap: wrap; row-gap: 4px; }
+  .li .nowrap { white-space: normal; }
 }
 
 /* Request log: monospace table, alternating rows on the elevated surface. */

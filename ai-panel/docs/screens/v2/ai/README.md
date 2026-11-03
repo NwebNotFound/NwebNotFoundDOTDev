@@ -10,6 +10,11 @@ loopback dev server.
 | `neu-<page>-1280.png` | the real panel at 1280×900, dark theme (the mockups are the night variant) |
 | `neu-<page>-390.png` | the real panel at 390×844, dark theme |
 | `day-<page>-1280.png` | the real panel at 1280×900, light theme (proves the day tokens) |
+| `stress-chat-1280.png`, `stress-chat-390.png` | long unbreakable words, a wide markdown table, big figures |
+| `stress-bots-1280.png` | a very long bot name and description |
+| `stress-usage-1280.png` | millions of tokens and a seven-figure cost, grouped de-DE |
+| `stress-log-1280.png` | a very long request path, clipped instead of overflowing |
+| `transition-cron-1280.png` | one frame grabbed in the middle of the SPA view transition |
 
 Pages: `chat`, `bots`, `crew`, `cron`, `usage`, `log`.
 
@@ -33,3 +38,11 @@ docker run --rm -v hermes-scratch-ai-out:/out alpine tar -cf - -C /out . | tar -
 The shots use `colorScheme: dark` for the primary pass because the mockups are the night variant;
 the panel's own toggle reads `prefers-color-scheme` on first load, so the day pass is the same page
 with `colorScheme: light`.
+
+The stress fixtures (a 32-char bot name with a long description, a session with seven-figure tokens
+and cost, and one markdown answer with a wide table) are injected into the in-process mock by the
+harness — `test/helpers.mjs` stays untouched apart from one additive `state.runOutput` hook.
+`transition-cron-1280.png` shows the SPA view transition mid-flight; the harness slows the two
+`::view-transition` animations to 3s for that single frame (override the `--vt-dur-*` tokens via
+CSSOM — an injected `<style>` would be blocked by the page's own `style-src 'self'` CSP), because
+the real fade is 240ms and is over before the screenshot round-trip.
