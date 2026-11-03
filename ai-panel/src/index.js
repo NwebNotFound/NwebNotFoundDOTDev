@@ -10,6 +10,8 @@ import * as auth from "./auth.js";
 import * as up from "./upstream.js";
 import * as store from "./store.js";
 import { teeSseFrames } from "./sse-tap.js";
+import { clampInt, redactValue, sessionKind } from "./redact.js";
+import * as crewRoutes from "./crew-routes.js";
 
 export { PanelStore } from "./store.js";
 
@@ -882,6 +884,10 @@ export async function route(request, env, ctx) {
     return json({ entries: await store.logRecent(env, Number(url.searchParams.get("limit")) || 50) });
   }
   if (path === "/api/usage") return await usage(env);
+
+  // Crew-Runs lives in crew-routes.js; the router only asks it and passes its own json helper on.
+  const crewResponse = await crewRoutes.handle(request, env, url, method, { json, upstreamProblem });
+  if (crewResponse) return crewResponse;
 
   if (path === "/api/runs") {
     if (method !== "GET") return json({ error: "method_not_allowed" }, 405);

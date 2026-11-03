@@ -662,11 +662,13 @@ test("soul: read, write needs confirm", async () => {
 
 test("sessions list and messages", async () => {
   const list = await body(await call("/api/bots/cloudflare/sessions"));
-  assert.equal(list.sessions.length, 1);
-  assert.equal(list.sessions[0].cost_usd > 0, true);
+  assert.equal(list.sessions.length, 3);
+  const deploy = list.sessions.find((s) => s.title === "Deploy check");
+  assert.ok(deploy, "the fixture session is listed");
+  assert.equal(deploy.cost_usd > 0, true);
 
-  const msgs = await body(await call(`/api/bots/cloudflare/sessions/${list.sessions[0].id}/messages`));
-  assert.equal(msgs.messages.length, 2);
+  const msgs = await body(await call(`/api/bots/cloudflare/sessions/${deploy.id}/messages`));
+  assert.equal(msgs.messages.length, 3);
   assert.equal(msgs.messages[0].role, "user");
 });
 
@@ -677,7 +679,7 @@ test("usage aggregates per bot and tolerates a missing OpenRouter key", async ()
   assert.equal(data.prices_error, "Kein OpenRouter-Key", "prices degrade the same generic way");
   assert.ok(data.per_bot.length >= 4);
   const cf = data.per_bot.find((b) => b.bot === "cloudflare");
-  assert.equal(cf.sessions, 1);
+  assert.equal(cf.sessions, 3);
   assert.ok(cf.cost_usd > 0);
   assert.ok(data.daily.length >= 1);
   assert.ok(Array.isArray(data.prices));

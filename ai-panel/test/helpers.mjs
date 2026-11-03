@@ -13,18 +13,56 @@ export function startMockHermes() {
     ],
     sessions: [
       {
-        id: "20260101_120000_aaaaaa",
+        id: "run_9f2c1a4b",
         title: "Deploy check",
+        status: "completed",
+        source: "panel",
         model: "deepseek/deepseek-v4.1-flash-1017",
         input_tokens: 1200,
         output_tokens: 300,
         estimated_cost_usd: 0.00042,
         api_call_count: 2,
+        started_at: Math.floor(Date.now() / 1000) - 4200,
         last_active: Math.floor(Date.now() / 1000) - 3600,
         message_count: 4,
       },
+      {
+        // A CLI session, and a title that carries a credential: the proxy must redact it.
+        id: "local-20261102-091400",
+        title: "Build mit GITHUB_TOKEN=ghp_0123456789abcdefghijABCDEFGHIJ012345",
+        status: "running",
+        source: "cli",
+        model: "deepseek/x",
+        input_tokens: 40,
+        output_tokens: 10,
+        started_at: Math.floor(Date.now() / 1000) - 7800,
+        last_active: Math.floor(Date.now() / 1000) - 7200,
+        message_count: 2,
+      },
+      {
+        // Hostile title: it must reach the DOM as text, never as markup.
+        id: "run_xss0001",
+        title: '<img src=x onerror="alert(1)"> <script>alert(2)</script>',
+        status: "failed",
+        model: "deepseek/x",
+        started_at: Math.floor(Date.now() / 1000) - 9600,
+        last_active: Math.floor(Date.now() / 1000) - 9000,
+        message_count: 1,
+      },
     ],
     soul: "# SOUL\ncloudflare bot\n",
+    // One transcript, shared by every session id the mock knows: role/content/timestamp plus
+    // two credential-shaped strings, so the redaction pass is exercised end to end.
+    sessionMessages: [
+      { role: "user", content: "hallo", timestamp: 1767225600 },
+      {
+        role: "tool",
+        tool_name: "terminal",
+        content: "OPENROUTER_API_KEY=sk-or-v1-0123456789abcdef0123456789abcdef\nAuthorization: Bearer abcdefghijklmnop123456",
+        timestamp: 1767225630,
+      },
+      { role: "assistant", content: "hi", timestamp: 1767225660 },
+    ],
     // What GET /v1/runs/<id> reports as waiting for a decision (approval body needs both).
     pendingControls: { request_id: "req_1", execution_generation: 3 },
     profiles: [
@@ -121,17 +159,24 @@ export function startMockHermes() {
         }
       }
 
+      // Sessions and transcripts. This branch models what the origin proxy answers (sorted,
+      // filtered, offset-paged, with total/has_more), because that proxy — not the raw gateway —
+      // is the Worker's upstream for these two paths in production.
       const sessions = p.match(/^\/gw\/p\/([a-z0-9_-]+)\/api\/sessions(?:\/([A-Za-z0-9_-]+)\/messages)?$/);
       if (sessions && req.method === "GET") {
-        if (sessions[2]) {
-          return send(200, {
-            messages: [
-              { role: "user", content: "hallo", timestamp: 1767225600 },
-              { role: "assistant", content: "hi", timestamp: 1767225660 },
-            ],
-          });
+        const limit = Number(url.searchParams.get("limit")) || 0;
+        const offset = Number(url.searchParams.get("offset")) || 0;
+        const filter = url.searchParams.get("filter") || "all";
+        let rows = sessions[2] ? state.sessionMessages.slice() : state.sessions.slice();
+        if (!sessions[2]) {
+          const kindOf = (id) => (id.startsWith("run_") ? "run" : id.startsWith("local-") ? "cli" : "other");
+          rows.sort((a, b) => (b.last_active || 0) - (a.last_active || 0));
+          if (filter !== "all") rows = rows.filter((r) => kindOf(r.id) === filter);
         }
-        return send(200, { sessions: state.sessions });
+        const total = rows.length;
+        const page = limit > 0 ? rows.slice(offset, offset + limit) : rows.slice(offset);
+        const body = { total, limit: limit || 50, offset, has_more: offset + page.length < total, truncated: false };
+        return send(200, sessions[2] ? { messages: page, ...body } : { sessions: page, ...body });
       }
 
       if (p.match(/^\/gw\/p\/[a-z0-9_-]+\/v1\/runs$/) && req.method === "POST") {

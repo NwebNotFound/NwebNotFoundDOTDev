@@ -18,6 +18,7 @@ import {
   toolFailed,
   toolOutputText,
 } from "./run-events.js";
+import { createCrewView } from "./crew.js";
 
 const state = {
   me: null,
@@ -1288,6 +1289,11 @@ async function loadRuns() {
 }
 
 // ---------------------------------------------------------------------------------------
+// Crew-Runs (read-only) — the view itself lives in crew.js; this is the only hook.
+// ---------------------------------------------------------------------------------------
+
+const crewView = createCrewView({ $, el, clear, api, describeError, state });
+// ---------------------------------------------------------------------------------------
 // Shell: views, drawer, theme, logout
 // ---------------------------------------------------------------------------------------
 
@@ -1300,6 +1306,7 @@ function switchView(view) {
   if (view === "usage") loadUsage();
   if (view === "log") loadLog();
   if (view === "runs") loadRuns();
+  if (view === "crew") crewView.open();
   if (window.innerWidth <= 860) closeDrawer();
 }
 
@@ -1394,6 +1401,8 @@ function wire() {
   $("#btn-usage-refresh").onclick = loadUsage;
   $("#btn-log-refresh").onclick = loadLog;
   $("#btn-runs-refresh").onclick = loadRuns;
+
+  crewView.wire();
 
   window.addEventListener("resize", () => {
     if (window.innerWidth > 860) closeDrawer();

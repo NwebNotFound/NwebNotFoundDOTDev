@@ -99,6 +99,38 @@ The browser never sees any of them. See `docs/ai-panel-tunnel.md` for the exact 
 - `/api/health` is public but answers `{ok}` only; bot names, origin state and `session_version`
   need a valid session.
 
+## Crew-Runs (read-only)
+
+A second, deliberately narrow view over what the bots did: the sessions the gateway recorded, split
+into API runs (`run_*`) and CLI sessions (`local-*`), with a paged transcript.
+
+- `GET /api/crew/sessions?bot=<bot>&filter=all|run|cli&limit&offset` →
+  `{bot, filter, sessions, total, limit, offset, has_more, truncated}`.
+- `GET /api/crew/sessions/<bot>/<session_id>/messages?limit&offset` →
+  `{bot, session_id, messages, total, limit, offset, has_more, truncated}`.
+- Both are GET-only (405 otherwise), behind the panel session, and forward to the origin proxy's
+  `/gw/p/<bot>/api/sessions[/<id>/messages]` with the panel secret. There is no write, approve,
+  delete or steer route in this view on either side.
+- Limits: list `limit` ≤ 100 at the Worker, ≤ 200 at the proxy; messages ≤ 200 at both; `offset`
+  ≤ 100 000. The session list is paged here (the run/CLI filter has to apply before the window is
+  cut); the window is 200 rows and `truncated` says so. Transcripts page **at the gateway** with
+  `order=latest` + `offset` (its real contract), one row above the cap is fetched as the
+  `has_more` probe, so a 600-message session stays reachable page by page.
+- Only `content`, `role`, `timestamp` and `tool_name` of a message are returned: a tool call's
+  arguments and the raw `tool_calls` blocks are dropped rather than filtered.
+- The bot must be on the allowlist the rest of the panel uses (a profile whose gateway key
+  resolves), the session id must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`. Any other path under
+  `/gw/p/<bot>/api/sessions*` is a 404 at the proxy — it would otherwise fall through to the
+  unredacted passthrough.
+- **Redaction** (`src/redact.js`, shared by the proxy and the Worker) removes PEM blocks,
+  `Bearer|Basic|Token` values, JWTs, `sk-`/`rk-`/`ghp_`/`github_pat_`/`xox*-`/`AKIA`/`glpat-`/
+  `npm_`/Stripe keys, `NAME=value` lines whose name says credential, the same pairing inline and
+  as JSON (`{"api_key":"…"}`), credentials in query strings (`?token=…`), `X-…-Key/Secret/Token:`
+  headers, `scheme://user:pass@` and long hex/base64 runs. `redactValue` additionally masks the
+  value of any field *named* like a credential, whatever the value looks like. It runs over every
+  returned string, in the proxy *and* again in the Worker. It is a second line of defence, not a
+  reason to put a key in a response.
+
 ## Not deployed by this branch
 
 Nothing here is deployed automatically. `wrangler deploy` is a manual step after review.
