@@ -8,8 +8,15 @@ These answer open questions 1, 4, 8, 9, 10 and 17 (see §10) and override anythi
 - **Languages:** German and English, both **automatically translated** (§8, "Languages").
 - **Guestbook:** **automatic moderation**, no manual approval queue by default (§8, "Guestbook").
 - **Storage:** uploads live on **Nils' own PC** for now (later maybe a mini-PC), not on R2 and not on Cloudflare Stream. Cloudflare only holds the code, the database and small thumbnails (§5a, §6).
-- **Video:** **YouTube embeds only.** No raw video files are hosted. Nils has made at most an occasional edit, so a video library is not needed.
-- **Focus:** this is Nils' little corner of the internet. The core is **stories (series like Harutronic), music, the blog and reviews.** Photos, motion, the tools page, study mode and the Discord Activity come after and can be cut or postponed without hurting the core (§9).
+- **Video: none.** No hosted or embedded video and no motion/video section. Nils shares videos on YouTube himself; the hub does not need them.
+- **Focus:** this is Nils' little corner of the internet. The core is **stories (series like Harutronic), music, the blog and reviews.** Photos, the tools page and study mode come after and can be cut or postponed without hurting the core (§9).
+- **Photos stay** (real life and virtual photography).
+- **Discord Activity is cut.** The lofi radio from PR #49 can still come to the website as a single-player feature, but nothing is built for Discord.
+- **Export:** every story can be downloaded as **EPUB or PDF** (§8, "Export").
+- **Feeds:** blog, stories, reviews and music each get an **RSS/Atom feed** (§8, "Feeds").
+- **Look:** a **pixel-art anime** blend: soft anime summer skies with pixel-art details and a pixel mascot (§7).
+- **No AI writes the stories.** AI is used only for moderation and translation. The studio has no "generate story" feature, in line with how Nils works on Harutronic.
+- **Hermes MCP server:** planned separately in `ai-panel/docs/mcp-server-plan.md`, not part of this hub.
 - **Tools page (new):** online tools run in the visitor's browser; local tools (apps, games) are downloaded from **GitHub Releases**. No public self-hosted git server (§8, "Tools & downloads").
 
 ## 1. Goal
@@ -38,8 +45,6 @@ The hub stays in **this one Worker + D1**. New pages are server-rendered like to
 | `/photos/:album` / `/photos/:album/:id` | Album grid / lightbox deep link |
 | `/writing` | Blog + stories, filter by type/tag |
 | `/writing/:slug` | Post/story reader (comfortable typography, reading time, chapters for series) |
-| `/motion` | Motion design & video edits showcase (YouTube embeds only) |
-| `/motion/:slug` | Project page: YouTube embed, thumbnail, project notes (tools, idea, process) |
 | `/c/:collection` | Generic page for any future interest collection |
 | `/reviews` | Movies, anime, books, light novels, games; filter by medium, rating, tag |
 | `/reviews/:slug` | Review with cover, rating, verdict, spoiler blocks |
@@ -48,9 +53,10 @@ The hub stays in **this one Worker + D1**. New pages are server-rendered like to
 | `/tools/:slug` | Tool page: description, screenshots, "Open" (online) or "Download" (GitHub Release), version, size, SHA-256, changelog |
 | `/about` | Who Nils is, quirks, "currently into", tools (FL Studio, photo mode, …), links |
 | `/admin/*` | Admin UI, **Cloudflare Access only** (Nils' account) |
-| `/feed.xml` | RSS for writing + reviews |
+| `/feed.xml` and per-section feeds | RSS 2.0 and Atom for everything, writing, stories (per series), reviews and music, per language (§8, "Feeds") |
+| `/downloads/…` | Pre-built EPUB and PDF files for published stories (§8, "Export") |
 
-Global nav (mobile: bottom tab bar): Home · Music · Photos · Writing · ⋯ (Tools, Motion, Reviews, Guestbook, About, other collections). A DE/EN switch sits in the header and footer. Footer: GitHub (github.com/NwebNotFound), X profile, Discord, RSS, mc.nwebnotfound.dev.
+Global nav (mobile: bottom tab bar): Home · Music · Photos · Writing · ⋯ (Tools, Reviews, Guestbook, About, other collections). A DE/EN switch sits in the header and footer. Footer: GitHub (github.com/NwebNotFound), X profile, Discord, RSS, mc.nwebnotfound.dev.
 
 ## 4. Content model
 Principle: **text content as Markdown in the repo** (versioned, reviewable in PRs, free), **dynamic/user data in D1**, **media files** on Nils' own PC behind a tunnel (§5a), with small thumbnails on Cloudflare so pages never look empty when the PC is off. R2 and Stream are not used unless Nils changes his mind.
@@ -66,9 +72,8 @@ Principle: **text content as Markdown in the repo** (versioned, reviewable in PR
 tracks(id, slug, title, bpm, key, duration_s, loop_start_ms, loop_end_ms, cover_path, audio_path, released_at, status /*draft|public*/, plays)
 playlists(id, slug, title, description, cover_path, sort)
 playlist_tracks(playlist_id, track_id, pos)
-media(id, kind /*image|audio|embed*/, path_or_url, provider /*home|cf-assets|youtube|x*/, width, height, duration_s, blurhash, thumb_path, alt, created_at)  -- shared media library
+media(id, kind /*image|audio*/, path_or_url, provider /*home|cf-assets*/, width, height, duration_s, blurhash, thumb_path, alt, created_at)  -- shared media library
 photos(id, media_id, category /*real|virtual*/, album, game?, path, width, height, blurhash, caption, exif_json, taken_at, sort, status)
-videos(id, slug, youtube_id, title, kind /*motion|edit|clip*/, tools, notes_md, thumb_media_id, published_at, status)  -- YouTube only, no hosted video files
 tools(id, slug, title, kind /*online|local*/, platform /*web|windows|linux|macos|android*/, summary, description_md, repo /*owner/name*/, online_url, icon_media_id, status, sort)
 tool_releases(tool_id, tag, name, published_at, asset_name, asset_url, size_bytes, sha256, prerelease)  -- cache of GitHub Releases, refreshed by cron
 collections(slug, title, icon, color_token, description, sort, template /*grid|list|timeline*/)
@@ -80,28 +85,27 @@ guestbook  -- existing table, add: sticker, color, mood, reply (Nils' reply), pi
 reactions(target_type, target_id, emoji, count)   -- anonymous hearts/sparkles, rate-limited
 todos(user_id, id, text, done, created_at)       -- study mode, Discord login
 ```
-Music, photos and videos live in D1 (not Markdown) because Nils uploads them via the admin UI. Text that needs both languages stores them side by side (`*_de`, `*_en`, `orig_lang`, `auto_translated`), see §8.
+Music and photos live in D1 (not Markdown) because Nils uploads them via the admin UI. Text that needs both languages stores them side by side (`*_de`, `*_en`, `orig_lang`, `auto_translated`), see §8.
 
 ### 4.3 Collections & cross-linking
-- Every section (music, photos, motion, writing, reviews) is a built-in collection; new interests are added as rows in `collections` and use the generic `items` table + templates.
+- Every section (music, photos, writing, reviews) is a built-in collection; new interests are added as rows in `collections` and use the generic `items` table + templates.
 - Shared tags work across everything (`/tags/:tag` shows photos, tracks, posts, reviews together).
 - **Embeds in posts/stories** via shortcodes in Markdown, resolved at build/render time from the media library:
-  `{{photo id=123}}`, `{{gallery album=tokyo-2026}}`, `{{track slug=sunny-loop}}` (inline mini player), `{{video slug=edit-01}}`, `{{review slug=frieren}}` (card).
+  `{{photo id=123}}`, `{{gallery album=tokyo-2026}}`, `{{track slug=sunny-loop}}` (inline mini player), `{{review slug=frieren}}` (card).
 - Admin gets a **media picker** that inserts these shortcodes; posts list their linked items, and linked items show "featured in" back-links.
 
 ## 5. Admin / editing flow (Nils only)
 - `/admin` protected by **Cloudflare Access** (free, email/GitHub login) + Worker checks the `Cf-Access-Jwt-Assertion` header. No public sign-up, no passwords in the repo.
 - **Music:** upload WAV/MP3 export from FL Studio → set title, cover, BPM, loop points (drag on waveform preview), playlist → publish.
 - **Photos:** drag in images → album, caption, optional EXIF keep/strip (strip GPS always).
-- **Videos:** paste a YouTube URL → thumbnail, tools, project notes. No file upload.
-- **Media library:** one shared view of all images/audio/videos with copy-shortcode button.
+- **Media library:** one shared view of all images and audio with copy-shortcode button.
 - **Collections:** add a new interest category (title, icon, colour, template) without code.
 - **Guestbook:** review what the automatic moderation held back or hid, override its verdict, pin, reply.
 - **Writing & reviews:** edited as Markdown in the repo (VS Code / GitHub web editor / Hermes), merged via PR → auto deploy. Optional later: a simple admin Markdown editor that opens a PR via GitHub API.
 - Review helper: enter a title → admin fetches cover + metadata from TMDB (movies/series), AniList GraphQL (anime/manga/LN), Open Library (books). API keys (TMDB) as Worker secrets only.
 
 ## 5a. Creator studio – `create.nwebnotfound.dev`
-A private studio where Nils uploads pictures, stories, videos and music and writes blog posts. Published items show up on the public hub at `nwebnotfound.dev`.
+A private studio where Nils uploads pictures, stories and music and writes blog posts. Published items show up on the public hub at `nwebnotfound.dev`.
 
 **Hosting options**
 - **A (recommended): same Worker.** The `create.` hostname is added as a custom domain to the existing Worker, which routes by `Host`. One deploy, one shared D1, and no CORS.
@@ -115,8 +119,7 @@ A private studio where Nils uploads pictures, stories, videos and music and writ
 **Upload flows**
 - **Pictures:** drag & drop (multi) → client-side resize to AVIF/WebP in 480/1080/2048 + blurhash, GPS always stripped → pick album, real-life or game, caption, tags → full sizes go to the home storage origin, the 480 px thumbnail and blurhash are stored on Cloudflare → saved as a `media` row.
 - **Music:** WAV/MP3 from FL Studio → client-side encode/check size (192 kbps MP3/Opus) → title, cover, BPM, key, loop points on a waveform, playlist.
-- **Videos:** paste a YouTube URL → oEmbed fetches title + thumbnail → tools, notes. No video files are uploaded or hosted.
-- **Stories / blog posts:** Markdown editor (split view with live preview in the summer theme), front-matter form (title, slug, tags, cover, collection), **media picker** (search the library and insert shortcodes such as `{{photo id}}`, `{{gallery album}}`, `{{track id}}`, `{{video id}}`, `{{review id}}`), and paste/drag an image to upload it and embed it inline. Autosave of drafts to D1.
+- **Stories / blog posts:** Markdown editor (split view with live preview in the summer theme), front-matter form (title, slug, tags, cover, collection), **media picker** (search the library and insert shortcodes such as `{{photo id}}`, `{{gallery album}}`, `{{track id}}`, `{{review id}}`), and paste/drag an image to upload it and embed it inline. Autosave of drafts to D1.
 - **Reviews:** title search via TMDB/AniList/Open Library → cover + metadata prefilled.
 
 **Drafts, scheduling, publish**
@@ -130,12 +133,11 @@ A private studio where Nils uploads pictures, stories, videos and music and writ
 |---|---|---|
 | Metadata, Markdown, drafts, thumbnails | D1 (free tier) | Always on. Thumbnails (480 px AVIF/WebP, roughly 20–60 KB) and blurhash are stored here or as static assets so every page renders when the PC is off |
 | Full-size photos, longer audio, other uploads | **Nils' PC** (later maybe a mini-PC), served from a media hostname such as `media.nwebnotfound.dev` through a **Cloudflare Tunnel**, nothing exposed on the home IP, no port forwarding | The studio Worker pushes uploads to a small upload receiver on the PC, authenticated with a shared secret (same pattern as `ai-panel/origin-proxy`). Reads are public and read-only |
-| Video | YouTube embeds | Nothing hosted |
 | R2 / Stream | not used | Would need a payment method on the account; revisit only if Nils asks |
 
 **Consequences of the home origin (accepted by Nils, listed so nobody is surprised)**
 - If the PC is off, full-size images and anything served from the origin are unavailable; thumbnails still show. The studio shows "storage offline" and blocks new uploads instead of failing halfway.
-- Cloudflare's free-plan terms discourage serving large amounts of video/audio/image traffic through its network without its media products. A personal site with a few photos and tracks is far from that, but it is one more reason not to host video. If traffic ever grows, move the media origin to a small VPS or R2.
+- Cloudflare's free-plan terms discourage serving large amounts of media traffic through its network without its media products. A personal site with a few photos and tracks is far from that, but it is why no video is hosted. If traffic ever grows, move the media origin to a small VPS or R2.
 - Public availability of the music showcase is a design choice, see open question 20.
 - No originals are overwritten: the origin stores new files under content hashes, so a bad upload never replaces a good one.
 
@@ -150,7 +152,7 @@ The studio uses a storage interface (`putMedia/getMedia`) with a `home` backend 
 - **Nils' PC via Tunnel:** full-size photos and other uploads (§5a). Not a requirement for the site to load, only for full-size media.
 - **Images:** pre-generate AVIF/WebP in 3 sizes (480/1080/2048) + blurhash **at upload time** in the browser or with a script (sharp), since Cloudflare Images/transformations aren't free. Lazy-load, `srcset`.
 - **Audio streaming:** HTTP range requests; no transcoding on the server. Where tracks are served from is open question 20.
-- **Video:** YouTube embeds (`youtube-nocookie`) only. No Stream, no hosted files.
+- **Video:** none. The hub does not host or embed video.
 - **Downloads:** GitHub Releases (free, versioned, outside Cloudflare traffic). The Worker only links to them and caches release metadata.
 - **AI features:** Workers AI on the free allocation for guestbook moderation and translation (§8). Check current model availability and free-tier limits before building; fall back to "held for review" if the allocation is used up.
 - **R2:** not used. Needs billing on the account; only if Nils asks.
@@ -174,9 +176,18 @@ Mood: the first warm day of summer vacation – bright sky, cumulus clouds, sunf
 | lavender | `#C9B8FF` | writing |
 Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; same accents slightly muted. Contrast ≥ WCAG AA.
 
-**Fonts** (self-hosted, free): headings **"M PLUS Rounded 1c"** or **"Nunito"** (soft rounded), body **"Inter"**, accents/JP flavour **"Zen Maru Gothic"**; reader mode for stories: **"Literata"**.
+**Fonts** (self-hosted, free, all open-licence; check each licence when adding): headings and short labels in a **pixel font** such as **"Pixelify Sans"** or **"DotGothic16"** (Japanese flavour), body text in a rounded sans (**"Nunito"** or **"Inter"**), **story reader mode in a serif ("Literata")** because long chapters must stay comfortable to read. The Minecraft area keeps Monocraft, so the hub deliberately uses a different pixel font and the two do not look identical.
 
 **Shape & detail:** big radii (20–28px), soft shadows, sticker-like badges with white outlines, hand-drawn underline squiggles, little kaomoji in empty states (`(◕‿◕)`).
+
+**Pixel-art anime blend (decided).** Think a cozy visual-novel / 16-bit RPG UI sitting under a Shinkai sky:
+- Soft gradient skies with **dithered** pixel clouds and a pixel sun; sunflowers, furin and a train crossing as small sprite scenes.
+- A **pixel mascot** (Nils draws it; 32×32 or 64×64 sprites are small enough to draw by hand) with a few frames per section: idle, headphones, camera, pen, wave. Sprites render with `image-rendering: pixelated` at whole-number scales.
+- UI chrome in stepped 2 px "pixel" borders and corner notches instead of smooth shadows; buttons press down one pixel; focus rings stay clearly visible.
+- **Dialogue-box cards** (visual-novel textbox with a name tag) for the guestbook, pull quotes in stories and review verdicts; a blinking "▼" continue marker.
+- Tiny pixel icons for sections, ratings as pixel hearts or sunflowers, pixel sparkle on reactions.
+- Hero and covers stay smooth illustration; the pixel language is the interface and the mascot, not every image.
+- Accessibility rules from DESIGN.md still win: AA contrast, `prefers-reduced-motion` turns off animation, and body text is never set in the pixel font.
 
 **Motion** (CSS first, respects `prefers-reduced-motion`): drifting clouds parallax in hero, sun glint on hover, cards bounce in softly (spring easing), wind-chime sway on nav icon, sparkle burst on reactions, vinyl/cassette spin while playing, page transitions via View Transitions API. 60fps, no layout shift.
 
@@ -189,7 +200,6 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 - Persistent mini player across pages (no reload thanks to client-side nav or View Transitions), queue, shuffle, repeat, **gapless/perfect loop** via Web Audio API using stored loop points.
 - Playlists as "stations" (e.g. *Sunny Mornings*, *Late Night Beats*, *Focus*). Only Nils' tracks by default; the vetted free tracks from PR #49 stay an optional fallback station.
 - Study mode: ambient mixer (rain, café, wind, typewriter – CC0 Freesound list in PR #49), Pomodoro, to-dos (Discord login). Website = single-player.
-- Later: Discord Activity (Embedded App SDK) reusing the same player, synced per voice channel – as planned in PR #49.
 - **Portfolio angle:** his own FL Studio lofi loops & beats as a showcase – per track BPM/key, "made in FL Studio", optional loop/stem previews and short process notes/screenshots, "beat tape" releases. Linked from About as part of his portfolio.
 - Media Session API for lock-screen controls on mobile.
 - Availability of the audio files when the PC is off: open question 20.
@@ -199,14 +209,27 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 - Masonry/justified grid, albums, lightbox with swipe, pinch-zoom, keyboard nav, optional EXIF panel (camera, lens; for photo mode: game, location/district). GPS stripped.
 
 ### Writing
-- Posts and stories can embed or link photos, galleries, tracks, videos and reviews (shortcodes, §4.3).
+- Posts and stories can embed or link photos, galleries, tracks and reviews (shortcodes, §4.3).
 - **Stories are a first-class section, not a side feature.** Serial stories like Harutronic are published as a series with chapters, a series page (cover, blurb, status ongoing/complete, chapter list), previous/next navigation, reading progress and a comfortable reader mode (font size, light/night). Blog posts are the shorter, dated form.
 - Chapters are Markdown files (`content/writing/<series>/<nn>-<slug>.md`), so a whole story is versioned in git and can be imported from existing files. Each chapter can be written in German or English and gets the automatic translation described above.
+- **Where published stories come from.** For Harutronic the published prose lives in the HaruReader story sources (`src/stories/*.md`, see Harutronic's `CANON.md`; its docs name `mereMint/HaruReader`, while an `NwebNotFound/HaruReader` repo also exists, so the owner needs confirming). The hub imports **only files with `published: true`**. It never reads Harutronic's private worldbuilding notes, outlines or planning files, and it does not show `canon`/`canonId`/`continuity` metadata. A story's content-warning block is shown before the text. Skits and other `canon: false` pieces can appear as "shorts".
+- Right now that is three canon short stories (Race Condition, Last Stop, Still Breathing, roughly 4,900 to 9,700 words each) and one skit (Shots in Suarmi). Nils is also thinking about a **new story**; the section works the same for it, and anything marked draft stays hidden.
 - Whether Harutronic itself goes public, and which chapters, is Nils' decision (open question 5). Drafts and private series stay hidden until `status: published`.
 
-### Motion design & video edits
-- Showcase grid with hover-preview thumbnails, filter by kind (motion design, edits, clips) and tools (After Effects, Premiere, DaVinci, Blender…).
-- Project page: embed, project notes (idea, process, breakdown), linked music if he scored it himself.
+### Export (EPUB and PDF)
+- Each published story, chapter and series has **"Download EPUB"** and **"Download PDF"** buttons. Blog posts get the same.
+- **Built at deploy time**, not on request: a GitHub Actions step converts the Markdown (EPUB 3 with pandoc; PDF from the same content with a print stylesheet, for example via pandoc plus a PDF engine; confirm the exact tools when building) and writes the files to `/downloads/…` as static assets. Files are only rebuilt when their source or translation changed (content hash).
+- EPUB: cover, title page, table of contents, language metadata, author, the content warning page, and a short rights line. PDF: readable book layout (A5-style), page numbers, same front matter.
+- One file per story and one for a whole series; German and English editions are separate files, and automatically translated editions are labelled as such on the title page.
+- A print stylesheet on the reader page is the fallback ("Print / Save as PDF").
+- Size is no issue: a 10,000-word story is a few hundred KB at most, far below the 25 MiB asset limit.
+- The rights line is Nils' choice (open question 23).
+
+### Feeds
+- RSS 2.0 and Atom feeds with proper autodiscovery (`<link rel="alternate">`) on every page: **everything** (`/feed.xml`), **blog**, **stories** (new chapters, plus one feed per series), **reviews**, and **music** (new tracks), each in German and English (`/de/…`, `/en/…`).
+- Blog posts and reviews: full text in the feed by default. Story chapters: title, summary and link by default, so the reader mode and downloads stay the main experience (open question 24).
+- Feeds contain only `published` items whose `publish_at` has passed. Responses are cached for a short time and carry `ETag`/`Last-Modified`.
+- No tracking parameters and no third-party feed service.
 
 ### Reviews
 - Card grid with cover art, medium icon, score (e.g. 8.5/10 shown as stars or a "sunflower meter"), tags, "currently watching/reading" shelf, yearly stats.
@@ -243,10 +266,10 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 ## 9. Phased rollout (one PR each, all reviewed by Claude Code / Codex)
 
 ### Core: the corner (stories, music, blog, reviews)
-The core needs **no home server**: text lives in the repo/D1, tracks are small static files (default for open question 20), and the site is complete without photos or videos.
+The core needs **no home server**: text lives in the repo/D1, tracks are small static files (default for open question 20), and the site is complete without photos.
 1. **Design system + summer theme tokens** (builds on PR #44): palette, fonts, base components, light/dark, reduced-motion.
 2. **Shell & home:** nav/tab bar, footer links, new home with hero and mascot placeholder; `/about`; **DE/EN routing and interface message files**. Minecraft + AI panel untouched (regression check).
-3. **Writing:** stories (series, chapters, reader mode) and blog posts from Markdown, RSS, import of existing story files, translation at publish.
+3. **Writing:** stories (series, chapters, reader mode) and blog posts from Markdown, import of published story files, translation at publish, **EPUB/PDF export and feeds**.
 4. **Reviews:** cards, rating, verdict, spoiler blocks, TMDB/AniList/Open Library helper script.
 5. **Music v1:** tracks, playlists, persistent player, perfect loops, tracks served from Cloudflare static assets.
 6. **Guestbook revamp** with automatic moderation and translation (Workers AI, fail-closed to `pending`).
@@ -255,10 +278,10 @@ The core needs **no home server**: text lives in the repo/D1, tracks are small s
 ### Later (nice to have, cut or reorder freely)
 8. **Media library + photography** (real life and virtual photography), shortcodes/embeds in writing, tags pages.
 9. **Tools & downloads:** `/tools`, `tool_releases` cache, cron for GitHub Releases.
-10. **Motion & video** showcase (YouTube embeds).
-11. **Studio uploads for photos and longer audio:** home storage origin behind the tunnel, thumbnails on Cloudflare (§5a).
-12. **Study mode** (ambient mixer, Pomodoro, to-dos) from PR #49.
-13. **Discord Activity** (needs Nils' Discord Developer Portal login).
+10. **Studio uploads for photos and longer audio:** home storage origin behind the tunnel, thumbnails on Cloudflare (§5a).
+11. **Study mode** (ambient mixer, Pomodoro, to-dos) from PR #49, single-player website only.
+
+Cut: Discord Activity, motion/video showcase.
 
 ## 10. Questions
 
@@ -267,8 +290,11 @@ The core needs **no home server**: text lives in the repo/D1, tracks are small s
 4. Uploads: **own PC, no R2** (billing not needed). Same for 17.
 8. Site language: **German and English, both automatically translated.**
 9. Guestbook: **automatic moderation** instead of manual approval.
-10. Video: **YouTube embeds only**, no Stream, no hosted raw files.
+10. Video: **dropped entirely** (no hosting, no embeds, no motion section).
 17. Storage at launch: **own PC** (see 4).
+
+### Answered (Nils, 2026-11-03, second round)
+- Photos: **yes.** Discord Activity: **skip.** Video: **no.** EPUB/PDF export: **yes.** Blog as RSS feed: **yes.** Look: **pixel-art anime blend.** Hermes MCP server: **wanted** (separate plan).
 
 ### Still open
 2. Light "summer day" as default with "summer night" dark mode – okay?
@@ -286,4 +312,7 @@ The core needs **no home server**: text lives in the repo/D1, tracks are small s
 19. Should stories and blog posts be separate types or one "writing" type with tags?
 20. Music availability: should your tracks always be playable, even when your PC is off (small MP3/Opus files committed as Cloudflare static assets, a few MB each), or is it fine that they only play while the PC is on? Recommendation: always-on for tracks, PC origin for photos.
 21. Tools page: which of the candidate repos should be listed at launch, and should any of them also get an online (browser) version?
+23. Rights line for the EPUB/PDF downloads: "© Nils, all rights reserved, personal reading only", a Creative Commons licence, or something else?
+24. Feeds: full text or only an excerpt for story chapters? (Default: excerpt + link for stories, full text for blog and reviews.)
+25. HaruReader: should the hub's `/writing` replace the HaruReader reader, link to it, or both live side by side? And which HaruReader repo (`mereMint/` or `NwebNotFound/`) is the source of truth for the published files?
 22. Translations: should the original language always stay visible next to the translation, or only via a "show original" link?
