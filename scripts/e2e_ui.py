@@ -431,7 +431,7 @@ with sync_playwright() as p:
                 return
             r.continue_()
         ctx = br.new_context(viewport={"width": 1280, "height": 800}); pg = ctx.new_page(); pg.route("**/*", route_p)
-        pg.goto("https://" + P + "/", wait_until="domcontentloaded", timeout=45000); pg.locator("#umb img").wait_for(timeout=10000)
+        pg.goto("https://" + P + "/portfolio", wait_until="domcontentloaded", timeout=45000); pg.locator("#umb img").wait_for(timeout=10000)
         info = pg.evaluate("""() => { const img = document.querySelector('#umb img'); const name = document.querySelector('#umb .hide-s'); return { src: img ? img.src : '', attr: img ? img.getAttribute('onerror') : 'missing', xss: window.__xss || 0, name: name ? name.textContent : '', imgs: document.querySelectorAll('#umb img').length }; }""")
         ctx.close(); return info
     bad = chip('"><img src=x onerror=window.__xss=1>')
