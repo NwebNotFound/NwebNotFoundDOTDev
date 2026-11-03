@@ -229,6 +229,11 @@ function fontCss() {
 }
 
 const probe = { mockups: [], impl: [], style: {} };
+// `--only mockup|impl` runs must not drop the other half of the report: carry the untouched
+// sections over from the previous run so the committed report.json always holds both.
+const REPORT = path.join(OUT, "report.json");
+let prevReport = {};
+try { prevReport = JSON.parse(fs.readFileSync(REPORT, "utf8")); } catch { /* first run */ }
 
 async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal } = {}) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1, reducedMotion: "no-preference", colorScheme: "dark" });
@@ -305,7 +310,7 @@ async function main() {
         probe.mockups.push({ page: p.slug, ...r });
       }
     }
-  }
+  } else if (prevReport.mockups) probe.mockups = prevReport.mockups;
   if (impl) {
     for (const p of PAGES) {
       for (const vp of VIEWPORTS) {
@@ -316,6 +321,10 @@ async function main() {
     probe.style = await styleProbe(browser, session.cookie);
     // Horizontal overflow at phone width is the classic regression of a new layout layer.
     probe.overflow390 = probe.impl.filter((x) => x.w === 390 && x.scrollWidth > 390).map((x) => ({ page: x.page, scrollWidth: x.scrollWidth }));
+  } else {
+    probe.impl = prevReport.impl || [];
+    probe.style = prevReport.style || {};
+    probe.overflow390 = prevReport.overflow390 || [];
   }
 
   await browser.close();
