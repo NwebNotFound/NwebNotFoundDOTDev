@@ -8,7 +8,7 @@
 // The HTTP half of the same story (status codes, Set-Cookie, redirects, Minecraft regression) runs
 // in scripts/e2e.mjs against a real `wrangler dev`; this file is the cheap, deterministic half.
 import { MESSAGES, LANGS, LANG_COOKIE, makeT, missingKeys, parseAcceptLanguage, pickLang, splitLang, withLang } from "../src/i18n/index.js";
-import { GITHUB_URL, HUB_PAGES, MC_HOST, X_URL, hubPage, hubPageExists } from "../src/hub.js";
+import { GITHUB_URL, HUB_PAGES, MC_HOST, X_URL, hubPage, hubPageExists, writingListBody, writingListPage, writingPostPage, writingSeriesPage } from "../src/hub.js";
 
 let pass = 0;
 let fail = 0;
@@ -118,6 +118,96 @@ for (const lang of LANGS) {
   const soon = hubPage("/writing", "de");
   ok(soon.includes("sm-mascot--placeholder") && soon.includes("(◕‿◕)"), "empty state shows the mascot placeholder and a kaomoji");
   ok(soon.includes("Texte kommt bald"), "empty state names the section", soon.slice(soon.indexOf("sm-h1"), soon.indexOf("sm-h1") + 120));
+}
+
+/* ---- 6. writing: list, post, series (phase 3a) -------------------------------------- */
+{
+  const mk = (o) => ({
+    slug: o.slug,
+    kind: o.kind || "blog",
+    title: o.title || o.slug,
+    date: o.date || "2026-01-01",
+    updated: o.updated || null,
+    tags: o.tags || [],
+    draft: !!o.draft,
+    archived: !!o.archived,
+    lang: o.lang || "de",
+    summary: o.summary || null,
+    cover: null,
+    series: o.series || null,
+    seriesTitle: o.seriesTitle || null,
+    chapter: o.chapter || null,
+    wordCount: 10,
+    readingMinutes: o.readingMinutes || 1,
+    html: o.html || "<p>Body</p>",
+  });
+  const all = [
+    mk({ slug: "post-one", title: "Post One", date: "2026-01-03", tags: ["alpha"], summary: "Kurz eins" }),
+    mk({ slug: "post-two", title: "Post Two", date: "2026-01-02", tags: ["beta"] }),
+    mk({ slug: "old", title: "Old Post", date: "2026-01-01", archived: true }),
+    mk({ slug: "en-post", title: "English Post", date: "2026-01-04", lang: "en" }),
+    mk({ slug: "ch-1", title: "Chapter One", kind: "story", series: "serie", seriesTitle: "Serie", chapter: 1, date: "2025-01-01" }),
+    mk({ slug: "ch-2", title: "Chapter Two", kind: "story", series: "serie", chapter: 2, date: "2025-01-02" }),
+  ];
+
+  /* list */
+  const list = writingListPage(all, "de");
+  ok(list.startsWith('<!doctype html><html lang="de" class="sm-root">') && list.includes('href="https://nwebnotfound.dev/de/writing"'), "writing list: shell and canonical");
+  ok(list.includes("sm-post-grid") && list.includes("Post One") && list.includes("English Post"), "writing list: cards for the published posts");
+  ok(!list.includes("Old Post") && !list.includes("/de/writing/old"), "writing list: an archived post is not listed");
+  ok(!list.includes("sm-soon"), "writing list: no empty state while there is content");
+  ok(list.includes("sm-tag--active") && list.includes('aria-current="true"'), "writing list: the 'all' chip is marked");
+  ok(list.includes('href="/de/writing?kind=story"') && list.includes('href="/de/writing?tag=alpha"'), "writing list: kind and tag filter links");
+  ok(list.includes("5 Beiträge"), "writing list: count excludes archived", list.slice(list.indexOf("sm-filters__count"), list.indexOf("sm-filters__count") + 120));
+  ok(list.indexOf("English Post") < list.indexOf("Post One"), "writing list: newest first");
+  ok(writingListBody(all, "de", { kind: "story" }).includes("2 Beiträge") && !writingListBody(all, "de", { kind: "story" }).includes("Post One"), "writing list: filter by kind");
+  ok(writingListBody(all, "de", { tag: "alpha" }).includes("1 Beiträge"), "writing list: filter by tag");
+  ok(writingListBody(all, "de", { kind: "story", tag: "alpha" }).includes("Zu diesem Filter"), "writing list: empty filter result is explained");
+  const emptyList = writingListPage([], "de");
+  ok(emptyList.includes("sm-mascot-placeholder") && emptyList.includes("Texte kommt bald"), "writing list: nothing published → the mascot empty state");
+
+  /* post */
+  const post = writingPostPage(all[0], all, "de");
+  ok(post.startsWith('<!doctype html><html lang="de" class="sm-root">') && post.includes("<h1 class=\"sm-h1\">Post One</h1>"), "post: shell and title");
+  ok(post.includes('href="https://nwebnotfound.dev/de/writing/post-one"') && !post.includes('rel="alternate"'), "post: canonical at the original language, no hreflang alternates");
+  ok(post.includes("Min. Lesezeit") && post.includes('href="/de/writing?tag=alpha"'), "post: reading time and tag link");
+  ok(post.includes('class="sm-prose" lang="de"'), "post: body in the .sm-prose reader with its own lang");
+  ok(post.includes('href="/de/writing"'), "post: back link to the list");
+  ok(!post.includes("sm-note"), "post: no original-language note when UI language == content language");
+  const enOnDe = writingPostPage(all[3], all, "de");
+  ok(enOnDe.includes("Original auf Englisch.") && enOnDe.includes('href="https://nwebnotfound.dev/en/writing/en-post"'), "post: English text on the German UI notes the original and keeps its canonical");
+  ok(writingPostPage(all[0], all, "en").includes("Original in German."), "post: German text on the English UI notes the original");
+  const archivedPage = writingPostPage(all[2], all, "de");
+  ok(archivedPage.includes("wurde archiviert") && archivedPage.includes("Archiviert"), "post: an archived post stays reachable and shows the banner");
+  const ch1 = writingPostPage(all[4], all, "de");
+  ok(ch1.includes("Nächstes Kapitel") && ch1.includes('href="/de/writing/ch-2"') && !ch1.includes("Vorheriges Kapitel"), "chapter: next link on the first chapter, no previous");
+  const ch2 = writingPostPage(all[5], all, "de");
+  ok(ch2.includes("Vorheriges Kapitel") && ch2.includes('href="/de/writing/ch-1"') && !ch2.includes("Nächstes Kapitel"), "chapter: previous link on the last chapter, no next");
+  ok(writingPostPage(all[0], all, "de").includes('href="/de/writing/series/serie"') === false, "post: a blog post has no series eyebrow link");
+  ok(ch1.includes('href="/de/writing/series/serie"'), "chapter: eyebrow links to the series page");
+
+  /* escaping on a writing page */
+  const unsafe = writingPostPage(mk({ slug: "unsafe", title: "Unsafe", html: "<p>&lt;script&gt;alert(1)&lt;/script&gt; &lt;img src=x onerror=alert(1)&gt;</p>" }), all, "de");
+  ok(!/<script(?![^>]*\ssrc=)/i.test(unsafe), "post: a payload in the body never becomes a live script tag");
+  ok(!/<img[^>]*\son[a-z]+\s*=/i.test(unsafe), "post: no event attribute on a live tag");
+  ok(unsafe.includes("&lt;script&gt;"), "post: the payload is visible as escaped text");
+
+  /* series */
+  const series = { slug: "serie", title: "Serie", chapters: ["ch-1", "ch-2"], count: 2 };
+  const seriesPage = writingSeriesPage(series, all, "de");
+  ok(seriesPage.includes("<h1 class=\"sm-h1\">Serie</h1>") && seriesPage.includes('href="https://nwebnotfound.dev/de/writing/series/serie"'), "series: shell, title and canonical");
+  ok(seriesPage.includes("Chapter One") && seriesPage.includes("Chapter Two") && seriesPage.indexOf("Chapter One") < seriesPage.indexOf("Chapter Two"), "series: chapter list in reading order");
+  ok(seriesPage.includes('hreflang="de"') && seriesPage.includes('hreflang="en"'), "series: the UI page keeps its hreflang alternates");
+  ok(writingSeriesPage({ slug: "serie", title: "Serie", chapters: [], count: 0 }, all, "de").includes("Diese Serie hat 2 Kapitel"), "series: the chapter count comes from the chapters that exist");
+
+  /* routing */
+  ok(hubPageExists("/writing") && hubPageExists("/writing/post-one") && hubPageExists("/writing/series/serie"), "hubPageExists owns the writing routes");
+  ok(!hubPageExists("/writing/series/BAD") && !hubPageExists("/writing/UPPER"), "hubPageExists rejects a non-slug segment");
+  ok(!hubPageExists("/writingx") && !hubPageExists("/writing/a/b"), "hubPageExists is exact about its shapes");
+  ok(hubPage("/writing/post-one", "de") === null, "hubPage: an unknown slug (empty index) falls through to the caller");
+  ok(hubPage("/writing/series/unknown", "de") === null, "hubPage: an unknown series falls through");
+  const q = new URLSearchParams("kind=story");
+  ok(hubPage("/writing", "de", { query: q }).includes("Texte kommt bald"), "hubPage: with an empty index the list stays the empty state");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

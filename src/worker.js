@@ -944,7 +944,7 @@ export default {
     if (pre.lang && !hubPageExists(pre.path)) return Response.redirect(`https://${MAIN}${pre.path}`, 301);
     if (hubPageExists(pre.path)) {
       const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
-      const page = hubPage(pre.path, lang);
+      const page = hubPage(pre.path, lang, { query: url.searchParams });
       if (page) return html(page, 200, pre.lang ? { "set-cookie": langCookie(pre.lang), vary: "accept-language" } : { vary: "accept-language" });
     }
     if (p === "/portfolio") return html(PORTFOLIO);

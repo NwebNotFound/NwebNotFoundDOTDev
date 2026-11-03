@@ -6,6 +6,10 @@ import fs from "node:fs";
 import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
 import { faceRgba, skinOk, skinResponse, renderHead, encodePng, fetchRetry, RETRY_MS, resolveSkin, DEFAULT_SKINS, validSkinUrl } from "../src/mc-head.js";
 import "./vip-unit.mjs";
+import "./content-unit.mjs";
+import "./markdown-unit.mjs";
+import { CONTENT } from "../src/generated/content.js";
+import { hubPage } from "../src/hub.js";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
@@ -36,8 +40,15 @@ fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
 const wd = spawn("npx", ["wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: true });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
-const cleanup = () => { try { process.kill(-wd.pid); } catch {} fs.rmSync(DV, { force: true }); if (hadDV) fs.renameSync(DV + ".e2e-bak", DV); };
+const cleanup = () => { try { process.kill(-wd.pid); } catch {} fs.rmSync(DV, { force: true }); if (hadDV) fs.renameSync(DV + ".e2e-bak", DV); if (hadContent) { try { fs.renameSync(CONTENT_JS + ".e2e-bak", CONTENT_JS); } catch {} } };
 process.on("exit", cleanup); process.on("SIGINT", () => process.exit(130));
+// Writing fixtures (phase 3a): the committed src/generated/content.js carries Nils' real content
+// (currently none). For the e2e run we build the index from scripts/fixtures/content so the writing
+// routes have something to render; the original file is restored on exit.
+const CONTENT_JS = ROOT + "src/generated/content.js";
+const hadContent = fs.existsSync(CONTENT_JS);
+if (hadContent) fs.copyFileSync(CONTENT_JS, CONTENT_JS + ".e2e-bak");
+execSync("node scripts/build-content.mjs --fixtures", { cwd: ROOT, stdio: "ignore" });
 for (let i = 0; i < 60; i++) { try { await fetch(BASE + "/", { headers: { host: HOST } }); break; } catch { await new Promise((r) => setTimeout(r, 500)); } }
 
 try {
@@ -539,6 +550,60 @@ try {
     ok((await hub("/guestbook")).s === 200 && (await hub("/guestbook")).t.includes("<title>Gästebuch · NwebNotFound</title>"), "/guestbook bleibt erreichbar (Portfolio-Design)");
     const mcHome = await req("/");
     ok(mcHome.s === 200 && mcHome.t.includes("Kein offizielles Minecraft-Produkt") && !mcHome.t.includes("sm-root"), "mc.nwebnotfound.dev / unverändert (kein Hub-Theme, Regression)");
+  }
+  console.log("7c) Hub: Writing (Fixture-Build)");
+  {
+    const hub = (path, opt = {}) => req(path, { testHost: "nwebnotfound.dev", ...opt });
+    // The committed index (no real content yet) must render the mascot empty state. `CONTENT` was
+    // imported before the fixture build overwrote the file, so this is the committed state.
+    const committed = CONTENT.writing.filter((w) => !w.draft && !w.archived).length;
+    if (committed === 0) {
+      const empty = hubPage("/writing", "de");
+      ok(empty.includes("sm-mascot-placeholder") && empty.includes("sm-soon") && empty.includes("Texte kommt bald"), "Leerzustand /writing (committed build, kein Inhalt)");
+    } else {
+      ok(hubPage("/writing", "de").includes("sm-post-grid"), "Liste /writing mit Inhalt (committed build)");
+    }
+    ok(!hubPage("/writing/does-not-exist", "de") && !hubPage("/writing/series/does-not-exist", "de"), "hubPage: unbekannter Slug/Serie → null");
+
+    const list = await hub("/writing");
+    ok(list.s === 200 && list.t.includes("sm-post-grid") && list.t.includes("TEST FIXTURE Hello world"), "GET /writing → 200, Liste mit Beiträgen", list.s);
+    ok(list.t.includes("TEST FIXTURE English post") && !list.t.includes("TEST FIXTURE Draft post") && !list.t.includes("Chapter three"), "Liste: draft und archived fehlen");
+    ok(list.t.includes('href="/de/writing?kind=story"') && list.t.includes('href="/de/writing?tag=fixtures"'), "Liste: Filterlinks nach Art und Stichwort");
+    const en = await hub("/en/writing");
+    ok(en.s === 200 && /<html lang="en"/.test(en.t) && en.t.includes("Stories and blog"), "/en/writing → englische Oberfläche", en.s);
+    const kind = await hub("/writing?kind=story");
+    ok(kind.s === 200 && kind.t.includes("TEST FIXTURE Chapter one") && !kind.t.includes("TEST FIXTURE Hello world"), "Filter ?kind=story zeigt nur Kapitel", kind.s);
+    const tag = await hub("/writing?tag=fixtures");
+    ok(tag.s === 200 && tag.t.includes("TEST FIXTURE Hello world"), "Filter ?tag=fixtures", tag.s);
+    const none = await hub("/writing?tag=kein-treffer");
+    ok(none.s === 200 && none.t.includes("Zu diesem Filter"), "Filter ohne Treffer erklärt das", none.s);
+
+    const post = await hub("/writing/test-fixture-hello");
+    ok(post.s === 200 && post.t.includes("TEST FIXTURE Hello world") && post.t.includes('class="sm-prose"') && post.t.includes("Min. Lesezeit"), "Beitragsseite → 200 mit Reader und Lesezeit", post.s);
+    ok(post.t.includes('rel="canonical" href="https://nwebnotfound.dev/de/writing/test-fixture-hello"') && !post.t.includes('rel="alternate"'), "Beitrag: canonical auf die Originalsprache, kein hreflang");
+    ok(post.t.includes("<h2>Eine Zwischenüberschrift</h2>") && post.t.includes("<ul><li>erster Punkt</li>") && post.t.includes("<pre><code"), "Markdown ist vorgerendert (h2, Liste, Codeblock)");
+    ok(post.t.includes('href="/de/writing?tag=fixtures"') && post.t.includes('class="sm-prose" lang="de"'), "Beitrag: Tag-Link und Reader-Sprache");
+    ok(!post.t.includes("Original auf") && !post.t.includes("Original in"), "deutscher Text, deutsche Hülle → kein Original-Hinweis");
+    const enPostDe = await hub("/de/writing/test-fixture-english");
+    ok(enPostDe.s === 200 && enPostDe.t.includes("Original auf Englisch."), "englischer Text in deutscher Hülle → Hinweis", enPostDe.s);
+    ok(!/class="sm-note"/.test((await hub("/en/writing/test-fixture-english")).t), "englischer Text in englischer Hülle → kein Hinweis-Banner");
+    ok((await hub("/writing/test-fixture-draft")).s === 404, "draft ist auch über den direkten Link nicht erreichbar");
+    const arch = await hub("/writing/test-fixture-chapter-3");
+    ok(arch.s === 200 && arch.t.includes("Archiviert") && arch.t.includes("wurde archiviert"), "archived: direkter Link erreichbar + Hinweis-Banner", arch.s);
+
+    const series = await hub("/writing/series/test-fixture-serie");
+    ok(series.s === 200 && series.t.includes("Test Fixture Series") && series.t.includes("TEST FIXTURE Chapter one") && series.t.includes("Chapter three (archived)"), "Serienseite: Kapitelliste inkl. archiviertem Kapitel", series.s);
+    const ch2 = await hub("/writing/test-fixture-chapter-2");
+    ok(ch2.t.includes('href="/de/writing/test-fixture-chapter-1"') && ch2.t.includes('href="/de/writing/test-fixture-chapter-3"'), "Kapitel: Vorheriges/Nächstes");
+    ok((await hub("/de/writing/test-fixture-chapter-2")).s === 200, "/de/writing/<slug> rendert (kein Redirect)");
+
+    const unsafe = await hub("/writing/test-fixture-unsafe");
+    ok(unsafe.s === 200 && unsafe.t.includes("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;"), "unsafe: Rohes HTML ist escaped", unsafe.s);
+    ok(!/<script(?![^>]*\ssrc=)/i.test(unsafe.t) && !/<img[^>]*\son[a-z]+\s*=/i.test(unsafe.t), "unsafe: kein Live-Script, kein Event-Handler");
+    ok(!/href="javascript:/i.test(unsafe.t) && !/href="data:/i.test(unsafe.t), "unsafe: kein javascript:-/data:-Link");
+    ok(unsafe.t.includes('<img src="/content-assets/placeholder.svg"'), "unsafe: erlaubtes lokales Bild wird gerendert");
+    ok(!/evil\.example/.test(unsafe.t), "unsafe: externes Bild wird verworfen");
+    ok(!(await req("/writing")).t.includes("TEST FIXTURE"), "Writing erscheint nicht auf mc.nwebnotfound.dev");
   }
   console.log("8) UI (Chromium 390/1440)");
   { // Live-Ticks: erster Ingest legt je Item einen Tick an; gleicher Preis → kein neuer; Preisänderung → neuer Tick
