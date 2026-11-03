@@ -275,12 +275,30 @@ const SUMMER_ASSERTIONS = [
   [/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?--sm-duration-fast: 0ms;[\s\S]*?\}/, "prefers-reduced-motion zeroes the summer durations"],
   [/@media \(forced-colors: active\)/, "a forced-colors block keeps focus visible"],
   [/\.sm-skip-link/, "the skip link exists"],
+  // Summer Theme v2: soft page transitions and the parallax layers.
+  [/@view-transition \{\s*navigation:\s*auto;\s*\}/, "cross-document view transitions are on"],
+  [/\.sm-nav \{\s*view-transition-name: sm-nav;\s*\}/, "the header is a named view-transition part"],
+  [/\.sm-footer \{\s*view-transition-name: sm-footer;\s*\}/, "the footer is a named view-transition part"],
+  [/::view-transition-new\(root\)/, "the incoming page has its own animation"],
+  [/@supports \(animation-timeline: scroll\(\)\)/, "the parallax is guarded behind @supports"],
+  [/animation-timeline: scroll\(root\)/, "the parallax uses a scroll-driven timeline on the root scroller"],
+  [/@keyframes sm-parallax-(far|mid|close)/, "parallax layers exist"],
+  [/--sm-mx, 0px/, "the mouse parallax writes custom properties, not transforms"],
 ];
 for (const [re, label] of SUMMER_ASSERTIONS) {
   if (!re.test(summerCss)) {
     fail++;
     console.error(`  ✗ summer.css: ${label} is missing`);
   }
+}
+// Reduced motion must switch off both new motion features.
+if (!/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?::view-transition-new\(root\)[\s\S]*?\}/.test(summerCss)) {
+  fail++;
+  console.error("  ✗ summer.css: reduced motion does not disable the page transition");
+}
+if (!/@media \(prefers-reduced-motion: no-preference\)/.test(summerCss)) {
+  fail++;
+  console.error("  ✗ summer.css: the parallax is not limited to no-preference");
 }
 
 console.log(`\n${pass} pairs pass, ${fail} fail. Lowest: ${lowest.label} = ${lowest.ratio.toFixed(2)}:1`);

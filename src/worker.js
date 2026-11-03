@@ -112,6 +112,7 @@ const PORT_V2_CSS = `
 --sh1:0 1px 2px rgba(0,0,0,.3),0 16px 36px -16px rgba(0,0,0,.6);--sh2:0 2px 4px rgba(0,0,0,.3),0 24px 48px -16px rgba(0,0,0,.7)}}
 body{background-color:var(--bg);background-image:linear-gradient(180deg,var(--sky1) 0,var(--sky2) 360px,var(--bg) 640px);background-repeat:no-repeat}
 .px{shape-rendering:crispEdges;image-rendering:pixelated}
+img[src^="/mc-icon/"]{image-rendering:pixelated}
 .pxfont{font-family:var(--px-font)}
 .nav{position:sticky;top:0;z-index:50;padding:16px 0;padding-top:calc(16px + env(safe-area-inset-top));background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;border-bottom:0}
 .nav .wrap{height:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;padding:8px 8px 8px 16px;border-radius:999px;background:var(--navbg);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);box-shadow:inset 0 0 0 1px var(--line),var(--sh1)}
@@ -280,7 +281,7 @@ const PORTFOLIO = portfolio({ title: "Projekte · Nils Weberruß", desc: "Inform
 <p class="pk reveal">Projekte</p><h2 class="h-l reveal d1">Was ich gebaut habe</h2><p class="lead reveal d1">Woran ich gerade arbeite.</p>
 <div class="pgrid">
 <a class="card pcard reveal" href="https://${MCD}/">
-<span class="pcover pcover--mc"><svg class="px ground" height="70" viewBox="0 0 40 7" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect x="0" y="2" width="40" height="2" fill="#4fbf6a"/><rect x="0" y="4" width="40" height="3" fill="#8a5d3a"/><rect x="8" y="1" width="6" height="1" fill="#4fbf6a"/><rect x="26" y="0" width="4" height="2" fill="#4fbf6a"/></svg></span>
+<span class="pcover pcover--mc"><span class="ctr"><img class="px" alt="" width="64" height="64" loading="lazy" src="/mc-icon/v2/grass_block"></span></span>
 <span class="in"><span class="pchips"><span class="tag">Live</span></span><h3>Minecraft-Server</h3><p>Vanilla+ für Freunde: Velocity, Paper, Simple Voice Chat, eigene Economy und Discord-Anbindung. Läuft in Docker.</p><span class="more">Zum Server ›</span></span>
 </a>
 <div class="card pcard reveal d1">

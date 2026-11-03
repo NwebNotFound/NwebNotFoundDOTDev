@@ -588,6 +588,50 @@
   font-size: var(--sm-text-sm);
   color: var(--sm-muted-foreground);
 }
+/* Tables: the renderer of this site does not emit them today, but a table must never push the page
+   sideways — on a narrow screen it scrolls inside its own box instead. */
+.sm-prose table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: var(--sm-text-base);
+}
+.sm-prose th,
+.sm-prose td {
+  padding: var(--sm-space-2) var(--sm-space-3);
+  border-bottom: 1px solid var(--sm-border);
+  text-align: left;
+  white-space: nowrap;
+}
+/* Long titles, tags and names wrap instead of overflowing: the layout stays inside 390px. */
+.sm-h1,
+.sm-h2,
+.sm-h3,
+.sm-post-card__title,
+.sm-chapters__link,
+.sm-feature__title,
+.sm-tile__cta,
+.sm-brand__name,
+.sm-nav__link,
+.sm-tag,
+.sm-badge,
+.sm-feed-note__link,
+.sm-prevnext__link,
+.sm-dialog__name {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+/* Numbers line up: counts, reading time, chapter numbers, prices. */
+.sm-tnum,
+.sm-filters__count,
+.sm-chapters__num,
+.sm-post-card__meta,
+.sm-post-meta,
+.sm-stat__v {
+  font-variant-numeric: tabular-nums;
+}
 .sm-kaomoji {
   font-family: var(--sm-font-body);
   font-size: var(--sm-text-sm);
@@ -1450,11 +1494,14 @@
   right: 30px;
   opacity: 0.8;
 }
-.sm-scene__ground {
-  position: absolute;
+.sm-scene__ground-wrap {
   left: 0;
   right: 0;
   bottom: 0;
+  width: 100%;
+}
+.sm-scene__ground-wrap svg {
+  display: block;
   width: 100%;
 }
 .sm-scene__mascot {
@@ -1912,6 +1959,121 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
+   Cross-document view transitions (Summer Theme v2). The browser cross-fades the content, while the
+   glass header and the footer stay in place: they are named parts and their groups do not animate.
+   Browsers without support navigate normally; prefers-reduced-motion switches the animation off.
+
+   `@view-transition` is a document-level at-rule by design (it cannot be scoped to a class), so
+   scripts/summer-scope-check.mjs allows exactly this one at-rule by name.
+   --------------------------------------------------------------------------------------------- */
+@view-transition {
+  navigation: auto;
+}
+.sm-nav {
+  view-transition-name: sm-nav;
+}
+.sm-footer {
+  view-transition-name: sm-footer;
+}
+:where(.sm-root)::view-transition-old(root) {
+  animation: sm-page-out 0.34s var(--sm-ease) both;
+}
+:where(.sm-root)::view-transition-new(root) {
+  animation: sm-page-in 0.34s var(--sm-ease) both;
+}
+/* Header and footer are identical on both sides of a navigation, so their groups must hold still. */
+:where(.sm-root)::view-transition-old(sm-nav),
+:where(.sm-root)::view-transition-new(sm-nav),
+:where(.sm-root)::view-transition-old(sm-footer),
+:where(.sm-root)::view-transition-new(sm-footer) {
+  animation: none;
+}
+@keyframes sm-page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes sm-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Parallax. Sky and stars move slowest, clouds in the middle, ground and mascot fastest. Where the
+   browser can do it, this is pure CSS: a scroll-driven `view()` timeline per layer, so nothing
+   listens to scroll and nothing hijacks it. Only `transform` moves, so the page never reflows.
+   The mouse parallax of the hero panel comes from /design/summer-parallax.js, which only sets
+   custom properties on the scene — the transform stays in this file.
+   --------------------------------------------------------------------------------------------- */
+.sm-layer {
+  position: absolute;
+  display: block;
+}
+.sm-scene {
+  transform: translate3d(var(--sm-mx, 0px), var(--sm-my, 0px), 0) rotate(var(--sm-mr, 0deg));
+  transition: transform 0.25s var(--sm-ease);
+}
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sm-parallax {
+      animation: sm-parallax-close linear both;
+      /* The root scroller is the timeline, so a clipped panel (`.sm-scene` is overflow:hidden) does
+         not become the layers' own scrollport — and no script has to listen to `scroll`. */
+      animation-timeline: scroll(root);
+      animation-range: 0 640px;
+    }
+    .sm-parallax--mid {
+      animation-name: sm-parallax-mid;
+    }
+    .sm-parallax--slow {
+      animation-name: sm-parallax-far;
+    }
+  }
+}
+@keyframes sm-parallax-far {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-16px);
+  }
+}
+@keyframes sm-parallax-mid {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-34px);
+  }
+}
+@keyframes sm-parallax-close {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-64px);
+  }
+}
+/* Page heads of the inner pages: the same slow layer, but it starts moving a little later. */
+.sm-page-head .sm-parallax {
+  animation-range: 120px 640px;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Real Minecraft textures (`/mc-icon/v2/<id>`, the same endpoint the Minecraft surface uses).
+   16x16 source art has to be upscaled without smoothing.
+   --------------------------------------------------------------------------------------------- */
+.sm-mc-icon {
+  display: block;
+  flex: none;
+  image-rendering: pixelated;
+}
+
+
+/* ---------------------------------------------------------------------------------------------
    Motion (artboard theme.css): nothing here is information-carrying, and all of it collapses
    when the user asks.
    --------------------------------------------------------------------------------------------- */
@@ -2078,6 +2240,21 @@
   .sm-card--link:hover,
   .sm-iconbtn:hover {
     transform: none;
+  }
+  /* Parallax and the page transition are motion: with a reduced-motion preference the layers sit
+     still (the mouse helper never starts) and a navigation does not animate. */
+  .sm-layer,
+  .sm-scene {
+    animation: none !important;
+    transform: none;
+  }
+  :where(.sm-root)::view-transition-old(root),
+  :where(.sm-root)::view-transition-new(root),
+  :where(.sm-root)::view-transition-old(sm-nav),
+  :where(.sm-root)::view-transition-new(sm-nav),
+  :where(.sm-root)::view-transition-old(sm-footer),
+  :where(.sm-root)::view-transition-new(sm-footer) {
+    animation: none !important;
   }
 }
 

@@ -162,7 +162,7 @@ const cloudArt = (w, h, cls = "sm-drift") =>
 
 /** Grass + dirt ground, stretched to the panel width (artboard uses preserveAspectRatio="none"). */
 const groundArt = (h, viewBox = "0 0 60 16") =>
-  `<svg class="sm-px-icon sm-scene__ground" height="${h}" viewBox="${viewBox}" preserveAspectRatio="none" aria-hidden="true" focusable="false" shape-rendering="crispEdges">` +
+  `<svg class="sm-px-icon" height="${h}" viewBox="${viewBox}" preserveAspectRatio="none" aria-hidden="true" focusable="false" shape-rendering="crispEdges">` +
   `<rect x="0" y="6" width="60" height="10" fill="var(--sm-accent-grass)"></rect>` +
   `<rect x="10" y="4" width="22" height="2" fill="var(--sm-accent-grass)"></rect>` +
   `<rect x="16" y="2" width="12" height="2" fill="var(--sm-accent-grass)"></rect>` +
@@ -203,10 +203,8 @@ const rssArt = (size = 16) =>
   `<rect x="6" y="4" width="1" height="4" fill="var(--sm-sun-edge)"></rect>` +
   `</svg>`;
 
-/* Tile icons, drawn on a 10x10 grid (artboards). */
+/* Tile icons, drawn on a 10x10 grid (artboards). Non-Minecraft sections keep the artboard art. */
 const TILE_ART = {
-  minecraft:
-    `<rect x="0" y="0" width="10" height="3" fill="#3f9a4f"></rect><rect x="0" y="3" width="10" height="7" fill="#a8703f"></rect><rect x="2" y="3" width="1" height="2" fill="#3f9a4f"></rect><rect x="6" y="3" width="1" height="1" fill="#3f9a4f"></rect><rect x="3" y="6" width="1" height="1" fill="#7a4f2a"></rect><rect x="7" y="7" width="1" height="1" fill="#7a4f2a"></rect>`,
   about:
     `<rect x="2" y="1" width="6" height="6" fill="#ffffff"></rect><rect x="1" y="2" width="8" height="6" fill="#ffffff"></rect><rect x="3" y="3" width="1" height="1" fill="#1f2a44"></rect><rect x="6" y="3" width="1" height="1" fill="#1f2a44"></rect><rect x="4" y="5" width="2" height="1" fill="#1f2a44"></rect><rect x="2" y="8" width="2" height="1" fill="#ffffff"></rect>`,
   music:
@@ -223,6 +221,38 @@ const TILE_ART = {
 
 const tileIcon = (key, size = 28) =>
   `<svg class="sm-px-icon" width="${size}" height="${size}" viewBox="0 0 10 10" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${TILE_ART[key] || ""}</svg>`;
+
+/**
+ * A real Minecraft texture, straight from the surface's own icon endpoint (`/mc-icon/v2/<id>`, the
+ * same source the Minecraft navigation uses). `/mc-icon` resolves the id server-side and falls back
+ * to `item/paper`, so a missing id still renders a texture instead of a broken image — that is why
+ * no `onerror` handler is needed (the hub ships no inline handler). Used only where Minecraft
+ * really appears; the mascot and pure decoration (clouds, stars, grass line) stay inline SVG.
+ */
+const mcIcon = (id, px = 32, cls = "sm-mc-icon") =>
+  `<img class="${cls}" alt="" width="${px}" height="${px}" loading="lazy" decoding="async" src="/mc-icon/v2/${esc(id)}">`;
+
+/* ---------- numbers ---------- */
+
+const NUM_LOCALE = { de: "de-DE", en: "en-GB" };
+
+/**
+ * Grouped number in the language of the page: `1234` → `1.234` (de-DE) / `1,234` (en-GB).
+ * `Intl.NumberFormat` is available in the Workers runtime; if it ever is not, the plain value still
+ * renders instead of `undefined`.
+ */
+function num(value, lang) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value ?? "");
+  try {
+    return new Intl.NumberFormat(NUM_LOCALE[lang] || NUM_LOCALE.de).format(n);
+  } catch {
+    return String(n);
+  }
+}
+
+/** Grouped number for the current language (exported for scripts/hub-unit.mjs). */
+export const formatNumber = num;
 
 /* ---------- writing: dates, kinds, tags, urls ---------- */
 
@@ -378,7 +408,7 @@ ${cloudArt(80, 34)}
 <div class="sm-feature__body">
 <div class="sm-feature__chips">
 <span class="sm-badge sm-badge--lavender">${esc(t("writing.series.eyebrow"))}</span>
-<span class="sm-badge">${esc(t("writing.count", { n: chapters.length }))}</span>
+<span class="sm-badge sm-tnum">${esc(t("writing.count", { n: num(chapters.length, lang) }))}</span>
 </div>
 <h2 class="sm-h2"><a href="${seriesUrl(series.slug, lang)}">${esc(series.title)}</a></h2>
 <div class="sm-feature__cta">
@@ -426,7 +456,7 @@ export function writingListBody(items, lang, filters = {}, t = makeT(lang)) {
 </div>
 <nav class="sm-filters sm-filters--tabs" aria-label="${esc(t("writing.filter.label"))}">${chips}</nav>
 </div>
-<p class="sm-muted sm-filters__count">${esc(t("writing.count", { n: filtered.length }))}</p>
+<p class="sm-muted sm-filters__count sm-tnum">${esc(t("writing.count", { n: num(filtered.length, lang) }))}</p>
 ${featured}
 ${body}
 ${feedNote(writingListFeeds(t), t)}
@@ -538,19 +568,23 @@ function themeToggle(t, slot = "header") {
     `</button>`;
 }
 
-/** The sky panel of the home hero (artboard Main-day): sun, two clouds, ground, mascot, twinkles. */
+/**
+ * The sky panel of the home hero (artboard Main-day): sun, two clouds, ground, mascot, twinkles.
+ * Each layer sits in its own wrapper so the parallax (scroll-driven CSS or the mouse helper) can
+ * move the wrapper while the art keeps its own bob/drift animation.
+ */
 function scene(t) {
-  return `<div class="sm-scene">
-${sunArt(72, "sm-scene__sun")}
-${cloudArt(120, 50, "sm-drift sm-scene__cloud")}
-${cloudArt(84, 34, "sm-drift--slow sm-scene__cloud sm-scene__cloud--far")}
-${groundArt(96)}
-<div class="sm-scene__mascot">
+  return `<div class="sm-scene" data-sm-parallax>
+<span class="sm-layer sm-parallax sm-parallax--slow sm-scene__sun">${sunArt(72)}</span>
+<span class="sm-layer sm-parallax sm-parallax--mid sm-scene__cloud">${cloudArt(120, 50)}</span>
+<span class="sm-layer sm-parallax sm-parallax--mid sm-scene__cloud sm-scene__cloud--far">${cloudArt(84, 34, "sm-drift--slow")}</span>
+<span class="sm-layer sm-parallax sm-scene__ground-wrap">${groundArt(96)}</span>
+<span class="sm-layer sm-parallax sm-scene__mascot">
 ${mascotArt(120, "sm-bob", t("home.mascot_alt"))}
 <span class="sm-scene__shadow" aria-hidden="true"></span>
-</div>
-${twinkleArt(15, "#ffd45e", "sm-scene__twinkle sm-scene__twinkle--a")}
-${twinkleArt(10, "#ffc8dd", "sm-scene__twinkle sm-scene__twinkle--b")}
+</span>
+<span class="sm-layer sm-parallax sm-parallax--slow sm-scene__twinkle sm-scene__twinkle--a">${twinkleArt(15, "#ffd45e")}</span>
+<span class="sm-layer sm-parallax sm-parallax--slow sm-scene__twinkle sm-scene__twinkle--b">${twinkleArt(10, "#ffc8dd")}</span>
 </div>`;
 }
 
@@ -578,8 +612,10 @@ function document_(o) {
     .map((f) => `<link rel="alternate" type="${FEED_MIME[f.format]}" title="${esc(f.title)}" href="${esc(f.href)}">`)
     .join("");
   // The print helper is an external file (never an inline handler), loaded only where a print button
-  // exists — story chapters and series pages.
+  // exists — story chapters and series pages. The parallax helper is a small external file too, and
+  // only the page that has a hero scene loads it.
   const printScript = o.print ? `<script src="/design/summer-print.js" defer></script>` : "";
+  const parallaxScript = o.parallax ? `<script src="/design/summer-parallax.js" defer></script>` : "";
   return `<!doctype html><html lang="${lang}" class="sm-root"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}">
@@ -591,7 +627,7 @@ ${hreflangTags}
 ${feedTags}
 <link rel="preload" href="/design/fonts/pixelify-sans-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/design/fonts/nunito-latin-400.woff2" as="font" type="font/woff2" crossorigin>
-<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${printScript}
+<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${printScript}${parallaxScript}
 </head><body class="sm-shell">
 <a class="sm-skip-link" href="#main">${esc(t("skip"))}</a>
 <header class="sm-nav"><div class="sm-wrap"><div class="sm-hdr">
@@ -621,11 +657,11 @@ ${grassline()}
 
 /* ---------- other pages ---------- */
 
-function tile({ href_, iconKey, tone, title, text, badge, cta, ctaMuted, external, wide }) {
+function tile({ href_, iconKey, mcId, tone, title, text, badge, cta, ctaMuted, external, wide }) {
   const inner = `<h2 class="sm-h3">${esc(title)}</h2><p class="sm-tile__text">${esc(text)}</p>` +
     `<span class="sm-tile__cta${ctaMuted ? " sm-tile__cta--muted" : ""}">${esc(cta)}${ctaMuted ? "" : ` ${ctaArrow}`}</span>`;
   const cls = `sm-card sm-card--link sm-tile${wide ? " sm-tile--wide" : ""}${badge ? " sm-tile--soon" : ""} sm-rise`;
-  const head = `<div class="sm-tile__head"><span class="sm-tile__icon sm-tile__icon--${tone}">${tileIcon(iconKey)}</span>${badge || ""}</div>`;
+  const head = `<div class="sm-tile__head"><span class="sm-tile__icon sm-tile__icon--${tone}">${mcId ? mcIcon(mcId, 36) : tileIcon(iconKey)}</span>${badge || ""}</div>`;
   if (external) return `<a class="${cls}" href="${esc(href_)}" target="_blank" rel="noopener noreferrer">${head}${inner}</a>`;
   return `<a class="${cls}" href="${href_}">${head}${inner}</a>`;
 }
@@ -648,7 +684,7 @@ function homeBody(t, lang) {
 <p class="sm-lead">${esc(t("home.sections_lead"))}</p>
 </div>
 <div class="sm-tiles">
-${tile({ href_: `https://${MC_HOST}/`, iconKey: "minecraft", tone: "grass", title: t("tile.minecraft.title"), text: t("tile.minecraft.text"), cta: t("tile.minecraft.cta"), external: true, wide: true })}
+${tile({ href_: `https://${MC_HOST}/`, mcId: "grass_block", iconKey: "minecraft", tone: "grass", title: t("tile.minecraft.title"), text: t("tile.minecraft.text"), cta: t("tile.minecraft.cta"), external: true, wide: true })}
 ${tile({ href_: href("/about", lang), iconKey: "about", tone: "sakura", title: t("tile.about.title"), text: t("tile.about.text"), cta: t("tile.cta.more") })}
 ${tile({ href_: href("/music", lang), iconKey: "music", tone: "ramune", title: t("tile.music.title"), text: t("tile.music.text"), badge: soon, cta: t("tile.cta.soon"), ctaMuted: true })}
 ${tile({ href_: href("/writing", lang), iconKey: "writing", tone: "lavender", title: t("tile.writing.title"), text: t("tile.writing.text"), badge: soon, cta: t("tile.cta.soon"), ctaMuted: true })}
@@ -818,7 +854,7 @@ export function hubPage(bare, lang, opts = {}) {
   const meta = META[bare];
   if (!meta) return null;
   const body = bare === "/" ? homeBody(t, lang) : bare === "/about" ? aboutBody(t, lang) : soonBody(t, lang, bare);
-  return document_({ lang, bare, t, title: t(meta[0]), desc: t(meta[1]), body });
+  return document_({ lang, bare, t, title: t(meta[0]), desc: t(meta[1]), body, parallax: bare === "/" });
 }
 
 export const hubPageExists = (bare) => Object.prototype.hasOwnProperty.call(META, bare) || writingRoute(bare) !== null;

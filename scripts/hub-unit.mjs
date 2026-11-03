@@ -8,7 +8,7 @@
 // The HTTP half of the same story (status codes, Set-Cookie, redirects, Minecraft regression) runs
 // in scripts/e2e.mjs against a real `wrangler dev`; this file is the cheap, deterministic half.
 import { MESSAGES, LANGS, LANG_COOKIE, makeT, missingKeys, parseAcceptLanguage, pickLang, splitLang, withLang } from "../src/i18n/index.js";
-import { GITHUB_URL, HUB_PAGES, MC_HOST, X_URL, hubPage, hubPageExists, writingListBody, writingListPage, writingPostPage, writingSeriesPage } from "../src/hub.js";
+import { GITHUB_URL, HUB_PAGES, MC_HOST, X_URL, formatNumber, hubPage, hubPageExists, writingListBody, writingListPage, writingPostPage, writingSeriesPage } from "../src/hub.js";
 
 let pass = 0;
 let fail = 0;
@@ -113,6 +113,15 @@ for (const lang of LANGS) {
 
   const home = hubPage("/", "en");
   ok(home.includes(`href="https://${MC_HOST}/" target="_blank" rel="noopener noreferrer"`), "home tile opens the Minecraft server externally");
+  // Summer Theme v2: real Minecraft texture (the same /mc-icon endpoint the MC surface uses) plus
+  // the parallax layer markup and the external parallax helper.
+  ok(home.includes('src="/mc-icon/v2/grass_block"') && home.includes("sm-mc-icon"), "the Minecraft tile shows the real grass_block texture");
+  ok(home.includes("data-sm-parallax") && home.includes('class="sm-layer sm-parallax'), "the hero scene carries the parallax layers");
+  ok(home.includes('<script src="/design/summer-parallax.js" defer></script>'), "the start page loads the external parallax helper");
+  ok(!hubPage("/about", "de").includes("summer-parallax.js"), "inner pages do not load the parallax helper");
+  // Formatted numbers follow the page language.
+  ok(formatNumber(1234, "de") === "1.234" && formatNumber(1234, "en") === "1,234", "counts are grouped per language", `${formatNumber(1234, "de")} / ${formatNumber(1234, "en")}`);
+  ok(formatNumber("kaputt", "de") === "kaputt", "a non-number is passed through instead of 'NaN'");
   ok(["music", "writing", "reviews"].every((s) => home.includes(`href="/en/${s}"`)), "home links the still-empty sections");
   ok(home.includes("sm-badge--sun") && home.includes("soon"), "still-empty sections are marked as soon");
   const de = hubPage("/", "de");
