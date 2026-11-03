@@ -494,7 +494,11 @@ change the Minecraft or the portfolio look — those pages do not load this styl
 | `public/design/summer-sprites.svg` | **placeholder** pixel shapes (sun, cloud, sparkle, heart, star, mascot stand-in) |
 | `public/design/fonts/` | `SmPixel` (Pixelify Sans) and `SmBody` (Nunito), both OFL 1.1; licences in `fonts/LICENSES.md` |
 | `scripts/summer-scope-check.mjs` | regression gate: no bare element selectors, no foreign token names, no `@import`/remote URL, preview page stays CSP-clean |
+| `src/hub.js` | the hub shell and its pages (nav, footer, hero, tiles, empty states); server-rendered from `src/worker.js` |
+| `src/i18n/de.js`, `src/i18n/en.js`, `src/i18n/index.js` | interface messages plus language negotiation, `/de/…`–`/en/…` prefixes and `t()` |
+| `scripts/i18n-check.mjs`, `scripts/hub-unit.mjs` | gates: message files stay complete, and the shell renders the expected HTML (no browser needed) |
 | `docs/screens/summer-preview-{day,night}.png` | the two reference screenshots of the preview page, taken with Playwright in a throwaway container (both themes) |
+| `docs/screens/hub-*.png` | reference screenshots of the hub shell (home, about, empty state, English home; 390/1280, day/night), same throwaway-container workflow (`node scripts/screenshots.mjs --serve --only hub`) |
 
 `.sm-root` goes on `<html>` (mirroring `html.mc`), so `<body>` is styled through the root class.
 Every selector starts with an `sm-`-namespaced class; the check fails the run otherwise.
@@ -582,6 +586,9 @@ readable in both themes instead of only the sunflower surviving.
 | `.sm-stars` `--lg|--sm` | display only: 5 stars filled to `--sm-rating` (0–5, one decimal) with `role="img"` + `aria-label`; no widget, no script |
 | `.sm-sticker`, `.sm-sky` `--night`, `.sm-dither`, `.sm-mascot` `--placeholder`, `.sm-icon` `--lg` | pixel/sticker detail and the mascot slot |
 | `.sm-wrap`, `.sm-stack`, `.sm-row`, `.sm-section`, `.sm-visually-hidden` | shell helpers for phase 2 |
+| `.sm-shell`, `.sm-nav` (`__inner` `__nav` `__links` `__link` `__tools`), `.sm-brand` (`__name`), `.sm-lang` (`__link`), `.sm-theme` | hub shell: skip link → sticky header, navigation, DE/EN switch, theme toggle (§11.9) |
+| `.sm-hero` (`__inner` `__cta` `__note`), `.sm-display__soft`, `.sm-tiles`, `.sm-tile` (`__text` `__cta` `--soon`), `.sm-measure`, `.sm-placeholder` (`__note`), `.sm-soon` | home hero, section tiles, the "soon" empty state (§11.9) |
+| `.sm-footer` (`__grid` `__col` `__title` `__list` `__bottom`), `.sm-mascot--xl`, `.sm-mascot--brand`, `.sm-mascot__art` | footer (links, language, theme) and the mascot slot sizes |
 
 ### 11.6 Contrast (measured, `scripts/contrast-check.mjs`)
 
@@ -605,7 +612,7 @@ No worker or route change, no navigation entry, no content, no translation, no d
 deploy, no new dependency in `package.json`. `src/worker.js` still renders the portfolio and MC
 surfaces exactly as before: the hub shell (nav, footer, hero, routes) is phase 2, and it is the step
 that starts serving `summer.css` to hub pages. The preview page is a static file under
-`/design/summer-preview.html`, marked `noindex`.
+`/design/summer-preview.html`, marked `noindex`. (Phase 2 does exactly that — see §11.9.)
 
 ### 11.8 Extending the hub theme
 
@@ -615,5 +622,47 @@ control outline can use it, and a swatch on the preview page. A new component me
 prefixed class, a preview example, and a row in §11.5. Run all three gates before pushing:
 
 ```
-node scripts/icon-check.mjs && node scripts/contrast-check.mjs && node scripts/summer-scope-check.mjs
+node scripts/icon-check.mjs && node scripts/contrast-check.mjs && node scripts/summer-scope-check.mjs \
+  && node scripts/i18n-check.mjs && node scripts/hub-unit.mjs
 ```
+
+### 11.9 Phase 2: shell, home and DE/EN routing
+
+Phase 2 serves `summer.css` to the hub pages (still only there — the Minecraft surface and the
+portfolio keep their own stylesheets) and adds the shared shell in `src/hub.js`.
+
+**Routes.** `nwebnotfound.dev` owns `/`, `/about` and the still-empty sections `/music`, `/writing`
+and `/reviews` (empty state with the mascot placeholder, `(◕‿◕)` and a "soon" badge in the
+navigation). The previous start page moved unchanged to **`/portfolio`** and is linked from the home
+tiles, the About page and the footer; `/guestbook`, `/profile`, `/feedback` and every
+`/api/…`/`/auth/…` route behave exactly as before. `mc.nwebnotfound.dev` is untouched and does not
+load `summer.css` (checked by the e2e suite).
+
+**Languages.** German and English interface text lives in `src/i18n/de.js` / `en.js` (identical key
+sets, enforced by `scripts/i18n-check.mjs`); `src/i18n/index.js` holds negotiation and `t(key, vars)`.
+`/de/…` and `/en/…` are the canonical URLs and carry `hreflang` alternates plus `x-default`.
+`Accept-Language` decides the language for the unprefixed path, a `nnf_lang` cookie (one year,
+`SameSite=Lax`, not `HttpOnly` — it holds no personal data) remembers an explicit switch, and German
+is the fallback. `<html lang>` follows the language. `/` never redirects, so no redirect loop can
+exist; a language prefix in front of a route the hub does not own returns `301` to the unprefixed
+path (`/en/guestbook` → `/guestbook`, since those legacy pages are German-only for now). A missing
+key falls back to the other language. No machine translation in this phase: content translation
+follows with phase 3 (`/writing`).
+
+**Shell.** `public/design/summer-theme.js` is loaded **before** `summer.css` in `<head>`, so the
+stored/system theme is known before the first paint; the toggle in the header *and* the footer is a
+`[data-summer-theme-toggle]` button that the script keeps in sync (`aria-pressed`, label swapped from
+`data-label-day`/`data-label-night`). Its label area has a fixed width, so switching the theme does
+not shift the layout. Below 600px the navigation wraps onto a second row instead of scrolling
+sideways, so no entry (and no "soon" badge) is ever clipped. Accessibility: the skip link is the
+first focusable element and stays off-screen until focused — the `prefers-reduced-motion` block no
+longer resets its `transform` (that parked it on top of the header; the zeroed duration is enough to
+remove the slide) —, `<header>`, `<main id="main">` and `<footer>` are the landmarks, and every
+target is at least `--sm-tap-dense` (44px on coarse pointers) tall. Privacy: no tracker, no CDN, no
+external font and no inline script — GitHub and X are plain links with `rel="noopener noreferrer"`,
+which `scripts/hub-unit.mjs` asserts.
+
+**Tests.** `node scripts/hub-unit.mjs` (language negotiation, prefixes, `t()` fallback, generated
+HTML), `node scripts/i18n-check.mjs` (message files), plus the hub block in `scripts/e2e.mjs`
+(status codes, `Set-Cookie`, `301` targets, Minecraft regression) — all three run in CI before the
+browser suite.

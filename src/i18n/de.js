@@ -1,0 +1,100 @@
+// German interface messages for the Creative Hub (docs/creative-hub-plan.md §8 "Languages").
+//
+// Interface text only: navigation, buttons, labels, empty states. No content translation in this
+// phase (that is phase 3 "Writing"); nothing here is machine-translated at runtime.
+//
+// The key set must stay identical to en.js — `node scripts/i18n-check.mjs` fails the run otherwise.
+// Missing keys fall back to the other language at render time (see ./index.js), so a slip shows up
+// as a mixed-language page instead of an empty label.
+export default {
+  /* ---- common ---- */
+  "site.name": "NwebNotFound",
+  "skip": "Zum Inhalt springen",
+  "nav.label": "Hauptnavigation",
+  "nav.home": "Start",
+  "nav.music": "Musik",
+  "nav.writing": "Texte",
+  "nav.reviews": "Rezensionen",
+  "nav.about": "Über mich",
+  "nav.minecraft": "Minecraft-Server",
+  "nav.soon": "bald",
+  "nav.soon_label": "erscheint bald",
+  "lang.label": "Sprache",
+  "lang.de": "Deutsch",
+  "lang.en": "English",
+  "lang.de.short": "DE",
+  "lang.en.short": "EN",
+  "theme.switch": "Design wechseln",
+  "theme.night": "Nacht",
+  "theme.day": "Tag",
+
+  /* ---- home ---- */
+  "home.eyebrow": "Willkommen",
+  "home.title": "Hi, ich bin Nils.",
+  "home.title2": "Willkommen in meiner Ecke.",
+  "home.lead": "Hier sammle ich, was ich baue: einen Minecraft-Server, Texte, Musik und Rezensionen. Das meiste wächst gerade erst – schau dich um.",
+  "home.mascot_alt": "Platzhalter-Maskottchen: ein Pixel-Wesen, das Nils später selbst zeichnet.",
+  "home.placeholder_note": "Maskottchen-Platzhalter – das echte Bild zeichnet Nils selbst.",
+  "home.sections_title": "Die Bereiche",
+  "home.sections_lead": "Manches ist schon da, manches braucht noch Zeit.",
+  "tile.minecraft.title": "Minecraft-Server",
+  "tile.minecraft.text": "Vanilla+ für Freunde: Status, Bestenlisten, Markt, Wiki und das eigene Profil.",
+  "tile.minecraft.cta": "Zum Server",
+  "tile.music.title": "Musik",
+  "tile.music.text": "Eigene Loops und Beats, die ich selbst baue – später mit kleinem Player.",
+  "tile.writing.title": "Texte",
+  "tile.writing.text": "Eine neue Geschichte in Kapiteln, dazu Blog-Beiträge.",
+  "tile.reviews.title": "Rezensionen",
+  "tile.reviews.text": "Filme, Anime, Bücher und Spiele mit fünf Sternen und kurzem Fazit.",
+  "tile.about.title": "Über mich",
+  "tile.about.text": "Wer ich bin, was ich gerade mag und wo du mich sonst findest.",
+  "tile.guestbook.title": "Gästebuch",
+  "tile.guestbook.text": "Lass einen Gruß da – zum Schreiben meldest du dich mit Discord an.",
+  "tile.portfolio.title": "Projekte",
+  "tile.portfolio.text": "Die frühere Startseite: Web- und Server-Projekte im Überblick.",
+  "tile.cta.soon": "Bald verfügbar",
+  "tile.cta.more": "Ansehen",
+
+  /* ---- about ---- */
+  "about.eyebrow": "Über mich",
+  "about.title": "Kurzvorstellung",
+  "about.lead": "Ein paar Zeilen zu mir – und die Links, über die du mich erreichst.",
+  "about.placeholder_badge": "Platzhalter",
+  "about.placeholder_note": "Dieser Text ist ein Platzhalter. Nils ersetzt ihn selbst; hier stehen bewusst noch keine Angaben zu seiner Person.",
+  "about.intro_p1": "Hier steht später, was ich so mache: woran ich gerade baue, womit ich meine Zeit verbringe und was mich an Technik freut.",
+  "about.intro_p2": "Bis dahin lohnt sich ein Blick auf die Bereichsseiten und auf die Projektübersicht – das meiste wächst gerade erst.",
+  "about.links_title": "Wo du mich findest",
+  "about.links_lead": "Die beiden Profile sind normale Links ohne Tracking.",
+  "about.projects_link": "Projekte ansehen",
+  "about.external_note": "Beide Links öffnen in einem neuen Tab.",
+
+  /* ---- soon (empty states with the mascot placeholder) ---- */
+  "soon.eyebrow": "Bald",
+  "soon.title": "{section} kommt bald",
+  "soon.music_text": "Hier entsteht die Musik-Seite: eigene Loops und Beats mit Loop-Punkten in einem kleinen Player. Tracks sind noch keine da.",
+  "soon.writing_text": "Hier entsteht die Texte-Seite: eine neue Geschichte in Kapiteln und Blog-Beiträge. Der erste Text kommt, sobald er fertig ist.",
+  "soon.reviews_text": "Hier entsteht die Rezensionen-Seite: Filme, Anime, Bücher und Spiele mit fünf Sternen und kurzem Fazit.",
+  "soon.back": "Zur Startseite",
+
+  /* ---- footer ---- */
+  "footer.nav_title": "Bereiche",
+  "footer.links_title": "Links",
+  "footer.settings_title": "Einstellungen",
+  "footer.guestbook": "Gästebuch",
+  "footer.projects": "Projekte",
+  "footer.rights": "© {year} Nils Weberruß",
+  "footer.built": "Gemacht mit Cloudflare Workers.",
+  "footer.privacy_note": "Kein Tracking, keine externen Schriften, keine Cookies außer der Sprachwahl.",
+
+  /* ---- page metadata ---- */
+  "meta.home.title": "NwebNotFound · Nils' Ecke im Internet",
+  "meta.home.desc": "Minecraft-Server, Texte, Musik und Rezensionen – Nils' kleine Ecke im Internet.",
+  "meta.about.title": "Über mich · NwebNotFound",
+  "meta.about.desc": "Kurzvorstellung und Links zu GitHub und X.",
+  "meta.music.title": "Musik (bald) · NwebNotFound",
+  "meta.music.desc": "Eigene Loops und Beats – die Musik-Seite entsteht gerade.",
+  "meta.writing.title": "Texte (bald) · NwebNotFound",
+  "meta.writing.desc": "Neue Geschichte und Blog-Beiträge – die Texte-Seite entsteht gerade.",
+  "meta.reviews.title": "Rezensionen (bald) · NwebNotFound",
+  "meta.reviews.desc": "Filme, Anime, Bücher und Spiele – die Rezensionen entstehen gerade.",
+};

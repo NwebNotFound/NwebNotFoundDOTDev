@@ -442,6 +442,27 @@
 .sm-root a:hover {
   color: var(--sm-link-hover);
 }
+/* An anchor styled as a button keeps the button's own colours. `.sm-root a` (0,1,1) would otherwise
+   beat `.sm-btn` (0,1,0) and paint the link colour on the button face: light teal on the yellow
+   primary button in summer night, which is not readable. The token-pair contrast check cannot see
+   this because it never looks at the cascade. */
+.sm-root a.sm-btn {
+  color: var(--sm-primary-foreground);
+  text-decoration: none;
+}
+.sm-root a.sm-btn:hover {
+  color: var(--sm-primary-foreground);
+}
+.sm-root a.sm-btn--ghost {
+  color: var(--sm-link);
+}
+.sm-root a.sm-btn--ghost:hover {
+  color: var(--sm-link-hover);
+}
+.sm-root a.sm-btn--danger,
+.sm-root a.sm-btn--danger:hover {
+  color: var(--sm-danger);
+}
 .sm-root code,
 .sm-root kbd {
   font-family: var(--sm-font-mono);
@@ -1030,6 +1051,274 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
+   Shell (Phase 2): header with navigation, language switch, theme toggle, footer, hero, section
+   tiles and the empty state. Spec: DESIGN.md §11.9. Same contract as everything above — `.sm-*`
+   classes, `--sm-*` tokens only, no bare element selector, no remote resource, no new font.
+   --------------------------------------------------------------------------------------------- */
+.sm-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.sm-shell > .sm-nav {
+  flex: none;
+}
+.sm-shell > main {
+  flex: 1 0 auto;
+}
+.sm-nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--sm-z-nav);
+  padding-top: env(safe-area-inset-top);
+  background: color-mix(in srgb, var(--sm-sky-3) 88%, transparent);
+  border-bottom: var(--sm-pixel) solid var(--sm-border);
+  backdrop-filter: saturate(160%) blur(12px);
+  -webkit-backdrop-filter: saturate(160%) blur(12px);
+}
+.sm-nav__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm-space-2) var(--sm-space-3);
+  padding-block: var(--sm-space-2);
+}
+.sm-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm-space-2);
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-base);
+  font-weight: var(--sm-weight-bold);
+  color: var(--sm-foreground);
+  text-decoration: none;
+}
+.sm-brand:hover {
+  color: var(--sm-link);
+}
+.sm-brand__name {
+  white-space: nowrap;
+}
+.sm-nav__nav {
+  min-width: 0;
+  flex: 1 1 100%;
+  order: 3;
+}
+.sm-nav__links {
+  display: flex;
+  gap: var(--sm-pixel);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sm-nav__links::-webkit-scrollbar {
+  display: none;
+}
+.sm-nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm-space-1);
+  min-height: var(--sm-tap-dense);
+  padding: 0 var(--sm-space-3);
+  border-radius: var(--sm-radius-sm);
+  font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-semibold);
+  color: var(--sm-muted-foreground);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--sm-duration-fast) var(--sm-ease), color var(--sm-duration-fast) var(--sm-ease);
+}
+.sm-nav__link:hover {
+  background: var(--sm-surface-2);
+  color: var(--sm-foreground);
+}
+.sm-nav__link[aria-current="page"] {
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
+  box-shadow: inset 0 calc(-1 * var(--sm-pixel)) 0 0 var(--sm-accent-sun);
+}
+.sm-nav__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm-space-1);
+  margin-left: auto;
+}
+.sm-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--sm-surface-2);
+  border: var(--sm-pixel) solid var(--sm-border-strong);
+  border-radius: var(--sm-radius-md);
+}
+.sm-lang__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--sm-tap-dense);
+  min-height: var(--sm-tap-dense);
+  padding: 0 var(--sm-space-2);
+  border-radius: var(--sm-radius-sm);
+  font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-bold);
+  color: var(--sm-muted-foreground);
+  text-decoration: none;
+}
+.sm-lang__link:hover {
+  background: var(--sm-surface-3);
+  color: var(--sm-foreground);
+}
+.sm-lang__link[aria-current="true"] {
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
+  box-shadow: inset 0 calc(-1 * var(--sm-pixel)) 0 0 var(--sm-accent-ramune);
+}
+/* Fixed width so swapping the label ("Tag"/"Nacht") never moves the neighbours — no layout shift. */
+.sm-theme {
+  flex: none;
+  min-width: 6em;
+}
+.sm-hero {
+  position: relative;
+  isolation: isolate;
+  padding-block: var(--sm-space-8) var(--sm-space-6);
+  text-align: center;
+}
+.sm-hero__inner {
+  display: grid;
+  justify-items: center;
+  gap: var(--sm-space-3);
+}
+.sm-hero__cta {
+  justify-content: center;
+}
+.sm-hero__note {
+  margin: 0;
+  font-size: var(--sm-text-sm);
+}
+.sm-display__soft {
+  font-size: 0.62em;
+}
+.sm-mascot--xl {
+  width: 96px;
+  height: 96px;
+}
+.sm-mascot--brand {
+  width: 28px;
+  height: 28px;
+}
+.sm-mascot__art {
+  color: var(--sm-foreground);
+}
+.sm-tiles {
+  display: grid;
+  gap: var(--sm-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+.sm-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm-space-2);
+}
+.sm-tile__text {
+  margin: 0;
+  color: var(--sm-muted-foreground);
+}
+.sm-tile__cta {
+  margin-top: auto;
+  padding-top: var(--sm-space-2);
+  font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-semibold);
+  color: var(--sm-link);
+}
+.sm-tile--soon {
+  background-image: linear-gradient(180deg, var(--sm-surface-2), var(--sm-surface) 60%);
+}
+/* A badge inside the tile column must stay a pill, not stretch over the whole card. */
+.sm-tile > .sm-badge {
+  align-self: flex-start;
+}
+.sm-measure {
+  max-width: 68ch;
+  margin-inline: auto;
+}
+.sm-placeholder {
+  display: grid;
+  gap: var(--sm-space-3);
+  justify-items: start;
+  margin-block: var(--sm-space-4);
+}
+.sm-placeholder__note {
+  margin: 0;
+  color: var(--sm-muted-foreground);
+}
+.sm-soon {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: var(--sm-space-3);
+}
+.sm-footer {
+  border-top: var(--sm-pixel) solid var(--sm-border);
+  background: var(--sm-surface-2);
+  padding-block: var(--sm-space-6) calc(var(--sm-space-6) + env(safe-area-inset-bottom));
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+.sm-footer__grid {
+  display: grid;
+  gap: var(--sm-space-5);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+}
+.sm-footer__col {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--sm-space-2);
+}
+.sm-footer__title {
+  margin: 0;
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-sm);
+  color: var(--sm-foreground);
+}
+.sm-footer__list {
+  display: grid;
+  gap: var(--sm-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sm-footer__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sm-space-2) var(--sm-space-4);
+  margin-top: var(--sm-space-5);
+  padding-top: var(--sm-space-4);
+  border-top: 1px solid var(--sm-border);
+}
+@media (min-width: 720px) {
+  .sm-nav__nav {
+    flex: 1 1 auto;
+    order: 0;
+  }
+  .sm-hero {
+    padding-block: var(--sm-space-10) var(--sm-space-8);
+  }
+}
+/* Narrow screens: the tabs wrap instead of scrolling sideways, so no entry is ever clipped. */
+@media (max-width: 600px) {
+  .sm-nav__links {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
    Motion: nothing here is information-carrying, and all of it collapses when the user asks.
    --------------------------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
@@ -1045,9 +1334,8 @@
     transition: none !important;
     scroll-behavior: auto !important;
   }
-  .sm-skip-link {
-    transform: none;
-  }
+  /* The skip link stays off-screen: its offset is position, not motion. Zeroing the duration above
+     already removes the slide, and `transform: none` here would park it on top of the header. */
   .sm-btn:active {
     transform: none;
   }

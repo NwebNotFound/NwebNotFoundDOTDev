@@ -79,7 +79,9 @@ async function reachable(url, timeoutMs = 120_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url, { redirect: "manual" });
+      // A hung connection must not stall the wait: without a timeout the readiness probe can sit in
+      // the event loop forever while the Worker is already answering.
+      const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(5_000) });
       if (res.status < 500) return true;
     } catch {
       /* not up yet */
@@ -93,8 +95,14 @@ async function startServers() {
   const persist = path.join(ROOT, ".wrangler", "screens-" + process.pid);
   await rm(persist, { recursive: true, force: true });
 
+  // Only the servers whose group is requested are started (so `--only hub` needs neither the MC
+  // Worker nor the panel, and a broken neighbour cannot block the run).
+  const needSite = GROUPS.includes("site") || GROUPS.includes("hub");
+  const needMc = GROUPS.includes("mc");
+  const needPanel = GROUPS.includes("panel");
+
   // Fresh local D1 per run so the pages render their real (empty) states instead of a 500.
-  for (const dir of ["site", "mc"]) {
+  for (const dir of [needSite ? "site" : null, needMc ? "mc" : null].filter(Boolean)) {
     const to = path.join(persist, dir).split(path.sep).join("/");
     try {
       execSync(`npx wrangler d1 execute DB --local --persist-to "${to}" --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
@@ -103,30 +111,49 @@ async function startServers() {
     }
   }
 
-  // The panel needs a Hermes-shaped backend for the chat, drawer and approval screenshots.
-  const { origin } = await startMockHermes();
-  panelEnv = {
-    HERMES_ORIGIN: origin,
-    HERMES_PANEL_SECRET: "screens-panel-secret",
-    SESSION_SECRET: "screens-session-secret-0123456789abcdef",
-    ALLOWED_DISCORD_ID: "111111111111111111",
-    PANEL_BOTS: "cloudflare,minecraft,discord,homelab",
-  };
+  if (needPanel) {
+    // The panel needs a Hermes-shaped backend for the chat, drawer and approval screenshots.
+    const { origin } = await startMockHermes();
+    panelEnv = {
+      HERMES_ORIGIN: origin,
+      HERMES_PANEL_SECRET: "screens-panel-secret",
+      SESSION_SECRET: "screens-session-secret-0123456789abcdef",
+      ALLOWED_DISCORD_ID: "111111111111111111",
+      PANEL_BOTS: "cloudflare,minecraft,discord,homelab",
+    };
+  }
 
   // Two Workers because the site is host-routed: the Worker decides the surface from the host name.
   // Ports follow the --site/--mc URLs so a stale local server can never be screenshotted by accident.
   const sitePort = new URL(SITE).port || "8790";
   const mcPort = new URL(MC).port || "8791";
-  serve("npx", ["wrangler", "dev", "--port", sitePort, "--local", "--ip", "127.0.0.1", "--local-upstream", "nwebnotfound.dev", "--persist-to", path.join(persist, "site")]);
-  serve("npx", ["wrangler", "dev", "--port", mcPort, "--local", "--ip", "127.0.0.1", "--local-upstream", "mc.nwebnotfound.dev", "--persist-to", path.join(persist, "mc")]);
-  serve("node", [path.join("ai-panel", "scripts", "dev-server.mjs")], { PORT: new URL(PANEL).port || "8788", ...panelEnv });
+  const started = [];
+  if (needSite) {
+    serve("npx", ["wrangler", "dev", "--port", sitePort, "--local", "--ip", "127.0.0.1", "--local-upstream", "nwebnotfound.dev", "--persist-to", path.join(persist, "site")]);
+    started.push(`${SITE}/`);
+  }
+  if (needMc) {
+    serve("npx", ["wrangler", "dev", "--port", mcPort, "--local", "--ip", "127.0.0.1", "--local-upstream", "mc.nwebnotfound.dev", "--persist-to", path.join(persist, "mc")]);
+    started.push(`${MC}/`);
+  }
+  if (needPanel) {
+    serve("node", [path.join("ai-panel", "scripts", "dev-server.mjs")], { PORT: new URL(PANEL).port || "8788", ...panelEnv });
+    started.push(`${PANEL}/`);
+  }
 
-  await Promise.all([reachable(`${SITE}/`), reachable(`${MC}/`), reachable(`${PANEL}/`)]);
+  await Promise.all(started.map((url) => reachable(url)));
 }
 
 const PAGES = [
   { group: "site", name: "home", url: `${SITE}/`, fullPage: true },
+  { group: "site", name: "portfolio", url: `${SITE}/portfolio`, fullPage: true },
   { group: "site", name: "guestbook", url: `${SITE}/guestbook`, fullPage: true },
+  // Hub shell (Phase 2): reference shots for design review, committed under docs/screens/ (own out
+  // directory so the site group keeps writing into screenshots/).
+  { group: "hub", name: "hub-home", url: `${SITE}/`, fullPage: true, out: "docs/screens" },
+  { group: "hub", name: "hub-about", url: `${SITE}/about`, fullPage: true, out: "docs/screens" },
+  { group: "hub", name: "hub-soon", url: `${SITE}/writing`, fullPage: true, out: "docs/screens" },
+  { group: "hub", name: "hub-home-en", url: `${SITE}/en`, fullPage: true, out: "docs/screens", schemes: ["light"], only: (vp) => vp.w === 390 },
   { group: "mc", name: "mc-home", url: `${MC}/`, fullPage: false, waitUntil: "domcontentloaded", schemes: ["dark"] },
   { group: "mc", name: "mc-wiki", url: `${MC}/wiki`, fullPage: true, waitUntil: "domcontentloaded", schemes: ["dark"] },
   // Panel: signed out (login), chat with tool output, approval card, drawer open, new-bot dialog.
@@ -268,7 +295,7 @@ async function main() {
   if (SERVE) await startServers();
   else {
     const wanted = [];
-    if (GROUPS.includes("site")) wanted.push(`${SITE}/`);
+    if (GROUPS.includes("site") || GROUPS.includes("hub")) wanted.push(`${SITE}/`);
     if (GROUPS.includes("mc")) wanted.push(`${MC}/`);
     if (GROUPS.includes("panel")) wanted.push(`${PANEL}/login`);
     await Promise.all(wanted.map((url) => reachable(url, 20_000))).catch((err) => {
@@ -284,7 +311,9 @@ async function main() {
         for (const scheme of page.schemes || SCHEMES) {
           for (const vp of VIEWPORTS) {
             if (page.only && !page.only(vp)) continue;
-            const file = path.join(OUT, `${page.name}-${vp.tag}-${scheme}.png`);
+            const outDir = page.out ? path.resolve(ROOT, page.out) : OUT;
+            await mkdir(outDir, { recursive: true });
+            const file = path.join(outDir, `${page.name}-${vp.tag}-${scheme}.png`);
             await shoot(browser, { ...page, ...vp, scheme }, file);
             const rel = path.relative(ROOT, file).replace(/\\/g, "/");
             console.log(`  ✓ ${rel}`);

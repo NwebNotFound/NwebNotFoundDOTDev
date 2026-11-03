@@ -178,3 +178,12 @@
 .sm-preview__rate-5 {
   --sm-rating: 5;
 }
+
+/* Phase 2 shell demo: inside the preview the header is a static snapshot, so a sticky bar cannot
+   fight with the preview's own sticky chrome. Everything else is the real component. */
+.sm-preview__shell {
+  border: var(--sm-pixel) dashed var(--sm-border);
+}
+.sm-preview__shell .sm-nav {
+  position: static;
+}
