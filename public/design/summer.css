@@ -442,6 +442,27 @@
 .sm-root a:hover {
   color: var(--sm-link-hover);
 }
+/* An anchor styled as a button keeps the button's own colours. `.sm-root a` (0,1,1) would otherwise
+   beat `.sm-btn` (0,1,0) and paint the link colour on the button face: light teal on the yellow
+   primary button in summer night, which is not readable. The token-pair contrast check cannot see
+   this because it never looks at the cascade. */
+.sm-root a.sm-btn {
+  color: var(--sm-primary-foreground);
+  text-decoration: none;
+}
+.sm-root a.sm-btn:hover {
+  color: var(--sm-primary-foreground);
+}
+.sm-root a.sm-btn--ghost {
+  color: var(--sm-link);
+}
+.sm-root a.sm-btn--ghost:hover {
+  color: var(--sm-link-hover);
+}
+.sm-root a.sm-btn--danger,
+.sm-root a.sm-btn--danger:hover {
+  color: var(--sm-danger);
+}
 .sm-root code,
 .sm-root kbd {
   font-family: var(--sm-font-mono);
