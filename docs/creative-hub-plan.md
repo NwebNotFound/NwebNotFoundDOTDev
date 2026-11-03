@@ -12,7 +12,8 @@ These answer open questions 1, 4, 8, 9, 10 and 17 (see §10) and override anythi
 - **Focus:** this is Nils' little corner of the internet. The core is **stories (series like Harutronic), music, the blog and reviews.** Photos, the tools page and study mode come after and can be cut or postponed without hurting the core (§9).
 - **Photos stay** (real life and virtual photography).
 - **Discord Activity is cut.** The lofi radio from PR #49 can still come to the website as a single-player feature, but nothing is built for Discord.
-- **Export:** every story can be downloaded as **EPUB or PDF** (§8, "Export").
+- **Export:** stories (and later research papers) can be downloaded as **EPUB or PDF** (§8, "Export"). Blog posts and reviews get **no** download buttons; nobody needs an EPUB of a blog post, and the browser's print function still works.
+- **Research (new, later):** a place to publish scientific work such as papers, reports and theses, with PDF, math, citations and optional DOIs (§8, "Research & publications").
 - **Feeds:** blog, stories, reviews and music each get an **RSS/Atom feed** (§8, "Feeds").
 - **Look:** a **pixel-art anime** blend: soft anime summer skies with pixel-art details and a pixel mascot (§7).
 - **No AI writes the stories.** AI is used only for moderation and translation. The studio has no "generate story" feature, in line with how Nils works on Harutronic.
@@ -56,7 +57,7 @@ The hub stays in **this one Worker + D1**. New pages are server-rendered like to
 | `/feed.xml` and per-section feeds | RSS 2.0 and Atom for everything, writing, stories (per series), reviews and music, per language (§8, "Feeds") |
 | `/downloads/…` | Pre-built EPUB and PDF files for published stories (§8, "Export") |
 
-Global nav (mobile: bottom tab bar): Home · Music · Photos · Writing · ⋯ (Tools, Reviews, Guestbook, About, other collections). A DE/EN switch sits in the header and footer. Footer: GitHub (github.com/NwebNotFound), X profile, Discord, RSS, mc.nwebnotfound.dev.
+Global nav (mobile: bottom tab bar): Home · Music · Photos · Writing · ⋯ (Tools, Research, Reviews, Guestbook, About, other collections). A DE/EN switch sits in the header and footer. Footer: GitHub (github.com/NwebNotFound), X profile, Discord, RSS, mc.nwebnotfound.dev.
 
 ## 4. Content model
 Principle: **text content as Markdown in the repo** (versioned, reviewable in PRs, free), **dynamic/user data in D1**, **media files** on Nils' own PC behind a tunnel (§5a), with small thumbnails on Cloudflare so pages never look empty when the PC is off. R2 and Stream are not used unless Nils changes his mind.
@@ -217,7 +218,7 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 - Whether Harutronic itself goes public, and which chapters, is Nils' decision (open question 5). Drafts and private series stay hidden until `status: published`.
 
 ### Export (EPUB and PDF)
-- Each published story, chapter and series has **"Download EPUB"** and **"Download PDF"** buttons. Blog posts get the same.
+- Each published story, chapter and series has **"Download EPUB"** and **"Download PDF"** buttons. Research papers get a PDF (and an EPUB only if Nils wants one). Blog posts, reviews and music pages have none.
 - **Built at deploy time**, not on request: a GitHub Actions step converts the Markdown (EPUB 3 with pandoc; PDF from the same content with a print stylesheet, for example via pandoc plus a PDF engine; confirm the exact tools when building) and writes the files to `/downloads/…` as static assets. Files are only rebuilt when their source or translation changed (content hash).
 - EPUB: cover, title page, table of contents, language metadata, author, the content warning page, and a short rights line. PDF: readable book layout (A5-style), page numbers, same front matter.
 - One file per story and one for a whole series; German and English editions are separate files, and automatically translated editions are labelled as such on the title page.
@@ -230,6 +231,17 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 - Blog posts and reviews: full text in the feed by default. Story chapters: title, summary and link by default, so the reader mode and downloads stay the main experience (open question 24).
 - Feeds contain only `published` items whose `publish_at` has passed. Responses are cached for a short time and carry `ETag`/`Last-Modified`.
 - No tracking parameters and no third-party feed service.
+
+### Research & publications
+A section for scientific and technical work that Nils wants to put online: papers, reports, theses, lab write-ups, notes. Route `/research` with `/research/:slug` per work; it appears in the feeds as its own feed.
+- **Content:** Markdown in the repo (`content/research/<slug>/index.md` plus figures and a `.bib` file) or, alternatively, a finished PDF that Nils exports himself (LaTeX, Word, Typst) with the page generated from its metadata. Both work; the page is the same.
+- **Front matter:** title, authors, abstract, keywords, date, **version** (v1, v2 with a short change note), `kind` (preprint, report, thesis, notes, poster), `status` label, language, license, optional DOI, optional code/data repository link.
+- **Rendering:** math with KaTeX at build time, numbered figures, tables, footnotes, a references list generated from BibTeX, "cite this" box (BibTeX and plain text), table of contents. Reading view on the page and the **PDF as the primary download**, built at deploy time like the story exports (pandoc plus a PDF engine, or Typst; confirm when building).
+- **Findability:** Google Scholar-style `citation_*` meta tags, a stable permalink per version, and a DOI where wanted. A free DOI is possible through **Zenodo** (it can archive a GitHub release automatically); DOIs are permanent and records cannot simply be deleted afterwards, so publish a DOI only for things Nils is sure about.
+- **Honest labelling:** every work shows its status (for example "Preprint, not peer-reviewed", "Course report", "Thesis") so a visitor never mistakes a self-published page for a journal article.
+- **Languages:** scientific text is **not auto-translated by default**, because a machine translation can change technical meaning. Nils can switch translation on per work; it is then labelled and links to the original.
+- **Before publishing coursework or thesis material:** check the university's rules and any co-authors' or supervisors' consent, and whether the work contains material the university or a company owns (data, templates, logos). The hub cannot decide that for him.
+- **Author details:** name, affiliation and contact are shown only if Nils chooses (open question 28).
 
 ### Reviews
 - Card grid with cover art, medium icon, score (e.g. 8.5/10 shown as stars or a "sunflower meter"), tags, "currently watching/reading" shelf, yearly stats.
@@ -277,9 +289,10 @@ The core needs **no home server**: text lives in the repo/D1, tracks are small s
 
 ### Later (nice to have, cut or reorder freely)
 8. **Media library + photography** (real life and virtual photography), shortcodes/embeds in writing, tags pages.
-9. **Tools & downloads:** `/tools`, `tool_releases` cache, cron for GitHub Releases.
-10. **Studio uploads for photos and longer audio:** home storage origin behind the tunnel, thumbnails on Cloudflare (§5a).
-11. **Study mode** (ambient mixer, Pomodoro, to-dos) from PR #49, single-player website only.
+9. **Research & publications:** `/research`, front matter and BibTeX pipeline, KaTeX, PDF build, citation meta tags, versions, feed.
+10. **Tools & downloads:** `/tools`, `tool_releases` cache, cron for GitHub Releases.
+11. **Studio uploads for photos and longer audio:** home storage origin behind the tunnel, thumbnails on Cloudflare (§5a).
+12. **Study mode** (ambient mixer, Pomodoro, to-dos) from PR #49, single-player website only.
 
 Cut: Discord Activity, motion/video showcase.
 
@@ -315,4 +328,7 @@ Cut: Discord Activity, motion/video showcase.
 23. Rights line for the EPUB/PDF downloads: "© Nils, all rights reserved, personal reading only", a Creative Commons licence, or something else?
 24. Feeds: full text or only an excerpt for story chapters? (Default: excerpt + link for stories, full text for blog and reviews.)
 25. HaruReader: should the hub's `/writing` replace the HaruReader reader, link to it, or both live side by side? And which HaruReader repo (`mereMint/` or `NwebNotFound/`) is the source of truth for the published files?
+26. Research: which kinds of work do you want to publish first (course reports, a thesis, your own experiments), and should they be English, German or both?
+27. DOIs: OK to use Zenodo (free, permanent) for the works you choose, or no DOIs at all for now?
+28. Research author details: name only, or also affiliation (for example your university) and a contact address?
 22. Translations: should the original language always stay visible next to the translation, or only via a "show original" link?
