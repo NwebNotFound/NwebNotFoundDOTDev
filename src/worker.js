@@ -89,7 +89,7 @@ const PORT_CSS = `.hero{padding-top:clamp(4.5rem,12vw,9rem)}
 
 // Minecraft-Sub-Theme: Palette, Pixel-Schrift, Slots und Bevels stehen als --ds-mc-* in
 // /design/tokens.css (html.mc) und werden in /mc/ds.css auf die Altnamen --c-* gemappt.
-const MC_CSS = `:root{--menubg:#141a16}
+const MC_CSS = `:root{--menubg:#1b2a24}
 
 .px{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:0}
 
@@ -152,7 +152,7 @@ function shell({ title, desc, css, nav, body, head = "", footer, loginBase = "",
   return `<!doctype html><html lang="de"${css === MC_CSS ? ' class="mc"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${themeColor}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
-<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/design/minecraft.css?v=${AV}"><link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/mc/ds.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>` : ""}${head}</head><body>
+<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/design/minecraft.css?v=${AV}"><link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/mc/ds.css?v=${AV}"><link rel="stylesheet" href="/mc/theme-v2.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>` : ""}${head}</head><body>
 <header class="nav"><div class="wrap">${nav}<div class="acct" id="acct"></div></div></header>
 <main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}${ACCT_JS(loginBase)}</body></html>`;
 }
@@ -209,7 +209,8 @@ load();
 /* ---------- Minecraft-Bereich ---------- */
 const BLOCK_SVG = `<svg class="block" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect width="8" height="8" fill="#6b4a2b"/><rect width="8" height="3" fill="#4ade80"/><rect y="3" width="1" height="1" fill="#4ade80"/><rect x="3" y="3" width="1" height="2" fill="#4ade80"/><rect x="6" y="3" width="1" height="1" fill="#4ade80"/><rect x="1" y="1" width="1" height="1" fill="#22c55e"/><rect x="5" y="0" width="1" height="1" fill="#86efac"/><rect x="2" y="5" width="1" height="1" fill="#5a3c22"/><rect x="5" y="6" width="1" height="1" fill="#7c5a37"/></svg>`;
 const mNav = hubNav(MAIN);
-const mFoot = `<span>© {{Y}} Nils Weberruß · Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt oder mit ihnen verbunden.</span><span><a href="/feedback">Feedback</a> · <a href="https://${MAIN}/">Hauptseite</a></span>`;
+const GRASSLINE = `<svg class="px grassline" viewBox="0 0 80 2" preserveAspectRatio="none" aria-hidden="true"><rect x="0" y="1" width="80" height="1" fill="var(--grass)"></rect><rect x="3" y="0" width="2" height="1" fill="var(--grass)"></rect><rect x="29" y="0" width="3" height="1" fill="var(--grass)"></rect><rect x="61" y="0" width="2" height="1" fill="var(--grass)"></rect></svg>`;
+const mFoot = `${GRASSLINE}<span class="fbrand brand">NwebNotFound MC</span><span class="fnl"><a href="/feedback">Feedback</a><a href="https://${MAIN}/">Hauptseite</a></span><p>© {{Y}} Nils Weberruß · Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt oder mit ihnen verbunden.</p>`;
 
 const mcPage = (title, desc, body) => shell({ title, desc, css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body });
 const MC_HOME = mcPage("Minecraft-Server · NwebNotFound", "Status, Profil, Bestenlisten, Markt und Wiki für mc.nwebnotfound.dev", homeBody(MC_HOST));
