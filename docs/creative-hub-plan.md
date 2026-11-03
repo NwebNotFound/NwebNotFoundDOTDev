@@ -9,14 +9,14 @@ These answer open questions 1, 4, 8, 9, 10 and 17 (see §10) and override anythi
 - **Guestbook:** **automatic moderation**, no manual approval queue by default (§8, "Guestbook").
 - **Storage:** uploads live on **Nils' own PC** for now (later maybe a mini-PC), not on R2 and not on Cloudflare Stream. Cloudflare only holds the code, the database and small thumbnails (§5a, §6).
 - **Video: none.** No hosted or embedded video and no motion/video section. Nils shares videos on YouTube himself; the hub does not need them.
-- **Focus:** this is Nils' little corner of the internet. The core is **stories (series like Harutronic), music, the blog and reviews.** Photos, the tools page and study mode come after and can be cut or postponed without hurting the core (§9).
+- **Focus:** this is Nils' little corner of the internet. The core is **stories (a new story that Nils is going to write), music, the blog and reviews.** Photos, the tools page and study mode come after and can be cut or postponed without hurting the core (§9).
 - **Photos stay** (real life and virtual photography).
 - **Discord Activity is cut.** The lofi radio from PR #49 can still come to the website as a single-player feature, but nothing is built for Discord.
 - **Export:** stories (and later research papers) can be downloaded as **EPUB or PDF** (§8, "Export"). Blog posts and reviews get **no** download buttons; nobody needs an EPUB of a blog post, and the browser's print function still works.
 - **Research (new, later):** a place to publish scientific work such as papers, reports and theses, with PDF, math, citations and optional DOIs (§8, "Research & publications").
 - **Feeds:** blog, stories, reviews and music each get an **RSS/Atom feed** (§8, "Feeds").
 - **Look:** a **pixel-art anime** blend: soft anime summer skies with pixel-art details and a pixel mascot (§7).
-- **No AI writes the stories.** AI is used only for moderation and translation. The studio has no "generate story" feature, in line with how Nils works on Harutronic.
+- **No AI writes the stories.** AI is used only for moderation and translation. The studio has no "generate story" feature.
 - **Hermes MCP server:** planned separately in `ai-panel/docs/mcp-server-plan.md`, not part of this hub.
 - **Tools page (new):** online tools run in the visitor's browser; local tools (apps, games) are downloaded from **GitHub Releases**. No public self-hosted git server (§8, "Tools & downloads").
 
@@ -211,11 +211,10 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 
 ### Writing
 - Posts and stories can embed or link photos, galleries, tracks and reviews (shortcodes, §4.3).
-- **Stories are a first-class section, not a side feature.** Serial stories like Harutronic are published as a series with chapters, a series page (cover, blurb, status ongoing/complete, chapter list), previous/next navigation, reading progress and a comfortable reader mode (font size, light/night). Blog posts are the shorter, dated form.
-- Chapters are Markdown files (`content/writing/<series>/<nn>-<slug>.md`), so a whole story is versioned in git and can be imported from existing files. Each chapter can be written in German or English and gets the automatic translation described above.
-- **Where published stories come from.** For Harutronic the published prose lives in the HaruReader story sources (`src/stories/*.md`, see Harutronic's `CANON.md`; its docs name `mereMint/HaruReader`, while an `NwebNotFound/HaruReader` repo also exists, so the owner needs confirming). The hub imports **only files with `published: true`**. It never reads Harutronic's private worldbuilding notes, outlines or planning files, and it does not show `canon`/`canonId`/`continuity` metadata. A story's content-warning block is shown before the text. Skits and other `canon: false` pieces can appear as "shorts".
-- Right now that is three canon short stories (Race Condition, Last Stop, Still Breathing, roughly 4,900 to 9,700 words each) and one skit (Shots in Suarmi). Nils is also thinking about a **new story**; the section works the same for it, and anything marked draft stays hidden.
-- Whether Harutronic itself goes public, and which chapters, is Nils' decision (open question 5). Drafts and private series stay hidden until `status: published`.
+- **Stories are a first-class section, not a side feature.** A serial story is published as a series with chapters, a series page (cover, blurb, status ongoing/complete, chapter list), previous/next navigation, reading progress and a comfortable reader mode (font size, light/night). Blog posts are the shorter, dated form.
+- Chapters are Markdown files (`content/writing/<series>/<nn>-<slug>.md`), so a whole story is versioned in git. Each chapter can be written in German or English and gets the automatic translation described above.
+- **Where stories come from (decided):** Nils writes **something new for the hub**. **Nothing from Harutronic or HaruReader is imported**; those projects stay separate and are never read by the site. Content is Markdown written in the studio editor or committed to the repo, and anything marked `draft` stays hidden.
+- The section has no content yet, so it launches with the first chapter Nils decides to publish; an empty state ("coming soon", with the mascot) covers the time until then.
 
 ### Export (EPUB and PDF)
 - Each published story, chapter and series has **"Download EPUB"** and **"Download PDF"** buttons. Research papers get a PDF (and an EPUB only if Nils wants one). Blog posts, reviews and music pages have none.
@@ -281,7 +280,7 @@ A section for scientific and technical work that Nils wants to put online: paper
 The core needs **no home server**: text lives in the repo/D1, tracks are small static files (default for open question 20), and the site is complete without photos.
 1. **Design system + summer theme tokens** (builds on PR #44): palette, fonts, base components, light/dark, reduced-motion.
 2. **Shell & home:** nav/tab bar, footer links, new home with hero and mascot placeholder; `/about`; **DE/EN routing and interface message files**. Minecraft + AI panel untouched (regression check).
-3. **Writing:** stories (series, chapters, reader mode) and blog posts from Markdown, import of published story files, translation at publish, **EPUB/PDF export and feeds**.
+3. **Writing:** stories (series, chapters, reader mode) and blog posts from Markdown, translation at publish, **EPUB/PDF export and feeds**.
 4. **Reviews:** cards, rating, verdict, spoiler blocks, TMDB/AniList/Open Library helper script.
 5. **Music v1:** tracks, playlists, persistent player, perfect loops, tracks served from Cloudflare static assets.
 6. **Guestbook revamp** with automatic moderation and translation (Workers AI, fail-closed to `pending`).
@@ -309,10 +308,11 @@ Cut: Discord Activity, motion/video showcase.
 ### Answered (Nils, 2026-11-03, second round)
 - Photos: **yes.** Discord Activity: **skip.** Video: **no.** EPUB/PDF export: **yes.** Blog as RSS feed: **yes.** Look: **pixel-art anime blend.** Hermes MCP server: **wanted** (separate plan).
 
+- Harutronic: **not imported**; Nils writes a new story for the hub. HaruReader is no longer a source (questions 5 and 25 are closed). mc-stack is a **beta for Nils and his friends**, not a public server.
+
 ### Still open
 2. Light "summer day" as default with "summer night" dark mode – okay?
 3. Music: only your tracks, or keep the free lofi station from PR #49 as filler until you have enough?
-5. Harutronic: publish it as a series (all chapters or only some), keep it private for now, or start with a different story? (Stories like it are the focus either way.)
 6. Review scale: 0–10 with halves, 5 stars, or a custom "sunflower" scale?
 7. Which X handle should be linked?
 11. Which other interests should get their own collection at launch (gaming, cosplay, cooking, …)?
@@ -327,7 +327,6 @@ Cut: Discord Activity, motion/video showcase.
 21. Tools page: which of the candidate repos should be listed at launch, and should any of them also get an online (browser) version?
 23. Rights line for the EPUB/PDF downloads: "© Nils, all rights reserved, personal reading only", a Creative Commons licence, or something else?
 24. Feeds: full text or only an excerpt for story chapters? (Default: excerpt + link for stories, full text for blog and reviews.)
-25. HaruReader: should the hub's `/writing` replace the HaruReader reader, link to it, or both live side by side? And which HaruReader repo (`mereMint/` or `NwebNotFound/`) is the source of truth for the published files?
 26. Research: which kinds of work do you want to publish first (course reports, a thesis, your own experiments), and should they be English, German or both?
 27. DOIs: OK to use Zenodo (free, permanent) for the works you choose, or no DOIs at all for now?
 28. Research author details: name only, or also affiliation (for example your university) and a contact address?
