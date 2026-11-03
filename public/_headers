@@ -1,2 +1,6 @@
 /mc/icons/tex/*
   Cache-Control: public, max-age=604800
+
+/downloads/*
+  Content-Type: application/epub+zip
+  Cache-Control: public, max-age=86400

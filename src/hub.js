@@ -15,6 +15,7 @@ import { AV } from "./asset-version.js";
 import { LANGS, makeT, withLang } from "./i18n/index.js";
 import { CONTENT } from "./generated/content.js";
 import { allTags, byNewest, chaptersOf, excerpt, filterWriting, findWriting, prevNext, publishedWriting } from "./content.js";
+import { epubPath, seriesEpubPath } from "./epub.js";
 import { FEED_MIME } from "./feed.js";
 import { htmlToText } from "./markdown.js";
 
@@ -98,40 +99,85 @@ function tagsHtml(tags, lang, cls = "") {
 /* ---------- feeds (plan §8 "Feeds", phase 3b) ---------- */
 
 // Feed URLs are language-neutral: a feed carries the language of its content, not the UI language, so
-// there is exactly one URL per feed (`/writing/feed.xml`, not `/de/writing/feed.xml`).
-const feedLinks = (base, title, label) => [
-  { format: "rss", href: `${base}/feed.xml`, title },
-  { format: "atom", href: `${base}/atom.xml`, title: label },
+// there is exactly one URL per feed (`/writing/feed.xml`, not `/de/writing/feed.xml`). `group` is the
+// short scope name shown in the footnote, so a chapter page does not end up with four identical
+// "RSS · Atom · RSS · Atom" links.
+const feedLinks = (base, title, group = "") => [
+  { format: "rss", href: `${base}/feed.xml`, title, group },
+  { format: "atom", href: `${base}/atom.xml`, title, group },
 ];
 
 /** Autodiscovery links for the `/writing` list (the whole writing feed). */
-export const writingListFeeds = (t) => feedLinks("/writing", t("feed.title"), t("feed.title"));
+export const writingListFeeds = (t) => feedLinks("/writing", t("feed.title"));
 
 /** Autodiscovery links for one post: its kind feed, plus the series feed for a story chapter. */
 export function writingPostFeeds(item, all, t) {
   const kind = item.kind === "story" ? "/writing/stories" : "/writing/blog";
   const kindTitle = t(item.kind === "story" ? "feed.title.stories" : "feed.title.blog");
-  const feeds = feedLinks(kind, kindTitle, kindTitle);
+  const group = t(item.kind === "story" ? "writing.filter.story" : "writing.filter.blog");
+  const feeds = feedLinks(kind, kindTitle, group);
   if (item.kind === "story" && item.series) {
-    const title = t("feed.title.series", { series: seriesTitleOf(all, item.series) });
-    feeds.push(...feedLinks(`/writing/series/${item.series}`, title, title));
+    const seriesTitle = seriesTitleOf(all, item.series);
+    feeds.push(...feedLinks(`/writing/series/${item.series}`, t("feed.title.series", { series: seriesTitle }), t("feed.series_label", { series: seriesTitle })));
   }
   return feeds;
 }
 
 /** Autodiscovery links for a series page. */
 export function writingSeriesFeeds(series, t) {
-  const title = t("feed.title.series", { series: series.title });
-  return feedLinks(`/writing/series/${series.slug}`, title, title);
+  return feedLinks(`/writing/series/${series.slug}`, t("feed.title.series", { series: series.title }), t("feed.series_label", { series: series.title }));
 }
 
 /** The visible footnote: which feeds this page belongs to, so a reader can subscribe. */
 function feedNote(feeds, t) {
   if (!feeds || !feeds.length) return "";
   const links = feeds
-    .map((f) => `<a class="sm-feed-note__link" href="${esc(f.href)}">${esc(t(f.format === "rss" ? "feed.rss" : "feed.atom"))}</a>`)
+    .map((f) => {
+      const label = t(f.format === "rss" ? "feed.rss" : "feed.atom");
+      return `<a class="sm-feed-note__link" href="${esc(f.href)}">${esc(f.group ? `${label} (${f.group})` : label)}</a>`;
+    })
     .join(`<span class="sm-feed-note__sep" aria-hidden="true"> · </span>`);
   return `<p class="sm-feed-note">${esc(t("writing.feed.note"))} ${links}</p>`;
+}
+
+/* ---------- export (plan §8 "Export", phase 3c) ---------- */
+
+// Download and print live on story pages only. Blog posts and (later) reviews get no export at all —
+// Nils' decision in plan §0. The print button calls `window.print()` from an external script
+// (/design/summer-print.js), never from an inline handler, so the CSP stays clean.
+const printButton = (t) => `<button class="sm-btn sm-btn--ghost" type="button" data-sm-print>${esc(t("writing.export.print"))}</button>`;
+
+const rightsLine = (t) => `<p class="sm-export__rights">${esc(t("writing.export.rights"))}</p>`;
+
+/** Download + print block of one story chapter. An archived chapter is not exported, so it gets none. */
+function exportBlock(item, t) {
+  if (item.archived) return "";
+  const series = item.series ? `<a class="sm-btn sm-btn--ghost" href="${seriesEpubPath(item.series)}" download>${esc(t("writing.export.series_epub"))}</a>` : "";
+  return `
+<div class="sm-export">
+<p class="sm-export__label">${esc(t("writing.export.note"))}</p>
+<p class="sm-row sm-export__row">
+<a class="sm-btn sm-btn--ghost" href="${epubPath(item.slug)}" download>${esc(t("writing.export.epub"))}</a>
+${series}
+${printButton(t)}
+</p>
+<p class="sm-hint">${esc(t("writing.export.print_hint"))}</p>
+${rightsLine(t)}
+</div>`;
+}
+
+/** Download + print block of a series page (one EPUB with every published chapter). */
+function seriesExportBlock(series, t) {
+  return `
+<div class="sm-export">
+<p class="sm-export__label">${esc(t("writing.export.note"))}</p>
+<p class="sm-row sm-export__row">
+<a class="sm-btn sm-btn--ghost" href="${seriesEpubPath(series.slug)}" download>${esc(t("writing.export.series_epub"))}</a>
+${printButton(t)}
+</p>
+<p class="sm-hint">${esc(t("writing.export.print_hint"))}</p>
+${rightsLine(t)}
+</div>`;
 }
 
 /* ---------- writing: bodies ---------- */
@@ -207,6 +253,7 @@ ${tagsHtml(item.tags, lang)}
 ${note}
 ${archived}
 <div class="sm-prose" lang="${esc(item.lang)}">${item.html}</div>
+${item.kind === "story" ? exportBlock(item, t) : ""}
 ${prevNextHtml(item, all, lang, t)}
 ${feedNote(writingPostFeeds(item, all, t), t)}
 <p><a class="sm-btn sm-btn--ghost" href="${href("/writing", lang)}">${esc(t("writing.back"))}</a></p>
@@ -242,6 +289,7 @@ export function writingSeriesBody(series, all, lang, t = makeT(lang)) {
 <h1 class="sm-h1">${esc(series.title)}</h1>
 <p class="sm-lead">${esc(t("writing.series.lead", { count: chapters.length }))}</p>
 <ul class="sm-chapters">${rows}</ul>
+${seriesExportBlock(series, t)}
 ${feedNote(writingSeriesFeeds(series, t), t)}
 <p><a class="sm-btn sm-btn--ghost" href="${href("/writing", lang)}">${esc(t("writing.back"))}</a></p>
 </div></section>`;
@@ -294,6 +342,9 @@ function document_(o) {
   const feedTags = (o.feeds === undefined ? writingListFeeds(t) : o.feeds)
     .map((f) => `<link rel="alternate" type="${FEED_MIME[f.format]}" title="${esc(f.title)}" href="${esc(f.href)}">`)
     .join("");
+  // The print helper is an external file (never an inline handler), loaded only where a print button
+  // exists — story chapters and series pages.
+  const printScript = o.print ? `<script src="/design/summer-print.js" defer></script>` : "";
   return `<!doctype html><html lang="${lang}" class="sm-root"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}">
@@ -305,7 +356,7 @@ ${hreflangTags}
 ${feedTags}
 <link rel="preload" href="/design/fonts/pixelify-sans-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/design/fonts/nunito-latin-400.woff2" as="font" type="font/woff2" crossorigin>
-<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">
+<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${printScript}
 </head><body class="sm-shell">
 <a class="sm-skip-link" href="#main">${esc(t("skip"))}</a>
 <header class="sm-nav"><div class="sm-wrap sm-nav__inner">
@@ -448,6 +499,7 @@ export function writingPostPage(item, all, lang, t = makeT(lang)) {
     canonicalTo: `https://${SITE}${withLang(`/writing/${item.slug}`, item.lang)}`,
     hreflangs: [],
     feeds: writingPostFeeds(item, all, t),
+    print: item.kind === "story",
   });
 }
 
@@ -461,6 +513,7 @@ export function writingSeriesPage(series, all, lang, t = makeT(lang)) {
     desc: t("meta.writing.series.desc", { series: series.title }),
     body: writingSeriesBody(series, all, lang, t),
     feeds: writingSeriesFeeds(series, t),
+    print: true,
   });
 }
 

@@ -106,3 +106,21 @@ automatisch „verschönert“.
 Bilder für Texte liegen unter `public/content-assets/` und werden im Markdown als
 `![Alt-Text](/content-assets/dateiname.png)` eingebunden. In Phase 3a gibt es dort nur
 `placeholder.svg` als Test-Platzhalter (für die Fixture-Seiten).
+
+## Feeds und Exporte (Phase 3b/3c)
+
+Derselbe Build (`node scripts/build-content.mjs`) erzeugt zwei Dinge zusätzlich:
+
+- **Feeds** unter `/writing/feed.xml` (RSS) und `/writing/atom.xml` (Atom), dazu je Art
+  (`/writing/blog/…`, `/writing/stories/…`) und je Serie (`/writing/series/<serie>/…`). Nur
+  veröffentlichte Texte (kein `draft`, kein `archived`), die neuesten 30, Sprache = Sprache des
+  Inhalts. Blog-Beiträge enthalten den vollen Text, Story-Kapitel einen Auszug plus Link.
+- **EPUB-Downloads** je Story-Kapitel (`/downloads/story-<slug>.epub`) und je Serie
+  (`/downloads/series-<slug>.epub`, alle nicht-archivierten Kapitel in Reihenfolge). Blog-Beiträge
+  bekommen bewusst keinen Download. Die Dateien entstehen bei jedem Build neu unter
+  `public/downloads/` und sind **nicht** eingecheckt (siehe `.gitignore`); ein gelöschtes Kapitel
+  verschwindet beim nächsten Build auch als Download.
+
+Für PDF gibt es keinen eigenen Erzeuger: Story-Seiten haben eine Druckansicht
+(`@media print` in `public/design/summer.css`) und einen „Als PDF drucken“-Button, der den
+Browser-Druckdialog öffnet – dort „Als PDF speichern“ wählen.
