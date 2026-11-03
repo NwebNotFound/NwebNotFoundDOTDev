@@ -9,6 +9,7 @@ These answer open questions 1, 4, 8, 9, 10 and 17 (see §10) and override anythi
 - **Guestbook:** **automatic moderation**, no manual approval queue by default (§8, "Guestbook").
 - **Storage:** uploads live on **Nils' own PC** for now (later maybe a mini-PC), not on R2 and not on Cloudflare Stream. Cloudflare only holds the code, the database and small thumbnails (§5a, §6).
 - **Video:** **YouTube embeds only.** No raw video files are hosted. Nils has made at most an occasional edit, so a video library is not needed.
+- **Focus:** this is Nils' little corner of the internet. The core is **stories (series like Harutronic), music, the blog and reviews.** Photos, motion, the tools page, study mode and the Discord Activity come after and can be cut or postponed without hurting the core (§9).
 - **Tools page (new):** online tools run in the visitor's browser; local tools (apps, games) are downloaded from **GitHub Releases**. No public self-hosted git server (§8, "Tools & downloads").
 
 ## 1. Goal
@@ -37,7 +38,6 @@ The hub stays in **this one Worker + D1**. New pages are server-rendered like to
 | `/photos/:album` / `/photos/:album/:id` | Album grid / lightbox deep link |
 | `/writing` | Blog + stories, filter by type/tag |
 | `/writing/:slug` | Post/story reader (comfortable typography, reading time, chapters for series) |
-| `/writing/archive` | Optional: old Harutronic pieces, unlisted from home, marked "archive" |
 | `/motion` | Motion design & video edits showcase (YouTube embeds only) |
 | `/motion/:slug` | Project page: YouTube embed, thumbnail, project notes (tools, idea, process) |
 | `/c/:collection` | Generic page for any future interest collection |
@@ -200,7 +200,9 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 
 ### Writing
 - Posts and stories can embed or link photos, galleries, tracks, videos and reviews (shortcodes, §4.3).
-- Blog posts and stories; series with chapters; reading progress bar; estimated reading time; table of contents. Fresh start – Harutronic works only in `/writing/archive` if Nils wants them public at all.
+- **Stories are a first-class section, not a side feature.** Serial stories like Harutronic are published as a series with chapters, a series page (cover, blurb, status ongoing/complete, chapter list), previous/next navigation, reading progress and a comfortable reader mode (font size, light/night). Blog posts are the shorter, dated form.
+- Chapters are Markdown files (`content/writing/<series>/<nn>-<slug>.md`), so a whole story is versioned in git and can be imported from existing files. Each chapter can be written in German or English and gets the automatic translation described above.
+- Whether Harutronic itself goes public, and which chapters, is Nils' decision (open question 5). Drafts and private series stay hidden until `status: published`.
 
 ### Motion design & video edits
 - Showcase grid with hover-preview thumbnails, filter by kind (motion design, edits, clips) and tools (After Effects, Premiere, DaVinci, Blender…).
@@ -231,7 +233,7 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
   - **Online tools** run entirely **in the visitor's browser** (static HTML/JS). They are served from Cloudflare, do not need Nils' PC, and never send visitor input to a server of his.
   - **Local tools** (apps, games, scripts) are **downloaded from GitHub Releases** of the tool's repo. The Worker reads the releases through the GitHub API on a schedule, caches version, date, file name, size and SHA-256 in `tool_releases`, and links straight to the release asset. Downloads therefore do not go through Cloudflare or Nils' PC.
 - Each tool page shows platform, version, size, SHA-256 and a short install note. Unsigned Windows programs trigger SmartScreen; the page says so and shows the checksum so people can verify the file.
-- Candidate tools from Nils' existing public repos, to be confirmed by him: HaruReader, TaikoFX, EdgettsForKoodoReader, streamforge-local, sulfur, SpaceFight. Private repos (for example Harutronic) are never listed.
+- Candidate tools from Nils' existing public repos, to be confirmed by him: HaruReader, TaikoFX, EdgettsForKoodoReader, streamforge-local, sulfur, SpaceFight. Private repos are never listed.
 - **Decided against** a public self-hosted git server (Forgejo/Gitea) as the download source: downloads would break whenever the PC is off, and a public git server is extra attack surface. A local Forgejo remains fine for private projects or as a mirror, outside this plan.
 - Adding a tool is one row (`tools`) plus a repo name; releases appear without further work.
 
@@ -239,20 +241,24 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 - Quirks list, "currently into" (pulled from latest reviews / now playing), tools, GitHub + X + Discord links, small "made with Cloudflare Workers" colophon.
 
 ## 9. Phased rollout (one PR each, all reviewed by Claude Code / Codex)
+
+### Core: the corner (stories, music, blog, reviews)
+The core needs **no home server**: text lives in the repo/D1, tracks are small static files (default for open question 20), and the site is complete without photos or videos.
 1. **Design system + summer theme tokens** (builds on PR #44): palette, fonts, base components, light/dark, reduced-motion.
-2. **Shell & home:** nav/tab bar, footer links, new home with hero and placeholders; `/about`; **DE/EN routing and interface message files**. Minecraft + AI panel untouched (regression check).
-3. **Guestbook revamp** (D1 migration adds columns, Turnstile unchanged) with **automatic moderation and translation** (Workers AI, fail-closed to `pending`).
-3b. **Tools & downloads:** `/tools`, `tools` and `tool_releases` tables, cron that refreshes GitHub Releases, tool pages. Online tools as static pages.
-4. **Writing + reviews** from Markdown, RSS, TMDB/AniList/Open Library helper script.
-5. **Media library + photography** (shared `media` table, real-life & virtual categories, image pipeline).
-5b. **Shortcodes/embeds** in writing (photos, galleries, tracks, videos, reviews) + tags pages.
-6. **Music v1:** tracks, playlists, persistent player, perfect loops (assets committed manually).
-6b. **Motion & video** showcase (YouTube embeds).
-7. **Creator studio skeleton:** Access app + JWT check, `create.` custom domain (with Nils' OK at deploy time), status/publish_at columns, cron publisher.
-7b. **Studio uploads:** picture/music/video-link flows, media library + picker, storage interface with the `home` backend first (upload receiver on the PC behind the tunnel, thumbnails on Cloudflare).
-7c. **Studio editor:** Markdown post/story editor with embeds, autosave drafts, preview, scheduling, revisions, translation editing; review helper; moderation queue and collections manager.
-8. **Study mode** (ambient mixer, Pomodoro, to-dos) from PR #49.
-9. **Discord Activity** (needs Nils' Discord Developer Portal login).
+2. **Shell & home:** nav/tab bar, footer links, new home with hero and mascot placeholder; `/about`; **DE/EN routing and interface message files**. Minecraft + AI panel untouched (regression check).
+3. **Writing:** stories (series, chapters, reader mode) and blog posts from Markdown, RSS, import of existing story files, translation at publish.
+4. **Reviews:** cards, rating, verdict, spoiler blocks, TMDB/AniList/Open Library helper script.
+5. **Music v1:** tracks, playlists, persistent player, perfect loops, tracks served from Cloudflare static assets.
+6. **Guestbook revamp** with automatic moderation and translation (Workers AI, fail-closed to `pending`).
+7. **Studio:** skeleton (Access app + JWT check, `create.` custom domain with Nils' OK at deploy time, status/publish_at columns, cron publisher), then the editor (Markdown story/post editor with preview, autosave, scheduling, revisions, translation editing, moderation queue).
+
+### Later (nice to have, cut or reorder freely)
+8. **Media library + photography** (real life and virtual photography), shortcodes/embeds in writing, tags pages.
+9. **Tools & downloads:** `/tools`, `tool_releases` cache, cron for GitHub Releases.
+10. **Motion & video** showcase (YouTube embeds).
+11. **Studio uploads for photos and longer audio:** home storage origin behind the tunnel, thumbnails on Cloudflare (§5a).
+12. **Study mode** (ambient mixer, Pomodoro, to-dos) from PR #49.
+13. **Discord Activity** (needs Nils' Discord Developer Portal login).
 
 ## 10. Questions
 
@@ -267,7 +273,7 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 ### Still open
 2. Light "summer day" as default with "summer night" dark mode – okay?
 3. Music: only your tracks, or keep the free lofi station from PR #49 as filler until you have enough?
-5. Harutronic: archive publicly, keep private, or remove?
+5. Harutronic: publish it as a series (all chapters or only some), keep it private for now, or start with a different story? (Stories like it are the focus either way.)
 6. Review scale: 0–10 with halves, 5 stars, or a custom "sunflower" scale?
 7. Which X handle should be linked?
 11. Which other interests should get their own collection at launch (gaming, cosplay, cooking, …)?
