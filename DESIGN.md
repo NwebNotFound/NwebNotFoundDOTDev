@@ -347,6 +347,7 @@ Canonical names live in three files, one per theme, with shared semantics:
 - `public/design/tokens.css` — website portfolio (light/dark). Its `html.mc` block is only a bridge
   that maps the shared `--ds-*` names onto the `--mc-*` tokens of the Minecraft theme.
 - `public/design/minecraft.css` — the Minecraft theme (`html.mc`), complete `--mc-*` set, see §10.
+- `public/design/summer.css` — the Creative Hub theme (`.sm-root`), complete `--sm-*` set, see §11.
 - `ai-panel/public/app.css` — panel (dark default, `[data-theme="light"]`, plus a
   `prefers-color-scheme: light` fallback for a document that has no `data-theme` yet).
 
@@ -473,3 +474,146 @@ The Gacha surface under `mc.nwebnotfound.dev` consumes this theme as-is: `--mc-*
 frame components, pixel headings, motion tokens. It adds its own layout and content, not new colour
 values. If a genuinely new token is needed, it goes into `public/design/minecraft.css` with a row in
 this section and a contrast pair — never into a component rule.
+
+---
+
+## 11. Creative Hub theme — "anime summer" (phase 1: tokens + base components)
+
+The hub (`nwebnotfound.dev` itself, plus `/writing`, `/music`, `/photos`, `/reviews`, `/guestbook`
+and the other hub routes from `docs/creative-hub-plan.md`) is a **third surface**: soft anime summer
+skies with pixel-art interface chrome. It does not borrow from the Minecraft palette and it does not
+change the Minecraft or the portfolio look — those pages do not load this stylesheet at all.
+
+### 11.1 Files
+
+| File | Role |
+| --- | --- |
+| `public/design/summer.css` | tokens (`--sm-*`) and every base component, scoped to `.sm-root` |
+| `public/design/summer-theme.js` | theme bootstrap + optional toggle, sets `data-theme` before first paint |
+| `public/design/summer-preview.html` / `summer-preview.css` | internal preview of all tokens and components in both themes (not linked in any navigation, `noindex`) |
+| `public/design/summer-sprites.svg` | **placeholder** pixel shapes (sun, cloud, sparkle, heart, star, mascot stand-in) |
+| `public/design/fonts/` | `SmPixel` (Pixelify Sans) and `SmBody` (Nunito), both OFL 1.1; licences in `fonts/LICENSES.md` |
+| `scripts/summer-scope-check.mjs` | regression gate: no bare element selectors, no foreign token names, no `@import`/remote URL, preview page stays CSP-clean |
+| `docs/screens/summer-preview-{day,night}.png` | the two reference screenshots of the preview page, taken with Playwright in a throwaway container (both themes) |
+
+`.sm-root` goes on `<html>` (mirroring `html.mc`), so `<body>` is styled through the root class.
+Every selector starts with an `sm-`-namespaced class; the check fails the run otherwise.
+
+### 11.2 Theme switching
+
+`summer day` (light) is the **default**, `summer night` is the dark mode. Precedence, implemented in
+CSS only where possible:
+
+1. `?theme=day|night` in the URL (preview page, screenshots),
+2. `localStorage["summer-theme"]`,
+3. `prefers-color-scheme`.
+
+An explicit `data-theme` on the root element always wins: the system-driven block is written as
+`.sm-root:not([data-theme])` inside `@media (prefers-color-scheme: dark)`, the explicit choice as
+`.sm-root[data-theme="summer-night"]`. `summer-theme.js` runs synchronously in `<head>` **before** the
+stylesheet, so there is no light flash for a night user. It is a classic external script — no inline
+code, no inline event handler, no `eval` — so it passes `script-src 'self'` without a nonce.
+`scripts/contrast-check.mjs` additionally asserts that both dark paths define byte-identical values.
+
+### 11.3 Palette
+
+Roles first; a component reads the role, never a literal.
+
+| Token | summer day | summer night | Used for |
+| --- | --- | --- | --- |
+| `--sm-sky-1` / `--sm-sky-2` | `#8fd3ff` → `#ddf3ff` | `#101a36` → `#23335c` | hero and band gradients |
+| `--sm-background` / `--sm-background-2` | `#f1f9ff` / `#e4f2fe` | `#141b33` / `#101628` | page, alternating band |
+| `--sm-surface` / `-2` / `-3` | `#ffffff` / `#eaf5fe` / `#dcebf9` | `#1c2542` / `#17203a` / `#26304f` | cards, controls, tiles |
+| `--sm-foreground` | `#1f2a44` | `#f1f5ff` | body text, headings |
+| `--sm-muted-foreground` | `#4a5a7a` | `#aeb9d4` | secondary text |
+| `--sm-border` / `--sm-border-strong` | `rgba(31,42,68,.14)` / `#647aa0` | `rgba(255,255,255,.14)` / `#6e7da8` | hairline / control outline |
+| `--sm-frame` | `#24314f` | `#a9b7d9` | the 2 px pixel frame |
+| `--sm-primary` / `--sm-primary-foreground` / `--sm-primary-deep` | `#ffd45e` / `#2a2410` / `#7a5300` | same fill, `#1a1633` text | the one interactive fill (sunflower) |
+| `--sm-link` | `#0e6b63` | `#7fe0d3` | links (ramune family, text-safe member) |
+| `--sm-accent-sun` / `-peach` / `-sakura` / `-ramune` / `-lavender` | `#ffd45e` / `#ffb8a8` / `#ffc8dd` / `#7fe0d3` / `#c9b8ff` | identical (tints change less than text) | section flavours, badge tints |
+| `--sm-peach-ink` / `-sakura-ink` / `-ramune-ink` / `-lavender-ink` | `#a6432c` / `#a2405f` / `#0e6b63` / `#4b3ba8` | the pastel itself | that family's text on a *surface* |
+| `--sm-on-pastel` | `#1f2a44` | `#1f2a44` | text on a pastel *tint* |
+| `--sm-danger` / `-success` / `-warning` | `#b3261e` / `#1b6b3a` / `#8a5a00` | `#ff8a80` / `#78e0a0` / `#ffd08a` | states, always with text or an icon |
+| `--sm-focus-ring` | `#0b5c8a` | `#ffd45e` | `:focus-visible` outline |
+| `--sm-star` / `--sm-star-empty` | `#b06e00` / `#768db0` | `#ffd45e` / `#6e7ca6` | rating display |
+| `--sm-shadow-color` / `--sm-shadow-hard-color` / `--sm-scrim` | `rgba(31,42,68,…)` | `rgba(0,0,0,…)` | soft shadow, pixel offset, scrim |
+
+The pastel families separate two jobs on purpose: the pastel is a **tint** (background, badge, chip)
+and the matching `*-ink` is the **text** value on a surface. That is what keeps five happy colours
+readable in both themes instead of only the sunflower surviving.
+
+### 11.4 Structure: type, spacing, pixel detail, z-order
+
+- `--sm-font-pixel` (`SmPixel`) for `.sm-h1`–`.sm-h4`, `.sm-display`, `.sm-eyebrow`, badges, card
+  titles and numbers; `--sm-font-body` (`SmBody`) for every paragraph, list, label, input and button.
+  Running text is never set in the pixel font. Both are self-hosted `woff2` (47 KB total, latin subset
+  with German umlauts), `< 150 KB` budget, `font-display: swap`, no CDN and no tracking request.
+- Sizes are the shared scale restated as `--sm-text-*` (11/12/14/16/18/22/28/36 px + display clamp),
+  leading `--sm-leading-body` 1.6, prose measure `68ch`.
+- Spacing is the same 4/8 grid as §3 (`--sm-space-1` … `--sm-space-12`), section padding
+  `--sm-section-space`.
+- Pixel detail is CSS only, all from tokens: `--sm-pixel` 2 px borders, `--sm-pixel-step` 4 px and
+  `--sm-pixel-notch` 8 px staircase corners drawn with `clip-path: polygon(…)` on `.sm-card--pixel`,
+  `--sm-shadow-pixel` (a 2 px hard offset instead of a blur), `--sm-dither` (a 4 px diagonal pattern
+  from `repeating-linear-gradient`) on `.sm-dither` / `.sm-card--dither`, and sprite art at
+  `image-rendering: pixelated`.
+- `--sm-tap` 44 px is the minimum for every target; `--sm-tap-dense` 36 px is the compact variant and
+  is raised to 44 px inside `@media (pointer: coarse)`.
+- Z-order lives in tokens (`--sm-z-nav` 50, `--sm-z-scrim` 60, `--sm-z-drawer` 70, `--sm-z-popover` 80,
+  `--sm-z-toast` 90) so no component invents a magic number.
+- Motion: `--sm-duration-fast|--sm-duration|--sm-duration-slow` (150/200/250 ms) with
+  `--sm-ease`; only `transform`/`background`/`color`. `prefers-reduced-motion: reduce` zeroes the
+  durations *and* disables animations/transitions inside `.sm-root`, including the dialogue-box
+  caret.
+
+### 11.5 Components (pure CSS, no JS)
+
+| Class | Notes |
+| --- | --- |
+| `.sm-skip-link` | first focusable element of a hub page; slides in on focus |
+| `.sm-h1`…`.sm-h4`, `.sm-display`, `.sm-eyebrow`, `.sm-lead`, `.sm-muted`, `.sm-tnum`, `.sm-kaomoji` | typography; `.sm-h1`/`.sm-h2` carry the 8 px on/off pixel underline |
+| `.sm-prose` | stories, blog, reviews: `h2`/`h3` in the pixel font, blockquote, list, `hr`, `small`/`figcaption` |
+| `.sm-btn` `--ghost` `--danger` `--dense` `--icon` `--block` | 44 px tall, `translateY(2px)` press onto the hard shadow; `.sm-btn--icon` needs an `aria-label` |
+| `.sm-card`, `--pixel`, `--sun`, `--dither`, `--link`, `.sm-card__title`, `.sm-card__meta` | illustration card vs pixel chrome card |
+| `.sm-dialog`, `.sm-dialog__name`, `__body`, `__more` | visual-novel textbox for guestbook entries, pull quotes, review verdicts |
+| `.sm-tabs` + `.sm-tab` | `role="tablist"`/`role="tab"` with `aria-selected`; keyboard wiring is phase 2 |
+| `.sm-field`, `.sm-label`, `.sm-input`, `.sm-textarea`, `.sm-select`, `.sm-hint`, `.sm-error` | real `<label for>`, 16 px text on touch, `aria-invalid` + `role="alert"` for errors |
+| `.sm-badge` `--sun|--sakura|--ramune|--lavender|--peach|--success|--warning|--danger`, `.sm-chip` | tint + `--sm-on-pastel`; chips use `aria-pressed` |
+| `.sm-stars` `--lg|--sm` | display only: 5 stars filled to `--sm-rating` (0–5, one decimal) with `role="img"` + `aria-label`; no widget, no script |
+| `.sm-sticker`, `.sm-sky` `--night`, `.sm-dither`, `.sm-mascot` `--placeholder`, `.sm-icon` `--lg` | pixel/sticker detail and the mascot slot |
+| `.sm-wrap`, `.sm-stack`, `.sm-row`, `.sm-section`, `.sm-visually-hidden` | shell helpers for phase 2 |
+
+### 11.6 Contrast (measured, `scripts/contrast-check.mjs`)
+
+The gate reads `public/design/summer.css` and checks 34 pairs per theme (68 in total) plus the token
+scale, the "both dark paths are identical" invariant and the reduced-motion/coarse-pointer blocks.
+
+| Pair | summer day | summer night |
+| --- | --- | --- |
+| `--sm-foreground` on `--sm-background` | 13.40 | 15.59 |
+| `--sm-foreground` on `--sm-surface-3` | 11.74 | 11.89 |
+| `--sm-muted-foreground` on `--sm-surface-3` | 5.70 | 6.26 |
+| `--sm-link` on `--sm-surface-3` | 5.24 | 8.35 |
+| `--sm-primary-foreground` on `--sm-primary` | 10.92 | 12.02 |
+| `--sm-on-pastel` on the pastels | 8.00–10.07 | identical (pastels are shared) |
+| `--sm-danger` on `--sm-background` | 6.14 | 7.45 |
+| `--sm-border-strong` on `--sm-surface-3` (non-text, 3:1) | 3.58 | 3.19 (the floor) |
+
+### 11.7 What phase 1 deliberately does not do
+
+No worker or route change, no navigation entry, no content, no translation, no database work, no
+deploy, no new dependency in `package.json`. `src/worker.js` still renders the portfolio and MC
+surfaces exactly as before: the hub shell (nav, footer, hero, routes) is phase 2, and it is the step
+that starts serving `summer.css` to hub pages. The preview page is a static file under
+`/design/summer-preview.html`, marked `noindex`.
+
+### 11.8 Extending the hub theme
+
+A new token means: a value in `public/design/summer.css` (day block, plus both night blocks — they
+must stay identical), a row in §11.3/§11.4, a pair in `scripts/contrast-check.mjs` if text or a
+control outline can use it, and a swatch on the preview page. A new component means: an `sm-`
+prefixed class, a preview example, and a row in §11.5. Run all three gates before pushing:
+
+```
+node scripts/icon-check.mjs && node scripts/contrast-check.mjs && node scripts/summer-scope-check.mjs
+```

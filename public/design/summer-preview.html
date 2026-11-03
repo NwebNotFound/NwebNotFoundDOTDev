@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="de" class="sm-root">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Strict CSP on purpose: this page is the reference implementation of the hub styling, so it
+         must work with no inline script, no inline style attribute and no third-party request.
+         `frame-ancestors` is deliberately absent: it is ignored in a meta-delivered policy (the
+         header is the right place for it), and the browser console would flag it. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; form-action 'none'"
+    />
+    <title>Creative Hub · Design-Vorschau (intern)</title>
+    <meta name="description" content="Interne Vorschau der Hub-Tokens und Basiskomponenten (summer day / summer night)." />
+    <script src="/design/summer-theme.js"></script>
+    <link rel="stylesheet" href="/design/summer.css" />
+    <link rel="stylesheet" href="/design/summer-preview.css" />
+  </head>
+  <body>
+    <a class="sm-skip-link" href="#main">Zum Inhalt springen</a>
+
+    <header class="sm-preview__header">
+      <div>
+        <h1 class="sm-preview__title">Creative Hub · Design-Vorschau</h1>
+        <p class="sm-preview__note">
+          Intern &middot; nicht in der Navigation verlinkt &middot; Phase 1 (Tokens + Basiskomponenten).
+          Der Minecraft-Bereich und das AI-Panel bleiben unberührt.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="sm-btn"
+        data-summer-theme-toggle
+        aria-pressed="false"
+        data-label-day="Sommer-Tag anzeigen"
+        data-label-night="Sommernacht anzeigen"
+      >
+        Theme wechseln
+      </button>
+    </header>
+
+    <main class="sm-preview sm-wrap" id="main">
+      <!-- ---------------------------------------------------------------- skies + mascot slot -->
+      <section class="sm-preview__section" id="skies">
+        <h2 class="sm-h2">Himmel &amp; Maskottchen-Platzhalter</h2>
+        <p class="sm-lead">
+          Zwei Himmel als Flächen-Tokens, dazu die Platzhalter-Formen aus
+          <code>/design/summer-sprites.svg</code>. Das echte Maskottchen zeichnet Nils selbst.
+        </p>
+        <div class="sm-preview__shots">
+          <div class="sm-preview__panel sm-preview__sky--day">
+            <svg class="sm-icon sm-icon--lg" width="40" height="40" aria-hidden="true" focusable="false">
+              <use href="/design/summer-sprites.svg#sm-sun"></use>
+            </svg>
+            <p class="sm-pixel">--sm-sky-1 → --sm-sky-2</p>
+          </div>
+          <div class="sm-preview__panel sm-preview__sky--night">
+            <svg class="sm-icon sm-icon--lg" width="40" height="40" aria-hidden="true" focusable="false">
+              <use href="/design/summer-sprites.svg#sm-sparkle"></use>
+            </svg>
+            <p class="sm-pixel">.sm-sky--night</p>
+          </div>
+          <div class="sm-preview__panel">
+            <span class="sm-mascot sm-mascot--placeholder">
+              <svg aria-hidden="true" focusable="false">
+                <use href="/design/summer-sprites.svg#sm-mascot-placeholder"></use>
+              </svg>
+            </span>
+            <p class="sm-muted">PLATZHALTER — Maskottchen</p>
+            <span class="sm-row">
+              <svg class="sm-icon" width="24" height="24" aria-hidden="true" focusable="false">
+                <use href="/design/summer-sprites.svg#sm-cloud"></use>
+              </svg>
+              <svg class="sm-icon" width="24" height="24" aria-hidden="true" focusable="false">
+                <use href="/design/summer-sprites.svg#sm-heart"></use>
+              </svg>
+              <svg class="sm-icon" width="24" height="24" aria-hidden="true" focusable="false">
+                <use href="/design/summer-sprites.svg#sm-star"></use>
+              </svg>
+              <svg class="sm-icon" width="24" height="24" aria-hidden="true" focusable="false">
+                <use href="/design/summer-sprites.svg#sm-sun"></use>
+              </svg>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------------- token colours -->
+      <section class="sm-preview__section" id="colours">
+        <h2 class="sm-h2">Farb-Tokens</h2>
+        <p class="sm-lead">
+          Alle Paare, die Text oder Bedienoberfläche tragen, sind in
+          <code>scripts/contrast-check.mjs</code> hinterlegt und müssen WCAG AA (4.5:1 Text, 3:1
+          Nicht-Text) in beiden Themes erfüllen.
+        </p>
+        <div class="sm-preview__swatches">
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--sky1"></div>
+            <span class="sm-preview__label"><b>--sm-sky-1</b>Himmel oben</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--sky2"></div>
+            <span class="sm-preview__label"><b>--sm-sky-2</b>Himmel unten</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--background"></div>
+            <span class="sm-preview__label"><b>--sm-background</b>Seitenhintergrund</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--surface"></div>
+            <span class="sm-preview__label"><b>--sm-surface</b>Karte</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--surface2"></div>
+            <span class="sm-preview__label"><b>--sm-surface-2</b>Band</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--surface3"></div>
+            <span class="sm-preview__label"><b>--sm-surface-3</b>Kachel</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--foreground"></div>
+            <span class="sm-preview__label"><b>--sm-foreground</b>Text</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--muted"></div>
+            <span class="sm-preview__label"><b>--sm-muted-foreground</b>Nebentext</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--primary"></div>
+            <span class="sm-preview__label"><b>--sm-primary</b>Sonnenblume (Aktion)</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--sun"></div>
+            <span class="sm-preview__label"><b>--sm-accent-sun</b>Akzent</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--peach"></div>
+            <span class="sm-preview__label"><b>--sm-accent-peach</b>Herzen</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--sakura"></div>
+            <span class="sm-preview__label"><b>--sm-accent-sakura</b>Tags</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--ramune"></div>
+            <span class="sm-preview__label"><b>--sm-accent-ramune</b>Musik</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--lavender"></div>
+            <span class="sm-preview__label"><b>--sm-accent-lavender</b>Writing</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--link"></div>
+            <span class="sm-preview__label"><b>--sm-link</b>Link (Ramune-Familie)</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--danger"></div>
+            <span class="sm-preview__label"><b>--sm-danger</b>Fehler</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--success"></div>
+            <span class="sm-preview__label"><b>--sm-success</b>OK</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--warning"></div>
+            <span class="sm-preview__label"><b>--sm-warning</b>Warnung</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--star"></div>
+            <span class="sm-preview__label"><b>--sm-star</b>Bewertung</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--frame"></div>
+            <span class="sm-preview__label"><b>--sm-frame</b>Pixel-Rahmen</span>
+          </div>
+          <div class="sm-preview__swatch">
+            <div class="sm-preview__chip sm-preview__chip--dither"></div>
+            <span class="sm-preview__label"><b>--sm-dither</b>Dither-Muster</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------------------------- typography -->
+      <section class="sm-preview__section" id="type">
+        <h2 class="sm-h2">Typografie</h2>
+        <p class="sm-lead">
+          Überschriften und kurze Labels in der Pixel-Schrift (<code>SmPixel</code>, Pixelify Sans),
+          Fließtext in <code>SmBody</code> (Nunito). Fließtext wird nie in der Pixel-Schrift gesetzt.
+        </p>
+        <p class="sm-eyebrow">Rubrik · Music</p>
+        <p class="sm-display">Sommer</p>
+        <h3 class="sm-h3">Zwischenüberschrift (sm-h3)</h3>
+        <h4 class="sm-h4">Unterzeile (sm-h4)</h4>
+        <div class="sm-prose">
+          <p>
+            Ein Absatz Fließtext mit Umlauten (ä ö ü ß), typografischen Anführungszeichen („so“),
+            Gedankenstrich (—), Auslassung (…) und Zahlen (1.234,56 €). Links sehen so aus:
+            <a href="/design/summer-preview.html">interner Link</a>.
+          </p>
+          <h2>Abschnitt im Text</h2>
+          <p>
+            Absätze sind auf <code>68ch</code> begrenzt, weil lange Kapitel sonst schwer zu lesen
+            sind.
+          </p>
+          <blockquote>Manchmal ist der Sommer nur ein Geräusch aus Zikaden.</blockquote>
+          <ul>
+            <li>Listenpunkt eins</li>
+            <li>Listenpunkt zwei</li>
+          </ul>
+          <hr />
+          <p><small>Bildunterschrift (small) · <span class="sm-kaomoji" aria-hidden="true">(◕‿◕)</span></small></p>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------------------ buttons -->
+      <section class="sm-preview__section" id="buttons">
+        <h2 class="sm-h2">Buttons</h2>
+        <p class="sm-lead">Jedes Ziel ist mindestens 44 px hoch; die dichte Variante wächst auf Touch auf 44 px.</p>
+        <p class="sm-row">
+          <button type="button" class="sm-btn">Primär</button>
+          <a class="sm-btn sm-btn--ghost" href="/design/summer-preview.html">Ghost</a>
+          <button type="button" class="sm-btn sm-btn--danger">Löschen</button>
+          <button type="button" class="sm-btn sm-btn--dense">Dicht</button>
+          <button type="button" class="sm-btn sm-btn--icon" aria-label="Stern geben">
+            <svg class="sm-icon" width="24" height="24" aria-hidden="true" focusable="false">
+              <use href="/design/summer-sprites.svg#sm-heart"></use>
+            </svg>
+          </button>
+          <button type="button" class="sm-btn" disabled>Deaktiviert</button>
+        </p>
+        <p><button type="button" class="sm-btn sm-btn--block">Volle Breite (Formular-Aktion)</button></p>
+      </section>
+
+      <!-- ------------------------------------------------------------------------------- cards -->
+      <section class="sm-preview__section" id="cards">
+        <h2 class="sm-h2">Karten &amp; Dialogbox</h2>
+        <div class="sm-preview__grid">
+          <div class="sm-card">
+            <h3 class="sm-card__title">Karte</h3>
+            <p>Sanfte Karte mit 1-px-Rahmen und weichem Schatten (Illustration).</p>
+            <p class="sm-card__meta">Meta-Zeile in <code>--sm-muted-foreground</code></p>
+          </div>
+          <div class="sm-card sm-card--pixel">
+            <h3 class="sm-card__title">Pixel-Karte</h3>
+            <p>2-px-Rahmen, harter Versatz-Schatten, Treppenkanten über <code>clip-path</code>.</p>
+            <p class="sm-card__meta">Fokus-Ring liegt innen, weil clip-path außen beschneidet.</p>
+          </div>
+          <div class="sm-card sm-card--sun sm-card--dither">
+            <h3 class="sm-card__title">Himmelskarte</h3>
+            <p>Verlauf von <code>--sm-sky-2</code> in die Karte, Dither-Muster als Textur.</p>
+          </div>
+          <a class="sm-card sm-card--link" href="/design/summer-preview.html">
+            <h3 class="sm-card__title">Verlinkte Karte</h3>
+            <p>Hover hebt 2 px, Fokus zeigt einen Ring auf der Karte selbst.</p>
+          </a>
+        </div>
+        <blockquote class="sm-dialog">
+          <span class="sm-dialog__name">Nils</span>
+          <p class="sm-dialog__body">
+            Willkommen im Hub. Die Box ist das Textbox-Muster für Gästebuch-Einträge, Zitate und
+            Review-Urteile.
+          </p>
+          <span class="sm-dialog__more" aria-hidden="true"></span>
+        </blockquote>
+      </section>
+
+      <!-- ------------------------------------------------------------------------------- tabs -->
+      <section class="sm-preview__section" id="tabs">
+        <h2 class="sm-h2">Tab-Leiste &amp; Chips</h2>
+        <p class="sm-lead">
+          Reines CSS. Die Tastatursteuerung und das Umschalten der Panels kommen in Phase 2 dazu; die
+          ARIA-Rollen stehen schon im Markup.
+        </p>
+        <div class="sm-tabs" role="tablist" aria-label="Bereiche">
+          <button type="button" class="sm-tab" role="tab" aria-selected="true">Music</button>
+          <button type="button" class="sm-tab" role="tab" aria-selected="false">Photos</button>
+          <button type="button" class="sm-tab" role="tab" aria-selected="false">Writing</button>
+          <button type="button" class="sm-tab" role="tab" aria-selected="false">Reviews</button>
+        </div>
+        <p class="sm-row">
+          <button type="button" class="sm-chip" aria-pressed="true">Ramune</button>
+          <button type="button" class="sm-chip" aria-pressed="false">Cicada</button>
+          <button type="button" class="sm-chip" aria-pressed="false">Train by the sea</button>
+        </p>
+      </section>
+
+      <!-- ------------------------------------------------------------------------------ forms -->
+      <section class="sm-preview__section" id="forms">
+        <h2 class="sm-h2">Formular</h2>
+        <form class="sm-preview__grid" action="/design/summer-preview.html" method="get">
+          <div class="sm-field">
+            <label class="sm-label" for="pv-name">Name</label>
+            <input class="sm-input" id="pv-name" name="name" type="text" placeholder="Wie heißt du?" />
+            <span class="sm-hint" id="pv-name-hint">Wird neben deinem Eintrag angezeigt.</span>
+          </div>
+          <div class="sm-field">
+            <label class="sm-label" for="pv-topic">Thema</label>
+            <select class="sm-select" id="pv-topic" name="topic">
+              <option>Musik</option>
+              <option>Fotos</option>
+              <option>Story</option>
+            </select>
+          </div>
+          <div class="sm-field">
+            <label class="sm-label" for="pv-msg">Nachricht</label>
+            <textarea class="sm-textarea" id="pv-msg" name="message" placeholder="Lass einen Gruß da …"></textarea>
+          </div>
+          <div class="sm-field">
+            <label class="sm-label" for="pv-mail">E-Mail (fehlerhaftes Beispiel)</label>
+            <input
+              class="sm-input"
+              id="pv-mail"
+              name="mail"
+              type="email"
+              value=""
+              aria-invalid="true"
+              aria-describedby="pv-mail-error"
+            />
+            <span class="sm-error" id="pv-mail-error" role="alert">Bitte eine gültige Adresse eingeben.</span>
+          </div>
+        </form>
+      </section>
+
+      <!-- ----------------------------------------------------------------------------- badges -->
+      <section class="sm-preview__section" id="badges">
+        <h2 class="sm-h2">Badges &amp; Zustände</h2>
+        <p class="sm-row">
+          <span class="sm-badge sm-badge--sun">Sunflower</span>
+          <span class="sm-badge sm-badge--sakura">Sakura</span>
+          <span class="sm-badge sm-badge--ramune">Ramune</span>
+          <span class="sm-badge sm-badge--lavender">Lavender</span>
+          <span class="sm-badge sm-badge--peach">Peach</span>
+          <span class="sm-badge">Neutral</span>
+          <span class="sm-badge sm-badge--success">Veröffentlicht</span>
+          <span class="sm-badge sm-badge--warning">Entwurf</span>
+          <span class="sm-badge sm-badge--danger">Blockiert</span>
+        </p>
+      </section>
+
+      <!-- ------------------------------------------------------------------------------ stars -->
+      <section class="sm-preview__section" id="stars">
+        <h2 class="sm-h2">Sterne (nur Darstellung)</h2>
+        <p class="sm-lead">
+          Fünf Sterne, gefüllt bis <code>--sm-rating</code> (0–5, eine Dezimalstelle). Kein
+          Eingabe-Widget, keine Skripte.
+        </p>
+        <ul class="sm-stack">
+          <li>
+            <span class="sm-stars sm-preview__rate-45" role="img" aria-label="4,5 von 5 Sternen"></span>
+            <span class="sm-muted">4,5 / 5</span>
+          </li>
+          <li>
+            <span class="sm-stars sm-stars--lg sm-preview__rate-5" role="img" aria-label="5 von 5 Sternen"></span>
+            <span class="sm-muted">5 / 5 (groß)</span>
+          </li>
+          <li>
+            <span class="sm-stars sm-stars--sm sm-preview__rate-25" role="img" aria-label="2,5 von 5 Sternen"></span>
+            <span class="sm-muted">2,5 / 5 (klein)</span>
+          </li>
+          <li>
+            <span class="sm-stars sm-preview__rate-0" role="img" aria-label="0 von 5 Sternen"></span>
+            <span class="sm-muted">0 / 5 (noch nichts bewertet)</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ------------------------------------------------------------------------ token table -->
+      <section class="sm-preview__section" id="tokens">
+        <h2 class="sm-h2">Token-Übersicht (Auszug)</h2>
+        <div class="sm-prose">
+          <ul>
+            <li>Abstände: <code>--sm-space-1</code> (4px) bis <code>--sm-space-12</code> (96px), 4/8-Raster.</li>
+            <li>Radien: <code>--sm-radius-sm</code> 6px bis <code>--sm-radius-2xl</code> 28px, <code>--sm-radius-pixel</code> 0.</li>
+            <li>Pixel: <code>--sm-pixel</code> 2px, <code>--sm-pixel-step</code> 4px, <code>--sm-pixel-notch</code> 8px.</li>
+            <li>Bewegung: <code>--sm-duration-fast</code> 150ms, <code>--sm-duration</code> 200ms, <code>--sm-duration-slow</code> 250ms.</li>
+            <li>Touch: <code>--sm-tap</code> 44px, <code>--sm-tap-dense</code> 36px (44px auf Touch-Geräten).</li>
+            <li>Z-Ordnung: <code>--sm-z-nav</code> 50, <code>--sm-z-scrim</code> 60, <code>--sm-z-drawer</code> 70, <code>--sm-z-popover</code> 80, <code>--sm-z-toast</code> 90.</li>
+          </ul>
+          <p class="sm-muted">
+            Diese Seite ist ein internes Werkzeug (<code>noindex</code>) und wird nicht verlinkt.
+            Beide Themes prüfen: Toggle oben rechts, oder <code>?theme=night</code> /
+            <code>?theme=day</code> in der Adresse.
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
