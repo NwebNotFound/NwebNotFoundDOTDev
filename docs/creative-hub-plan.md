@@ -20,6 +20,18 @@ These answer open questions 1, 4, 8, 9, 10 and 17 (see §10) and override anythi
 - **Hermes MCP server:** planned separately in `ai-panel/docs/mcp-server-plan.md`, not part of this hub.
 - **Tools page (new):** online tools run in the visitor's browser; local tools (apps, games) are downloaded from **GitHub Releases**. No public self-hosted git server (§8, "Tools & downloads").
 
+### Decisions, round 3 (Nils, 2026-11-03) - these override anything older in this document
+- **Discord Activity and video stay cut.** The lofi radio / study mode is single-player on the website only (late phase).
+- **`/motion` is now Nils' own element library** (JS, CSS, animations, UI components): every element has a live, beautiful preview next to its code, plus a **machine-readable index** (JSON manifest and a plain-text listing) so AI agents can read the code and the intent. Static, no paid service. It replaces the dropped video/motion showcase.
+- **Theme:** "summer day" (light) is the default, "summer night" is the dark mode.
+- **Writing:** **one content type `writing`** with a `kind` of `story` or `blog` (stories get series and chapters, blog posts do not). Shared tags and editor.
+- **Music:** **no paid Cloudflare plan, ever, unless Nils asks.** Tracks are small MP3/Opus files shipped as static assets (free), so they play even when the PC is off; keep each file well below the 25 MiB asset limit. Full-size photos stay on the home origin.
+- **Samples and sound design (new):** a `/samples` section where visitors can **download samples and sound-design packs**. Packs are zip files published as **GitHub Releases** (free, versioned, outside Cloudflare traffic); the site only links to them and plays short preview clips (small static files). Licence line: **free to use in your own projects, including commercial ones; no resale or redistribution as sample packs.**
+- **Reviews:** **5-star scale.**
+- **EPUB/PDF rights line:** "(c) Nils, personal reading only."
+- **Studio login: Discord.** Cloudflare Access has no Discord identity provider, so the studio reuses the Worker's existing Discord OAuth (as the AI panel does) with an **allowlist of Discord user IDs** (a Worker secret, only Nils). Every write endpoint checks the session and the allowlist, the public host exposes no write endpoints, and `create.` is a custom domain of the **same Worker** (option A of §5a). No Access app is required; this keeps the studio free.
+- Defaults I use unless Nils objects: scheduling granularity 15 minutes; story feeds carry an excerpt plus link, blog and reviews carry full text; translations show a "show original" link; photos start clean (no EXIF display).
+
 ## 1. Goal
 Turn nwebnotfound.dev from a near-empty start page + guestbook into Nils' personal creative hub: **his own music, photography, writing, reviews, guestbook, about** – with a cute, happy **anime summer** look and Apple-level polish, mobile-first (390px target, per DESIGN.md §0).
 
@@ -284,7 +296,7 @@ The core needs **no home server**: text lives in the repo/D1, tracks are small s
 4. **Reviews:** cards, rating, verdict, spoiler blocks, TMDB/AniList/Open Library helper script.
 5. **Music v1:** tracks, playlists, persistent player, perfect loops, tracks served from Cloudflare static assets.
 6. **Guestbook revamp** with automatic moderation and translation (Workers AI, fail-closed to `pending`).
-7. **Studio:** skeleton (Access app + JWT check, `create.` custom domain with Nils' OK at deploy time, status/publish_at columns, cron publisher), then the editor (Markdown story/post editor with preview, autosave, scheduling, revisions, translation editing, moderation queue).
+7. **Studio:** skeleton (Discord OAuth + user-ID allowlist check, no Access app, `create.` custom domain with Nils' OK at deploy time, status/publish_at columns, cron publisher), then the editor (Markdown story/post editor with preview, autosave, scheduling, revisions, translation editing, moderation queue).
 
 ### Later (nice to have, cut or reorder freely)
 8. **Media library + photography** (real life and virtual photography), shortcodes/embeds in writing, tags pages.
@@ -292,6 +304,8 @@ The core needs **no home server**: text lives in the repo/D1, tracks are small s
 10. **Tools & downloads:** `/tools`, `tool_releases` cache, cron for GitHub Releases.
 11. **Studio uploads for photos and longer audio:** home storage origin behind the tunnel, thumbnails on Cloudflare (§5a).
 12. **Study mode** (ambient mixer, Pomodoro, to-dos) from PR #49, single-player website only.
+13. **`/motion` element library:** Nils' own JS/CSS elements with live preview and code, plus a machine-readable index for AI agents (JSON manifest and plain-text listing). Static and free.
+14. **`/samples`:** downloadable samples and sound-design packs (zips on GitHub Releases, preview clips as small static files, licence line from section 0).
 
 Cut: Discord Activity, motion/video showcase.
 
@@ -310,10 +324,18 @@ Cut: Discord Activity, motion/video showcase.
 
 - Harutronic: **not imported**; Nils writes a new story for the hub. HaruReader is no longer a source (questions 5 and 25 are closed). mc-stack is a **beta for Nils and his friends**, not a public server.
 
+### Answered (Nils, 2026-11-03, third round)
+2. Theme: **summer day default, summer night dark mode.**
+6. Reviews: **5 stars.**
+15. Studio: **same Worker.**
+16. Studio login: **Discord** (existing Worker OAuth + allowlist, see section 0).
+19. **One `writing` type** with `kind` story or blog.
+20. Music: **always playable** via small static MP3/Opus files; **no paid Cloudflare plan.**
+23. Rights line: **"(c) Nils, personal reading only."**
+Also decided: Discord Activity and video stay cut; `/motion` becomes the element library; `/samples` for downloadable samples and sound design (section 0).
+
 ### Still open
-2. Light "summer day" as default with "summer night" dark mode – okay?
 3. Music: only your tracks, or keep the free lofi station from PR #49 as filler until you have enough?
-6. Review scale: 0–10 with halves, 5 stars, or a custom "sunflower" scale?
 7. Which X handle should be linked?
 11. Which other interests should get their own collection at launch (gaming, cosplay, cooking, …)?
 12. Real-life photos: which albums/categories to start with?
