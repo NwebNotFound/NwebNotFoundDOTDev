@@ -619,7 +619,19 @@
 .sm-badge,
 .sm-feed-note__link,
 .sm-prevnext__link,
-.sm-dialog__name {
+.sm-dialog__name,
+.sm-lead,
+.sm-tile__text,
+.sm-post-card__summary,
+.sm-dialog__body,
+.sm-hint,
+.sm-muted,
+.sm-export__rights,
+.sm-post-card__meta,
+.sm-post-meta,
+.sm-prose,
+.sm-prose p,
+.sm-prose li {
   overflow-wrap: anywhere;
   min-width: 0;
 }
