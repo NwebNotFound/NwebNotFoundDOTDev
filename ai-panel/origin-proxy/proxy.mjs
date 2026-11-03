@@ -9,17 +9,30 @@
 //
 // Credentials it injects (all from .env, never from the request):
 //   /dash/*            → X-Hermes-Session-Token: $HERMES_DASHBOARD_SESSION_TOKEN
-//   /gw/p/<bot>/…      → Authorization: Bearer $HERMES_KEY_<BOT>
-//   /gw/… (no profile) → Authorization: Bearer $API_SERVER_KEY
+//   /gw/p/<bot>/…      → Authorization: Bearer ***   (API_SERVER_KEY from profiles/<bot>/.env)
+//   /gw/… (no profile) → Authorization: Bearer ***   (API_SERVER_KEY of this .env)
+//
+// Two routes are special-cased instead of proxied as-is (see "Crew routes" below):
+//   GET /gw/p/<bot>/api/sessions
+//   GET /gw/p/<bot>/api/sessions/<id>/messages
+// They are read-only, paged with hard caps, and redact credential-shaped text server-side.
+//
+// Gateway keys are read from the Hermes profile directories on each lookup (cached ~30 s), so a
+// key rotated in a profile is picked up without restarting this process. HERMES_KEY_<BOT> is an
+// optional override.
 //
 // A /gw/p/<bot>/ request for a bot without a configured key is refused with 404, so a typo
 // in the profile name cannot silently fall back to another bot's credential.
 
 import http from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import os from "node:os";
 import path from "node:path";
+
+// One implementation of the redaction rules for both the proxy and the Worker.
+import { clampInt, redactValue, sessionKind } from "../src/redact.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -47,6 +60,11 @@ const PANEL_SECRET = process.env.PANEL_SECRET || "";
 const API_SERVER_KEY = process.env.API_SERVER_KEY || "";
 const DASHBOARD_TOKEN = process.env.HERMES_DASHBOARD_SESSION_TOKEN || process.env.DASHBOARD_TOKEN || "";
 
+// Cloudflare's edge drops an idle connection after ~100 s. An approval wait can be silent for
+// minutes, so an SSE response that has sent nothing for this long gets a comment frame — the
+// browser's EventSource/fetch reader ignores comment lines.
+const SSE_PING_MS = Math.max(20, Number(process.env.SSE_PING_MS) || 15_000);
+
 if (!PANEL_SECRET || PANEL_SECRET.length < 16) {
   console.error("refusing to start: PANEL_SECRET missing or shorter than 16 chars");
   process.exit(1);
@@ -66,9 +84,92 @@ export function keyNameFor(bot) {
   return `HERMES_KEY_${bot.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
 }
 
-/** The gateway key for a profile, or "" when none is configured. */
-function gatewayKeyFor(bot) {
-  return process.env[keyNameFor(bot)] || process.env[`API_SERVER_KEY_${bot.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`] || "";
+// Profile names the Worker and the gateway both accept; anything else is not a bot.
+const BOT_NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+const KEY_TTL_MS = 30_000;
+
+/** The Hermes data directory: %LOCALAPPDATA%\hermes unless HERMES_HOME says otherwise. */
+function hermesHome() {
+  if (process.env.HERMES_HOME) return path.resolve(process.env.HERMES_HOME);
+  const local = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
+  return path.join(local, "hermes");
+}
+
+/**
+ * The .env holding this profile's API_SERVER_KEY. The default profile keeps it in the Hermes
+ * home, every other profile in profiles/<bot>/.env. The resolved file must stay inside the
+ * profiles directory — a bot name that escapes it gets no key at all.
+ */
+function envFileFor(bot) {
+  const home = hermesHome();
+  if (bot === "default") return path.join(home, ".env");
+  const profilesDir = path.resolve(home, "profiles");
+  const file = path.resolve(profilesDir, bot, ".env");
+  if (!file.startsWith(profilesDir + path.sep)) return "";
+  return file;
+}
+
+/** API_SERVER_KEY from an env file, or "". Tolerates quotes, `export ` and trailing comments. */
+function readApiServerKey(file) {
+  if (!file) return "";
+  let text;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?API_SERVER_KEY\s*=\s*(.*)$/);
+    if (!m) continue;
+    let value = m[1].trim();
+    const quoted = value.match(/^(["'])(.*?)\1/);
+    if (quoted) value = quoted[2].trim();
+    else value = value.replace(/\s+#.*$/, "").trim();
+    return value;
+  }
+  return "";
+}
+
+/** Read the key for one bot from disk. Never logs the value. */
+function resolveGatewayKey(bot) {
+  const override = process.env[keyNameFor(bot)];
+  if (override) return override; // explicit env override wins
+  const fromFile = readApiServerKey(envFileFor(bot));
+  if (fromFile) return fromFile;
+  if (bot === "default") return process.env.API_SERVER_KEY || "";
+  return process.env[`API_SERVER_KEY_${bot.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`] || "";
+}
+
+// bot → { key, at }; misses are cached too, so a missing profile cannot cause a read per request.
+const keyCache = new Map();
+
+/**
+ * The gateway key for a profile, or "" when none is configured. Resolved from the Hermes
+ * profile .env on disk (cached ~30 s), so a key rotated in one profile needs no restart.
+ */
+export function gatewayKeyFor(bot) {
+  if (typeof bot !== "string" || !BOT_NAME.test(bot)) return "";
+  const now = Date.now();
+  const hit = keyCache.get(bot);
+  if (hit && now - hit.at < KEY_TTL_MS) return hit.key;
+  const key = resolveGatewayKey(bot);
+  keyCache.set(bot, { key, at: now });
+  return key;
+}
+
+/** Profile directories under the Hermes home (names only, never contents). */
+function discoverBots() {
+  const bots = ["default"];
+  try {
+    for (const entry of readdirSync(path.join(hermesHome(), "profiles"), { withFileTypes: true })) {
+      if (!entry.isDirectory() || !BOT_NAME.test(entry.name)) continue;
+      bots.push(entry.name);
+    }
+  } catch {
+    // no profiles directory: default only
+    return bots;
+  }
+  return bots;
 }
 
 function secretOk(header) {
@@ -78,7 +179,205 @@ function secretOk(header) {
   return timingSafeEqual(given, secretBuf);
 }
 
+/** Liveness for the Worker's health page: nothing secret, no paths, no keys. */
+async function healthPayload() {
+  let gateway = false;
+  try {
+    const res = await fetch(`${GATEWAY}/health`, { signal: AbortSignal.timeout(1500) });
+    gateway = Boolean(res); // any answer, even a 404, means the port is listening
+  } catch {
+    gateway = false;
+  }
+  return {
+    ok: true,
+    uptime_s: Math.round(process.uptime()),
+    gateway,
+    bots: discoverBots(), // profiles dir + default: the same source the routing uses
+  };
+}
+
 const PROFILE = /^\/p\/([a-z0-9][a-z0-9_-]{0,31})(?=\/|$)/;
+
+// ---------------------------------------------------------------------------------------
+// Crew routes — read-only session browsing
+// ---------------------------------------------------------------------------------------
+//
+//   GET /gw/p/<bot>/api/sessions                 a bot's sessions, paged
+//   GET /gw/p/<bot>/api/sessions/<id>/messages   one session's transcript, paged
+//
+// These two are the only routes that rewrite the body instead of piping it: they clamp paging
+// to a hard maximum and redact credential-shaped text before it leaves the host. Everything
+// else (/v1/runs, /api/jobs, …) still streams through untouched, which is what the chat and
+// the cron editor need.
+//
+// The allowlist is the same one every other /gw/p/<bot>/ route uses: a profile whose gateway
+// key resolves. A bot without a key is a 404 here too, so a typo cannot read another bot's
+// history.
+
+const CREW_LIST = /^\/gw\/p\/([a-z0-9][a-z0-9_-]{0,31})\/api\/sessions$/;
+const CREW_MESSAGES = /^\/gw\/p\/([a-z0-9][a-z0-9_-]{0,31})\/api\/sessions\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/messages$/;
+const CREW_PAGE_MAX = 200; // hard cap per request, for the gateway call and the response
+const CREW_OFFSET_MAX = 100_000;
+const CREW_FILTERS = new Set(["all", "run", "cli"]);
+
+/** The crew route this pathname names, or null. A malformed session id never matches. */
+export function crewRoute(pathname) {
+  const messages = pathname.match(CREW_MESSAGES);
+  if (messages) return { kind: "messages", bot: messages[1], sessionId: messages[2] };
+  const list = pathname.match(CREW_LIST);
+  if (list) return { kind: "sessions", bot: list[1], sessionId: null };
+  return null;
+}
+
+function sendJson(res, status, data, extra = {}) {
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra });
+  res.end(JSON.stringify(data));
+}
+
+const seconds = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value > 1e12 ? Math.round(value / 1000) : Math.round(value);
+  if (typeof value === "string" && value) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return seconds(n);
+    const t = Date.parse(value);
+    if (Number.isFinite(t)) return Math.round(t / 1000);
+  }
+  return null;
+};
+
+const clip = (value, max) => (typeof value === "string" ? value.slice(0, max) : value ?? null);
+
+/** The fields the panel shows, and nothing else. Unknown upstream fields are dropped. */
+function normalizeSession(row) {
+  const id = String(row?.id || row?.session_id || "");
+  if (!id) return null;
+  return {
+    id,
+    title: clip(String(row?.title || row?.preview || ""), 300),
+    kind: sessionKind(id),
+    status: clip(String(row?.status || row?.state || ""), 40) || null,
+    source: clip(String(row?.source || ""), 40) || null,
+    model: clip(String(row?.model || ""), 120) || null,
+    provider: clip(String(row?.provider || ""), 60) || null,
+    started_at: seconds(row?.started_at || row?.created_at),
+    last_active: seconds(row?.last_active || row?.updated_at || row?.ended_at || row?.started_at),
+    message_count: Number(row?.message_count || 0) || 0,
+    input_tokens: Number(row?.input_tokens || 0) || 0,
+    output_tokens: Number(row?.output_tokens || 0) || 0,
+    api_call_count: Number(row?.api_call_count || 0) || 0,
+    cost_usd: Number(row?.actual_cost_usd || row?.estimated_cost_usd || row?.cost_usd || 0) || 0,
+  };
+}
+
+function normalizeMessage(row) {
+  if (!row || typeof row !== "object") return null;
+  const content = typeof row.content === "string" ? row.content : row.content == null ? "" : JSON.stringify(row.content);
+  return {
+    role: clip(String(row.role || "?"), 24),
+    content: content.slice(0, 20_000),
+    timestamp: seconds(row.timestamp || row.created_at || row.ts),
+    tool_name: clip(String(row.tool_name || row.name || row.tool || ""), 80) || null,
+    ok: typeof row.ok === "boolean" ? row.ok : null,
+  };
+}
+
+/** One JSON GET against the gateway, with the already-resolved per-bot key. */
+async function gatewayGet(bearer, pathAndQuery) {
+  try {
+    const res = await fetch(`${GATEWAY.replace(/\/$/, "")}${pathAndQuery}`, {
+      headers: { authorization: `Bearer ${bearer}`, accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const text = await res.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+    return { ok: res.status < 400, status: res.status, data };
+  } catch (err) {
+    // The reason (host, timeout) stays in this process's log, never in the response.
+    console.warn(`crew upstream error: ${String(err?.message || err)}`);
+    return { ok: false, status: 0, data: null };
+  }
+}
+
+async function handleCrew(req, res, url, route) {
+  if (req.method !== "GET") {
+    sendJson(res, 405, { error: "method_not_allowed" }, { allow: "GET" });
+    console.warn(`${req.method} ${url.pathname} 405 (crew routes are read-only)`);
+    return;
+  }
+
+  const bearer = gatewayKeyFor(route.bot);
+  if (!bearer) {
+    sendJson(res, 404, { error: "unknown_bot" });
+    console.warn(`${req.method} ${url.pathname} 404 (no key for profile ${route.bot})`);
+    return;
+  }
+
+  const isList = route.kind === "sessions";
+  const limit = clampInt(url.searchParams.get("limit"), { min: 1, max: CREW_PAGE_MAX, dflt: isList ? 50 : 100 });
+  const offset = clampInt(url.searchParams.get("offset"), { min: 0, max: CREW_OFFSET_MAX, dflt: 0 });
+  const filter = String(url.searchParams.get("filter") || "all").toLowerCase();
+  if (!CREW_FILTERS.has(filter)) {
+    sendJson(res, 400, { error: "invalid_filter" });
+    return;
+  }
+
+  const path0 = `/p/${route.bot}/api/sessions`;
+  // Transcripts page at the gateway, which supports limit/offset/order (it does not support a
+  // bot-side filter). Ask for one row above the cap: that extra row is the honest "older
+  // messages exist" signal, and the response still never carries more than the cap.
+  // The session *list* is paged here instead, because the run/CLI filter has to be applied
+  // before the window is cut — otherwise page 2 of `filter=run` would be a different window.
+  const upstreamPath = isList
+    ? `${path0}?limit=${CREW_PAGE_MAX}&offset=0&order=recent`
+    : `${path0}/${encodeURIComponent(route.sessionId)}/messages?limit=${limit + 1}&offset=${offset}&order=latest`;
+
+  const got = await gatewayGet(bearer, upstreamPath);
+  if (!got.ok) {
+    console.warn(`${req.method} ${url.pathname} ${got.status || 502} (crew upstream)`);
+    if (got.status === 404) return sendJson(res, 404, { error: "session_not_found" });
+    return sendJson(res, 502, { error: "upstream_unreachable" });
+  }
+
+  const payload = got.data;
+  const arrayFrom = (obj, key) => (Array.isArray(obj?.[key]) ? obj[key] : Array.isArray(obj) ? obj : []);
+  const rawRows = isList ? arrayFrom(payload, "sessions") : arrayFrom(payload, "messages");
+  let rows = rawRows.map(isList ? normalizeSession : normalizeMessage).filter(Boolean);
+  let hasMore;
+  let total;
+  if (isList) {
+    rows.sort((a, b) => (b.last_active || 0) - (a.last_active || 0));
+    if (filter !== "all") rows = rows.filter((r) => r.kind === filter);
+    total = rows.length;
+    hasMore = rows.length > offset + limit;
+  } else {
+    // The gateway anchors `offset` at the newest message and returns the window oldest-first,
+    // so the page the client asked for is the *tail* of the window; the extra row at the head
+    // proves there is an older page.
+    hasMore = rows.length > limit;
+    rows = rows.length > limit ? rows.slice(rows.length - limit) : rows;
+  }
+
+  const page = isList ? rows.slice(offset, offset + limit) : rows;
+  const body = {
+    bot: route.bot,
+    session_id: route.sessionId,
+    [isList ? "sessions" : "messages"]: page,
+    limit,
+    offset,
+    has_more: hasMore,
+    // A full upstream window means "there may be more than we can see", not "this is all".
+    truncated: rawRows.length >= CREW_PAGE_MAX,
+  };
+  if (isList) body.total = total;
+
+  sendJson(res, 200, redactValue(body));
+  console.log(`${req.method} ${url.pathname} 200 ${page.length}/(${total ?? "?"}) (crew ${route.kind})`);
+}
 
 function upstreamFor(pathname) {
   if (pathname.startsWith("/gw/")) {
@@ -90,7 +389,7 @@ function upstreamFor(pathname) {
   return null;
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const started = Date.now();
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
 
@@ -98,6 +397,30 @@ const server = http.createServer((req, res) => {
     res.writeHead(401, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "panel secret missing or wrong" }));
     console.warn(`${req.method} ${url.pathname} 401 (secret)`);
+    return;
+  }
+
+  if (url.pathname === "/health") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify(await healthPayload()));
+    return;
+  }
+
+  // Read-only session browsing. Matched before the generic router so a non-GET on these two
+  // paths is a 405 here instead of being proxied to the gateway.
+  const crew = crewRoute(url.pathname);
+  if (crew) {
+    await handleCrew(req, res, url, crew);
+    return;
+  }
+
+  // Everything else under /gw/p/<bot>/api/sessions* is refused rather than passed through: the
+  // generic passthrough does not redact, and a near-miss (trailing slash, a dotted id, no
+  // /messages) would otherwise return raw transcript text.
+  if (/^\/gw\/p\/[a-z0-9][a-z0-9_-]{0,31}\/api\/sessions(\/|$)/.test(url.pathname)) {
+    res.writeHead(404, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ error: "not_found" }));
+    console.warn(`${req.method} ${url.pathname} 404 (not a crew route)`);
     return;
   }
 
@@ -120,6 +443,12 @@ const server = http.createServer((req, res) => {
         console.warn(`${req.method} ${url.pathname} 404 (no key for profile ${target.bot})`);
         return;
       }
+    } else if (target.path.startsWith("/p/")) {
+      // A profile-shaped path whose name is not a valid bot must not fall back to the default key.
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "unknown_bot" }));
+      console.warn(`${req.method} ${url.pathname} 404 (invalid profile name)`);
+      return;
     } else {
       bearer = API_SERVER_KEY;
     }
@@ -152,6 +481,25 @@ const server = http.createServer((req, res) => {
       }
       out["x-accel-buffering"] = "no";
       res.writeHead(up.statusCode || 502, out);
+
+      // Keep an idle event stream alive through the Cloudflare edge: a comment frame every
+      // SSE_PING_MS while the upstream says nothing. Comment lines never reach the client's
+      // event handlers, so this cannot confuse a consumer.
+      let ping = null;
+      if (String(up.headers["content-type"] || "").includes("text/event-stream")) {
+        ping = setInterval(() => {
+          if (res.writableEnded) return;
+          res.write(": ping\n\n");
+        }, SSE_PING_MS);
+        const stop = () => {
+          if (ping) clearInterval(ping);
+          ping = null;
+        };
+        up.on("end", stop);
+        up.on("close", stop);
+        res.on("close", stop);
+      }
+
       up.pipe(res);
       up.on("end", () => {
         console.log(`${req.method} ${url.pathname} ${up.statusCode} ${Date.now() - started}ms`);
@@ -179,10 +527,13 @@ server.listen(PORT, HOST, () => {
   console.log(`  /dash/* → ${DASHBOARD}`);
   console.log(`  shared secret: configured (${PANEL_SECRET.length} chars)`);
   console.log(`  dashboard session token: ${DASHBOARD_TOKEN ? "configured" : "MISSING (set HERMES_DASHBOARD_SESSION_TOKEN)"}`);
-  const bots = Object.keys(process.env)
+  console.log(`  hermes home: ${hermesHome()}`);
+  // Names only: which profiles exist, never whether their key is set or what it looks like.
+  console.log(`  gateway keys resolved from profile .env: ${discoverBots().join(", ")}`);
+  const overrides = Object.keys(process.env)
     .filter((k) => /^HERMES_KEY_[A-Z0-9_]+$/.test(k))
     .map((k) => k.slice("HERMES_KEY_".length).toLowerCase());
-  console.log(`  per-bot gateway keys: ${bots.length ? bots.join(", ") : "none (set HERMES_KEY_<BOT>)"}`);
+  console.log(`  env overrides: ${overrides.length ? overrides.join(", ") : "none"}`);
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {

@@ -7,6 +7,8 @@ const JSON_TIMEOUT_MS = 25_000;
 const BOT_NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 const BOTS_TTL_MS = 60_000;
 const botsCache = new Map(); // origin → {names, expires}
+const healthCache = new Map(); // origin → {value, expires}
+const HEALTH_TTL_MS = 10_000;
 
 /** The static seed from wrangler.jsonc. Used as the fallback and always kept in the list. */
 export function staticBots(env) {
@@ -17,32 +19,76 @@ export function staticBots(env) {
 }
 
 /**
- * The bots the panel accepts: the live profile list from the dashboard (so a bot created in
- * the panel works without a redeploy), unioned with PANEL_BOTS, every name pattern-checked.
- * Cached per isolate for a minute; a dashboard hiccup falls back to the static list.
+ * The origin proxy's own view of the bots: the Hermes profiles directory plus `default`, the
+ * exact source it resolves gateway keys from. Cached ~10 s so a health poll cannot hammer it.
+ * Returns null when the proxy cannot be reached at all.
+ */
+export async function proxyHealth(env, { fresh = false } = {}) {
+  const base = origin(env);
+  if (!base) return null;
+  const cached = healthCache.get(base);
+  if (!fresh && cached && cached.expires > Date.now()) return cached.value;
+  let value = null;
+  try {
+    const res = await fetch(`${base}/health`, {
+      headers: upstreamHeaders(env),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data && typeof data === "object") {
+        value = {
+          ok: data.ok !== false,
+          gateway: Boolean(data.gateway),
+          bots: (Array.isArray(data.bots) ? data.bots : []).filter((n) => BOT_NAME.test(String(n))),
+        };
+      }
+    }
+  } catch {
+    value = null;
+  }
+  healthCache.set(base, { value, expires: Date.now() + HEALTH_TTL_MS });
+  return value;
+}
+
+/** Live profile names from the dashboard, or []. */
+async function dashboardBots(env) {
+  try {
+    const { status, data } = await call(env, "dash", "/api/profiles");
+    if (status >= 400) return [];
+    const rows = Array.isArray(data?.profiles) ? data.profiles : Array.isArray(data) ? data : [];
+    return rows.map((p) => String(p?.name || "")).filter((n) => BOT_NAME.test(n));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The bots the panel accepts. The primary source is the origin proxy — the same profile
+ * directory it reads gateway keys from — so listing and routing can never disagree. The
+ * dashboard list and PANEL_BOTS are fallbacks for a proxy/dashboard hiccup.
  */
 export async function botList(env, { fresh = false } = {}) {
   const key = origin(env) || "none";
   const cached = botsCache.get(key);
   if (!fresh && cached && cached.expires > Date.now()) return cached.names;
   if (!origin(env)) return staticBots(env);
-  try {
-    const { status, data } = await call(env, "dash", "/api/profiles");
-    if (status >= 400) throw new Error(`profiles ${status}`);
-    const rows = Array.isArray(data?.profiles) ? data.profiles : Array.isArray(data) ? data : [];
-    const live = rows.map((p) => String(p?.name || "")).filter((n) => BOT_NAME.test(n));
-    const names = [...new Set([...live, ...staticBots(env)])];
-    botsCache.set(key, { names, expires: Date.now() + BOTS_TTL_MS });
-    return names;
-  } catch {
-    const names = staticBots(env);
-    botsCache.set(key, { names, expires: Date.now() + 10_000 });
-    return names;
-  }
+
+  const [health, dash] = await Promise.all([proxyHealth(env, { fresh }), dashboardBots(env)]);
+  let names;
+  if (health?.bots?.length) names = [...health.bots, ...dash];
+  else if (dash.length) names = dash;
+  else names = staticBots(env);
+  names = [...new Set(names)].filter((n) => BOT_NAME.test(n));
+  // A failed probe is retried quickly; a good one holds for a minute.
+  const ttl = health ? BOTS_TTL_MS : 10_000;
+  botsCache.set(key, { names, expires: Date.now() + ttl });
+  return names;
 }
 
 export function invalidateBots(env) {
   botsCache.delete(origin(env) || "none");
+  healthCache.delete(origin(env) || "none");
 }
 
 export async function isBot(env, name) {
@@ -127,8 +173,56 @@ export function sseHeaders(extra = {}) {
   };
 }
 
-/** Pass an upstream SSE body through untouched, keeping status and content type. */
-export async function pipeSse(res) {
+/**
+ * Wrap an upstream SSE body so an idle stretch still sends bytes. Cloudflare drops a quiet
+ * connection after ~100 s, which is exactly what a pending approval looks like. Comment frames
+ * (`: ping`) are ignored by SSE consumers, so this is invisible to the UI.
+ */
+export function sseBody(body, { pingMs = 15_000 } = {}) {
+  const encoder = new TextEncoder();
+  const reader = body.getReader();
+  let timer = null;
+  let closed = false;
+  return new ReadableStream({
+    start(controller) {
+      timer = setInterval(() => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(": ping\n\n"));
+        } catch {
+          // the response is gone; cancel() clears the timer
+        }
+      }, pingMs);
+      (async () => {
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done || closed) break;
+            controller.enqueue(value);
+          }
+        } catch {
+          // upstream died mid-stream: close cleanly, the client reconnects and polls
+        } finally {
+          closed = true;
+          clearInterval(timer);
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
+        }
+      })();
+    },
+    cancel() {
+      closed = true;
+      clearInterval(timer);
+      reader.cancel().catch(() => {});
+    },
+  });
+}
+
+/** Pass an upstream SSE body through untouched (plus keep-alives), keeping status and type. */
+export async function pipeSse(res, { pingMs } = {}) {
   const type = res.headers.get("content-type") || "";
   if (!res.ok && !type.includes("event-stream")) {
     // Detail stays in the Worker log; the browser only learns that the upstream failed.
@@ -145,7 +239,7 @@ export async function pipeSse(res) {
       headers: sseHeaders(),
     });
   }
-  return new Response(res.body, {
+  return new Response(sseBody(res.body, { pingMs }), {
     status: res.ok ? 200 : res.status,
     headers: sseHeaders({ "x-upstream-status": String(res.status) }),
   });

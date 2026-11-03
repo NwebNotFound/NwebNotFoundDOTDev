@@ -694,7 +694,7 @@ try {
   { const WID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", WID2 = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff", WID3 = "cccccccc-dddd-4eee-8fff-000000000000", OR = "https://" + HOST;
     const post = (path, body, opt = {}) => req(path, { method: opt.method || "POST", body, cookie: opt.cookie, token: opt.token, origin: opt.origin === undefined ? OR : opt.origin, ip: opt.ip });
     const ack = (acks) => post("/api/mc-vip-commands/ack", { acks }, { token: TOK, origin: null, cookie: null });
-    const cmd = (rid) => sqlRows(`SELECT status, reason, ip FROM mc_vip_commands WHERE request_id='${rid}'`)[0];
+    const cmd = (rid) => sqlRows(`SELECT status, reason, ip, ip_hash FROM mc_vip_commands WHERE request_id='${rid}'`)[0];
     // Payloads wörtlich aus docs/vip-api.md (mc-stack 956683c).
     const CWORLD = (o = {}) => ({ id: WID, owner_uuid: U1, owner_name: "Nils", name: "Insel", type: "normal", status: "running", visibility: "friends", slot: "vipworld-2", player_limit: 10, players: 2, invites: [{ uuid: U2, name: "Seller", role: "trusted", added_at: 1793503000000 }], addons: ["keep-inventory"], created_at: 1793500000000, last_started_at: 1793501000000, ...o });
     const CLOG = (o = {}) => ({ at: 1793504000000, admin_uuid: U2, admin_name: "Seller", owner_uuid: U1, owner_name: "Nils", world_id: WID, action: "set_visibility", detail: "private", ...o });
@@ -725,10 +725,10 @@ try {
     const pend = await req("/api/mc-vip-commands/pending", { token: TOK });
     ok(pend.s === 200 && pend.j?.items?.[0]?.action === "start" && pend.j.items[0].request_id === "vip-7f1e-start" && pend.j.items[0].discord_id === D1 && !("op" in pend.j.items[0]), "Pending liefert action, nicht op", JSON.stringify(pend.j?.items?.[0]));
     ok((await req("/api/mc-vip-commands/pending")).s === 401, "Pending ohne Token → 401");
-    ok(cmd("vip-7f1e-start")?.ip === "10.0.0.1", "IP nur fürs Rate-Limit gespeichert");
+    ok(cmd("vip-7f1e-start")?.ip === null && "ip_hash" in (cmd("vip-7f1e-start") || {}), "keine Klartext-IP gespeichert, nur ip_hash (ohne Pepper null)");
     const ack1 = await ack([{ request_id: "vip-7f1e-start", discord_id: D1, status: "done", reason: "" }]);
     ok(ack1.s === 200 && ack1.j?.updated === 1 && cmd("vip-7f1e-start")?.status === "done", "Ack done über request_id und discord_id", ack1.t);
-    ok(cmd("vip-7f1e-start")?.ip === null, "IP wird beim Ack gelöscht");
+    ok(cmd("vip-7f1e-start")?.ip === null && cmd("vip-7f1e-start")?.ip_hash === null, "IP-Information wird beim Ack gelöscht");
     const ack2 = await ack([{ request_id: "vip-7f1e-start", discord_id: D1, status: "failed", reason: "ram_budget" }]);
     ok(ack2.j?.updated === 0 && cmd("vip-7f1e-start")?.status === "done", "zweites Ack ändert nichts");
     const aged0 = await post(`/api/mc-vip/worlds/${WID}/start`, { request_id: "vip-aged-0" }, { cookie: c1 });

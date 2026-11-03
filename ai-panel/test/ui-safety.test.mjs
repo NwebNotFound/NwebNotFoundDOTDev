@@ -10,7 +10,7 @@ import path from "node:path";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.join(here, "..", "public");
 
-const JS = ["app.js", "markdown.js", "highlight.js"];
+const JS = ["app.js", "markdown.js", "highlight.js", "run-events.js", "crew.js"];
 
 async function read(name) {
   return readFile(path.join(pub, name), "utf8");
@@ -59,6 +59,16 @@ test("the shell has the pieces the chat UI needs", async () => {
     "btn-menu",
     "btn-theme",
     "scrim",
+    "health",
+    "run-list",
+    "btn-runs-refresh",
+    "crew-bot",
+    "crew-filters",
+    "crew-list",
+    "btn-crew-refresh",
+    "btn-crew-more",
+    "crew-transcript",
+    "crew-messages",
   ]) {
     assert.match(html, new RegExp(`id="${id}"`), `#${id} present`);
   }
