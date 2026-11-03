@@ -99,9 +99,10 @@ html.mc .eyebrow::before, html.mc .eyb::before {
 html.mc .center .eyebrow, html.mc .center .eyb { justify-content: center; }
 html.mc .hero, html.mc .sec { padding-top: clamp(2rem, 6vw, 3rem) !important; padding-bottom: clamp(2.5rem, 7vw, 4rem) !important; }
 html.mc .hero { overflow: visible; }
-/* `.pixbg` was the pixel-texture glow of the chest GUI look; the v2 canvas carries the sky
-   gradient instead, so the layer is retired without touching the (kept) element. */
-html.mc .pixbg, html.mc .pixbg::before, html.mc .pixbg::after { display: none !important; }
+/* `.pixbg` was the pixel-texture glow of the chest GUI look. In v2 the page canvas carries the sky
+   gradient; a quiet, real-texture version stays as the scroll-parallax layer of the page heads
+   (see the hero scene below). The home hero brings its own scene, so its pixbg stays off. */
+html.mc .hero-scene > .pixbg { display: none !important; }
 
 /* ---------- header: floating glass pill (pages.css `.hdr` + `.hdr-wrap`) ---------- */
 html.mc .nav {
@@ -218,7 +219,7 @@ html.mc a.g:hover, html.mc a.g:focus-visible, html.mc a.card:hover, html.mc a.ca
 html.mc a.g:hover .qi, html.mc a.card:hover .ic, html.mc .card:hover .tile, html.mc a.card:hover .qi { animation: wiggle 0.6s ease; }
 html.mc a.g .go, html.mc .card .go { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
 html.mc a.g:hover .go, html.mc .card:hover .go { transform: translateX(4px); }
-html.mc .pixbg { display: none !important; }
+html.mc .pixbg { display: block !important; position: absolute; inset: -8% 0 auto 0; height: 120%; z-index: -2; opacity: 0.4; }
 html.mc .stat .k, html.mc .mini .k, html.mc .kv2 small, html.mc .kv3 small {
   font-family: var(--f-body); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--muted); opacity: 1;
@@ -407,6 +408,95 @@ html.mc .icon-btn:hover { transform: rotate(-12deg) scale(1.06); }
   html.mc *, html.mc *::before, html.mc *::after { animation: none !important; transition-duration: 0s !important; }
   html.mc a.g:hover, html.mc a.card:hover { transform: none; }
   html.mc .onl a.g:hover { transform: none; }
+  html.mc .hscene .in, html.mc .hscene .ly { transform: none !important; }
+}
+
+/* ---------- cross-document view transitions (item 3) ----------
+   `@view-transition { navigation: auto }` is already set by BASE_CSS; here the chrome keeps its own
+   names so the header pill and the footer stay put while the page body fades and slides. Chrome
+   without support just navigates normally, and reduced motion opts out entirely. */
+html.mc .nav { view-transition-name: mc-header; }
+html.mc footer { view-transition-name: mc-footer; }
+html.mc main { view-transition-name: mc-page; }
+::view-transition-group(mc-header), ::view-transition-group(mc-footer) { animation: none; }
+::view-transition-old(mc-page) { animation: vt-out 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+::view-transition-new(mc-page) { animation: vt-in 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes vt-out { to { opacity: 0; transform: translateY(-10px); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+/* ---------- hero scene + parallax (item 4) ----------
+   Layers: sky/stars (slowest), clouds (medium), hills + grass edge + mascot (fastest). The scroll
+   offset rides on `.ly` (CSS scroll-driven animation, JS fallback), the pointer offset on `.in`, so
+   the two never fight over `transform`. Only transform/opacity, no layout thrash, no scroll hijack. */
+html.mc .hero-scene { overflow: hidden; }
+html.mc .hscene { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+html.mc .hscene .ly { position: absolute; inset: 0; will-change: transform; }
+html.mc .hscene .in { position: absolute; inset: 0; transform: translate3d(calc(var(--mx, 0px) * var(--k, 1)), calc(var(--my, 0px) * var(--k, 1)), 0); transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+html.mc .hscene .l-stars { --k: 0.3; --py: 34; }
+html.mc .hscene .l-clouds { --k: 0.65; --py: 108; }
+html.mc .hscene .l-hills { --k: 1.15; --py: 186; }
+html.mc .hscene .l-mascot { --k: 1.7; --py: 236; }
+html.mc .hscene svg { display: block; position: absolute; }
+html.mc .hscene .l-stars svg { top: 0; left: 0; width: 100%; height: 58%; }
+html.mc .hscene .l-stars g > rect:nth-child(3) { animation-delay: 0.7s; }
+html.mc .hscene .l-stars g > rect:nth-child(5) { animation-delay: 1.3s; }
+html.mc .hscene .l-stars g > rect:nth-child(7) { animation-delay: 1.9s; }
+html.mc .hscene .l-clouds svg { top: 6%; left: -5%; width: 110%; height: 34%; }
+html.mc .hscene .l-hills svg { bottom: -2px; left: 0; width: 100%; height: 46%; }
+html.mc .hscene .l-mascot .in { inset: auto auto 22px clamp(16px, 5vw, 72px); width: clamp(44px, 6vw, 72px); }
+html.mc .hscene .l-mascot img { display: block; width: 100%; height: auto; animation: bob 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
+html.mc .hscene .l-mascot .shadow { position: absolute; left: 8%; right: 8%; bottom: -9px; height: 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.35); animation: shadow-pulse 3.2s ease-in-out infinite; }
+@media (max-width: 760px) { html.mc .hscene .l-mascot .in { bottom: 14px } }
+/* Scroll-driven parallax where the browser can do it in CSS. */
+@supports (animation-timeline: scroll()) {
+  html.mc .hscene .ly { animation: linear both; animation-timeline: scroll(root block); animation-range: 0 130vh; }
+  html.mc .hscene .l-stars { animation-name: par-stars; }
+  html.mc .hscene .l-clouds { animation-name: par-clouds; }
+  html.mc .hscene .l-hills { animation-name: par-hills; }
+  html.mc .hscene .l-mascot { animation-name: par-mascot; }
+  html.mc .pixbg::before { animation: linear both; animation-name: par-glow; animation-timeline: scroll(root block); animation-range: 0 100vh; }
+}
+@keyframes par-stars { to { transform: translate3d(0, 34px, 0); } }
+@keyframes par-clouds { to { transform: translate3d(0, 108px, 0); } }
+@keyframes par-hills { to { transform: translate3d(0, 186px, 0); } }
+@keyframes par-mascot { to { transform: translate3d(0, 236px, 0); } }
+@keyframes par-glow { to { transform: translate3d(0, 70px, 0); } }
+/* JS fallback (`/mc/parallax.js`): same offsets from a rAF loop when scroll timelines are missing. */
+html.mc .hscene.par-js .ly { transform: translate3d(0, var(--sy, 0px), 0); }
+
+/* ---------- long names + big numbers (item 2) ---------- */
+/* Names ellipsize, values must stay complete: only the name-ish element gets the ellipsis, numbers
+   (b.tnum, .num, the value cell after .lbr's name span) keep their full digits and tabular widths. */
+html.mc :is(.lrow, .li, .shh, .auh, .link-row, .order, .vs, .ir, .cmd) b:not(.tnum),
+html.mc .shh b:not(.tnum), html.mc .auh b:not(.tnum) {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+html.mc b.tnum, html.mc .num, html.mc .lbr > b { flex: none; white-space: nowrap; }
+html.mc :is(.lrow, .li, .lbr, .shh, .auh, .order, .mrow, .ir, .vs, .link-row) { min-width: 0; }
+html.mc .lbr { min-width: 0; }
+html.mc .lbr .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The podium is the one grid a 16-char name used to widen: minmax(0,1fr) + min-width:0 keeps it in. */
+html.mc .pod { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html.mc .pod > div { min-width: 0; }
+html.mc .pod b { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.mc .hub-h, html.mc .hub-h2, html.mc .card h3, html.mc .shh b, html.mc .wk h1 {
+  overflow-wrap: anywhere; word-break: break-word;
+}
+html.mc .num, html.mc .tnum, html.mc td, html.mc .stat .v { font-variant-numeric: tabular-nums; }
+/* Wide prose tables become a scrollable box on the phone instead of stretching the page. */
+@media (max-width: 700px) {
+  html.mc .wk table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  html.mc .wk th, html.mc .wk td { white-space: normal; }
+  html.mc .g.pad:has(table.cmd) { overflow-x: auto; }
+  html.mc .pod { gap: 0.5rem; }
+  html.mc .pod > div { padding: 1rem 0.35rem; }
+  html.mc .pod img { width: 44px; height: 44px; }
+  html.mc .pod .p1 img { width: 56px; height: 56px; }
+  html.mc .pod b { font-size: 0.82rem; }
+  html.mc .pod span { font-size: 0.72rem; }
 }
 
 /* ---------- responsive (pages.css @media 760px + the nav breakpoint of ds.css) ---------- */

@@ -263,7 +263,7 @@
       "file": "docs/screens/v2/mc/neu-home-1280.png",
       "w": 1280,
       "h": 900,
-      "pageHeight": 2796,
+      "pageHeight": 2599,
       "scrollWidth": 1280
     },
     {
@@ -415,7 +415,7 @@
       "file": "docs/screens/v2/mc/neu-leaderboards-390.png",
       "w": 390,
       "h": 844,
-      "pageHeight": 1551,
+      "pageHeight": 1548,
       "scrollWidth": 390
     },
     {
@@ -515,6 +515,104 @@
       "scrollWidth": 390
     }
   ],
+  "stress": [
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/stress-spieler-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 918,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/stress-spieler-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 896,
+      "scrollWidth": 390
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/stress-player-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1807,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/stress-player-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2432,
+      "scrollWidth": 390
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/stress-leaderboards-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1339,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/stress-leaderboards-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1404,
+      "scrollWidth": 390
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/stress-markt-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2723,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/stress-markt-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3202,
+      "scrollWidth": 390
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/stress-shops-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 986,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/stress-shops-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1166,
+      "scrollWidth": 390
+    },
+    {
+      "page": "bestellungen",
+      "file": "docs/screens/v2/mc/stress-bestellungen-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 900,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "bestellungen",
+      "file": "docs/screens/v2/mc/stress-bestellungen-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 844,
+      "scrollWidth": 390
+    }
+  ],
   "style": {
     "no-preference": {
       "bodyFont": "SmBody, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
@@ -547,5 +645,84 @@
       ]
     }
   },
-  "overflow390": []
+  "stressChecks": {
+    "player": {
+      "docOverflowPx": 0,
+      "spilledText": [],
+      "groupedThousands": true,
+      "sample": "1.234.567.890 CP",
+      "ellipsisOnRows": "clip"
+    },
+    "leaderboards": {
+      "docOverflowPx": 0,
+      "spilledText": [],
+      "groupedThousands": true,
+      "sample": "617.283.945 CP",
+      "ellipsisOnRows": "clip"
+    },
+    "shops": {
+      "docOverflowPx": 0,
+      "spilledText": [
+        "Der allerallerallerlaengste Erz-",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      ],
+      "groupedThousands": false,
+      "sample": null,
+      "ellipsisOnRows": "clip"
+    },
+    "bestellungen": {
+      "docOverflowPx": 0,
+      "spilledText": [],
+      "groupedThousands": true,
+      "sample": null,
+      "ellipsisOnRows": "clip"
+    }
+  },
+  "motion": {
+    "shots": [
+      "parallax-home-top.png",
+      "parallax-home-scrolled.png",
+      "parallax-home-pointer.png",
+      "transition-same-document.png"
+    ],
+    "supportsScrollTimeline": true,
+    "viewTransition": {
+      "header": "mc-header",
+      "footer": "mc-footer",
+      "main": "mc-page",
+      "jsFallbackActive": false,
+      "scenePresent": true
+    },
+    "layers": {
+      "scroll0": {
+        "stars": "matrix(1, 0, 0, 1, 0, 0)",
+        "clouds": "matrix(1, 0, 0, 1, 0, 0)",
+        "hills": "matrix(1, 0, 0, 1, 0, 0)",
+        "mascot": "matrix(1, 0, 0, 1, 0, 0)",
+        "glow": "none"
+      },
+      "scroll280": {
+        "stars": "matrix(1, 0, 0, 1, 0, 8.13675)",
+        "clouds": "matrix(1, 0, 0, 1, 0, 25.8462)",
+        "hills": "matrix(1, 0, 0, 1, 0, 44.5128)",
+        "mascot": "matrix(1, 0, 0, 1, 0, 56.4786)",
+        "glow": "none"
+      }
+    },
+    "pointer": {
+      "mx": "-5.25px",
+      "my": "1.95px",
+      "mascotInner": "matrix(1, 0, 0, 1, -8.925, 3.315)"
+    },
+    "transitionRunning": true,
+    "reducedMotion": {
+      "stars": "none",
+      "clouds": "none",
+      "hills": "none",
+      "mascot": "none",
+      "glow": "none"
+    }
+  },
+  "overflow390": [],
+  "overflow390Stress": []
 }

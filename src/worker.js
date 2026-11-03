@@ -207,7 +207,9 @@ load();
 </script>` });
 
 /* ---------- Minecraft-Bereich ---------- */
-const BLOCK_SVG = `<svg class="block" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect width="8" height="8" fill="#6b4a2b"/><rect width="8" height="3" fill="#4ade80"/><rect y="3" width="1" height="1" fill="#4ade80"/><rect x="3" y="3" width="1" height="2" fill="#4ade80"/><rect x="6" y="3" width="1" height="1" fill="#4ade80"/><rect x="1" y="1" width="1" height="1" fill="#22c55e"/><rect x="5" y="0" width="1" height="1" fill="#86efac"/><rect x="2" y="5" width="1" height="1" fill="#5a3c22"/><rect x="5" y="6" width="1" height="1" fill="#7c5a37"/></svg>`;
+// (The hand-drawn pixel grass block that used to stand in for a block texture is gone: v2 renders
+// every block/item/mob/head through the real, self-hosted textures under /mc-icon/v2, /mc-head,
+// /mc-mob and /mc-skin.)
 const mNav = hubNav(MAIN);
 const GRASSLINE = `<svg class="px grassline" viewBox="0 0 80 2" preserveAspectRatio="none" aria-hidden="true"><rect x="0" y="1" width="80" height="1" fill="var(--grass)"></rect><rect x="3" y="0" width="2" height="1" fill="var(--grass)"></rect><rect x="29" y="0" width="3" height="1" fill="var(--grass)"></rect><rect x="61" y="0" width="2" height="1" fill="var(--grass)"></rect></svg>`;
 const mFoot = `${GRASSLINE}<span class="fbrand brand">NwebNotFound MC</span><span class="fnl"><a href="/feedback">Feedback</a><a href="https://${MAIN}/">Hauptseite</a></span><p>© {{Y}} Nils Weberruß · Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt oder mit ihnen verbunden.</p>`;

@@ -70,6 +70,19 @@ const VIEWPORTS = [
   { w: 1280, h: 900, tag: "1280" },
   { w: 390, h: 844, tag: "390" },
 ];
+const STRESS = args.includes("--stress");
+
+// Item 2: pages whose formatting is worth pushing to the contract limits (16-char MC names, 48-char
+// shop names, nine-digit CP sums). Captured as stress-<slug>-<tag>.png next to the normal shots.
+const LONG = "Xx_LaengsterName";
+const STRESS_PAGES = [
+  { slug: "spieler", url: "/spieler" },
+  { slug: "player", url: `/spieler/${LONG}` },
+  { slug: "leaderboards", url: "/leaderboards" },
+  { slug: "markt", url: "/markt" },
+  { slug: "shops", url: "/shops" },
+  { slug: "bestellungen", url: "/bestellungen" },
+];
 
 const children = [];
 function serve(cmd, cmdArgs) {
@@ -228,7 +241,7 @@ function fontCss() {
   ].join("\n");
 }
 
-const probe = { mockups: [], impl: [], style: {} };
+const probe = { mockups: [], impl: [], stress: [], style: {}, stressChecks: {}, motion: {} };
 // `--only mockup|impl` runs must not drop the other half of the report: carry the untouched
 // sections over from the previous run so the committed report.json always holds both.
 const REPORT = path.join(OUT, "report.json");
@@ -283,12 +296,169 @@ async function styleProbe(browser, cookie) {
   return out;
 }
 
+// Stress fixtures: same ingest contract, the longest names and the largest numbers it accepts.
+function stressFixture() {
+  const long = "Xx_LaengsterName"; // 16 chars — the MC name limit
+  const others = ["AAAAAAAAAAAAAAAA", "ZZZZZZZZZZZZZZZZ", "Neunzehn_Zeichen", "LangLangLangLang"];
+  const uuid = (i) => (i === 0 ? U1 : `bbbbbbbb-0000-4000-8000-00000000000${i}`);
+  const lead = (f) => [long, ...others].map((n, i) => ({ name: n, value: Math.round(f(i)) }));
+  return {
+    links: [{ discord_id: D1, mc_name: long, mc_uuid: U1, has_role: true, verified: true }],
+    leaderboards: {
+      money: lead((i) => 1234567890 / (i + 1)), playtime: lead((i) => 999999999 / (i + 1)),
+      blocks_mined: lead((i) => 987654321 / (i + 1)), kills: lead((i) => 1234567 / (i + 1)),
+      distance: lead((i) => 123456789 / (i + 1)), kd: lead((i) => 1234.5678 / (i + 1)),
+    },
+    leaderboards_weekly: { money: lead((i) => 98765432 / (i + 1)), playtime: lead((i) => 8640000 / (i + 1)) },
+    player_ranks: [long, ...others].map((n, i) => ({ uuid: uuid(i), name: n, rank: i === 0 ? "vip" : "default", color: i === 0 ? "&a" : "&7", weight: 10 - i })),
+    players_stats: Object.fromEntries([long, ...others].map((n, i) => [uuid(i), {
+      money: 1234567890 - i, playtime: 999999999 - i * 1000, kills: 1234567 - i, deaths: 98765 - i,
+      blocks_mined: 987654321 - i * 100, distance: 123456789 - i * 10, online: i < 2,
+      details: {
+        mined: { stone: 9876543, deepslate: 1234567, diamond_ore: 98765, netherrack: 123456 },
+        killed: { zombie: 123456, creeper: 98765 }, placed: { cobblestone: 1234567 },
+        deaths_by: { fall: 12345, lava: 9876 }, crafted: { torch: 123456 },
+        distance_m: { walk: 123456789, sprint: 98765432, fly: 5432109 },
+        fished: 98765, traded: 43210, jumps: 1234567, damage_dealt: 9876543, damage_taken: 1234567,
+        cp_earned: 1234567890, shop_sales: 98765,
+      },
+    }])),
+    market: [
+      ["enchanted_golden_apple", 1234567.89, 987654.31, 1000000, 987654321, 1234567890, 987654, 1234.5678],
+      ["netherite_chestplate", 987654.32, 790123.45, 800000, 12345678, 987654321, 45678, -1234.5678],
+      ["diamond", 120.5, 96.4, 100, 340, 38200, 57, 4.25],
+    ].map(([item, buy, sell, base, vol, cp, trades, ch]) => ({ item, buy_price: buy, sell_price: sell, base_price: base, volume_24h_qty: vol, volume_24h_cp: cp, trades_24h: trades, change_24h_pct: ch, updated_at: Math.floor(Date.now() / 1000) })),
+    shops: [
+      { id: "s-long", owner_uuid: uuid(0), owner_name: long, name: "Der allerallerallerlaengste Erz- und Trankeladen", location: { world: "survival", x: 1234567, y: 64, z: -9876543 }, updated_at: Date.now(), items: [{ listing_id: "L1", item: "enchanted_golden_apple", price: 1234567, stock: 999999, mode: "sell" }, { listing_id: "L2", item: "netherite_chestplate", price: 987654, stock: 123456, mode: "buy" }] },
+      { id: "s-long2", owner_uuid: uuid(1), owner_name: others[0], name: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", location: "survival · 9876543 / 64 / -1234567", updated_at: Date.now(), items: [{ listing_id: "L3", item: "diamond", price: 123456, stock: 999999, mode: "sell" }] },
+    ],
+    auctions: [
+      { id: "a-long", seller_uuid: uuid(0), seller_name: long, item: "netherite_chestplate", amount: 9999, nbt_summary: "Schutz IV, Haltbarkeit III, Reparatur, Unzerstörbar, Fluch der Bindung", min_price: 987654321, current_bid: 1234567890, current_bidder_name: others[0], bid_count: 987654, ends_at: Date.now() + 3600000, status: "active", bids: [{ name: others[0], amount: 1234567890, at: Date.now() - 60000 }] },
+    ],
+  };
+}
+
+async function seedStress(session) {
+  const res = await fetch(`${MC}/api/mc-ingest`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ingest-token": TOK, host: HOST },
+    body: JSON.stringify(stressFixture()),
+  });
+  const txt = await res.text();
+  if (!res.ok) throw new Error(`stress ingest ${res.status}: ${txt.slice(0, 300)}`);
+  console.log("stress seed:", txt.slice(0, 200));
+  return session;
+}
+
+// Item 2 checks: nothing overflows horizontally, long labels ellipsize instead of pushing the row
+// wide, and big numbers come out grouped in German.
+async function stressChecks(browser, cookie) {
+  const out = {};
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "no-preference", colorScheme: "dark" });
+  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+  const page = await ctx.newPage();
+  for (const [name, url] of [["player", `/spieler/${LONG}`], ["leaderboards", "/leaderboards"], ["shops", "/shops"], ["bestellungen", "/bestellungen"]]) {
+    await page.goto(`${MC}${url}`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1700);
+    out[name] = await page.evaluate(() => {
+      // "Ellipsized" is the goal for names; "spilled" would mean the box really overflows its row.
+      const rows = [...document.querySelectorAll(".lrow b:not(.tnum), .li b:not(.tnum), .shh b, .lbr .n, .card h3")];
+      const cut = rows.filter((e) => e.scrollWidth > e.clientWidth + 2);
+      const clipped = (e) => getComputedStyle(e).textOverflow !== "ellipsis" && getComputedStyle(e).overflow !== "hidden";
+      const text = document.body.innerText;
+      return {
+        docOverflowPx: Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
+        checkedNames: rows.length,
+        ellipsizedNames: cut.filter((e) => !clipped(e)).map((e) => (e.textContent || "").trim().slice(0, 28)),
+        spilledText: cut.filter(clipped).map((e) => (e.textContent || "").trim().slice(0, 32)),
+        groupedThousands: /\d{1,3}(?:\.\d{3})+/.test(text),
+        sample: (text.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?\s*(?:CP|%)/) || [])[0] || null,
+        ellipsisOnRows: rows.length ? getComputedStyle(rows[0]).textOverflow : null,
+      };
+    });
+  }
+  await ctx.close();
+  return out;
+}
+
+// Items 3 + 4 evidence: scroll-driven layer offsets, pointer parallax, reduced-motion opt-out and
+// the view-transition names, plus screenshots at two scroll positions and mid-transition.
+async function motionEvidence(browser, cookie) {
+  const out = { shots: [] };
+  const read = (page) => page.evaluate(() => {
+    const g = (s) => { const e = document.querySelector(s); return e ? getComputedStyle(e).transform : null; };
+    return { stars: g(".l-stars"), clouds: g(".l-clouds"), hills: g(".l-hills"), mascot: g(".l-mascot"), glow: g(".pixbg") };
+  });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "no-preference", colorScheme: "dark" });
+  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+  const page = await ctx.newPage();
+  await page.goto(`${MC}/`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(2400);
+  out.supportsScrollTimeline = await page.evaluate(() => CSS.supports("animation-timeline: scroll()"));
+  out.viewTransition = await page.evaluate(() => {
+    const n = (s) => { const e = document.querySelector(s); return e ? getComputedStyle(e).viewTransitionName : null; };
+    return { header: n(".nav"), footer: n("footer"), main: n("main"), jsFallbackActive: !!document.querySelector(".hscene.par-js"), scenePresent: !!document.querySelector(".hscene") };
+  });
+  out.layers = {};
+  out.layers.scroll0 = await read(page);
+  out.shots.push(await shot(page, "parallax-home-top.png"));
+  await page.evaluate(() => window.scrollTo(0, 280));
+  await page.waitForTimeout(800);
+  out.layers.scroll280 = await read(page);
+  out.shots.push(await shot(page, "parallax-home-scrolled.png"));
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(400);
+  await page.mouse.move(1240, 90);
+  await page.waitForTimeout(150);
+  await page.mouse.move(160, 780, { steps: 14 });
+  await page.waitForTimeout(700);
+  out.pointer = await page.evaluate(() => {
+    const sc = document.querySelector(".hscene");
+    return { mx: getComputedStyle(sc).getPropertyValue("--mx").trim(), my: getComputedStyle(sc).getPropertyValue("--my").trim(), mascotInner: getComputedStyle(document.querySelector(".l-mascot .in")).transform };
+  });
+  out.shots.push(await shot(page, "parallax-home-pointer.png"));
+  // Same-document view transition (test-side only, no page JS): the CSS rules for ::view-transition-*
+  // (mc-page) have to fire, and the header/footer must not move. The animations are stretched to 2 s
+  // for the capture only (a slow-motion photo of the theme's own keyframes, names and easing).
+  try {
+    await page.addStyleTag({ content: "::view-transition-old(mc-page){animation-duration:2s !important}::view-transition-new(mc-page){animation-duration:2s !important}" });
+    await page.evaluate(() => new Promise((res) => {
+      // `ready` rejects when the transition is skipped, so both paths resolve — plus a hard stop, so
+      // the harness can never hang on a browser that decides not to run the transition.
+      let done = false;
+      const finish = () => { if (!done) { done = true; res(); } };
+      try {
+        const t = document.startViewTransition(() => { const m = document.querySelector("main"); if (m) m.style.minHeight = "1600px"; });
+        t.ready.then(() => setTimeout(finish, 420)).catch(finish);
+      } catch { finish(); }
+      setTimeout(finish, 2500);
+    }));
+    out.transitionRunning = true;
+    const cdp = await ctx.newCDPSession(page);
+    const cap = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    fs.writeFileSync(path.join(OUT, "transition-same-document.png"), Buffer.from(cap.data, "base64"));
+    out.shots.push("transition-same-document.png");
+  } catch (e) { out.transitionRunning = String(e).slice(0, 120); }
+  await ctx.close();
+  const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce", colorScheme: "dark" });
+  const p2 = await ctx2.newPage();
+  await p2.goto(`${MC}/`, { waitUntil: "domcontentloaded" });
+  await p2.waitForTimeout(1600);
+  out.reducedMotion = await read(p2);
+  await ctx2.close();
+  return out;
+}
+
+async function shot(page, name) {
+  await page.screenshot({ path: path.join(OUT, name), fullPage: false });
+  return name;
+}
+
 async function main() {
   await mkdir(OUT, { recursive: true });
   const session = {};
   let restore = () => {};
   if (SERVE) {
-    if (!SERVE && SERVED) throw new Error("--serve is required to start the local Worker");
     restore = await startServer();
     await seed(session);
   } else {
@@ -299,6 +469,44 @@ async function main() {
   const browser = await chromium.launch();
   const impl = ONLY === "all" || ONLY === "impl";
   const mockup = ONLY === "all" || ONLY === "mockup";
+  const motionOnly = ONLY === "motion";
+  const stressOnly = ONLY === "stress";
+  if (stressOnly) {
+    if (SERVE) await seedStress(session);
+    for (const p of STRESS_PAGES) {
+      for (const vp of VIEWPORTS) {
+        const r = await capture(browser, `${MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
+        probe.stress.push({ page: p.slug, ...r });
+      }
+    }
+    probe.overflow390Stress = probe.stress.filter((x) => x.w === 390 && x.scrollWidth > 390).map((x) => ({ page: x.page, scrollWidth: x.scrollWidth }));
+    probe.stressChecks = await stressChecks(browser, session.cookie);
+    probe.mockups = prevReport.mockups || [];
+    probe.impl = prevReport.impl || [];
+    probe.style = prevReport.style || {};
+    probe.motion = prevReport.motion || {};
+    probe.overflow390 = prevReport.overflow390 || [];
+    await browser.close();
+    fs.writeFileSync(path.join(OUT, "report.json"), JSON.stringify(probe, null, 2));
+    restore();
+    console.log(JSON.stringify({ overflow390Stress: probe.overflow390Stress, stressChecks: probe.stressChecks }, null, 2));
+    return;
+  }
+  if (motionOnly) {
+    probe.motion = await motionEvidence(browser, session.cookie);
+    probe.mockups = prevReport.mockups || [];
+    probe.impl = prevReport.impl || [];
+    probe.stress = prevReport.stress || [];
+    probe.style = prevReport.style || {};
+    probe.stressChecks = prevReport.stressChecks || {};
+    probe.overflow390 = prevReport.overflow390 || [];
+    probe.overflow390Stress = prevReport.overflow390Stress || [];
+    await browser.close();
+    fs.writeFileSync(path.join(OUT, "report.json"), JSON.stringify(probe, null, 2));
+    restore();
+    console.log(JSON.stringify({ motion: probe.motion }, null, 2));
+    return;
+  }
 
   if (mockup) {
     const inject = `(()=>{const s=document.createElement("style");s.textContent=${JSON.stringify(fontCss())};document.head.appendChild(s);document.addEventListener("DOMContentLoaded",()=>document.head.appendChild(s));})()`;
@@ -327,10 +535,36 @@ async function main() {
     probe.overflow390 = prevReport.overflow390 || [];
   }
 
+  // Stress pass (item 2): same pages, but with the longest allowed names and the biggest numbers the
+  // contracts permit, so ellipsis/wrapping and grouped digits are checked instead of assumed.
+  if (impl || STRESS) {
+    if (SERVE) await seedStress(session);
+    for (const p of STRESS_PAGES) {
+      for (const vp of VIEWPORTS) {
+        const r = await capture(browser, `${MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
+        probe.stress.push({ page: p.slug, ...r });
+      }
+    }
+    probe.overflow390Stress = probe.stress.filter((x) => x.w === 390 && x.scrollWidth > 390).map((x) => ({ page: x.page, scrollWidth: x.scrollWidth }));
+    probe.stressChecks = await stressChecks(browser, session.cookie);
+  } else {
+    probe.stress = prevReport.stress || [];
+    probe.overflow390Stress = prevReport.overflow390Stress || [];
+    probe.stressChecks = prevReport.stressChecks || {};
+  }
+
+  // Parallax + view transition evidence (items 3 + 4).
+  if (impl) probe.motion = await motionEvidence(browser, session.cookie);
+  else probe.motion = prevReport.motion || {};
+
   await browser.close();
   fs.writeFileSync(path.join(OUT, "report.json"), JSON.stringify(probe, null, 2));
   restore();
-  console.log(JSON.stringify({ mockups: probe.mockups.length, impl: probe.impl.length, style: probe.style, overflow390: probe.overflow390 }, null, 2));
+  console.log(JSON.stringify({
+    mockups: probe.mockups.length, impl: probe.impl.length, stress: probe.stress.length,
+    style: probe.style, overflow390: probe.overflow390, overflow390Stress: probe.overflow390Stress,
+    stressChecks: probe.stressChecks, motion: probe.motion,
+  }, null, 2));
 }
 
 main().catch((e) => { console.error(e); stopServers(); process.exit(1); });
