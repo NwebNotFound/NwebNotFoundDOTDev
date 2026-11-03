@@ -25,6 +25,8 @@ export default {
   "lang.de.short": "DE",
   "lang.en.short": "EN",
   "theme.switch": "Design wechseln",
+  "theme.switch_to_day": "Zum Tag wechseln",
+  "theme.switch_to_night": "Zur Nacht wechseln",
   "theme.night": "Nacht",
   "theme.day": "Tag",
 
@@ -33,7 +35,7 @@ export default {
   "home.title": "Hi, ich bin Nils.",
   "home.title2": "Willkommen in meiner Ecke.",
   "home.lead": "Hier sammle ich, was ich baue: einen Minecraft-Server, Texte, Musik und Rezensionen. Das meiste wächst gerade erst – schau dich um.",
-  "home.mascot_alt": "Platzhalter-Maskottchen: ein Pixel-Wesen, das Nils später selbst zeichnet.",
+  "home.mascot_alt": "Das Maskottchen: ein kleines Pixel-Wesen mit Ohren und roten Bäckchen.",
   "home.placeholder_note": "Maskottchen-Platzhalter – das echte Bild zeichnet Nils selbst.",
   "home.sections_title": "Die Bereiche",
   "home.sections_lead": "Manches ist schon da, manches braucht noch Zeit.",
@@ -59,6 +61,9 @@ export default {
   "about.eyebrow": "Über mich",
   "about.title": "Kurzvorstellung",
   "about.lead": "Ein paar Zeilen zu mir – und die Links, über die du mich erreichst.",
+  "about.role": "Informatik-Student · baut Dinge im Homelab",
+  "about.intro_title": "Kurz zu mir",
+  "about.projects_lead": "Lust auf mehr? Hier sind meine Projekte.",
   "about.placeholder_badge": "Platzhalter",
   "about.placeholder_note": "Dieser Text ist ein Platzhalter. Nils ersetzt ihn selbst; hier stehen bewusst noch keine Angaben zu seiner Person.",
   "about.intro_p1": "Hier steht später, was ich so mache: woran ich gerade baue, womit ich meine Zeit verbringe und was mich an Technik freut.",
@@ -70,6 +75,7 @@ export default {
 
   /* ---- soon (empty states with the mascot placeholder) ---- */
   "soon.eyebrow": "Bald",
+  "soon.art_alt": "Das Maskottchen baut an {section} – mit Ziegelmütze und Hammer.",
   "soon.title": "{section} kommt bald",
   "soon.music_text": "Hier entsteht die Musik-Seite: eigene Loops und Beats mit Loop-Punkten in einem kleinen Player. Tracks sind noch keine da.",
   "soon.writing_text": "Hier entsteht die Texte-Seite: eine neue Geschichte in Kapiteln und Blog-Beiträge. Der erste Text kommt, sobald er fertig ist.",

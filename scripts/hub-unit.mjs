@@ -86,7 +86,9 @@ for (const lang of LANGS) {
     ok(html.includes('<header class="sm-nav"') && html.includes('<footer class="sm-footer"'), `${label}: header and footer landmarks`);
     ok(!/<script(?![^>]*\bsrc=)/.test(html), `${label}: no inline script (script-src 'self')`);
     ok(!/\son[a-z]+\s*=/i.test(html), `${label}: no inline event handler`);
-    ok(html.includes("summer-sprites.svg#sm-mascot-placeholder"), `${label}: uses the placeholder sprite sheet`);
+    // Summer Theme v2: the mascot is the approved inline pixel art (artboard), not the Phase 1
+    // placeholder sprite — an inline SVG follows the theme tokens and needs no second request.
+    ok(html.includes('shape-rendering="crispEdges"') && html.includes("var(--sm-cream)"), `${label}: uses the inline pixel art (crispEdges)`);
     ok(html.includes("data-summer-theme-toggle") && html.includes('data-label-day="') && html.includes('data-label-night="'), `${label}: theme toggle is wired for summer-theme.js`);
     ok(html.includes(`href="${withLang("/", lang)}"`), `${label}: brand links to the language home`);
     const urls = [...html.matchAll(/(?:href|src)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
@@ -116,7 +118,7 @@ for (const lang of LANGS) {
   const de = hubPage("/", "de");
   ok(de.includes("sm-badge--sun") && de.includes("bald"), "the German home says 'bald'");
   const soon = hubPage("/writing", "de");
-  ok(soon.includes("sm-mascot--placeholder") && soon.includes("(◕‿◕)"), "empty state shows the mascot placeholder and a kaomoji");
+  ok(soon.includes("sm-hammer") && soon.includes("(◕‿◕)"), "empty state shows the building mascot and a kaomoji");
   ok(soon.includes("Texte kommt bald"), "empty state names the section", soon.slice(soon.indexOf("sm-h1"), soon.indexOf("sm-h1") + 120));
 }
 
@@ -164,7 +166,7 @@ for (const lang of LANGS) {
   ok(writingListBody(all, "de", { tag: "alpha" }).includes("1 Beiträge"), "writing list: filter by tag");
   ok(writingListBody(all, "de", { kind: "story", tag: "alpha" }).includes("Zu diesem Filter"), "writing list: empty filter result is explained");
   const emptyList = writingListPage([], "de");
-  ok(emptyList.includes("sm-mascot-placeholder") && emptyList.includes("Texte kommt bald"), "writing list: nothing published → the mascot empty state");
+  ok(emptyList.includes("sm-hammer") && emptyList.includes("Texte kommt bald"), "writing list: nothing published → the mascot empty state");
 
   /* post */
   const post = writingPostPage(all[0], all, "de");

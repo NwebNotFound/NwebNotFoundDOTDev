@@ -23,6 +23,8 @@ export default {
   "lang.de.short": "DE",
   "lang.en.short": "EN",
   "theme.switch": "Switch theme",
+  "theme.switch_to_day": "Switch to day",
+  "theme.switch_to_night": "Switch to night",
   "theme.night": "Night",
   "theme.day": "Day",
 
@@ -31,7 +33,7 @@ export default {
   "home.title": "Hi, I am Nils.",
   "home.title2": "Welcome to my corner.",
   "home.lead": "This is where I keep what I build: a Minecraft server, writing, music and reviews. Most of it is still growing – have a look around.",
-  "home.mascot_alt": "Placeholder mascot: a pixel creature that Nils will draw himself later.",
+  "home.mascot_alt": "The mascot: a small pixel creature with ears and rosy cheeks.",
   "home.placeholder_note": "Placeholder mascot – the real drawing comes from Nils.",
   "home.sections_title": "The sections",
   "home.sections_lead": "Some of it is live already, the rest still needs time.",
@@ -57,6 +59,9 @@ export default {
   "about.eyebrow": "About",
   "about.title": "A short introduction",
   "about.lead": "A few lines about me – and the links that reach me.",
+  "about.role": "Computer science student · builds things in the homelab",
+  "about.intro_title": "About me, briefly",
+  "about.projects_lead": "Want more? These are my projects.",
   "about.placeholder_badge": "Placeholder",
   "about.placeholder_note": "This text is a placeholder. Nils will replace it himself; deliberately there are no details about him here yet.",
   "about.intro_p1": "Later this will say what I am up to: what I am building, what I spend my time on and what I enjoy about technology.",
@@ -68,6 +73,7 @@ export default {
 
   /* ---- soon (empty states with the mascot placeholder) ---- */
   "soon.eyebrow": "Soon",
+  "soon.art_alt": "The mascot is building {section} – with a hard hat and a hammer.",
   "soon.title": "{section} is coming soon",
   "soon.music_text": "The music page is being built here: my own loops and beats with loop points in a small player. There are no tracks yet.",
   "soon.writing_text": "The writing page is being built here: a new story in chapters and blog posts. The first piece appears once it is finished.",

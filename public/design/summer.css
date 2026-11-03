@@ -1,5 +1,8 @@
-/* NwebNotFound Creative Hub — "anime summer" theme (Phase 1: tokens + base components).
-   Spec: DESIGN.md §11. Plan: docs/creative-hub-plan.md §7.
+/* NwebNotFound Creative Hub — "summer theme v2" (cozy pixel, polished).
+   Spec: DESIGN.md §11, the approved artboards in /opt/data/mockups/summer-v2 (reference shots:
+   docs/screens/v2/hub/mockup-*.png). Colours, radii, shadows, keyframes and easing are taken from
+   theme.css/pages.css of the artboards; the two fonts stay self-hosted (the page promises "keine
+   externen Schriften", so "Pixelify Sans" is SmPixel and "Nunito" is SmBody).
 
    Scope contract (do not break):
    - This file is loaded ONLY on hub pages. It never styles the Minecraft surface (public/mc/*,
@@ -50,31 +53,35 @@
 .sm-root {
   color-scheme: light;
 
-  /* sky + surfaces (plan §7 palette: sky #8FD3FF → #DDF3FF, cloud #FFFFFF / #F7FBFF) */
-  --sm-sky-1: #8fd3ff;
-  --sm-sky-2: #ddf3ff;
+  /* sky + surfaces (artboard theme.css .day: sky #9AD8FF → #E6F6FF, surface #FFFFFF/#EFF6FE) */
+  --sm-sky-1: #9ad8ff;
+  --sm-sky-2: #e6f6ff;
   --sm-sky-3: #ffffff;
-  --sm-background: #f1f9ff;
-  --sm-background-2: #e4f2fe;
+  --sm-background: #f4faff;
+  --sm-background-2: #e8f4ff;
   --sm-surface: #ffffff;
-  --sm-surface-2: #eaf5fe;
-  --sm-surface-3: #dcebf9;
+  --sm-surface-2: #eff6fe;
+  --sm-surface-3: #e2eefb;
+  --sm-glass: rgba(255, 255, 255, 0.74);
 
-  /* ink (plan §7: ink #1F2A44) */
+  /* ink */
   --sm-foreground: #1f2a44;
-  --sm-muted-foreground: #4a5a7a;
+  --sm-muted-foreground: #55648a;
 
-  /* lines: soft hairline for rhythm, strong line for anything that must be perceived as a control
-     outline (WCAG AA non-text 3:1, checked in scripts/contrast-check.mjs) */
-  --sm-border: rgba(31, 42, 68, 0.14);
+  /* lines: `--sm-border` is the soft hairline of the artboards; `--sm-border-strong` is the solid
+     control outline and stays above WCAG AA non-text 3:1 in both themes
+     (checked in scripts/contrast-check.mjs). */
+  --sm-border: rgba(31, 42, 68, 0.1);
   --sm-border-strong: #647aa0;
-  --sm-frame: #24314f; /* the 2px pixel frame colour */
+  --sm-frame: #24314f; /* the pixel frame colour */
+  --sm-edge: #647aa0; /* the "toy key" edge under a soft button */
 
-  /* accents (plan §7). `--sm-primary` is the single interactive *fill*; the `*-ink` values are the
-     text-safe members of each pastel family (the pastel itself is a tint, never text). */
+  /* accents. `--sm-primary` is the single interactive *fill*; the `*-ink` values are the text-safe
+     members of each pastel family (the pastel itself is a tint, never text). */
   --sm-primary: #ffd45e; /* sunflower — primary buttons, active states */
   --sm-primary-foreground: #2a2410; /* 10.92:1 on --sm-primary */
   --sm-primary-deep: #7a5300; /* pressed edge / border of a primary button (4.84:1 on the fill) */
+  --sm-sun-edge: #e2a52a; /* the hard edge under a primary button */
   --sm-accent-sun: #ffd45e;
   --sm-accent-peach: #ffb8a8;
   --sm-peach-ink: #a6432c;
@@ -84,6 +91,10 @@
   --sm-ramune-ink: #0e6b63;
   --sm-accent-lavender: #c9b8ff;
   --sm-lavender-ink: #4b3ba8;
+  --sm-accent-grass: #7bd389;
+  --sm-accent-dirt: #c98f5b;
+  --sm-cream: #fff7e6;
+  --sm-cheek: #ff9fbf;
   /* Ink for a pastel *tint* background. The four pastels keep the same value in both themes, so
      this one colour is shared — it is never used as a body colour on a dark surface. */
   --sm-on-pastel: #1f2a44;
@@ -100,13 +111,13 @@
 
   /* focus, shadows, scrim, ratings */
   --sm-focus-ring: #0b5c8a;
-  --sm-shadow-color: rgba(31, 42, 68, 0.18);
-  --sm-shadow-hard-color: rgba(31, 42, 68, 0.5);
+  --sm-shadow-color: rgba(31, 42, 68, 0.22);
+  --sm-shadow-hard-color: rgba(31, 42, 68, 0.14);
   --sm-scrim: rgba(20, 27, 51, 0.45);
   --sm-star: #b06e00;
   --sm-star-empty: #768db0;
 
-  /* type: pixel for headings/labels only, rounded sans for running text (plan §7) */
+  /* type: pixel for headings/labels only, rounded sans for running text */
   --sm-font-pixel: "SmPixel", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --sm-font-body: "SmBody", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --sm-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -121,19 +132,19 @@
   --sm-space-8: 3rem;
   --sm-space-10: 4rem;
   --sm-space-12: 6rem;
-  --sm-container: min(1080px, 100% - 2.5rem - env(safe-area-inset-left) - env(safe-area-inset-right));
-  --sm-section-space: clamp(3.5rem, 9vw, 7rem);
+  --sm-container: min(1120px, 100% - 2.5rem - env(safe-area-inset-left) - env(safe-area-inset-right));
+  --sm-section-space: clamp(3rem, 7vw, 5.5rem);
 
   --sm-text-2xs: 0.6875rem;
   --sm-text-xs: 0.75rem;
   --sm-text-sm: 0.875rem;
   --sm-text-base: 1rem;
-  --sm-text-lg: 1.125rem;
-  --sm-text-xl: 1.375rem;
-  --sm-text-2xl: 1.75rem;
+  --sm-text-lg: 1.1875rem; /* 19px — the artboard reading size */
+  --sm-text-xl: 1.25rem;
+  --sm-text-2xl: 1.625rem; /* 26px — .h2 of the artboards */
   --sm-text-3xl: 2.25rem;
-  --sm-text-display: clamp(2.6rem, 8vw, 5rem);
-  --sm-leading-tight: 1.15;
+  --sm-text-display: clamp(2.6rem, 8vw, 4rem); /* 64px at 1280 — hero h1 of the artboards */
+  --sm-leading-tight: 1.05;
   --sm-leading-snug: 1.3;
   --sm-leading-normal: 1.5;
   --sm-leading-body: 1.6;
@@ -141,13 +152,14 @@
   --sm-weight-medium: 500;
   --sm-weight-semibold: 600;
   --sm-weight-bold: 700;
+  --sm-weight-black: 900;
 
-  /* radii: big and soft for illustration surfaces, 0/2px for pixel chrome (plan §7) */
-  --sm-radius-sm: 6px;
-  --sm-radius-md: 10px;
+  /* radii (artboard: cards 22px, tiles/buttons 14px, chips/pills 999px, small controls 12px) */
+  --sm-radius-sm: 10px;
+  --sm-radius-md: 12px;
   --sm-radius-lg: 14px;
-  --sm-radius-xl: 20px;
-  --sm-radius-2xl: 28px;
+  --sm-radius-xl: 18px;
+  --sm-radius-2xl: 22px;
   --sm-radius-full: 999px;
   --sm-radius-pixel: 0;
 
@@ -155,7 +167,7 @@
   --sm-pixel: 2px;
   --sm-pixel-step: 4px;
   --sm-pixel-notch: 8px;
-  --sm-pixel-shadow: 2px;
+  --sm-pixel-shadow: 3px;
   --sm-dither-size: 4px;
   --sm-dither-opacity: 0.16;
   --sm-dither: repeating-linear-gradient(
@@ -164,19 +176,20 @@
     transparent calc(var(--sm-dither-size) / 2) var(--sm-dither-size)
   );
 
-  /* shadows: a pixel offset for chrome, soft light for illustration cards */
-  --sm-shadow-1: 0 1px 2px -1px var(--sm-shadow-color);
-  --sm-shadow-2: 0 18px 40px -18px var(--sm-shadow-color);
-  --sm-shadow-pixel: 0 var(--sm-pixel-shadow) 0 0 var(--sm-shadow-hard-color);
+  /* shadows (artboard theme.css .day) */
+  --sm-shadow-1: 0 1px 2px rgba(31, 42, 68, 0.06), 0 14px 34px -14px rgba(31, 42, 68, 0.22);
+  --sm-shadow-2: 0 2px 4px rgba(31, 42, 68, 0.06), 0 22px 44px -16px rgba(31, 42, 68, 0.3);
+  --sm-shadow-pixel: 0 var(--sm-pixel-shadow) 0 var(--sm-sun-edge);
   --sm-outline-sticker: 0 0 0 2px var(--sm-surface), 0 0 0 4px var(--sm-frame);
 
-  /* touch + motion */
+  /* touch + motion (artboard easing: the springy cubic-bezier(.34,1.56,.64,1)) */
   --sm-tap: 44px;
   --sm-tap-dense: 36px;
   --sm-duration-fast: 150ms;
   --sm-duration: 200ms;
   --sm-duration-slow: 250ms;
   --sm-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sm-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* z-order: one place to look, no magic numbers in components (DESIGN.md §11.6) */
   --sm-z-base: 1;
@@ -192,22 +205,25 @@
 @media (prefers-color-scheme: dark) {
   .sm-root:not([data-theme]) {
     color-scheme: dark;
-    --sm-sky-1: #101a36;
-    --sm-sky-2: #23335c;
+    --sm-sky-1: #0b1330;
+    --sm-sky-2: #243461;
     --sm-sky-3: #2c3d68;
-    --sm-background: #141b33;
-    --sm-background-2: #101628;
-    --sm-surface: #1c2542;
-    --sm-surface-2: #17203a;
-    --sm-surface-3: #26304f;
+    --sm-background: #10172e;
+    --sm-background-2: #0b1124;
+    --sm-surface: #18213e;
+    --sm-surface-2: #1f2a4b;
+    --sm-surface-3: #2a365b;
+    --sm-glass: rgba(20, 28, 54, 0.72);
     --sm-foreground: #f1f5ff;
-    --sm-muted-foreground: #aeb9d4;
-    --sm-border: rgba(255, 255, 255, 0.14);
-    --sm-border-strong: #6e7da8;
+    --sm-muted-foreground: #aab6d4;
+    --sm-border: rgba(255, 255, 255, 0.08);
+    --sm-border-strong: #7f8fbd;
     --sm-frame: #a9b7d9;
+    --sm-edge: #7f8fbd;
     --sm-primary: #ffd45e;
     --sm-primary-foreground: #1a1633;
     --sm-primary-deep: #7a5300;
+    --sm-sun-edge: #c48712;
     --sm-accent-sun: #ffd45e;
     --sm-accent-peach: #ffb8a8;
     --sm-peach-ink: #ffb8a8;
@@ -217,6 +233,10 @@
     --sm-ramune-ink: #7fe0d3;
     --sm-accent-lavender: #c9b8ff;
     --sm-lavender-ink: #c9b8ff;
+    --sm-accent-grass: #4fa86a;
+    --sm-accent-dirt: #8a5d3a;
+    --sm-cream: #fff3d9;
+    --sm-cheek: #ff8fb4;
     --sm-link: #7fe0d3;
     --sm-link-hover: #a6ece2;
     --sm-danger: #ff8a80;
@@ -225,34 +245,39 @@
     --sm-success-weak: rgba(120, 224, 160, 0.14);
     --sm-warning: #ffd08a;
     --sm-warning-weak: rgba(255, 208, 138, 0.14);
-    --sm-focus-ring: #ffd45e;
+    --sm-focus-ring: #7fe0d3;
     --sm-shadow-color: rgba(0, 0, 0, 0.6);
-    --sm-shadow-hard-color: rgba(0, 0, 0, 0.75);
+    --sm-shadow-hard-color: rgba(0, 0, 0, 0.3);
     --sm-scrim: rgba(6, 9, 20, 0.6);
     --sm-star: #ffd45e;
     --sm-star-empty: #6e7ca6;
     --sm-dither-opacity: 0.22;
+    --sm-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 36px -16px rgba(0, 0, 0, 0.6);
+    --sm-shadow-2: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
   }
 }
 
 .sm-root[data-theme="summer-night"] {
   color-scheme: dark;
-  --sm-sky-1: #101a36;
-  --sm-sky-2: #23335c;
+  --sm-sky-1: #0b1330;
+  --sm-sky-2: #243461;
   --sm-sky-3: #2c3d68;
-  --sm-background: #141b33;
-  --sm-background-2: #101628;
-  --sm-surface: #1c2542;
-  --sm-surface-2: #17203a;
-  --sm-surface-3: #26304f;
+  --sm-background: #10172e;
+  --sm-background-2: #0b1124;
+  --sm-surface: #18213e;
+  --sm-surface-2: #1f2a4b;
+  --sm-surface-3: #2a365b;
+  --sm-glass: rgba(20, 28, 54, 0.72);
   --sm-foreground: #f1f5ff;
-  --sm-muted-foreground: #aeb9d4;
-  --sm-border: rgba(255, 255, 255, 0.14);
-  --sm-border-strong: #6e7da8;
+  --sm-muted-foreground: #aab6d4;
+  --sm-border: rgba(255, 255, 255, 0.08);
+  --sm-border-strong: #7f8fbd;
   --sm-frame: #a9b7d9;
+  --sm-edge: #7f8fbd;
   --sm-primary: #ffd45e;
   --sm-primary-foreground: #1a1633;
   --sm-primary-deep: #7a5300;
+  --sm-sun-edge: #c48712;
   --sm-accent-sun: #ffd45e;
   --sm-accent-peach: #ffb8a8;
   --sm-peach-ink: #ffb8a8;
@@ -262,6 +287,10 @@
   --sm-ramune-ink: #7fe0d3;
   --sm-accent-lavender: #c9b8ff;
   --sm-lavender-ink: #c9b8ff;
+  --sm-accent-grass: #4fa86a;
+  --sm-accent-dirt: #8a5d3a;
+  --sm-cream: #fff3d9;
+  --sm-cheek: #ff8fb4;
   --sm-link: #7fe0d3;
   --sm-link-hover: #a6ece2;
   --sm-danger: #ff8a80;
@@ -270,13 +299,15 @@
   --sm-success-weak: rgba(120, 224, 160, 0.14);
   --sm-warning: #ffd08a;
   --sm-warning-weak: rgba(255, 208, 138, 0.14);
-  --sm-focus-ring: #ffd45e;
+  --sm-focus-ring: #7fe0d3;
   --sm-shadow-color: rgba(0, 0, 0, 0.6);
-  --sm-shadow-hard-color: rgba(0, 0, 0, 0.75);
+  --sm-shadow-hard-color: rgba(0, 0, 0, 0.3);
   --sm-scrim: rgba(6, 9, 20, 0.6);
   --sm-star: #ffd45e;
   --sm-star-empty: #6e7ca6;
   --sm-dither-opacity: 0.22;
+  --sm-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 36px -16px rgba(0, 0, 0, 0.6);
+  --sm-shadow-2: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
 }
 
 /* Touch targets: dense controls grow to 44px on coarse pointers (DESIGN.md §0.7). */
@@ -297,16 +328,22 @@
   line-height: var(--sm-leading-body);
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  background-image: linear-gradient(180deg, var(--sm-sky-1) 0, var(--sm-sky-2) 360px, var(--sm-background) 640px);
+  background-repeat: no-repeat;
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 .sm-root body {
   margin: 0;
   min-height: 100%;
-  background-color: var(--sm-background);
+  background-color: transparent;
+  background-image: linear-gradient(180deg, var(--sm-sky-1) 0, var(--sm-sky-2) 360px, var(--sm-background) 640px);
+  background-repeat: no-repeat;
   color: var(--sm-foreground);
   font-family: var(--sm-font-body);
   font-size: var(--sm-text-base);
   line-height: var(--sm-leading-body);
   overflow-x: hidden;
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 .sm-root *,
 .sm-root *::before,
@@ -325,8 +362,8 @@
 /* Focus is always visible and never removed without a replacement (DESIGN.md §2).
    `:where()` keeps the specificity at 0 so components can refine their own ring. */
 :where(.sm-root) :focus-visible {
-  outline: var(--sm-pixel) solid var(--sm-focus-ring);
-  outline-offset: 2px;
+  outline: 3px solid var(--sm-focus-ring);
+  outline-offset: 3px;
 }
 :where(.sm-root) :focus:not(:focus-visible) {
   outline: none;
@@ -348,7 +385,8 @@
   color: var(--sm-primary-foreground);
   font-weight: var(--sm-weight-bold);
   text-decoration: none;
-  border: var(--sm-pixel) solid var(--sm-frame);
+  border-radius: var(--sm-radius-lg);
+  box-shadow: 0 var(--sm-pixel-shadow) 0 var(--sm-sun-edge);
   transition: transform var(--sm-duration-fast) var(--sm-ease);
 }
 .sm-skip-link:focus-visible {
@@ -356,76 +394,95 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
-   Typography + prose (stories, blog, reviews). Body text is never set in the pixel font.
+   Typography + prose (stories, blog, reviews). Pixel font for titles and labels, the rounded sans
+   for running text — artboard pages.css: .h1/.kicker pixel, .h2/.h3/.prose Nunito.
    --------------------------------------------------------------------------------------------- */
 .sm-h1,
-.sm-h2,
-.sm-h3,
-.sm-h4,
 .sm-pixel {
   font-family: var(--sm-font-pixel);
   font-weight: var(--sm-weight-bold);
   color: var(--sm-foreground);
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
   line-height: var(--sm-leading-tight);
   margin: 0 0 var(--sm-space-3);
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
 .sm-h1 {
-  font-size: var(--sm-text-3xl);
+  font-size: 3.25rem;
+}
+.sm-h2,
+.sm-h3,
+.sm-h4 {
+  font-family: var(--sm-font-body);
+  color: var(--sm-foreground);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--sm-space-3);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 .sm-h2 {
   font-size: var(--sm-text-2xl);
+  font-weight: var(--sm-weight-black);
 }
 .sm-h3 {
   font-size: var(--sm-text-xl);
+  font-weight: var(--sm-weight-black);
 }
 .sm-h4 {
   font-size: var(--sm-text-lg);
+  font-weight: var(--sm-weight-bold);
 }
 .sm-display {
   font-family: var(--sm-font-pixel);
   font-size: var(--sm-text-display);
   font-weight: var(--sm-weight-bold);
-  line-height: 1.08;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
   margin: 0 0 var(--sm-space-4);
   overflow-wrap: anywhere;
 }
-/* Pixel underline: an 8px on/off bar drawn with a gradient so it scales with zoom. */
-.sm-h1::after,
-.sm-h2::after {
-  content: "";
-  display: block;
-  width: min(100%, 72px);
-  height: 6px;
-  margin-top: var(--sm-space-3);
-  background-image: repeating-linear-gradient(90deg, var(--sm-accent-sun) 0 8px, transparent 8px 16px);
-}
+/* Page kicker: pixel star (artboard .kicker::before) instead of a plain square. */
 .sm-eyebrow {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm-space-2);
   font-family: var(--sm-font-pixel);
-  font-size: var(--sm-text-xs);
-  font-weight: var(--sm-weight-bold);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-regular);
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--sm-muted-foreground);
   margin: 0 0 var(--sm-space-2);
 }
 .sm-eyebrow::before {
   content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: var(--sm-space-2);
-  background: var(--sm-accent-sun);
-  vertical-align: baseline;
+  width: 10px;
+  height: 10px;
+  flex: none;
+  background: var(--sm-sun-edge);
+  clip-path: polygon(
+    40% 0,
+    60% 0,
+    60% 40%,
+    100% 40%,
+    100% 60%,
+    60% 60%,
+    60% 100%,
+    40% 100%,
+    40% 60%,
+    0 60%,
+    0 40%,
+    40% 40%
+  );
 }
 .sm-lead {
   font-size: var(--sm-text-lg);
-  line-height: var(--sm-leading-snug);
+  line-height: 1.55;
   color: var(--sm-muted-foreground);
-  max-width: 40rem;
+  font-weight: var(--sm-weight-semibold);
+  max-width: 56ch;
   margin: 0 0 var(--sm-space-4);
 }
 .sm-muted {
@@ -453,6 +510,12 @@
 .sm-root a.sm-btn:hover {
   color: var(--sm-primary-foreground);
 }
+.sm-root a.sm-btn--soft {
+  color: var(--sm-foreground);
+}
+.sm-root a.sm-btn--soft:hover {
+  color: var(--sm-foreground);
+}
 .sm-root a.sm-btn--ghost {
   color: var(--sm-link);
 }
@@ -469,29 +532,35 @@
   font-size: 0.9em;
   background: var(--sm-surface-2);
   border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-sm);
   padding: 0.05em 0.35em;
   overflow-wrap: anywhere;
 }
 .sm-prose {
-  max-width: 68ch;
+  max-width: 66ch;
+  font-size: var(--sm-text-lg);
+  line-height: 1.75;
   color: var(--sm-foreground);
 }
 .sm-prose > * + * {
   margin-top: var(--sm-space-4);
 }
 .sm-prose h2 {
-  font-family: var(--sm-font-pixel);
+  font-family: var(--sm-font-body);
   font-size: var(--sm-text-2xl);
+  font-weight: var(--sm-weight-black);
+  letter-spacing: -0.01em;
   margin-top: var(--sm-space-8);
 }
 .sm-prose h3 {
-  font-family: var(--sm-font-pixel);
+  font-family: var(--sm-font-body);
   font-size: var(--sm-text-xl);
+  font-weight: var(--sm-weight-black);
   margin-top: var(--sm-space-6);
 }
 .sm-prose p,
 .sm-prose li {
-  line-height: var(--sm-leading-body);
+  line-height: 1.75;
 }
 .sm-prose ul,
 .sm-prose ol {
@@ -500,12 +569,13 @@
 .sm-prose li + li {
   margin-top: var(--sm-space-2);
 }
+/* Artboard: a lavender edge on the left instead of a grey box. */
 .sm-prose blockquote {
-  margin: var(--sm-space-6) 0;
-  padding: var(--sm-space-4) var(--sm-space-5);
-  background: var(--sm-surface-2);
-  border-left: var(--sm-pixel-step) solid var(--sm-accent-ramune);
-  color: var(--sm-foreground);
+  margin: 1.4em 0;
+  padding: 4px 0 4px 20px;
+  background: none;
+  border-left: 4px solid var(--sm-accent-lavender);
+  color: var(--sm-muted-foreground);
 }
 .sm-prose hr {
   border: 0;
@@ -526,15 +596,16 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
-   Buttons. One primary action per view; every target is at least 44px tall.
+   Buttons. "Toy key" feel from theme.css: solid face, a short hard edge underneath, springy press.
+   One primary action per view; every target is at least 44px tall.
    --------------------------------------------------------------------------------------------- */
 .sm-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--sm-space-2);
-  min-height: var(--sm-tap);
-  padding: 0 var(--sm-space-4);
+  min-height: 48px;
+  padding: 0 22px;
   font-family: var(--sm-font-body);
   font-size: var(--sm-text-base);
   font-weight: var(--sm-weight-bold);
@@ -542,60 +613,78 @@
   text-align: center;
   text-decoration: none;
   cursor: pointer;
-  border: var(--sm-pixel) solid var(--sm-frame);
-  border-radius: var(--sm-radius-sm);
+  border: 0;
+  border-radius: var(--sm-radius-lg);
   background: var(--sm-primary);
   color: var(--sm-primary-foreground);
-  box-shadow: var(--sm-shadow-pixel);
-  transition: background-color var(--sm-duration-fast) var(--sm-ease),
-    border-color var(--sm-duration-fast) var(--sm-ease),
-    transform var(--sm-duration-fast) var(--sm-ease),
-    box-shadow var(--sm-duration-fast) var(--sm-ease);
+  box-shadow: 0 var(--sm-pixel-shadow) 0 var(--sm-sun-edge), 0 10px 22px -10px rgba(226, 165, 42, 0.8);
+  transition: transform 0.22s var(--sm-ease-spring), box-shadow 0.22s ease, background-color 0.3s ease;
 }
 .sm-btn:hover {
-  background: var(--sm-accent-sun);
-  filter: brightness(1.06);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--sm-sun-edge), 0 14px 26px -10px rgba(226, 165, 42, 0.85);
+  filter: none;
 }
-/* The pixel press: the button slides down onto its own hard shadow. */
+/* The press: the button slides down onto its own hard edge. */
 .sm-btn:active {
-  transform: translateY(var(--sm-pixel-shadow));
-  box-shadow: none;
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--sm-sun-edge), 0 4px 10px -6px rgba(226, 165, 42, 0.8);
+  transition-duration: 0.08s;
 }
 .sm-btn[disabled],
 .sm-btn[aria-disabled="true"] {
   background: var(--sm-surface-3);
   color: var(--sm-muted-foreground);
-  border-color: var(--sm-border-strong);
   box-shadow: none;
   cursor: not-allowed;
   filter: none;
   transform: none;
 }
+/* Secondary: a solid face with a hairline ring and its own short edge. */
+.sm-btn--soft {
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong), 0 var(--sm-pixel-shadow) 0 var(--sm-border);
+}
+.sm-btn--soft:hover {
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong), 0 5px 0 var(--sm-border);
+}
+.sm-btn--soft:active {
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong), 0 1px 0 var(--sm-border);
+}
 .sm-btn--ghost {
   background: transparent;
   color: var(--sm-link);
-  border-color: var(--sm-border-strong);
+  padding: 0 6px;
+  min-height: 44px;
+  border-radius: var(--sm-radius-md);
   box-shadow: none;
 }
 .sm-btn--ghost:hover {
   background: var(--sm-surface-2);
   color: var(--sm-link-hover);
-  filter: none;
+  transform: none;
+  box-shadow: none;
+}
+.sm-btn--ghost:active {
+  transform: none;
+  box-shadow: none;
 }
 .sm-btn--danger {
   background: transparent;
   color: var(--sm-danger);
-  border-color: var(--sm-danger);
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--sm-danger);
 }
 .sm-btn--danger:hover {
   background: var(--sm-danger-weak);
-  filter: none;
+  box-shadow: inset 0 0 0 1px var(--sm-danger);
+  transform: none;
 }
 .sm-btn--dense {
-  min-height: var(--sm-tap-dense);
-  padding: 0 var(--sm-space-3);
+  min-height: 40px;
+  padding: 0 16px;
   font-size: var(--sm-text-sm);
+  border-radius: var(--sm-radius-md);
 }
 .sm-btn--icon {
   width: var(--sm-tap);
@@ -604,46 +693,31 @@
 .sm-btn--block {
   width: 100%;
 }
+.sm-btn .sm-btn__arrow {
+  transition: transform 0.22s var(--sm-ease-spring);
+}
+.sm-btn:hover .sm-btn__arrow {
+  transform: translateX(4px);
+}
 
 /* ---------------------------------------------------------------------------------------------
-   Cards. Staircase ("Treppenkante") pixel corners via clip-path; interactive cards use an inset
-   ring because clip-path clips an outline.
+   Cards. Artboard pages.css: 22px radius, hairline ring + soft shadow, lift and a small tilt on
+   hover, the icon tile wiggles while the CTA arrow slides.
    --------------------------------------------------------------------------------------------- */
 .sm-card {
   position: relative;
   padding: var(--sm-space-5);
   background: var(--sm-surface);
   color: var(--sm-foreground);
-  border: var(--sm-pixel) solid var(--sm-border);
-  border-radius: var(--sm-radius-lg);
-  box-shadow: var(--sm-shadow-1);
+  border: 0;
+  border-radius: var(--sm-radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-1);
+  transition: transform 0.3s var(--sm-ease-spring), box-shadow 0.3s ease, background-color 0.5s ease;
 }
 .sm-card--pixel {
-  border: var(--sm-pixel) solid var(--sm-frame);
-  border-radius: var(--sm-radius-pixel);
-  box-shadow: var(--sm-shadow-pixel);
-  clip-path: polygon(
-    0 var(--sm-pixel-step),
-    var(--sm-pixel-step) var(--sm-pixel-step),
-    var(--sm-pixel-step) var(--sm-pixel),
-    var(--sm-pixel-notch) var(--sm-pixel),
-    var(--sm-pixel-notch) 0,
-    calc(100% - var(--sm-pixel-notch)) 0,
-    calc(100% - var(--sm-pixel-notch)) var(--sm-pixel),
-    calc(100% - var(--sm-pixel-step)) var(--sm-pixel),
-    calc(100% - var(--sm-pixel-step)) var(--sm-pixel-step),
-    100% var(--sm-pixel-step),
-    100% calc(100% - var(--sm-pixel-step)),
-    calc(100% - var(--sm-pixel-step)) calc(100% - var(--sm-pixel-step)),
-    calc(100% - var(--sm-pixel-step)) calc(100% - var(--sm-pixel)),
-    calc(100% - var(--sm-pixel-notch)) calc(100% - var(--sm-pixel)),
-    calc(100% - var(--sm-pixel-notch)) 100%,
-    var(--sm-pixel-notch) 100%,
-    var(--sm-pixel-notch) calc(100% - var(--sm-pixel)),
-    var(--sm-pixel-step) calc(100% - var(--sm-pixel)),
-    var(--sm-pixel-step) calc(100% - var(--sm-pixel-step)),
-    0 calc(100% - var(--sm-pixel-step))
-  );
+  border-radius: var(--sm-radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong), var(--sm-shadow-1);
+  clip-path: none;
 }
 .sm-card--sun {
   background-image: linear-gradient(180deg, var(--sm-sky-2), var(--sm-surface) 70%);
@@ -653,13 +727,15 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  border-radius: inherit;
   background-image: var(--sm-dither);
   opacity: var(--sm-dither-opacity);
   pointer-events: none;
 }
 .sm-card__title {
-  font-family: var(--sm-font-pixel);
+  font-family: var(--sm-font-body);
   font-size: var(--sm-text-xl);
+  font-weight: var(--sm-weight-black);
   margin: 0 0 var(--sm-space-2);
 }
 .sm-card__meta {
@@ -672,8 +748,19 @@
   text-decoration: none;
 }
 .sm-card--link:hover {
-  border-color: var(--sm-border-strong);
-  box-shadow: var(--sm-shadow-2);
+  transform: translateY(-5px) rotate(-0.4deg);
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong), var(--sm-shadow-2);
+}
+.sm-root a.sm-card--link,
+.sm-root a.sm-card--link:hover {
+  color: inherit;
+  text-decoration: none;
+}
+.sm-card--link:hover .sm-tile__icon {
+  animation: sm-wiggle 0.6s ease;
+}
+.sm-card--link:hover .sm-tile__cta-arrow {
+  transform: translateX(4px);
 }
 .sm-card--link:focus-visible {
   outline: none;
@@ -685,15 +772,15 @@
   }
 }
 
-/* Visual-novel dialogue box (guestbook entries, pull quotes, review verdicts; plan §7). */
+/* Visual-novel dialogue box (guestbook entries, pull quotes, review verdicts). */
 .sm-dialog {
   position: relative;
   margin: 0;
   padding: var(--sm-space-5);
   background: var(--sm-surface);
-  border: var(--sm-pixel) solid var(--sm-frame);
-  border-radius: var(--sm-radius-sm);
-  box-shadow: var(--sm-shadow-pixel);
+  border: 0;
+  border-radius: 20px 20px 20px 6px;
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-1);
 }
 .sm-dialog__name {
   position: absolute;
@@ -702,7 +789,7 @@
   padding: var(--sm-space-1) var(--sm-space-3);
   background: var(--sm-accent-sun);
   color: var(--sm-primary-foreground);
-  border: var(--sm-pixel) solid var(--sm-frame);
+  border-radius: var(--sm-radius-sm);
   font-family: var(--sm-font-pixel);
   font-size: var(--sm-text-sm);
 }
@@ -727,46 +814,45 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
-   Tab bar — a real tablist (arrow keys are the caller's job in Phase 2), plus a segmented variant.
+   Tab bar / segmented control — a real tablist, plus the DE/EN language switch.
    --------------------------------------------------------------------------------------------- */
 .sm-tabs {
-  display: flex;
-  gap: var(--sm-pixel);
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-1);
   max-width: 100%;
-  overflow-x: auto;
-  padding: 3px;
+  padding: 4px;
   background: var(--sm-surface-2);
-  border: var(--sm-pixel) solid var(--sm-border-strong);
-  border-radius: var(--sm-radius-md);
-  scrollbar-width: none;
-}
-.sm-tabs::-webkit-scrollbar {
-  display: none;
+  border-radius: var(--sm-radius-full);
+  box-shadow: inset 0 0 0 1px var(--sm-border);
 }
 .sm-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   min-height: var(--sm-tap-dense);
   padding: 0 var(--sm-space-4);
   font-family: var(--sm-font-body);
   font-size: var(--sm-text-sm);
-  font-weight: var(--sm-weight-semibold);
+  font-weight: var(--sm-weight-black);
   color: var(--sm-muted-foreground);
   background: transparent;
   border: 0;
-  border-radius: var(--sm-radius-sm);
+  border-radius: var(--sm-radius-full);
   cursor: pointer;
-  transition: background-color var(--sm-duration-fast) var(--sm-ease),
-    color var(--sm-duration-fast) var(--sm-ease);
+  text-decoration: none;
+  transition: background-color var(--sm-duration-slow) var(--sm-ease), color var(--sm-duration-slow) var(--sm-ease);
 }
 .sm-tab:hover {
-  background: var(--sm-surface-3);
+  background: var(--sm-surface);
   color: var(--sm-foreground);
 }
 .sm-tab[aria-selected="true"],
 .sm-tab[aria-pressed="true"] {
   background: var(--sm-surface);
   color: var(--sm-foreground);
-  box-shadow: inset 0 calc(-1 * var(--sm-pixel)) 0 0 var(--sm-accent-sun);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 0 var(--sm-border-strong);
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -780,23 +866,26 @@
   display: block;
   margin-bottom: var(--sm-space-1);
   font-size: var(--sm-text-sm);
-  font-weight: var(--sm-weight-semibold);
+  font-weight: var(--sm-weight-bold);
   color: var(--sm-foreground);
 }
 .sm-input,
 .sm-textarea,
 .sm-select {
   width: 100%;
-  min-height: var(--sm-tap);
-  padding: var(--sm-space-2) var(--sm-space-3);
+  min-height: 46px;
+  padding: var(--sm-space-2) var(--sm-space-4);
   font-family: var(--sm-font-body);
   font-size: 16px;
+  font-weight: var(--sm-weight-semibold);
   line-height: var(--sm-leading-normal);
   color: var(--sm-foreground);
   background: var(--sm-surface);
-  border: var(--sm-pixel) solid var(--sm-border-strong);
+  border: 0;
   border-radius: var(--sm-radius-md);
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong);
   appearance: none;
+  transition: box-shadow var(--sm-duration) var(--sm-ease);
 }
 .sm-input::placeholder,
 .sm-textarea::placeholder {
@@ -819,12 +908,11 @@
 .sm-textarea:focus-visible,
 .sm-select:focus-visible {
   outline: none;
-  border-color: var(--sm-focus-ring);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sm-focus-ring) 25%, transparent);
+  box-shadow: inset 0 0 0 2px var(--sm-focus-ring), 0 0 0 4px color-mix(in srgb, var(--sm-focus-ring) 25%, transparent);
 }
 .sm-input[aria-invalid="true"],
 .sm-textarea[aria-invalid="true"] {
-  border-color: var(--sm-danger);
+  box-shadow: inset 0 0 0 2px var(--sm-danger);
 }
 .sm-hint {
   display: block;
@@ -852,21 +940,21 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sm-space-1);
-  padding: 0.15rem var(--sm-space-2);
-  font-family: var(--sm-font-pixel);
+  min-height: 26px;
+  padding: 0 var(--sm-space-3);
+  font-family: var(--sm-font-body);
   font-size: var(--sm-text-xs);
-  font-weight: var(--sm-weight-bold);
-  line-height: 1.5;
+  font-weight: var(--sm-weight-black);
+  line-height: 1;
   white-space: nowrap;
   background: var(--sm-surface-2);
-  color: var(--sm-foreground);
-  border: 1px solid var(--sm-border-strong);
-  border-radius: var(--sm-radius-sm);
+  color: var(--sm-muted-foreground);
+  border: 0;
+  border-radius: var(--sm-radius-full);
+  box-shadow: inset 0 0 0 1px var(--sm-border);
 }
 .sm-chip {
   min-height: var(--sm-tap-dense);
-  padding: 0 var(--sm-space-3);
-  font-family: var(--sm-font-body);
   font-size: var(--sm-text-sm);
   cursor: pointer;
   background: var(--sm-surface);
@@ -877,12 +965,25 @@
 .sm-chip:hover {
   background: var(--sm-surface-3);
 }
+/* The status dot of a chip (`<span class="dot">` in the artboards). */
+.sm-badge__dot,
+.sm-chip__dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--sm-accent-sun);
+}
+.sm-badge--live .sm-badge__dot {
+  background: #2fbf71;
+  animation: sm-ping 2s ease-out infinite;
+}
 .sm-badge--sun,
 .sm-badge--sakura,
 .sm-badge--ramune,
 .sm-badge--lavender,
 .sm-badge--peach {
-  border-color: transparent;
+  box-shadow: none;
 }
 .sm-badge--sun {
   background: var(--sm-accent-sun);
@@ -907,17 +1008,17 @@
 .sm-badge--danger {
   background: var(--sm-danger-weak);
   color: var(--sm-danger);
-  border-color: var(--sm-danger);
+  box-shadow: inset 0 0 0 1px var(--sm-danger);
 }
 .sm-badge--success {
   background: var(--sm-success-weak);
   color: var(--sm-success);
-  border-color: var(--sm-success);
+  box-shadow: inset 0 0 0 1px var(--sm-success);
 }
 .sm-badge--warning {
   background: var(--sm-warning-weak);
   color: var(--sm-warning);
-  border-color: var(--sm-warning);
+  box-shadow: inset 0 0 0 1px var(--sm-warning);
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -966,11 +1067,11 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
-   Pixel detail helpers (plan §7): sticker outline, dotted sky, mascot slot.
+   Pixel detail helpers: sticker outline, dotted sky, mascot slot, inline pixel icons.
    --------------------------------------------------------------------------------------------- */
 .sm-sticker {
   box-shadow: var(--sm-outline-sticker);
-  border-radius: var(--sm-radius-sm);
+  border-radius: var(--sm-radius-lg);
   background: var(--sm-surface);
 }
 .sm-sky {
@@ -989,8 +1090,8 @@
 .sm-dither {
   background-image: var(--sm-dither);
 }
-/* Mascot slot: reserves the box Nils' drawing will fill; placeholder art comes from
-   /design/summer-sprites.svg. */
+/* Mascot slot: the artboards draw the pixel creature inline (crispEdges); the class only reserves
+   the box and keeps the pixels sharp. */
 .sm-mascot {
   display: inline-grid;
   place-items: center;
@@ -1002,25 +1103,30 @@
 .sm-mascot svg {
   width: 100%;
   height: 100%;
+  shape-rendering: crispEdges;
   image-rendering: pixelated;
-}
-.sm-mascot--placeholder {
-  border: var(--sm-pixel) dashed var(--sm-border-strong);
-  background: var(--sm-surface-2);
 }
 /* Sprite icon: always a whole-pixel square so pixel art stays crisp. */
 .sm-icon {
   width: 24px;
   height: 24px;
   flex: none;
+  shape-rendering: crispEdges;
   image-rendering: pixelated;
 }
 .sm-icon--lg {
   width: 40px;
   height: 40px;
 }
+/* Inline pixel art keeps the size it was drawn with (the width/height attributes of the artboard),
+   so the class only pins the rendering. */
+.sm-px-icon {
+  flex: none;
+  shape-rendering: crispEdges;
+  image-rendering: pixelated;
+}
 
-/* Layout helpers used by the shell in Phase 2. */
+/* Layout helpers used by the shell. */
 .sm-wrap {
   width: var(--sm-container);
   margin-inline: auto;
@@ -1034,8 +1140,34 @@
   align-items: center;
   gap: var(--sm-space-3);
 }
+.sm-row--center {
+  justify-content: center;
+}
+.sm-row-between {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sm-space-3);
+}
+.sm-small {
+  font-size: var(--sm-text-sm);
+}
 .sm-section {
   padding-block: var(--sm-section-space);
+}
+.sm-section--tight {
+  padding-block: var(--sm-space-6);
+}
+.sm-g2 {
+  display: grid;
+  gap: var(--sm-space-5);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+.sm-g3 {
+  display: grid;
+  gap: var(--sm-space-5);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
 }
 .sm-visually-hidden {
   position: absolute;
@@ -1051,9 +1183,7 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
-   Shell (Phase 2): header with navigation, language switch, theme toggle, footer, hero, section
-   tiles and the empty state. Spec: DESIGN.md §11.9. Same contract as everything above — `.sm-*`
-   classes, `--sm-*` tokens only, no bare element selector, no remote resource, no new font.
+   Shell: glass pill header, page head, hero with the artboard illustration, bento tiles, footer.
    --------------------------------------------------------------------------------------------- */
 .sm-shell {
   min-height: 100%;
@@ -1063,38 +1193,46 @@
 .sm-shell > .sm-nav {
   flex: none;
 }
-.sm-shell > main {
+.sm-shell > .sm-main {
   flex: 1 0 auto;
 }
+/* Sticky wrapper: only the pill is painted, so the sky gradient stays visible behind it. */
 .sm-nav {
   position: sticky;
   top: 0;
   z-index: var(--sm-z-nav);
-  padding-top: env(safe-area-inset-top);
-  background: color-mix(in srgb, var(--sm-sky-3) 88%, transparent);
-  border-bottom: var(--sm-pixel) solid var(--sm-border);
-  backdrop-filter: saturate(160%) blur(12px);
-  -webkit-backdrop-filter: saturate(160%) blur(12px);
+  padding: var(--sm-space-4) 0;
+  padding-top: calc(var(--sm-space-4) + env(safe-area-inset-top));
+  background: transparent;
 }
-.sm-nav__inner {
+.sm-hdr {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--sm-space-2) var(--sm-space-3);
-  padding-block: var(--sm-space-2);
+  padding: 8px 8px 8px 16px;
+  border-radius: var(--sm-radius-full);
+  background: var(--sm-glass);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-1);
+  transition: background-color 0.5s ease;
 }
 .sm-brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--sm-space-2);
+  gap: 10px;
   font-family: var(--sm-font-pixel);
-  font-size: var(--sm-text-base);
+  font-size: 18px;
   font-weight: var(--sm-weight-bold);
   color: var(--sm-foreground);
   text-decoration: none;
 }
-.sm-brand:hover {
-  color: var(--sm-link);
+.sm-root a.sm-brand,
+.sm-root a.sm-brand:hover {
+  color: var(--sm-foreground);
+  text-decoration: none;
 }
 .sm-brand__name {
   white-space: nowrap;
@@ -1106,103 +1244,251 @@
 }
 .sm-nav__links {
   display: flex;
-  gap: var(--sm-pixel);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.sm-nav__links::-webkit-scrollbar {
-  display: none;
 }
 .sm-nav__link {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--sm-space-1);
-  min-height: var(--sm-tap-dense);
-  padding: 0 var(--sm-space-3);
-  border-radius: var(--sm-radius-sm);
-  font-size: var(--sm-text-sm);
-  font-weight: var(--sm-weight-semibold);
-  color: var(--sm-muted-foreground);
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--sm-radius-full);
+  font-family: var(--sm-font-body);
+  font-size: 15px;
+  font-weight: var(--sm-weight-bold);
+  color: var(--sm-foreground);
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color var(--sm-duration-fast) var(--sm-ease), color var(--sm-duration-fast) var(--sm-ease);
+  transition: background-color var(--sm-duration) var(--sm-ease);
 }
 .sm-nav__link:hover {
   background: var(--sm-surface-2);
-  color: var(--sm-foreground);
 }
 .sm-nav__link[aria-current="page"] {
   background: var(--sm-surface);
-  color: var(--sm-foreground);
-  box-shadow: inset 0 calc(-1 * var(--sm-pixel)) 0 0 var(--sm-accent-sun);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 0 var(--sm-border-strong);
 }
-.sm-nav__tools {
+/* A section that is not ready yet: dimmed label plus a small sun pixel instead of a yellow badge. */
+.sm-nav__link--soon {
+  color: var(--sm-muted-foreground);
+}
+.sm-nav__link--soon::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--sm-accent-sun);
+}
+.sm-hdr__tools {
   display: inline-flex;
   align-items: center;
-  gap: var(--sm-space-1);
+  gap: var(--sm-space-2);
   margin-left: auto;
 }
+/* Language switch: the artboard segmented control. */
 .sm-lang {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 2px;
+  padding: 4px;
   background: var(--sm-surface-2);
-  border: var(--sm-pixel) solid var(--sm-border-strong);
-  border-radius: var(--sm-radius-md);
+  border-radius: var(--sm-radius-full);
+  box-shadow: inset 0 0 0 1px var(--sm-border);
 }
 .sm-lang__link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--sm-tap-dense);
-  min-height: var(--sm-tap-dense);
-  padding: 0 var(--sm-space-2);
-  border-radius: var(--sm-radius-sm);
-  font-size: var(--sm-text-sm);
-  font-weight: var(--sm-weight-bold);
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--sm-radius-full);
+  font-size: 13px;
+  font-weight: var(--sm-weight-black);
   color: var(--sm-muted-foreground);
   text-decoration: none;
+  transition: background-color var(--sm-duration-slow) var(--sm-ease), color var(--sm-duration-slow) var(--sm-ease);
 }
 .sm-lang__link:hover {
-  background: var(--sm-surface-3);
+  background: var(--sm-surface);
   color: var(--sm-foreground);
 }
 .sm-lang__link[aria-current="true"] {
   background: var(--sm-surface);
   color: var(--sm-foreground);
-  box-shadow: inset 0 calc(-1 * var(--sm-pixel)) 0 0 var(--sm-accent-ramune);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 0 var(--sm-border-strong);
 }
-/* Fixed width so swapping the label ("Tag"/"Nacht") never moves the neighbours — no layout shift. */
-.sm-theme {
-  flex: none;
-  min-width: 6em;
+/* Round icon button (theme toggle). */
+.sm-iconbtn {
+  width: var(--sm-tap);
+  height: var(--sm-tap);
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--sm-radius-full);
+  background: var(--sm-surface-2);
+  color: var(--sm-foreground);
+  box-shadow: inset 0 0 0 1px var(--sm-border);
+  cursor: pointer;
+  transition: transform 0.25s var(--sm-ease-spring);
 }
-.sm-hero {
-  position: relative;
-  isolation: isolate;
-  padding-block: var(--sm-space-8) var(--sm-space-6);
+.sm-iconbtn:hover {
+  transform: rotate(-12deg) scale(1.06);
+}
+.sm-iconbtn svg {
+  animation: sm-pop-spin 0.5s var(--sm-ease-spring);
+  shape-rendering: crispEdges;
+}
+/* The icon shows the theme that is painted right now; the label says what the click does. */
+.sm-theme__icon {
+  display: inline-grid;
+  place-items: center;
+}
+.sm-theme__icon--moon {
+  display: none;
+}
+.sm-root[data-theme="summer-night"] .sm-theme__icon--sun {
+  display: none;
+}
+.sm-root[data-theme="summer-night"] .sm-theme__icon--moon {
+  display: inline-grid;
+}
+@media (prefers-color-scheme: dark) {
+  .sm-root:not([data-theme]) .sm-theme__icon--sun {
+    display: none;
+  }
+  .sm-root:not([data-theme]) .sm-theme__icon--moon {
+    display: inline-grid;
+  }
+}
+
+/* Page head (artboard pages.css .page-head). */
+.sm-page-head {
+  padding: var(--sm-space-8) 0 var(--sm-space-6);
+}
+.sm-page-head--center {
   text-align: center;
 }
+.sm-page-head--center .sm-lead {
+  margin-inline: auto;
+}
+.sm-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sm-link);
+  font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-black);
+  text-decoration: none;
+}
+
+/* Hero (home): text column plus the illustrated sky panel. */
+.sm-hero {
+  padding-block: var(--sm-space-8) var(--sm-space-10);
+}
 .sm-hero__inner {
-  display: grid;
-  justify-items: center;
-  gap: var(--sm-space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm-space-8);
+}
+.sm-hero__text {
+  flex: 1 1 440px;
+  min-width: 0;
+}
+.sm-hero__art {
+  flex: 1 1 420px;
+  min-width: 0;
 }
 .sm-hero__cta {
-  justify-content: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-3);
+  margin-top: var(--sm-space-6);
 }
 .sm-hero__note {
-  margin: 0;
+  margin: var(--sm-space-4) 0 0;
   font-size: var(--sm-text-sm);
 }
 .sm-display__soft {
   font-size: 0.62em;
 }
+/* The illustration panel: 380px tall, 32px radius, sky gradient, sun/clouds/mascot/grass. */
+.sm-scene {
+  position: relative;
+  height: 380px;
+  border-radius: 32px;
+  overflow: hidden;
+  background-image: linear-gradient(180deg, var(--sm-sky-1), var(--sm-sky-2));
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-2);
+}
+.sm-scene__sun {
+  position: absolute;
+  top: 40px;
+  right: 56px;
+}
+.sm-scene__cloud {
+  position: absolute;
+  top: 64px;
+  left: 40px;
+  opacity: 0.95;
+}
+.sm-scene__cloud--far {
+  top: 150px;
+  left: auto;
+  right: 30px;
+  opacity: 0.8;
+}
+.sm-scene__ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+}
+.sm-scene__mascot {
+  position: absolute;
+  left: 50%;
+  bottom: 74px;
+  width: 120px;
+  margin-left: -60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sm-scene__shadow {
+  width: 80px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #1f2a44;
+  opacity: 0.25;
+  animation: sm-shadow-pulse 3.2s ease-in-out infinite;
+}
+.sm-scene__twinkle {
+  position: absolute;
+}
+.sm-scene__twinkle--a {
+  left: 30%;
+  top: 46%;
+}
+.sm-scene__twinkle--b {
+  right: 26%;
+  top: 38%;
+  animation-delay: 1.3s;
+}
 .sm-mascot--xl {
+  width: 120px;
+  height: 120px;
+}
+.sm-mascot--lg {
   width: 96px;
   height: 96px;
 }
@@ -1210,37 +1496,89 @@
   width: 28px;
   height: 28px;
 }
-.sm-mascot__art {
-  color: var(--sm-foreground);
-}
+
+/* Bento tiles ("Was es hier gibt"). */
 .sm-tiles {
   display: grid;
-  gap: var(--sm-space-4);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--sm-space-5);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .sm-tile {
   display: flex;
   flex-direction: column;
-  gap: var(--sm-space-2);
+  gap: 10px;
+  min-height: 0;
+}
+.sm-tile--wide {
+  grid-column: span 2;
+}
+.sm-tile__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sm-space-3);
 }
 .sm-tile__text {
   margin: 0;
   color: var(--sm-muted-foreground);
+  line-height: 1.55;
 }
 .sm-tile__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-top: auto;
   padding-top: var(--sm-space-2);
   font-size: var(--sm-text-sm);
-  font-weight: var(--sm-weight-semibold);
+  font-weight: var(--sm-weight-black);
   color: var(--sm-link);
+}
+.sm-tile__cta-arrow {
+  transition: transform 0.25s var(--sm-ease-spring);
+}
+.sm-tile__cta--muted {
+  color: var(--sm-muted-foreground);
 }
 .sm-tile--soon {
   background-image: linear-gradient(180deg, var(--sm-surface-2), var(--sm-surface) 60%);
 }
-/* A badge inside the tile column must stay a pill, not stretch over the whole card. */
 .sm-tile > .sm-badge {
   align-self: flex-start;
 }
+/* The 52px icon tile of the artboards. */
+.sm-tile__icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--sm-radius-lg);
+  color: #1f2a44;
+  box-shadow: inset 0 -3px 0 rgba(31, 42, 68, 0.12);
+  flex: none;
+}
+.sm-tile__icon--sun {
+  background: var(--sm-accent-sun);
+}
+.sm-tile__icon--sakura {
+  background: var(--sm-accent-sakura);
+}
+.sm-tile__icon--ramune {
+  background: var(--sm-accent-ramune);
+}
+.sm-tile__icon--lavender {
+  background: var(--sm-accent-lavender);
+}
+.sm-tile__icon--peach {
+  background: var(--sm-accent-peach);
+}
+.sm-tile__icon--grass {
+  background: var(--sm-accent-grass);
+}
+.sm-tile__icon--surface {
+  background: var(--sm-surface-3);
+  color: var(--sm-foreground);
+}
+
 .sm-measure {
   max-width: 68ch;
   margin-inline: auto;
@@ -1255,23 +1593,266 @@
   margin: 0;
   color: var(--sm-muted-foreground);
 }
+/* Empty state ("kommt bald"): centred mascot, kicker, title, lead, one way back. */
 .sm-soon {
   display: grid;
   justify-items: center;
   text-align: center;
   gap: var(--sm-space-3);
 }
-.sm-footer {
-  border-top: var(--sm-pixel) solid var(--sm-border);
+.sm-soon .sm-lead {
+  margin-inline: auto;
+}
+.sm-soon__art {
+  display: inline-block;
+  position: relative;
+}
+/* About: portrait card next to the text column, plus the "Gerade" list. */
+.sm-about {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sm-space-6);
+}
+.sm-about__aside {
+  flex: 1 1 300px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sm-space-4);
+  text-align: center;
+}
+.sm-about__body {
+  flex: 999 1 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm-space-5);
+}
+.sm-portrait {
+  width: 100%;
+  height: 200px;
+  border-radius: var(--sm-radius-xl);
+  background-image: linear-gradient(180deg, var(--sm-sky-1), var(--sm-sky-2));
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.sm-portrait__ground {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+}
+.sm-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sm-li {
+  display: flex;
+  align-items: center;
+  gap: var(--sm-space-3);
+  min-height: 56px;
+  padding: var(--sm-space-2) 0;
+}
+.sm-li + .sm-li {
+  border-top: 1px solid var(--sm-border);
+}
+.sm-li__grow {
+  flex: 1;
+  min-width: 0;
+}
+.sm-li__icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--sm-radius-md);
+  color: #1f2a44;
+  box-shadow: inset 0 -3px 0 rgba(31, 42, 68, 0.12);
+  flex: none;
+}
+.sm-li__icon--sun {
+  background: var(--sm-accent-sun);
+}
+.sm-li__icon--grass {
+  background: var(--sm-accent-grass);
+}
+.sm-li__icon--lavender {
+  background: var(--sm-accent-lavender);
+}
+.sm-li__icon--peach {
+  background: var(--sm-accent-peach);
+}
+.sm-panel {
+  background: var(--sm-surface);
+  border-radius: var(--sm-radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-1);
+  padding: var(--sm-space-5);
+}
+.sm-panel--tint {
   background: var(--sm-surface-2);
-  padding-block: var(--sm-space-6) calc(var(--sm-space-6) + env(safe-area-inset-bottom));
-  font-size: var(--sm-text-sm);
+}
+.sm-stat {
+  padding: var(--sm-space-4) var(--sm-space-5);
+  border-radius: var(--sm-radius-xl);
+  background: var(--sm-surface);
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-1);
+}
+.sm-stat__k {
+  font-size: var(--sm-text-xs);
+  font-weight: var(--sm-weight-black);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--sm-muted-foreground);
 }
-.sm-footer__grid {
+.sm-stat__v {
+  margin-top: 6px;
+  font-family: var(--sm-font-pixel);
+  font-size: 30px;
+  font-weight: var(--sm-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.sm-meter {
+  height: 8px;
+  margin-top: 10px;
+  border-radius: 4px;
+  background: var(--sm-surface-3);
+  overflow: hidden;
+}
+.sm-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--sm-accent-grass);
+}
+.sm-search {
+  display: flex;
+  align-items: center;
+  gap: var(--sm-space-2);
+  min-height: 52px;
+  padding: 0 var(--sm-space-4);
+  border-radius: var(--sm-radius-xl);
+  background: var(--sm-surface);
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong), var(--sm-shadow-1);
+  color: var(--sm-muted-foreground);
+  font-weight: var(--sm-weight-semibold);
+  max-width: 560px;
+}
+.sm-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--sm-foreground);
+  font: var(--sm-weight-semibold) 16px var(--sm-font-body);
+  outline: none;
+  min-height: 48px;
+}
+.sm-code {
+  font-family: var(--sm-font-pixel);
+  font-size: 18px;
+  padding: 10px 14px;
+  border-radius: var(--sm-radius-md);
+  background: var(--sm-surface-2);
+  box-shadow: inset 0 0 0 1px var(--sm-border);
+}
+.sm-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--sm-radius-md);
+  background: var(--sm-surface-3);
   display: grid;
-  gap: var(--sm-space-5);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+}
+.sm-rank {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--sm-radius-sm);
+  background: var(--sm-surface-2);
+  font-family: var(--sm-font-pixel);
+  font-weight: var(--sm-weight-bold);
+}
+.sm-rank--1 {
+  background: var(--sm-accent-sun);
+  color: #2a2410;
+}
+.sm-rank--2 {
+  background: #dfe7f3;
+  color: #1f2a44;
+}
+.sm-rank--3 {
+  background: #f1c7a3;
+  color: #4a2a10;
+}
+
+/* Footer: grass line, one row with brand, links and the note. */
+.sm-footer {
+  margin-top: var(--sm-space-6);
+  background: var(--sm-background-2);
+  padding-block: 0 calc(var(--sm-space-6) + env(safe-area-inset-bottom));
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+  transition: background-color 0.5s ease;
+}
+.sm-grassline {
+  display: block;
+  width: 100%;
+  height: 14px;
+}
+.sm-footer__in {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-4) var(--sm-space-6);
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--sm-space-6);
+  padding-bottom: var(--sm-space-6);
+}
+.sm-footer__brand {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-base);
+  font-weight: var(--sm-weight-bold);
+  color: var(--sm-foreground);
+}
+.sm-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sm-footer__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm-space-2);
+}
+.sm-footer__note {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: var(--sm-text-xs);
+  color: var(--sm-muted-foreground);
+}
+/* Second footer row: the privacy line and the settings on one line. */
+.sm-footer__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sm-space-3) var(--sm-space-4);
+  padding-top: var(--sm-space-4);
+  padding-bottom: var(--sm-space-5);
+  border-top: 1px solid var(--sm-border);
 }
 .sm-footer__col {
   display: grid;
@@ -1292,35 +1873,188 @@
   padding: 0;
   list-style: none;
 }
-.sm-footer__bottom {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--sm-space-2) var(--sm-space-4);
-  margin-top: var(--sm-space-5);
-  padding-top: var(--sm-space-4);
-  border-top: 1px solid var(--sm-border);
-}
+
 @media (min-width: 720px) {
   .sm-nav__nav {
     flex: 1 1 auto;
     order: 0;
+    display: flex;
+    justify-content: center;
   }
   .sm-hero {
-    padding-block: var(--sm-space-10) var(--sm-space-8);
+    padding-block: var(--sm-space-10) var(--sm-space-12);
   }
 }
-/* Narrow screens: the tabs wrap instead of scrolling sideways, so no entry is ever clipped. */
+@media (max-width: 760px) {
+  .sm-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sm-tile--wide {
+    grid-column: auto;
+  }
+}
+/* Narrow screens: the nav keeps its two-row behaviour (brand + tools, then the links) so no entry
+   is ever clipped; only the look changes. */
 @media (max-width: 600px) {
+  .sm-hdr {
+    padding: 8px 8px 8px 12px;
+  }
   .sm-nav__links {
-    flex-wrap: wrap;
     overflow-x: visible;
+  }
+  .sm-scene {
+    height: 300px;
   }
 }
 
 /* ---------------------------------------------------------------------------------------------
-   Motion: nothing here is information-carrying, and all of it collapses when the user asks.
+   Motion (artboard theme.css): nothing here is information-carrying, and all of it collapses
+   when the user asks.
    --------------------------------------------------------------------------------------------- */
+.sm-bob {
+  animation: sm-bob 3.2s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.sm-blink {
+  animation: sm-veil-blink 5s infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.sm-drift {
+  animation: sm-drift 22s ease-in-out infinite alternate;
+}
+.sm-drift--slow {
+  animation: sm-drift 34s ease-in-out infinite alternate-reverse;
+}
+.sm-twinkle {
+  animation: sm-twinkle 2.6s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.sm-rise {
+  animation: sm-rise 0.7s var(--sm-ease) both;
+}
+.sm-hammer {
+  animation: sm-hammer 1.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+}
+.sm-tilt {
+  animation: sm-tilt 2.4s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+@keyframes sm-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-8px) rotate(-1.5deg);
+  }
+}
+@keyframes sm-shadow-pulse {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scaleX(0.8);
+    opacity: 0.15;
+  }
+}
+@keyframes sm-veil-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes sm-drift {
+  from {
+    transform: translateX(-24px);
+  }
+  to {
+    transform: translateX(28px);
+  }
+}
+@keyframes sm-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+@keyframes sm-wiggle {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-8deg) scale(1.06);
+  }
+  60% {
+    transform: rotate(6deg) scale(1.06);
+  }
+}
+@keyframes sm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sm-pop-spin {
+  from {
+    transform: rotate(-120deg) scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes sm-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(47, 191, 113, 0.55);
+  }
+  80%,
+  100% {
+    box-shadow: 0 0 0 8px rgba(47, 191, 113, 0);
+  }
+}
+@keyframes sm-tilt {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+@keyframes sm-hammer {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  40% {
+    transform: rotate(-28deg);
+  }
+  55% {
+    transform: rotate(6deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sm-root {
     --sm-duration-fast: 0ms;
@@ -1336,12 +2070,14 @@
   }
   /* The skip link stays off-screen: its offset is position, not motion. Zeroing the duration above
      already removes the slide, and `transform: none` here would park it on top of the header. */
-  .sm-btn:active {
+  .sm-btn:active,
+  .sm-card--link:hover,
+  .sm-iconbtn:hover {
     transform: none;
   }
 }
 
-/* Forced colours (Windows high contrast): keep the pixel frame and the focus ring visible. */
+/* Forced colours (Windows high contrast): keep the focus ring visible. */
 @media (forced-colors: active) {
   .sm-root .sm-card--link:focus-visible {
     box-shadow: none;
@@ -1354,9 +2090,7 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
-   Writing (docs/creative-hub-plan.md §8 "Writing", §9 phase 3a): list, reader, series chapter
-   navigation. Reuses the Phase 1 tokens only — no new colour, so the token-pair contrast gate keeps
-   covering the same pairs (light and summer night).
+   Writing (list, reader, series chapter navigation, feeds, export).
    --------------------------------------------------------------------------------------------- */
 .sm-filters {
   display: flex;
@@ -1365,10 +2099,18 @@
   gap: var(--sm-space-2);
   margin-top: var(--sm-space-6);
 }
+.sm-filters--tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-1);
+  padding: 4px;
+  background: var(--sm-surface-2);
+  border-radius: var(--sm-radius-full);
+  box-shadow: inset 0 0 0 1px var(--sm-border);
+}
 .sm-filters__label {
   font-family: var(--sm-font-pixel);
   font-size: var(--sm-text-xs);
-  text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--sm-muted-foreground);
 }
@@ -1379,23 +2121,27 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--sm-tap-dense);
-  padding: 0 var(--sm-space-3);
-  border: 1px solid var(--sm-border);
+  padding: 0 var(--sm-space-4);
+  border: 0;
   border-radius: var(--sm-radius-full);
-  background: var(--sm-surface);
-  color: var(--sm-foreground);
+  background: transparent;
+  color: var(--sm-muted-foreground);
   font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-black);
   text-decoration: none;
+  transition: background-color var(--sm-duration-slow) var(--sm-ease), color var(--sm-duration-slow) var(--sm-ease);
 }
 .sm-tag:hover {
-  border-color: var(--sm-border-strong);
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
 }
 .sm-tag--active,
 .sm-root .sm-tag[aria-current="true"] {
-  background: var(--sm-accent-lavender);
-  border-color: var(--sm-frame);
-  color: var(--sm-on-pastel);
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 0 var(--sm-border-strong);
 }
+/* The tag chips under a card keep the pill look of the artboards. */
 .sm-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1407,9 +2153,16 @@
 .sm-tags li {
   margin: 0;
 }
+.sm-tags .sm-tag {
+  min-height: 26px;
+  padding: 0 var(--sm-space-3);
+  background: var(--sm-surface-2);
+  box-shadow: inset 0 0 0 1px var(--sm-border);
+  font-size: var(--sm-text-sm);
+}
 .sm-post-grid {
   display: grid;
-  gap: var(--sm-space-4);
+  gap: var(--sm-space-5);
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
   margin-top: var(--sm-space-5);
 }
@@ -1419,17 +2172,23 @@
   gap: var(--sm-space-2);
   padding: var(--sm-space-5);
   background: var(--sm-surface);
-  border: 1px solid var(--sm-border);
-  border-radius: var(--sm-radius-xl);
-  box-shadow: var(--sm-shadow-1);
+  border: 0;
+  border-radius: var(--sm-radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-1);
   color: var(--sm-foreground);
+  transition: transform 0.3s var(--sm-ease-spring), box-shadow 0.3s ease;
+}
+.sm-post-card:hover {
+  transform: translateY(-5px) rotate(-0.4deg);
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong), var(--sm-shadow-2);
 }
 .sm-post-card__kind {
   align-self: flex-start;
 }
 .sm-post-card__title {
-  font-family: var(--sm-font-pixel);
+  font-family: var(--sm-font-body);
   font-size: var(--sm-text-xl);
+  font-weight: var(--sm-weight-black);
   margin: 0;
 }
 .sm-root .sm-post-card__title a {
@@ -1453,6 +2212,57 @@
   margin: 0;
   color: var(--sm-muted-foreground);
 }
+/* Featured series card at the top of /writing (artboard: cover left, text right). */
+.sm-feature {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-6);
+  padding: var(--sm-space-6);
+}
+.sm-feature__cover {
+  flex: 0 0 200px;
+  height: 260px;
+  border-radius: var(--sm-radius-xl);
+  background-image: linear-gradient(180deg, var(--sm-accent-lavender), var(--sm-accent-sakura));
+  box-shadow: inset 0 0 0 1px var(--sm-border), 0 6px 0 rgba(31, 42, 68, 0.12);
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.sm-feature__title {
+  position: relative;
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-xl);
+  font-weight: var(--sm-weight-bold);
+  color: #2c2170;
+  text-align: center;
+  padding: 0 var(--sm-space-4);
+}
+.sm-feature__ground {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+}
+.sm-feature__body {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sm-space-3);
+}
+.sm-feature__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-2);
+}
+.sm-feature__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+}
 .sm-post-header {
   max-width: 68ch;
 }
@@ -1463,13 +2273,14 @@
   gap: var(--sm-space-3);
   margin-top: var(--sm-space-3);
   font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-bold);
   color: var(--sm-muted-foreground);
 }
 .sm-note {
   margin: var(--sm-space-6) 0;
   padding: var(--sm-space-3) var(--sm-space-4);
   background: var(--sm-surface-2);
-  border-left: var(--sm-pixel-step) solid var(--sm-accent-sun);
+  border-left: 4px solid var(--sm-accent-sun);
   border-radius: 0 var(--sm-radius-md) var(--sm-radius-md) 0;
   color: var(--sm-foreground);
 }
@@ -1501,7 +2312,6 @@
 .sm-prevnext__label {
   font-family: var(--sm-font-pixel);
   font-size: var(--sm-text-xs);
-  text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--sm-muted-foreground);
 }
@@ -1519,8 +2329,9 @@
   gap: var(--sm-space-3);
   padding: var(--sm-space-3) var(--sm-space-4);
   background: var(--sm-surface);
-  border: 1px solid var(--sm-border);
-  border-radius: var(--sm-radius-lg);
+  border: 0;
+  border-radius: var(--sm-radius-xl);
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-1);
 }
 .sm-chapters__num {
   font-family: var(--sm-font-pixel);
@@ -1536,10 +2347,11 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-/* Reader extras the base .sm-prose does not cover (phase 3a adds headings h4, code blocks, images). */
+/* Reader extras the base .sm-prose does not cover. */
 .sm-prose h4 {
-  font-family: var(--sm-font-pixel);
+  font-family: var(--sm-font-body);
   font-size: var(--sm-text-lg);
+  font-weight: var(--sm-weight-bold);
   margin-top: var(--sm-space-5);
 }
 .sm-prose pre {
@@ -1570,7 +2382,14 @@
 .sm-reader .sm-wrap {
   max-width: var(--sm-container);
 }
-/* Feeds (plan §8 "Feeds", phase 3b): the footnote that offers the RSS/Atom feed of the page. */
+/* The decorative chapter divider of the artboard. */
+.sm-divider {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 40px 0;
+}
+/* Feeds: the footnote that offers the RSS/Atom feed of the page. */
 .sm-feed-note {
   display: flex;
   flex-wrap: wrap;
@@ -1587,28 +2406,30 @@
   align-items: center;
   min-height: var(--sm-tap-dense);
   padding: 0 var(--sm-space-3);
-  border: 1px solid var(--sm-border);
+  border: 0;
   border-radius: var(--sm-radius-full);
   background: var(--sm-surface);
+  box-shadow: inset 0 0 0 1px var(--sm-border);
   color: var(--sm-link);
   font-weight: var(--sm-weight-semibold);
   text-decoration: none;
 }
 .sm-feed-note__link:hover {
-  border-color: var(--sm-border-strong);
+  box-shadow: inset 0 0 0 1px var(--sm-border-strong);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .sm-feed-note__sep {
   color: var(--sm-border-strong);
 }
-/* Export (plan §8 "Export", phase 3c): the download/print block on story and series pages. */
+/* Export: the download/print block on story and series pages. */
 .sm-export {
   margin-top: var(--sm-space-8);
   padding: var(--sm-space-5);
-  background: var(--sm-surface-2);
-  border: 1px solid var(--sm-border);
-  border-radius: var(--sm-radius-xl);
+  background: var(--sm-surface);
+  border: 0;
+  border-radius: var(--sm-radius-2xl);
+  box-shadow: inset 0 0 0 1px var(--sm-border), var(--sm-shadow-1);
 }
 .sm-export__label {
   margin: 0 0 var(--sm-space-3);
@@ -1630,9 +2451,10 @@
   .sm-nav,
   .sm-footer,
   .sm-skip-link,
-  .sm-theme,
+  .sm-iconbtn,
   .sm-lang,
   .sm-mascot,
+  .sm-scene,
   .sm-filters,
   .sm-tags,
   .sm-prevnext,
@@ -1640,12 +2462,15 @@
   .sm-btn,
   .sm-export__label,
   .sm-export__row,
-  .sm-hint {
+  .sm-hint,
+  .sm-tile__icon,
+  .sm-divider {
     display: none;
   }
   .sm-root,
   .sm-root body {
     background-color: #ffffff;
+    background-image: none;
     color: #000000;
   }
   .sm-wrap {
@@ -1689,7 +2514,7 @@
     margin-top: 10mm;
     padding: 0;
     background: none;
-    border: 0;
+    box-shadow: none;
   }
   .sm-export__rights {
     border-top: 0.4pt solid #666666;
@@ -1705,4 +2530,3 @@
     text-align: left;
   }
 }
-
