@@ -1,4 +1,5 @@
 // Spielershops + Auktionshaus + Warteschlangen (Website ist NICHT autoritativ fürs Geld; alle Beträge in Cent)
+import { hashIp } from "./ip-hash.js";
 const ID_RE = /^[A-Za-z0-9_.:-]{1,64}$/, ITEM_RE = /^[a-z0-9_]{1,48}$/, NAME_RE = /^[A-Za-z0-9_]{1,16}$/;
 const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 const normU = (x) => String(x).toLowerCase().replace(/-/g, "").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
@@ -69,11 +70,14 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
   const tokenOk = (req, env) => { const t = req.headers.get("x-ingest-token") || ""; return !!env.MC_INGEST_TOKEN && t.length > 0 && safeEq(t, env.MC_INGEST_TOKEN); };
   const originOk = (req) => { const o = req.headers.get("origin"); if (!o) return false; try { const h = new URL(o).hostname; return h === MAIN || h === MCD; } catch { return false; } };
   const linkFor = (env, discordId) => env.DB.prepare("SELECT mc_name, mc_uuid, has_role, verified FROM mc_links WHERE discord_id = ?").bind(discordId).first().catch(() => null);
-  // Rate-Limit über beide Warteschlangen: pro Discord-ID 5/min, 30/h; pro IP 10/min, 60/h
-  async function limited(env, discordId, ip) {
+  // Rate-Limit über beide Warteschlangen: pro Discord-ID 5/min, 30/h; pro IP 10/min, 60/h.
+  // Die IP-Zählung läuft über ip_hash; für Altdaten (nur Klartext-ip) wird zusätzlich ip verglichen.
+  async function limited(env, discordId, ipHash, ip) {
     const now = Date.now(), m = now - 60000, h = now - 3600000;
     const q = (col) => `SELECT SUM(c1) AS m, SUM(c2) AS h FROM (SELECT SUM(created_at > ?2) AS c1, COUNT(*) AS c2 FROM mc_bids_pending WHERE ${col} = ?1 AND created_at > ?3 UNION ALL SELECT SUM(created_at > ?2), COUNT(*) FROM mc_shop_orders_pending WHERE ${col} = ?1 AND created_at > ?3)`;
-    const [d, i] = await Promise.all([env.DB.prepare(q("discord_id")).bind(discordId, m, h).first(), ip ? env.DB.prepare(q("ip")).bind(ip, m, h).first() : { m: 0, h: 0 }]);
+    const qIp = `SELECT SUM(c1) AS m, SUM(c2) AS h FROM (SELECT SUM(created_at > ?2) AS c1, COUNT(*) AS c2 FROM mc_bids_pending WHERE (ip_hash = ?1 OR ip = ?4) AND created_at > ?3 UNION ALL SELECT SUM(created_at > ?2), COUNT(*) FROM mc_shop_orders_pending WHERE (ip_hash = ?1 OR ip = ?4) AND created_at > ?3)`;
+    const d = await env.DB.prepare(q("discord_id")).bind(discordId, m, h).first();
+    const i = ip ? await env.DB.prepare(qIp).bind(ipHash, m, h, ip).first() : { m: 0, h: 0 };
     return (d?.m || 0) >= 5 || (d?.h || 0) >= 30 || (i?.m || 0) >= 10 || (i?.h || 0) >= 60;
   }
   async function turnstileOk(env, req, token) {
@@ -99,12 +103,13 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (!l) return { err: json({ error: "Kein verknüpfter Minecraft-Account. Nutze /link im Discord." }, 403) };
     if (!l.verified || !l.has_role) return { err: json({ error: "Account nicht bestätigt oder Rolle fehlt" }, 403) };
     const ip = a.source === "web" ? req.headers.get("CF-Connecting-IP") || "" : null;
-    if (await limited(env, a.discordId, ip)) return { err: json({ error: "Zu viele Aktionen, bitte kurz warten" }, 429, { "retry-after": "60" }) };
-    return { b, a, l, ip };
+    const ipHash = await hashIp(env, ip);
+    if (await limited(env, a.discordId, ipHash, ip)) return { err: json({ error: "Zu viele Aktionen, bitte kurz warten" }, 429, { "retry-after": "60" }) };
+    return { b, a, l, ip, ipHash };
   }
 
   async function bid(req, env) {
-    const r = await prep(req, env); if (r.err) return r.err; const { b, a, l, ip } = r;
+    const r = await prep(req, env); if (r.err) return r.err; const { b, a, l, ipHash } = r;
     const amount = cents(b.amount); if (amount == null || amount < 1) return json({ error: "Betrag in Cent (Ganzzahl) angeben" }, 400);
     const { list } = await blob(env, "auctions"); const au = list.find((x) => x.id === String(b.auction_id ?? ""));
     if (!au) return json({ error: "Auktion nicht gefunden" }, 404);
@@ -115,11 +120,11 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const need = Math.max(minNext(au), own?.m ? own.m + 1 : 0);
     if (amount < need) return json({ error: "Mindestgebot ist " + (need / 100).toFixed(2) + " CP", min_next: need }, 409);
     const id = crypto.randomUUID(), now = Date.now();
-    await env.DB.prepare("INSERT INTO mc_bids_pending (id, auction_id, bidder_uuid, bidder_name, discord_id, amount, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, au.id, l.mc_uuid, l.mc_name, a.discordId, amount, a.source, now, ip).run();
+    await env.DB.prepare("INSERT INTO mc_bids_pending (id, auction_id, bidder_uuid, bidder_name, discord_id, amount, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?)").bind(id, au.id, l.mc_uuid, l.mc_name, a.discordId, amount, a.source, now, ipHash).run();
     return json({ ok: true, request_id: id, status: "pending", amount }, 202);
   }
   async function order(req, env) {
-    const r = await prep(req, env); if (r.err) return r.err; const { b, a, l, ip } = r;
+    const r = await prep(req, env); if (r.err) return r.err; const { b, a, l, ipHash } = r;
     if (b.type === "bank_buy") return bankBuy(req, env, r);
     if (b.type != null && b.type !== "shop") return json({ error: "Unbekannter Bestelltyp" }, 400);
     const qty = Math.floor(Number(b.qty)); if (!(qty >= 1 && qty <= 2304)) return json({ error: "Menge 1 bis 2304" }, 400);
@@ -131,13 +136,13 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (!off) off = sh.items.filter((x) => x.item === it && x.mode === "sell").sort((x, y) => y.stock - x.stock)[0]; if (!off) return json({ error: "Item wird hier nicht verkauft" }, 404);
     if (off.stock < qty) return json({ error: "Nur noch " + off.stock + " auf Lager" }, 409);
     const id = crypto.randomUUID(), now = Date.now();
-    await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)").bind(id, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ip).run();
+    await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?)").bind(id, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ipHash).run();
     return json({ ok: true, request_id: id, status: "pending", qty, unit_price: off.price, total: off.price * qty }, 202);
   }
   // Bank-Direktkauf: gleiche Queue wie Shop-Orders (type='bank_buy', shop_id NULL). Preis ist nur Anzeige/Obergrenze;
   // der Server prüft beim Ausführen Sperre, Tageslimit, Kontostand und aktuellen Preis.
   async function bankBuy(req, env, pre) {
-    const r = pre || await prep(req, env); if (r.err) return r.err; const { b, a, l, ip } = r;
+    const r = pre || await prep(req, env); if (r.err) return r.err; const { b, a, l, ipHash } = r;
     const it = item(b.item); if (!it) return json({ error: "Item ungültig" }, 400);
     const raw = b.amount ?? b.qty, qty = Number(raw); if (!(Number.isInteger(qty) && qty >= 1 && qty <= 2304)) return json({ error: "Menge 1 bis 2304" }, 400);
     if (b.mc_uuid != null && (!UUID_RE.test(String(b.mc_uuid)) || normU(b.mc_uuid) !== l.mc_uuid)) return json({ error: "mc_uuid passt nicht zum verknüpften Account" }, 403);
@@ -151,7 +156,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (!m) return json({ error: "Item gibt es bei der Bank nicht" }, 404);
     if (m.buy_locked || !(m.buy_price > 0)) return json({ error: "Nicht bei der Bank kaufbar" }, 409);
     const unit = Math.max(1, Math.round(m.buy_price * 100)), now = Date.now();
-    const ins = await env.DB.prepare("INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, type) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'bank_buy')").bind(rid, it, qty, l.mc_uuid, l.mc_name, a.discordId, unit, a.source, now, ip).run();
+    const ins = await env.DB.prepare("INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash, type) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, 'bank_buy')").bind(rid, it, qty, l.mc_uuid, l.mc_name, a.discordId, unit, a.source, now, ipHash).run();
     if (!ins.meta?.changes) return json({ error: "request_id kollidiert, bitte erneut senden" }, 409);
     return json({ ok: true, request_id: rid, type: "bank_buy", status: "pending", item: it, amount: qty, unit_price: unit, total: unit * qty }, 202);
   }

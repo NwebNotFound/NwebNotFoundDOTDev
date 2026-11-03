@@ -2,6 +2,7 @@
 // Browser sendet op über den Pfad. Gespeichert und an mc-stack ausgeliefert wird action.
 // expired setzt nur mc-stack, frühestens 600000 ms nach created_at.
 import { normU } from "./mc-vip.js";
+import { hashIp } from "./ip-hash.js";
 
 // Vom Browser erlaubte ops (Pfad → action).
 export const ACTIONS = ["start", "set_visibility", "invite", "uninvite"];
@@ -165,16 +166,20 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     const world = (list || []).find((w) => w.id === id);
     if (!world) return a.admin ? json({ error: "Welt nicht gefunden" }, 404) : deny(403, action === "start" ? "not_trusted" : "not_owner");
     // Vertrag: trusted wird bevorzugt über die UUID geprüft, der Name ist nur der Fallback.
-    const invite = (world.invites || []).find((i) => (i.uuid && normU(i.uuid) === a.uuid) || (i.name && i.name.toLowerCase() === a.name.toLowerCase()));
+    const invite = (world.invites || []).find((i) => (i.uuid ? normU(i.uuid) === a.uuid : !!i.name && i.name.toLowerCase() === a.name.toLowerCase()));
     const isOwner = world.owner_uuid === a.uuid;
-    let allowed = false;
-    if (a.admin || isOwner) allowed = true;
-    else if (invite?.role === "trusted" && action === "start") allowed = true;
+    const isAdmin = a.admin === true;
+    // Admin darf jede Welt verwalten, der Owner seine eigene, trusted nur starten.
+    const allowed = isAdmin || isOwner || (invite?.role === "trusted" && action === "start");
     if (!allowed) return deny(403, action === "start" ? "not_trusted" : "not_owner");
-    if (isOwner && !a.admin && !OWNER_RANKS.has(a.rank)) return deny(403, "no_rank");
-    if (!isOwner && !a.admin && action === "start") {
-      const ownerRank = await env.DB.prepare("SELECT rank FROM mc_player_ranks WHERE lower(replace(uuid, '-', '')) = ?").bind(world.owner_uuid.replace(/-/g, "")).first().catch(() => null);
-      if (!OWNER_RANKS.has(String(ownerRank?.rank || "").toLowerCase())) return deny(403, "no_rank");
+    // Die Rangprüfung gilt nur für Spieler: ein Admin braucht für fremde Welten keinen VIP-Rang,
+    // ein Owner muss einen Panel-Rang haben und trusted startet nur Welten mit berechtigtem Owner.
+    if (!isAdmin) {
+      if (isOwner && !OWNER_RANKS.has(a.rank)) return deny(403, "no_rank");
+      if (!isOwner && action === "start") {
+        const ownerRank = await env.DB.prepare("SELECT rank FROM mc_player_ranks WHERE lower(replace(uuid, '-', '')) = ?").bind(world.owner_uuid.replace(/-/g, "")).first().catch(() => null);
+        if (!OWNER_RANKS.has(String(ownerRank?.rank || "").toLowerCase())) return deny(403, "no_rank");
+      }
     }
     if (action === "invite" || action === "uninvite") {
       const has = (world.invites || []).some((i) => i.name && i.name.toLowerCase() === name.toLowerCase());
@@ -193,6 +198,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       return json({ ok: true, duplicate: true, request_id: rid, op: ex.action, status: ex.status }, 200);
     }
     const ip = req.headers.get("CF-Connecting-IP") || "";
+    const ipHash = await hashIp(env, ip);
     const now = Date.now(), since = now - HOUR;
     if (action === "start") {
       const busy = await env.DB.prepare("SELECT 1 AS n FROM mc_vip_commands WHERE world_id = ? AND status = 'pending' LIMIT 1").bind(id).first();
@@ -208,7 +214,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     } else {
       const [perD, perI] = await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE discord_id = ? AND action != 'start' AND created_at > ?").bind(a.user.id, since).first(),
-        env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE ip = ? AND action != 'start' AND created_at > ?").bind(ip, since).first(),
+        env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE (ip_hash = ?1 OR ip = ?2) AND action != 'start' AND created_at > ?3").bind(ipHash, ip, since).first(),
       ]);
       if ((perD?.n || 0) >= 10 || (perI?.n || 0) >= 20) {
         const t = Math.min(perD?.n >= 10 ? perD.t : Infinity, perI?.n >= 20 ? perI.t : Infinity);
@@ -216,7 +222,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       }
     }
     const rowId = crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, source, created_at, status, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'web', ?, 'pending', ?)").bind(rowId, rid, action, id, a.uuid, a.name, world.owner_uuid, a.user.id, name, role, visibility, now, ip).run();
+    await env.DB.prepare("INSERT INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'web', ?, 'pending', NULL, ?)").bind(rowId, rid, action, id, a.uuid, a.name, world.owner_uuid, a.user.id, name, role, visibility, now, ipHash).run();
     return json({ ok: true, request_id: rid, op: action, status: "pending" }, 202);
   }
 
@@ -246,8 +252,8 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       if (!row || row.status !== "pending") continue;
       if (x.action != null && x.action !== row.action) continue;
       if (x.status === "expired" && now - row.created_at < EXPIRE_MS) continue;
-      // Die IP dient nur dem Rate-Limit und wird beim Ack gelöscht.
-      const res = await env.DB.prepare("UPDATE mc_vip_commands SET status = ?, reason = ?, acked_at = ?, ip = NULL WHERE request_id = ? AND discord_id = ? AND status = 'pending'").bind(x.status, reason || null, now, x.request_id, x.discord_id).run();
+      // Die IP-Information (Klartext-ip und ip_hash) dient nur dem Rate-Limit und wird beim Ack gelöscht.
+      const res = await env.DB.prepare("UPDATE mc_vip_commands SET status = ?, reason = ?, acked_at = ?, ip = NULL, ip_hash = NULL WHERE request_id = ? AND discord_id = ? AND status = 'pending'").bind(x.status, reason || null, now, x.request_id, x.discord_id).run();
       updated += res.meta?.changes || 0;
     }
     return json({ ok: true, updated });
