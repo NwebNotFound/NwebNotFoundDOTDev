@@ -1,0 +1,551 @@
+{
+  "mockups": [
+    {
+      "page": "home",
+      "file": "docs/screens/v2/mc/mockup-home-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1635,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "home",
+      "file": "docs/screens/v2/mc/mockup-home-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3173,
+      "scrollWidth": 419
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/mockup-markt-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1245,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/mockup-markt-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1885,
+      "scrollWidth": 424
+    },
+    {
+      "page": "item",
+      "file": "docs/screens/v2/mc/mockup-item-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1030,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "item",
+      "file": "docs/screens/v2/mc/mockup-item-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1602,
+      "scrollWidth": 390
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/mockup-shops-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1002,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/mockup-shops-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1493,
+      "scrollWidth": 390
+    },
+    {
+      "page": "auktionen",
+      "file": "docs/screens/v2/mc/mockup-auktionen-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 981,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "auktionen",
+      "file": "docs/screens/v2/mc/mockup-auktionen-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1670,
+      "scrollWidth": 390
+    },
+    {
+      "page": "parkour",
+      "file": "docs/screens/v2/mc/mockup-parkour-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1231,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "parkour",
+      "file": "docs/screens/v2/mc/mockup-parkour-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1816,
+      "scrollWidth": 390
+    },
+    {
+      "page": "pvp",
+      "file": "docs/screens/v2/mc/mockup-pvp-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1074,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "pvp",
+      "file": "docs/screens/v2/mc/mockup-pvp-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1746,
+      "scrollWidth": 390
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/mockup-spieler-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1064,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/mockup-spieler-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2537,
+      "scrollWidth": 390
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/mockup-player-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1151,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/mockup-player-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1896,
+      "scrollWidth": 390
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/mockup-leaderboards-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1221,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/mockup-leaderboards-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1816,
+      "scrollWidth": 390
+    },
+    {
+      "page": "changelog",
+      "file": "docs/screens/v2/mc/mockup-changelog-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1237,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "changelog",
+      "file": "docs/screens/v2/mc/mockup-changelog-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1298,
+      "scrollWidth": 390
+    },
+    {
+      "page": "feedback",
+      "file": "docs/screens/v2/mc/mockup-feedback-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1155,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "feedback",
+      "file": "docs/screens/v2/mc/mockup-feedback-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1244,
+      "scrollWidth": 390
+    },
+    {
+      "page": "wiki",
+      "file": "docs/screens/v2/mc/mockup-wiki-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1464,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "wiki",
+      "file": "docs/screens/v2/mc/mockup-wiki-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2132,
+      "scrollWidth": 390
+    },
+    {
+      "page": "wiki-artikel",
+      "file": "docs/screens/v2/mc/mockup-wiki-artikel-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1464,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "wiki-artikel",
+      "file": "docs/screens/v2/mc/mockup-wiki-artikel-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2132,
+      "scrollWidth": 390
+    },
+    {
+      "page": "vip",
+      "file": "docs/screens/v2/mc/mockup-vip-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 986,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "vip",
+      "file": "docs/screens/v2/mc/mockup-vip-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1399,
+      "scrollWidth": 390
+    },
+    {
+      "page": "account",
+      "file": "docs/screens/v2/mc/mockup-account-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 979,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "account",
+      "file": "docs/screens/v2/mc/mockup-account-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1685,
+      "scrollWidth": 390
+    }
+  ],
+  "impl": [
+    {
+      "page": "home",
+      "file": "docs/screens/v2/mc/neu-home-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2796,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "home",
+      "file": "docs/screens/v2/mc/neu-home-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 4244,
+      "scrollWidth": 390
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/neu-markt-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2994,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/neu-markt-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3657,
+      "scrollWidth": 390
+    },
+    {
+      "page": "item",
+      "file": "docs/screens/v2/mc/neu-item-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1935,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "item",
+      "file": "docs/screens/v2/mc/neu-item-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1904,
+      "scrollWidth": 390
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/neu-shops-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1167,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/neu-shops-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1527,
+      "scrollWidth": 390
+    },
+    {
+      "page": "auktionen",
+      "file": "docs/screens/v2/mc/neu-auktionen-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1078,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "auktionen",
+      "file": "docs/screens/v2/mc/neu-auktionen-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1408,
+      "scrollWidth": 390
+    },
+    {
+      "page": "parkour",
+      "file": "docs/screens/v2/mc/neu-parkour-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2121,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "parkour",
+      "file": "docs/screens/v2/mc/neu-parkour-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2143,
+      "scrollWidth": 390
+    },
+    {
+      "page": "pvp",
+      "file": "docs/screens/v2/mc/neu-pvp-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1101,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "pvp",
+      "file": "docs/screens/v2/mc/neu-pvp-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1115,
+      "scrollWidth": 390
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/neu-spieler-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 908,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/neu-spieler-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 886,
+      "scrollWidth": 390
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/neu-player-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1995,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/neu-player-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2995,
+      "scrollWidth": 390
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/neu-leaderboards-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1507,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/neu-leaderboards-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1551,
+      "scrollWidth": 390
+    },
+    {
+      "page": "changelog",
+      "file": "docs/screens/v2/mc/neu-changelog-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1047,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "changelog",
+      "file": "docs/screens/v2/mc/neu-changelog-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1130,
+      "scrollWidth": 390
+    },
+    {
+      "page": "feedback",
+      "file": "docs/screens/v2/mc/neu-feedback-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1257,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "feedback",
+      "file": "docs/screens/v2/mc/neu-feedback-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1311,
+      "scrollWidth": 390
+    },
+    {
+      "page": "wiki",
+      "file": "docs/screens/v2/mc/neu-wiki-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1245,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "wiki",
+      "file": "docs/screens/v2/mc/neu-wiki-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1999,
+      "scrollWidth": 390
+    },
+    {
+      "page": "wiki-artikel",
+      "file": "docs/screens/v2/mc/neu-wiki-artikel-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2071,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "wiki-artikel",
+      "file": "docs/screens/v2/mc/neu-wiki-artikel-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3031,
+      "scrollWidth": 390
+    },
+    {
+      "page": "vip",
+      "file": "docs/screens/v2/mc/neu-vip-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2312,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "vip",
+      "file": "docs/screens/v2/mc/neu-vip-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3013,
+      "scrollWidth": 390
+    },
+    {
+      "page": "account",
+      "file": "docs/screens/v2/mc/neu-account-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 3334,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "account",
+      "file": "docs/screens/v2/mc/neu-account-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 4800,
+      "scrollWidth": 390
+    }
+  ],
+  "style": {
+    "no-preference": {
+      "bodyFont": "SmBody, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+      "headingFont": "SmPixel, ui-monospace, monospace",
+      "cardRadius": "22px",
+      "cardBackground": "rgb(21, 33, 28)",
+      "quickLinkAnimation": "rise",
+      "buttonShadow": "rgba(0, 0, 0, 0.3) 0px -2px 0px 0px inset",
+      "buttonHeight": 44,
+      "navRadius": "999px",
+      "navBlur": "blur(14px) saturate(1.4)",
+      "themeCss": true
+    },
+    "reduce": {
+      "bodyFont": "SmBody, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+      "headingFont": "SmPixel, ui-monospace, monospace",
+      "cardRadius": "22px",
+      "cardBackground": "rgb(21, 33, 28)",
+      "quickLinkAnimation": "none",
+      "buttonShadow": "rgba(0, 0, 0, 0.3) 0px -2px 0px 0px inset",
+      "buttonHeight": 44,
+      "navRadius": "999px",
+      "navBlur": "blur(14px) saturate(1.4)",
+      "themeCss": true
+    },
+    "diff": {
+      "quickLinkAnimation": [
+        "rise",
+        "none"
+      ]
+    }
+  },
+  "overflow390": []
+}
