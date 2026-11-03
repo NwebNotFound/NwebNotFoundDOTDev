@@ -35,6 +35,9 @@ const isSafeImageSrc = (src) => {
 
 /** `http`, `mailto`, `relative` or `bad` (an unknown scheme or a protocol-relative URL). */
 const linkKind = (href) => {
+  // Browsers drop control characters (and leading spaces) when they parse a URL, so "\u0001javascript:..." would
+  // still be a javascript: URL. No legitimate link contains them: refuse.
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(href)) return "bad";
   if (/^https?:\/\//i.test(href)) return "http";
   if (/^mailto:/i.test(href)) return "mailto";
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return "bad";

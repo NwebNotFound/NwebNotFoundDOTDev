@@ -63,6 +63,12 @@ assert.ok(md('<a href="javascript:void(0)" onclick="alert(2)"><b>t</b></a>').inc
 assert.ok(!/<a\s[^>]*onclick/.test(md('<a href="javascript:void(0)" onclick="alert(2)"><b>t</b></a>')), "no live handler");
 assert.equal(md("[x](javascript:alert(1))"), "<p>x</p>", "javascript: link removed");
 assert.equal(md("[x](data:text/html,1)"), "<p>x</p>", "data: link removed");
+// Browsers ignore control characters inside a URL, so they must not be able to hide a scheme.
+for (const c of ["\u0000", "\u0001", "\u0008", "\u001f", "\u007f", "\u0085", "\u009f"]) {
+  assert.equal(md(`[x](${c}javascript:alert(1))`), "<p>x</p>", `control char U+${c.charCodeAt(0).toString(16)} before javascript: removed`);
+  assert.equal(md(`[x](java${c}script:alert(1))`), "<p>x</p>", `control char U+${c.charCodeAt(0).toString(16)} inside the scheme removed`);
+}
+assert.equal(md("[ok](https://example.com/a?b=1)"), '<p><a href="https://example.com/a?b=1" target="_blank" rel="noopener noreferrer">ok</a></p>', "normal https link still works");
 assert.equal(md("[x](//evil.example/)"), "<p>x</p>", "protocol-relative link removed");
 assert.equal(md("[x](JAVASCRIPT:alert(1))"), "<p>x</p>", "scheme check is case-insensitive");
 assert.ok(!md("[x](vbscript:msgbox(1))").includes("vbscript:"), "unknown scheme removed");
