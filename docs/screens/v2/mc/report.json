@@ -648,30 +648,41 @@
   "stressChecks": {
     "player": {
       "docOverflowPx": 0,
+      "checkedNames": 0,
+      "ellipsizedNames": [],
       "spilledText": [],
       "groupedThousands": true,
       "sample": "1.234.567.890 CP",
-      "ellipsisOnRows": "clip"
+      "ellipsisOnRows": null
     },
     "leaderboards": {
       "docOverflowPx": 0,
+      "checkedNames": 2,
+      "ellipsizedNames": [
+        "Neunzehn_Zeichen",
+        "LangLangLangLang"
+      ],
       "spilledText": [],
       "groupedThousands": true,
       "sample": "617.283.945 CP",
-      "ellipsisOnRows": "clip"
+      "ellipsisOnRows": "ellipsis"
     },
     "shops": {
       "docOverflowPx": 0,
-      "spilledText": [
-        "Der allerallerallerlaengste Erz-",
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      "checkedNames": 2,
+      "ellipsizedNames": [
+        "Der allerallerallerlaengste ",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
       ],
+      "spilledText": [],
       "groupedThousands": false,
       "sample": null,
-      "ellipsisOnRows": "clip"
+      "ellipsisOnRows": "ellipsis"
     },
     "bestellungen": {
       "docOverflowPx": 0,
+      "checkedNames": 1,
+      "ellipsizedNames": [],
       "spilledText": [],
       "groupedThousands": true,
       "sample": null,
