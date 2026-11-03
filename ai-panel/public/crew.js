@@ -49,9 +49,11 @@ export function messageCountLabel(count) {
 /** One row of the list, as a button so it is keyboard- and touch-reachable. */
 export function crewCard(el, row, onOpen) {
   const title = String(row?.title || "").trim() || String(row?.id || "(ohne Titel)");
-  const meta = [statusLabel(row?.status), formatTime(row?.started_at), messageCountLabel(row?.message_count)]
-    .filter(Boolean)
-    .join(" · ");
+  const status = statusLabel(row?.status);
+  const rest = [formatTime(row?.started_at), messageCountLabel(row?.message_count)].filter(Boolean).join(" · ");
+  const meta = [status, rest].filter(Boolean).join(" · ");
+  // A running session gets the live chip in the meta line (mockup); everything else stays text.
+  const running = status === "läuft";
   return el(
     "button",
     {
@@ -62,13 +64,18 @@ export function crewCard(el, row, onOpen) {
         if (typeof onOpen === "function") onOpen(row);
       },
     },
+    el("span", { class: `crew-badge kind-${row?.kind || "other"}`, text: kindLabel(row?.kind) }),
     el(
       "span",
-      { class: "crew-card-head" },
-      el("span", { class: `crew-badge kind-${row?.kind || "other"}`, text: kindLabel(row?.kind) }),
+      { class: "crew-main" },
       el("span", { class: "crew-title", text: title }),
+      el(
+        "span",
+        { class: "crew-meta" },
+        running ? el("span", { class: "chip chip-live" }, el("span", { class: "dot" }), "läuft") : null,
+        running ? rest : meta,
+      ),
     ),
-    el("span", { class: "crew-meta", text: meta }),
     el("span", { class: "crew-id", text: String(row?.id || "") }),
   );
 }
