@@ -691,6 +691,7 @@ async function mcIngest(req, env) {
   if (ranks && ranks.rows.length) st.push(...rankStatements(env, ranks.rows, now));
   if (pvp && pvp.rows.length) st.push(...pvpStatements(env, pvp.rows, now));
   if (st.length) await env.DB.batch(st);
+  HIST_MEMO = null; MARKET_MEMO = null; // neue Marktdaten/Reset: kurzer Speicher ist nicht mehr gültig
   return json({ ok: true, ...(econ ? { economy_daily: econ.rows.length } : {}), ...(ranks ? { player_ranks: ranks.rows.length, ...(ranks.dropped ? { player_ranks_dropped: true } : {}) } : {}), ...(pvp ? { pvp_stats: pvp.rows.length, ...(pvp.dropped ? { pvp_stats_dropped: true } : {}) } : {}), ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
