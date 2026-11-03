@@ -26,8 +26,8 @@
       <div>
         <h1 class="sm-preview__title">Creative Hub · Design-Vorschau</h1>
         <p class="sm-preview__note">
-          Intern &middot; nicht in der Navigation verlinkt &middot; Phase 1 (Tokens + Basiskomponenten).
-          Der Minecraft-Bereich und das AI-Panel bleiben unberührt.
+          Intern &middot; nicht in der Navigation verlinkt &middot; Phase 1 (Tokens + Basiskomponenten)
+          und Phase 2 (Shell, Home, DE/EN-Routing). Der Minecraft-Bereich und das AI-Panel bleiben unberührt.
         </p>
       </div>
       <button
@@ -366,6 +366,155 @@
             <span class="sm-muted">0 / 5 (noch nichts bewertet)</span>
           </li>
         </ul>
+      </section>
+
+      <!-- -------------------------------------------------------------------------- hub shell -->
+      <section class="sm-preview__section" id="shell">
+        <h2 class="sm-h2">Shell (Phase 2)</h2>
+        <p class="sm-lead">
+          Genau die Bausteine, die <code>src/hub.js</code> als HTML ausliefert: Kopfzeile mit
+          Navigation (leere Bereiche als „bald“ markiert), DE/EN-Umschalter, Theme-Schalter, Hero mit
+          Maskottchen-Platzhalter, Bereichskacheln und Fußzeile mit GitHub/X und den Einstellungen.
+        </p>
+        <div class="sm-shell sm-preview__shell">
+          <header class="sm-nav">
+            <div class="sm-wrap sm-nav__inner">
+              <a class="sm-brand" href="/design/summer-preview.html"
+                ><span class="sm-mascot sm-mascot--placeholder sm-mascot--brand"
+                  ><svg class="sm-mascot__art" width="24" height="24" aria-hidden="true" focusable="false"
+                    ><use href="/design/summer-sprites.svg#sm-mascot-placeholder"></use></svg></span
+                ><span class="sm-brand__name">NwebNotFound</span></a
+              >
+              <nav class="sm-nav__nav" aria-label="Hauptnavigation">
+                <ul class="sm-nav__links">
+                  <li><a class="sm-nav__link" href="/" aria-current="page">Start</a></li>
+                  <li>
+                    <a class="sm-nav__link" href="/music" aria-label="Musik (erscheint bald)"
+                      >Musik <span class="sm-badge sm-badge--sun">bald</span></a
+                    >
+                  </li>
+                  <li>
+                    <a class="sm-nav__link" href="/writing" aria-label="Texte (erscheint bald)"
+                      >Texte <span class="sm-badge sm-badge--sun">bald</span></a
+                    >
+                  </li>
+                  <li><a class="sm-nav__link" href="/about">Über mich</a></li>
+                </ul>
+              </nav>
+              <div class="sm-nav__tools">
+                <nav class="sm-lang" aria-label="Sprache">
+                  <a class="sm-lang__link" href="/de/" hreflang="de" lang="de" aria-current="true">DE</a>
+                  <a class="sm-lang__link" href="/en/" hreflang="en" lang="en">EN</a>
+                </nav>
+                <button
+                  type="button"
+                  class="sm-btn sm-btn--ghost sm-btn--dense sm-theme"
+                  data-summer-theme-toggle
+                  aria-pressed="false"
+                  data-label-day="Tag"
+                  data-label-night="Nacht"
+                  title="Design wechseln"
+                >
+                  Nacht
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <section class="sm-hero sm-sky">
+            <div class="sm-wrap sm-hero__inner">
+              <span class="sm-mascot sm-mascot--placeholder sm-mascot--xl"
+                ><svg class="sm-mascot__art" width="24" height="24" aria-hidden="true" focusable="false"
+                  ><use href="/design/summer-sprites.svg#sm-mascot-placeholder"></use></svg></span
+              >
+              <p class="sm-eyebrow">Willkommen</p>
+              <h3 class="sm-display">
+                Hi, ich bin Nils.<br /><span class="sm-display__soft">Willkommen in meiner Ecke.</span>
+              </h3>
+              <p class="sm-lead">
+                Hier sammle ich, was ich baue: einen Minecraft-Server, Texte, Musik und Rezensionen.
+              </p>
+              <p class="sm-row sm-hero__cta">
+                <a class="sm-btn" href="/portfolio">Projekte</a>
+                <a class="sm-btn sm-btn--ghost" href="#" title="Minecraft-Server (Beispiel-Link)">Minecraft-Server</a>
+              </p>
+              <p class="sm-muted sm-hero__note">Maskottchen-Platzhalter – das echte Bild zeichnet Nils selbst.</p>
+            </div>
+          </section>
+
+          <section class="sm-section">
+            <div class="sm-wrap">
+              <div class="sm-tiles">
+                <a class="sm-card sm-card--link sm-tile" href="/about">
+                  <h4 class="sm-card__title">Über mich</h4>
+                  <p class="sm-tile__text">Wer ich bin, was ich gerade mag und wo du mich sonst findest.</p>
+                  <span class="sm-tile__cta">Ansehen &#8250;</span>
+                </a>
+                <a class="sm-card sm-card--link sm-tile sm-tile--soon" href="/music">
+                  <span class="sm-badge sm-badge--sun">Bald verfügbar</span>
+                  <h4 class="sm-card__title">Musik</h4>
+                  <p class="sm-tile__text">Eigene Loops und Beats, später mit kleinem Player.</p>
+                  <span class="sm-tile__cta">Bald verfügbar &#8250;</span>
+                </a>
+              </div>
+            </div>
+          </section>
+
+          <section class="sm-section">
+            <div class="sm-wrap sm-measure sm-soon">
+              <span class="sm-mascot sm-mascot--placeholder sm-mascot--xl"
+                ><svg class="sm-mascot__art" width="24" height="24" aria-hidden="true" focusable="false"
+                  ><use href="/design/summer-sprites.svg#sm-mascot-placeholder"></use></svg></span
+              >
+              <p class="sm-eyebrow">Bald</p>
+              <h3 class="sm-h1">Musik kommt bald</h3>
+              <p class="sm-lead">
+                Hier entsteht die Musik-Seite: eigene Loops und Beats mit Loop-Punkten in einem kleinen Player.
+              </p>
+              <p class="sm-kaomoji">(◕‿◕)</p>
+              <p><a class="sm-btn sm-btn--ghost" href="/">Zur Startseite</a></p>
+            </div>
+          </section>
+
+          <footer class="sm-footer">
+            <div class="sm-wrap sm-footer__grid">
+              <div class="sm-footer__col">
+                <p class="sm-footer__title">Links</p>
+                <ul class="sm-footer__list">
+                  <li>
+                    <!-- The preview stays CSP-clean, so the example links point nowhere:
+                         the real targets are https://github.com/NwebNotFound and https://x.com/NwebNotFound
+                         (see DESIGN.md §11.9). -->
+                    <a href="#" title="GitHub (Beispiel-Link)">GitHub</a>
+                  </li>
+                  <li><a href="#" title="X @NwebNotFound (Beispiel-Link)">X (@NwebNotFound)</a></li>
+                </ul>
+              </div>
+              <div class="sm-footer__col">
+                <p class="sm-footer__title">Einstellungen</p>
+                <nav class="sm-lang" aria-label="Sprache">
+                  <a class="sm-lang__link" href="/de/" hreflang="de" lang="de" aria-current="true">DE</a>
+                  <a class="sm-lang__link" href="/en/" hreflang="en" lang="en">EN</a>
+                </nav>
+                <button
+                  type="button"
+                  class="sm-btn sm-btn--ghost sm-btn--dense sm-theme"
+                  data-summer-theme-toggle
+                  aria-pressed="false"
+                  data-label-day="Tag"
+                  data-label-night="Nacht"
+                  title="Design wechseln"
+                >
+                  Nacht
+                </button>
+              </div>
+            </div>
+            <div class="sm-wrap sm-footer__bottom">
+              <span>© Nils Weberruß</span>
+              <span class="sm-muted">Gemacht mit Cloudflare Workers.</span>
+            </div>
+          </footer>
+        </div>
       </section>
 
       <!-- ------------------------------------------------------------------------ token table -->

@@ -126,7 +126,14 @@ async function startServers() {
 
 const PAGES = [
   { group: "site", name: "home", url: `${SITE}/`, fullPage: true },
+  { group: "site", name: "portfolio", url: `${SITE}/portfolio`, fullPage: true },
   { group: "site", name: "guestbook", url: `${SITE}/guestbook`, fullPage: true },
+  // Hub shell (Phase 2): reference shots for design review, committed under docs/screens/ (own out
+  // directory so the site group keeps writing into screenshots/).
+  { group: "hub", name: "hub-home", url: `${SITE}/`, fullPage: true, out: "docs/screens" },
+  { group: "hub", name: "hub-about", url: `${SITE}/about`, fullPage: true, out: "docs/screens" },
+  { group: "hub", name: "hub-soon", url: `${SITE}/writing`, fullPage: true, out: "docs/screens" },
+  { group: "hub", name: "hub-home-en", url: `${SITE}/en`, fullPage: true, out: "docs/screens", schemes: ["light"], only: (vp) => vp.w === 390 },
   { group: "mc", name: "mc-home", url: `${MC}/`, fullPage: false, waitUntil: "domcontentloaded", schemes: ["dark"] },
   { group: "mc", name: "mc-wiki", url: `${MC}/wiki`, fullPage: true, waitUntil: "domcontentloaded", schemes: ["dark"] },
   // Panel: signed out (login), chat with tool output, approval card, drawer open, new-bot dialog.
@@ -268,7 +275,7 @@ async function main() {
   if (SERVE) await startServers();
   else {
     const wanted = [];
-    if (GROUPS.includes("site")) wanted.push(`${SITE}/`);
+    if (GROUPS.includes("site") || GROUPS.includes("hub")) wanted.push(`${SITE}/`);
     if (GROUPS.includes("mc")) wanted.push(`${MC}/`);
     if (GROUPS.includes("panel")) wanted.push(`${PANEL}/login`);
     await Promise.all(wanted.map((url) => reachable(url, 20_000))).catch((err) => {
@@ -284,7 +291,9 @@ async function main() {
         for (const scheme of page.schemes || SCHEMES) {
           for (const vp of VIEWPORTS) {
             if (page.only && !page.only(vp)) continue;
-            const file = path.join(OUT, `${page.name}-${vp.tag}-${scheme}.png`);
+            const outDir = page.out ? path.resolve(ROOT, page.out) : OUT;
+            await mkdir(outDir, { recursive: true });
+            const file = path.join(outDir, `${page.name}-${vp.tag}-${scheme}.png`);
             await shoot(browser, { ...page, ...vp, scheme }, file);
             const rel = path.relative(ROOT, file).replace(/\\/g, "/");
             console.log(`  ✓ ${rel}`);

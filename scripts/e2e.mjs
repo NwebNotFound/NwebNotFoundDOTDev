@@ -20,7 +20,7 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   if (token) h["x-ingest-token"] = token;
   if (cookie) h.cookie = cookie;
   if (origin) h.origin = origin;
-  const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t };
+  const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
 };
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
 const now = Date.now(), H = 3600, HR0 = Math.floor(now / 1000 / H) * H, RESET = new Date((HR0 - 28 * H) * 1000).toISOString();
@@ -395,7 +395,7 @@ try {
   ok(iau.placeholder.length === 0 && iau.approx.length === 0, "icon-audit: 0 Platzhalter, 0 falsche Icons", JSON.stringify({ p: iau.placeholder, a: iau.approx }).slice(0, 300));
   console.log("9c) Navigation, Theme, Seiten");
   const home = (await req("/")).t; ok(!/<nav class="nl"[^]*?href="\/profile">Profil<\/a>[^]*?<\/nav>/.test(home), "kein doppelter Profil-Tab in der Nav");
-  { const port = await req("/", { testHost: "nwebnotfound.dev" }); const chip = (port.t.split("else if(d.user)")[1] || "").split("else if(d.available)")[0];
+  { const port = await req("/portfolio", { testHost: "nwebnotfound.dev" }); const chip = (port.t.split("else if(d.user)")[1] || "").split("else if(d.available)")[0];
     ok(port.s === 200 && port.t.includes("protocol!=='https:'") && chip.includes("createElement('img')") && chip.includes("httpsAvatar(d.user.avatar)") && !chip.includes("innerHTML") && !/onerror\s*=\s*["']/.test(chip), "Portfolio-Chip: Avatar nur als DOM-Property, nur https", chip.slice(0, 160));
     const mc = (port.t.split("if(k)")[1] || "").split("else if(d.user)")[0];
     ok(mc.includes("httpsAvatar(d.user.avatar)") && !mc.includes("this.src=d.user.avatar") && !/av\.src=nm\?/.test(mc), "MC-Konto: Avatar nur über httpsAvatar", mc.slice(0, 180)); }
@@ -498,6 +498,48 @@ try {
   for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle", "/parkour", "/vip"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
+  console.log("7b) Hub: Shell, Sprache, Weiterleitungen");
+  {
+    const hub = (path, opt = {}) => req(path, { testHost: "nwebnotfound.dev", ...opt });
+    const extUrls = (html) => [...html.matchAll(/(?:href|src)="(https?:\/\/[^"]+)"/g)].map((m) => m[1])
+      .filter((u) => !/^https:\/\/(github\.com\/NwebNotFound|x\.com\/NwebNotFound|mc\.nwebnotfound\.dev|nwebnotfound\.dev)(\/|$)/.test(u));
+    const home = await hub("/", { headers: { "accept-language": "de-DE,de;q=0.9,en;q=0.8" } });
+    ok(home.s === 200 && /<html lang="de" class="sm-root">/.test(home.t), "GET / → 200, <html lang=de> aus Accept-Language", home.s);
+    ok(home.t.includes("/design/summer.css?v=") && home.t.includes('src="/design/summer-theme.js"') && home.t.indexOf("summer-theme.js") < home.t.indexOf("summer.css?v="), "Hub lädt das Phase-1-Theme (Themeskript vor dem Stylesheet)");
+    ok(home.t.includes('class="sm-skip-link"') && home.t.includes('<main id="main">') && home.t.includes('<footer class="sm-footer"'), "Skip-Link und Landmarks vorhanden");
+    ok(home.t.includes('hreflang="de"') && home.t.includes('hreflang="en"') && home.t.includes('hreflang="x-default"'), "hreflang de/en/x-default gesetzt");
+    ok(home.t.includes('href="https://github.com/NwebNotFound" target="_blank" rel="noopener noreferrer"') && home.t.includes('href="https://x.com/NwebNotFound" target="_blank" rel="noopener noreferrer"'), "Footer: GitHub und X als normale Links mit rel=noopener noreferrer");
+    ok(extUrls(home.t).length === 0, "keine fremden Requests (kein CDN, kein Tracker, keine externen Schriften)", extUrls(home.t).slice(0, 3).join(" "));
+    ok(home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche sind in der Navigation als 'bald' markiert");
+    const en = await hub("/", { headers: { "accept-language": "en-GB,en;q=0.9" } });
+    ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("Welcome to my corner"), "Accept-Language en → englische Oberfläche");
+    ok(en.t.includes('href="/de"') && en.t.includes('href="/en"') && en.t.includes('aria-current="true"'), "Sprachumschalter verlinkt beide Sprachen und markiert die aktuelle");
+    const bare = await hub("/");
+    ok(/<html lang="de"/.test(bare.t), "ohne Accept-Language → Deutsch als Standard");
+    ok(bare.s === 200, "/ leitet nicht um (kein Redirect-Loop)", bare.s);
+    ok(/<html lang="en"/.test((await hub("/", { cookie: "nnf_lang=en", headers: { "accept-language": "de-DE,de;q=0.9" } })).t), "Cookie nnf_lang=en schlägt Accept-Language");
+    const deAbout = await hub("/de/about"), enAbout = await hub("/en/about");
+    ok(deAbout.s === 200 && /<html lang="de"/.test(deAbout.t) && deAbout.t.includes("Platzhalter"), "/de/about → 200, deutsch, klar als Platzhalter markiert", deAbout.s);
+    ok(enAbout.s === 200 && /<html lang="en"/.test(enAbout.t) && enAbout.t.includes("placeholder"), "/en/about → 200, englisch");
+    ok((deAbout.h.get("set-cookie") || "").includes("nnf_lang=de") && (enAbout.h.get("set-cookie") || "").includes("nnf_lang=en"), "Sprachpräfix setzt das Cookie nnf_lang", deAbout.h.get("set-cookie"));
+    ok((await hub("/en")).s === 200 && /<html lang="en"/.test((await hub("/en")).t), "/en (ohne Schluss-Slash) → 200, englisch");
+    for (const p of ["/de/guestbook", "/en/guestbook", "/en/portfolio", "/de/unbekannt"]) {
+      const r = await hub(p), want = p.slice(3);
+      ok(r.s === 301 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}`, `${p} → 301 ${want} (Hub-fremde Route ohne Präfix)`, `${r.s} ${r.h.get("location")}`);
+    }
+    for (const p of ["/", "/about", "/music", "/writing", "/reviews"]) {
+      const r = await hub(p);
+      ok(r.s === 200 && r.t.includes("/design/summer.css?v="), `Hub-Route ${p} → 200`, r.s);
+    }
+    const soon = await hub("/en/music");
+    ok(soon.s === 200 && soon.t.includes("sm-mascot--placeholder") && soon.t.includes("(◕‿◕)"), "/en/music → Leerzustand mit Maskottchen-Platzhalter");
+    ok(!/undefined|\{[a-z_]+\}/.test(deAbout.t) && !/undefined|\{[a-z_]+\}/.test(soon.t), "keine Rohkeys oder {Platzhalter} im Hub-HTML");
+    const port = await hub("/portfolio");
+    ok(port.s === 200 && port.t.includes('id="projekte"') && !port.t.includes("sm-root"), "/portfolio → 200, frühere Startseite im Portfolio-Design");
+    ok((await hub("/guestbook")).s === 200 && (await hub("/guestbook")).t.includes("<title>Gästebuch · NwebNotFound</title>"), "/guestbook bleibt erreichbar (Portfolio-Design)");
+    const mcHome = await req("/");
+    ok(mcHome.s === 200 && mcHome.t.includes("Kein offizielles Minecraft-Produkt") && !mcHome.t.includes("sm-root"), "mc.nwebnotfound.dev / unverändert (kein Hub-Theme, Regression)");
+  }
   console.log("8) UI (Chromium 390/1440)");
   { // Live-Ticks: erster Ingest legt je Item einen Tick an; gleicher Preis → kein neuer; Preisänderung → neuer Tick
     const t0 = (await req("/api/mc-market/diamond")).j; ok(Array.isArray(t0.ticks) && t0.ticks.length >= 1, "Item-API: Live-Ticks vorhanden", JSON.stringify(t0.ticks));

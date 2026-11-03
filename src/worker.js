@@ -14,6 +14,8 @@ import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.
 import { normInv, renderInventoryCard } from "./mc-inventory.js";
 import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
+import { hubPage, hubPageExists } from "./hub.js";
+import { LANG_COOKIE, pickLang, splitLang, langCookie } from "./i18n/index.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -155,11 +157,12 @@ function shell({ title, desc, css, nav, body, head = "", footer, loginBase = "",
 
 /* ---------- Portfolio ---------- */
 const pNav = (cur) => `<a class="brand" href="/">NwebNotFound</a>
-<a class="l hide-s" href="/#projekte">Projekte</a><a class="l" href="/guestbook"${cur === "gb" ? ' aria-current="page"' : ""}>Gästebuch</a><a class="l" href="https://${MCD}/">Minecraft</a>`;
+<a class="l hide-s" href="/portfolio">Projekte</a><a class="l" href="/guestbook"${cur === "gb" ? ' aria-current="page"' : ""}>Gästebuch</a><a class="l" href="https://${MCD}/">Minecraft</a>`;
 const pFoot = `<span>© {{Y}} Nils Weberruß</span><span><a href="/">Start</a> · <a href="/guestbook">Gästebuch</a> · <a href="https://${MCD}/">Minecraft</a></span>`;
 const portfolio = (o) => shell({ css: PORT_CSS, footer: pFoot, themeColor: "#fbfbfd", loginBase: "", ...o });
 
-const HOME = portfolio({ title: "Nils Weberruß · NwebNotFound", desc: "Informatik-Student an der TH Ulm. Web- und Server-Projekte.", nav: pNav("home"), body: `
+// Die frühere Startseite: seit Phase 2 unter /portfolio (der Hub besitzt `/`). Inhalte unverändert.
+const PORTFOLIO = portfolio({ title: "Projekte · Nils Weberruß", desc: "Informatik-Student an der TH Ulm. Web- und Server-Projekte.", nav: pNav("portfolio"), body: `
 <section class="hero center"><div class="wrap">
 <p class="eyebrow reveal">Informatik · TH Ulm</p>
 <h1 class="h-xl reveal d1">Hi, ich bin Nils.<br><span class="grad">Ich baue Dinge fürs Web.</span></h1>
@@ -805,7 +808,7 @@ async function mcMarketItem(env, raw) {
 const CSP_RO = "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mc-heads.net https://cdn.jsdelivr.net https://cdn.discordapp.com; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://discord.com; object-src 'none'";
 const SEC_HEADERS = { "content-security-policy-report-only": CSP_RO, "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
 const json = (o, s = 200, extra = {}) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
-const html = (h, s = 200) => new Response(h.replaceAll("{{Y}}", String(new Date().getUTCFullYear())), { status: s, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...SEC_HEADERS } });
+const html = (h, s = 200, extra = {}) => new Response(h.replaceAll("{{Y}}", String(new Date().getUTCFullYear())), { status: s, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...SEC_HEADERS, ...extra } });
 const notFound = (mc) => html(mc
   ? shell({ title: "404 · NwebNotFound MC", desc: "", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Diesen Chunk gibt es nicht.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` })
   : portfolio({ title: "404 · NwebNotFound", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Not Found. Passend zum Namen.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` }), 404);
@@ -913,7 +916,19 @@ export default {
     }
     if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden, Idee oder Sonstiges einreichen", css: MC_CSS, nav: mNav.replace(/href="\//g, `href="https://${MCD}/`), footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
     if (p === "/api/guestbook") return guestbookApi(req, env);
-    if (p === "/") return html(HOME);
+    // ---- Creative Hub (nwebnotfound.dev) ----
+    // Sprachpfade `/de/…` und `/en/…` plus die sprachlosen Pfade. `/` selbst rendert die gewählte
+    // Sprache (Cookie → Accept-Language → Deutsch), statt umzuleiten: so kann kein Redirect-Loop
+    // entstehen. Ein Sprachpräfix vor einer Hub-fremden Route fällt auf den Pfad ohne Präfix zurück
+    // (301), damit z. B. /en/guestbook nicht in einem 404 endet.
+    const pre = splitLang(p);
+    if (pre.lang && !hubPageExists(pre.path)) return Response.redirect(`https://${MAIN}${pre.path}`, 301);
+    if (hubPageExists(pre.path)) {
+      const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
+      const page = hubPage(pre.path, lang);
+      if (page) return html(page, 200, pre.lang ? { "set-cookie": langCookie(pre.lang), vary: "accept-language" } : { vary: "accept-language" });
+    }
+    if (p === "/portfolio") return html(PORTFOLIO);
     if (p === "/guestbook") return html(GUEST);
     if (p === "/profile") return html(PROFILE_MAIN());
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
