@@ -138,7 +138,8 @@ html.mc .nl .ngm {
 html.mc .nl .ng.open > .ngm { display: grid; }
 html.mc .nl .ng.ng-end .ngm { left: auto; right: 0; }
 html.mc .nl .ngm a { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; color: var(--ink); font-size: 0.95rem; font-weight: 700; white-space: nowrap; text-decoration: none; box-shadow: none; }
-html.mc .nl .ngm a:is(:hover, :focus-visible) { background: var(--surface-2); color: var(--ink); box-shadow: none; }
+/* Hover of dropdown entries and buttons stays on ONE shared token pair (--hl-bg/--hl-ring from
+   /mc/ds.css) — e2e_ui.py asserts both compute the same background and shadow. */
 html.mc .nl .ngm a[aria-current=page] { background: var(--surface-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 html.mc .nl .ngm a img { width: 20px; height: 20px; flex: none; }
 html.mc .nl .ngm a.out { color: var(--down); }
@@ -186,7 +187,7 @@ html.mc .go { display: inline-flex; align-items: center; gap: 6px; color: var(--
 html.mc a.go:hover { text-decoration: none; }
 
 /* ---------- chips, tags, badges ---------- */
-html.mc .chip, html.mc .pill, html.mc .tag, html.mc .soon, html.mc .wip, html.mc .todo, html.mc .nb {
+html.mc .chip, html.mc .pill, html.mc .tag, html.mc .soon, html.mc .wip, html.mc .todo {
   display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 10px; border: 0;
   border-radius: 999px; background: var(--surface-2); color: var(--muted);
   box-shadow: var(--bevel); font-family: var(--f-body); font-size: 0.75rem; font-weight: 800;
