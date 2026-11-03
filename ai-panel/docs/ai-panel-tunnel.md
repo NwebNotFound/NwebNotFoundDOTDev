@@ -13,8 +13,9 @@ The panel Worker must reach the Hermes gateway (`127.0.0.1:8642`) and the dashbo
 - injects the credential for the destination:
   - `/dash/*` → `X-Hermes-Session-Token: <HERMES_DASHBOARD_SESSION_TOKEN>` (the dashboard
     answers 401 without it),
-  - `/gw/p/<bot>/…` → `Authorization: Bearer <HERMES_KEY_<BOT>>`, chosen from the profile in
-    the path; a profile without a key is refused with 404,
+  - `/gw/p/<bot>/…` → `Authorization: Bearer <API_SERVER_KEY>`, read from that profile's own
+    env file at request time (cached ~30 s); a profile without a key, or an invalid bot name,
+    is refused with 404,
   - `/gw/…` without a profile → `Authorization: Bearer <API_SERVER_KEY>`,
 - strips any `authorization`, `x-hermes-session-token` or `cookie` header the caller sent, so a
   client cannot smuggle its own credential through,
@@ -78,19 +79,74 @@ node proxy.mjs
 |---|---|
 | `PANEL_SECRET` | shared secret, identical to the Worker's `HERMES_PANEL_SECRET` |
 | `HERMES_DASHBOARD_SESSION_TOKEN` | the dashboard's session token (the value the dashboard runs with); sent as `X-Hermes-Session-Token` on `/dash/*` |
-| `HERMES_KEY_CLOUDFLARE` | `API_SERVER_KEY` of the `cloudflare` profile |
-| `HERMES_KEY_MINECRAFT` | `API_SERVER_KEY` of the `minecraft` profile |
-| `HERMES_KEY_<BOT>` | one per profile; `my-bot` → `HERMES_KEY_MY_BOT` |
-| `API_SERVER_KEY` | optional, for `/gw/…` routes without a profile prefix |
+| `HERMES_KEY_<BOT>` | optional override for one profile; `my-bot` → `HERMES_KEY_MY_BOT` |
+| `API_SERVER_KEY` | optional, for `/gw/…` routes without a profile prefix (and the `default` bot fallback) |
+| `HERMES_HOME` | optional, the Hermes data dir if not `%LOCALAPPDATA%\hermes` |
 | `PORT` | listen port, default `8650` |
 | `GATEWAY` | default `http://127.0.0.1:8642` |
 | `DASHBOARD` | default `http://127.0.0.1:9119` |
 
-The proxy prints which keys it found at startup (`per-bot gateway keys: …`) and warns when the
-dashboard token is missing. A bot created in the panel needs its `HERMES_KEY_<BOT>` added here
-before its chat works — the panel itself picks it up without a redeploy.
+Gateway keys are not configured here any more: on each `/gw/p/<bot>/…` the proxy reads
+`API_SERVER_KEY` from the Hermes profile's own env file — `%LOCALAPPDATA%\hermes\.env` for
+`default`, `%LOCALAPPDATA%\hermes\profiles\<bot>\.env` for every other bot — and caches the
+result for ~30 s (misses included). So a bot created in the panel works without touching this
+`.env` and without a restart, and a rotated key is picked up within half a minute. Only
+`[a-z0-9][a-z0-9_-]{0,31}` is a valid bot name; anything else is a hard 404 `unknown_bot`, and
+the resolved file must stay inside the profiles directory. `HERMES_KEY_<BOT>`, when set, still
+wins. The proxy prints the profiles it discovered at startup (names only, never key values).
 
 The proxy binds `127.0.0.1` only. `.env` is gitignored; never commit it.
+
+### Health, keep-alive and autostart
+
+- `GET /health` on the proxy (shared secret required) answers `{ok, uptime_s, gateway, bots}`.
+  `gateway` is a TCP-level probe of the Hermes gateway; `bots` is the same profiles-directory
+  list the key resolution uses, names only. The Worker's public `/api/health` caches it for 10 s
+  and reports `origin: {reachable, gateway}`; the SPA shows that as the topbar dot
+  (`online` / `Gateway aus` / `Tunnel aus`).
+- On a `text/event-stream` response the proxy writes `: ping` every 15 s (`SSE_PING_MS`).
+  Cloudflare drops ~100 s of silence, which is exactly what a pending approval looks like; the
+  Worker does the same on its side (`sseBody`). Both are comment frames, invisible to the UI.
+- The SPA resumes a dropped stream (`?since=<seq>`, forwarded by the Worker), and when the stream
+  ends without a terminal event it polls `GET /api/bots/<bot>/runs/<id>` — which also refreshes
+  the persisted run status — before reconnecting with backoff.
+- `watchdog.ps1` (this directory) runs one service in the foreground and installs the scheduled
+  tasks that keep the three of them alive:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File watchdog.ps1 -Status    # what runs, which port answers
+  powershell -ExecutionPolicy Bypass -File watchdog.ps1 -Check     # restart a dead task
+  powershell -ExecutionPolicy Bypass -File watchdog.ps1 -Install   # register the tasks (once)
+  ```
+
+  It prefers an existing `run-proxy.ps1` / `run-dashboard.ps1` / `run-tunnel.ps1` in the origin
+  directory and falls back to `node proxy.mjs`, the Hermes dashboard and `cloudflared tunnel run`.
+  The tasks are named `AIPanel_proxy`, `AIPanel_dashboard`, `AIPanel_tunnel`, run at logon (20 s
+  delay) and restart every minute after a non-zero exit. Logs: `%LOCALAPPDATA%\ai-panel\logs`.
+
+### The approval contract
+`POST /p/<bot>/v1/runs/<id>/approval` takes exactly `{request_id, execution_generation, choice}`;
+a missing or extra key is rejected or, worse, silently ignored. The Worker builds that body and,
+when the browser did not supply the two ids, reads them from `GET /v1/runs/<id>`
+(`pending_controls`, id as `request_id` or `prompt_id`). If they cannot be resolved it answers
+409 `approval_context_missing` instead of sending a body that would do nothing. Run status and
+history live in `PanelStore` (`GET /api/runs?bot=&limit=`), so the "Runs" view survives an
+isolate restart.
+
+### Chat history
+
+The transcript lives in `PanelStore`, not in the browser and not only in Hermes:
+
+- `POST /api/bots/<bot>/runs` creates or reuses a conversation (`conversation_id` in the body,
+  returned in the response), stores the user message, and writes the run row.
+- The `/events` pass-through tees every SSE frame, so `tool.completed` and `approval.request`
+  become transcript rows and `run.completed` stores the final answer — while the bytes reach the
+  browser unchanged. When the stream dies early, the poll (`GET /runs/<id>`) stores the answer
+  instead; both paths dedupe on `(conversation, run_id, assistant)`.
+- The sidebar lists conversations (`GET /api/bots/<bot>/conversations`, title/bot/updated_at),
+  and opening one reads `GET /api/bots/<bot>/conversations/<id>/messages`. The id is kept in
+  `localStorage`, so a reload reopens the thread; after a re-login the sidebar still lists it.
+- Quick mode (`/v1/chat/completions`) is not stored — it is a scratch path, not a conversation.
 
 ## 3. Worker secrets (Nils or Luna)
 

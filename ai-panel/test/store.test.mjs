@@ -14,25 +14,47 @@ import {
   invalidateRevokedCache,
   resetCache,
   REVOKED_CACHE_TTL_MS,
+  fitValue,
+  VALUE_BYTES_MAX,
+  CONVERSATION_BYTES_MAX,
+  messageAppend,
+  messageList,
+  conversationUpsert,
+  resetConversations,
 } from "../src/store.js";
 import { LIMITS, reset as resetLocal } from "../src/ratelimit.js";
+
+// What the KV-backed Durable Object enforces per stored value (and what no key may ever exceed).
+const VALUE_LIMIT = 128 * 1024;
+const valueBytes = (v) => Buffer.byteLength(JSON.stringify(v) ?? "", "utf8");
 
 function fakeStorage() {
   const map = new Map();
   return {
     map,
     async get(k) {
+      if (Array.isArray(k)) return new Map(k.map((x) => [x, map.get(x)]));
       return map.get(k);
     },
     async put(k, v) {
-      map.set(k, v);
+      const n = valueBytes(v);
+      // The real DO rejects an oversized value. Throwing here is the point of the test: a single
+      // key holding a whole transcript must fail loudly instead of silently losing history.
+      if (n > VALUE_LIMIT) throw new Error(`value ${k} is ${n} bytes, over the ${VALUE_LIMIT} byte limit`);
+      map.set(k, structuredClone(v));
     },
     async delete(k) {
       if (Array.isArray(k)) for (const x of k) map.delete(x);
       else map.delete(k);
     },
-    async list({ prefix = "" } = {}) {
-      return new Map([...map].filter(([k]) => k.startsWith(prefix)));
+    async list({ prefix = "", start, end, reverse = false, limit } = {}) {
+      let keys = [...map.keys()].sort();
+      keys = keys.filter((k) => k.startsWith(prefix));
+      if (start !== undefined) keys = keys.filter((k) => k > start);
+      if (end !== undefined) keys = keys.filter((k) => k < end);
+      if (reverse) keys.reverse();
+      if (limit !== undefined) keys = keys.slice(0, limit);
+      return new Map(keys.map((k) => [k, map.get(k)]));
     },
   };
 }
@@ -220,4 +242,149 @@ test("without an explicit logout the marker still expires within the TTL", async
   t.mock.timers.tick(REVOKED_CACHE_TTL_MS + 1);
   assert.equal(await revokedBefore(env), 1700000000, "stale entry is gone after the TTL");
   resetCache();
+});
+
+// ---- chat history storage ---------------------------------------------------------------
+//
+// The old layout kept a whole transcript in one key (`msgs:<conv>`), which blows past the
+// per-value limit after a handful of long answers and loses the history on the first failed
+// put. These tests are the guard rail for that: one row per key, a byte budget per thread,
+// cursor pagination and pruning that takes the rows with it.
+
+const CONV = "c_test1234";
+const longText = (n) => "ä".repeat(n); // 2 bytes per char in UTF-8, so it also exercises the cap
+
+function assertAllValuesSmall(storage) {
+  let biggest = 0;
+  for (const [key, value] of storage.map) {
+    const n = valueBytes(value);
+    if (n > biggest) biggest = n;
+    assert.ok(n <= 128 * 1024, `key ${key} holds ${n} bytes, over the Durable Object limit`);
+  }
+  return biggest;
+}
+
+test("a conversation bigger than one value is stored one row per key and still reads back", async () => {
+  const { store, storage } = makeStore();
+  const rows = 260;
+  for (let i = 0; i < rows; i++) {
+    const res = await post(store, "/messages", {
+      conversation_id: CONV,
+      role: i % 2 ? "assistant" : "user",
+      content: longText(9_000) + `#${i}`,
+      run_id: `run_${i}`,
+    });
+    assert.equal(res.status, 200, `row ${i} accepted`);
+  }
+  // No single key may ever carry the transcript: rows live in `msg:<conv>:<seq>`.
+  const msgKeys = [...storage.map.keys()].filter((k) => k.startsWith(`msg:${CONV}:`));
+  assert.ok(msgKeys.length > 1, "rows are spread over keys");
+  for (const key of msgKeys) assert.match(key, new RegExp(`^msg:${CONV}:\\d{10}$`));
+  const biggest = assertAllValuesSmall(storage);
+  assert.ok(biggest < 128 * 1024, `largest value ${biggest} B stays under the limit`);
+
+  const page = await (await store.fetch(new Request(`https://panel-store/messages?conversation_id=${CONV}&limit=50`))).json();
+  assert.equal(page.messages.length, 50);
+  assert.equal(page.has_more, true);
+  assert.ok(page.next_before > 1, "a cursor for the older page");
+  assert.ok(page.total >= 50);
+  // newest page, oldest row first
+  assert.ok(page.messages[0].seq < page.messages.at(-1).seq);
+  assert.match(page.messages.at(-1).content, /#\d+$/);
+});
+
+test("cursor pagination walks backwards page by page without gaps or repeats", async () => {
+  const { store } = makeStore();
+  for (let i = 0; i < 120; i++) {
+    await post(store, "/messages", { conversation_id: CONV, role: "user", content: `m${i}` });
+  }
+  const seen = [];
+  let before = 0;
+  for (let guard = 0; guard < 10; guard++) {
+    const q = `conversation_id=${CONV}&limit=50${before ? `&before=${before}` : ""}`;
+    const page = await (await store.fetch(new Request(`https://panel-store/messages?${q}`))).json();
+    seen.unshift(...page.messages.map((m) => m.content));
+    if (!page.has_more) break;
+    before = page.next_before;
+  }
+  assert.equal(seen.length, 120, "every row is reachable");
+  assert.deepEqual(seen, Array.from({ length: 120 }, (_, i) => `m${i}`), "order is oldest first, no duplicates");
+});
+
+test("the per-conversation byte budget drops the oldest rows and keeps the newest", async () => {
+  const { store, storage } = makeStore();
+  for (let i = 0; i < 300; i++) {
+    await post(store, "/messages", { conversation_id: CONV, role: "user", content: longText(9_000) + `#${i}` });
+  }
+  const meta = await storage.get(`mmeta:${CONV}`);
+  assert.ok(meta.bytes <= CONVERSATION_BYTES_MAX, `thread bytes ${meta.bytes} within the budget`);
+  assert.ok(meta.dropped > 0, "old rows were pruned");
+  assert.equal(meta.count, [...storage.map.keys()].filter((k) => k.startsWith(`msg:${CONV}:`)).length, "count matches the keys");
+
+  const page = await (await store.fetch(new Request(`https://panel-store/messages?conversation_id=${CONV}&limit=5`))).json();
+  assert.match(page.messages.at(-1).content, /#299$/, "the newest row survived");
+  assert.ok(page.dropped > 0, "the API says the transcript was trimmed");
+});
+
+test("a run's final answer updates its row instead of appending a second one", async () => {
+  const { store, storage } = makeStore();
+  await post(store, "/messages", { conversation_id: CONV, role: "user", content: "frage", run_id: "run_X" });
+  await post(store, "/messages", { conversation_id: CONV, role: "assistant", content: "teil 1", run_id: "run_X" });
+  await post(store, "/messages", { conversation_id: CONV, role: "assistant", content: "ganz fertig", run_id: "run_X" });
+
+  const keys = [...storage.map.keys()].filter((k) => k.startsWith(`msg:${CONV}:`));
+  assert.equal(keys.length, 2, "user row + one assistant row");
+  const page = await (await store.fetch(new Request(`https://panel-store/messages?conversation_id=${CONV}`))).json();
+  assert.deepEqual(page.messages.map((m) => m.content), ["frage", "ganz fertig"]);
+  assert.equal(page.messages[1].seq, 2, "the row keeps its seq");
+});
+
+test("fitValue trims an oversized row instead of failing the put", () => {
+  const row = fitValue({ role: "tool", content: "x".repeat(400_000) });
+  assert.equal(row.truncated, true);
+  assert.ok(valueBytes(row) <= VALUE_BYTES_MAX + 1024, "fits the budget");
+  assert.ok(row.content.length > 0, "keeps a usable prefix");
+  assert.equal(fitValue({ role: "user", content: "kurz" }).truncated, undefined, "small rows are untouched");
+});
+
+test("pruning the conversation list takes the thread's message keys with it", async () => {
+  const { store, storage } = makeStore();
+  for (let i = 0; i < 105; i++) {
+    const id = `c_old${String(i).padStart(4, "0")}`;
+    await post(store, "/conversations", { id, bot: "cloudflare", title: `chat ${i}` });
+    await post(store, "/messages", { conversation_id: id, role: "user", content: `hallo ${i}` });
+    // keep updated_at increasing so the oldest thread is unambiguous
+    const rows = await storage.get("conversations");
+    const row = rows.find((r) => r.id === id);
+    row.updated_at = 1_700_000_000_000 + i;
+    await storage.put("conversations", rows);
+  }
+  const convs = await (await store.fetch(new Request("https://panel-store/conversations?limit=200"))).json();
+  assert.equal(convs.conversations.length, 100, "list is bounded");
+  assert.equal(convs.conversations.some((c) => c.id === "c_old0000"), false, "the oldest thread is gone");
+  assert.equal(
+    [...storage.map.keys()].some((k) => k.startsWith("msg:c_old0000:")),
+    false,
+    "its rows are gone too, not orphaned",
+  );
+  assert.equal(storage.map.has("mmeta:c_old0000"), false, "and its meta key");
+  assert.ok(storage.map.has("msg:c_old0104:0000000001"), "the newest thread is intact");
+});
+
+test("helpers fall back to the same shape without a store binding", async () => {
+  resetConversations();
+  const env = {};
+  await conversationUpsert(env, { id: CONV, bot: "cloudflare", title: "Fallback" });
+  for (let i = 0; i < 70; i++) await messageAppend(env, { conversation_id: CONV, role: "user", content: `f${i}` });
+
+  const newest = await messageList(env, { conversationId: CONV, limit: 50 });
+  assert.equal(newest.messages.length, 50);
+  assert.equal(newest.has_more, true);
+  assert.equal(newest.next_before, newest.messages[0].seq);
+
+  const older = await messageList(env, { conversationId: CONV, limit: 50, before: newest.next_before });
+  assert.equal(older.messages.length, 20, "the remaining rows");
+  assert.equal(older.has_more, false);
+  assert.equal(older.messages[0].content, "f0");
+  resetConversations();
 });

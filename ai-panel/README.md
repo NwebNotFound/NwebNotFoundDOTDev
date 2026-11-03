@@ -1,9 +1,10 @@
 # AI-Panel (ai.nwebnotfound.dev)
 
 Control panel for Nils' Hermes crew. One Cloudflare Worker, no dependencies, no build step.
-Chat with streamed thinking/tool events, approve/steer/stop, bots + SOUL, per-bot model
-switching, cron jobs, usage/cost and sessions — in a ChatGPT-style shell with a sidebar,
-markdown answers, highlighted code blocks and a phone drawer.
+Chat with streamed thinking/tool events, streaming that survives a dropped connection,
+approve/steer/stop, persistent chat history in the Durable Object, bots + SOUL, per-bot model
+switching, cron jobs, run history and usage/cost — in a ChatGPT-style shell with a sidebar,
+markdown answers, highlighted code blocks, a health dot and a phone drawer.
 
 - Plan: [`docs/plan.md`](docs/plan.md)
 - Tunnel + secrets setup: [`docs/ai-panel-tunnel.md`](docs/ai-panel-tunnel.md)
@@ -20,16 +21,18 @@ src/ratelimit.js   in-memory fallback limiter
 src/log.js         in-memory fallback request log
 public/index.html  shell
 public/app.js      SPA (chat, sidebar, panels)
+public/run-events.js pure stream helpers (approval body, tool output, terminal, backoff)
 public/markdown.js markdown -> data tree (no HTML strings)
 public/highlight.js syntax highlighting -> tokens
 origin-proxy/      loopback proxy that fronts gateway + dashboard for the tunnel
+origin-proxy/watchdog.ps1  runs/installs the three origin services as scheduled tasks
 test/              node:test unit + e2e (mock Hermes, no network)
 ```
 
 ## Develop
 
 ```bash
-npm test          # 84 tests: unit + e2e against a mock Hermes on 127.0.0.1
+npm test          # 137 tests: unit + e2e against a mock Hermes on 127.0.0.1
 npm run check     # node --check on every module
 npx wrangler dev  # needs .dev.vars (never committed)
 ```
@@ -55,7 +58,7 @@ exist in the Worker.
 |---|---|---|
 | `PANEL_SECRET` / `HERMES_PANEL_SECRET` | proxy `.env` / Worker secret | shared secret between Worker and proxy |
 | `HERMES_DASHBOARD_SESSION_TOKEN` | proxy `.env` | `X-Hermes-Session-Token` on every `/dash/*` call |
-| `HERMES_KEY_<BOT>` | proxy `.env` | gateway `Authorization: Bearer` per profile |
+| `HERMES_KEY_<BOT>` | proxy `.env` | optional override for one profile's gateway key (normally read from the profile's own env file) |
 | `API_SERVER_KEY` | proxy `.env` | gateway routes without a profile prefix |
 | `DISCORD_CLIENT_SECRET`, `SESSION_SECRET`, `ALLOWED_DISCORD_ID` | Worker secret | login |
 | `OPENROUTER_API_KEY` | Worker secret | usage page |
@@ -81,6 +84,20 @@ The browser never sees any of them. See `docs/ai-panel-tunnel.md` for the exact 
 - The SPA never builds markup from strings: markdown and highlighting produce data, and the DOM
   is built with `textContent`/`createTextNode`. Links are limited to http(s), mailto and
   site-relative URLs.
+
+## Chat history storage
+
+- One row per key: `msg:<conv>:<seq>` (plus `mmeta:<conv>` for the byte/count budget and
+  `mrun:<conv>:<run_id>` for "one final answer per run"). No value may approach the Durable
+  Object's per-key limit, which a whole transcript in one key did.
+- Budget per thread: `CONVERSATION_BYTES_MAX` (4 MiB) and `CONVERSATION_ROWS_MAX` rows; the oldest
+  rows are dropped first, `dropped` in the API says how many.
+- The conversation list keeps the newest 100 threads; a thread that falls out of it is deleted
+  together with its rows, run index and meta key.
+- `GET /api/bots/<bot>/conversations/<id>/messages?limit=&before=` returns
+  `{messages, has_more, next_before, total}` — newest page by default, older pages via `before`.
+- `/api/health` is public but answers `{ok}` only; bot names, origin state and `session_version`
+  need a valid session.
 
 ## Not deployed by this branch
 

@@ -7,7 +7,9 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { once } from "node:events";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import os from "node:os";
 import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +17,9 @@ const PROXY = path.join(here, "..", "origin-proxy", "proxy.mjs");
 const SECRET = "proxy-test-secret-0123456789";
 const DASH_TOKEN = "dash-session-token-for-tests";
 const KEYS = { cloudflare: "key-for-cloudflare", minecraft: "key-for-minecraft" };
+
+// Hermetic Hermes home: the proxy reads profile .env files, and the real ones must not leak in.
+const HERMES_HOME = mkdtempSync(path.join(os.tmpdir(), "hermes-home-test-"));
 
 let upstream;
 let upstreamUrl;
@@ -60,6 +65,7 @@ before(async () => {
       DASHBOARD: upstreamUrl,
       PANEL_SECRET: SECRET,
       HERMES_DASHBOARD_SESSION_TOKEN: DASH_TOKEN,
+      HERMES_HOME: HERMES_HOME,
       HERMES_KEY_CLOUDFLARE: KEYS.cloudflare,
       HERMES_KEY_MINECRAFT: KEYS.minecraft,
     },
@@ -194,6 +200,70 @@ test("an unreachable upstream is a generic 502 without internals", async () => {
   }
 });
 
+test("health reports the proxy, the gateway and the bots without leaking anything", async () => {
+  const res = await get("/health");
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.gateway, true, "the mock gateway answered");
+  assert.deepEqual(data.bots, ["default"], "the empty temp profiles dir yields default only");
+  assert.equal(data.keys, undefined);
+  assert.equal(data.secret, undefined);
+  assert.doesNotMatch(JSON.stringify(data), /key-for-/, "no key material in the health payload");
+});
+
+test("health needs the shared secret too", async () => {
+  const res = await fetch(`${proxyUrl}/health`);
+  assert.equal(res.status, 401, "the tunnel cannot be used to probe the host");
+});
+
+test("an idle event stream is kept alive through the proxy", async () => {
+  const holder = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    res.write('data: {"event":"run.started"}\n\n');
+    setTimeout(() => res.end(), 400);
+  });
+  holder.listen(0, "127.0.0.1");
+  await once(holder, "listening");
+  const gateway = `http://127.0.0.1:${holder.address().port}`;
+  const port = await freePort();
+  const proc = spawn(process.execPath, [PROXY], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      GATEWAY: gateway,
+      DASHBOARD: gateway,
+      PANEL_SECRET: SECRET,
+      HERMES_HOME: HERMES_HOME,
+      HERMES_KEY_CLOUDFLARE: KEYS.cloudflare,
+      SSE_PING_MS: "60",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("proxy did not start")), 8000);
+      proc.stdout.on("data", (buf) => {
+        if (buf.toString().includes("origin proxy on")) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    const res = await fetch(`http://127.0.0.1:${port}/gw/p/cloudflare/v1/runs/run_1/events`, {
+      headers: { "x-hermes-panel-secret": SECRET },
+    });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /text\/event-stream/);
+    const text = await res.text();
+    assert.match(text, /run\.started/, "the upstream frame is passed through");
+    assert.match(text, /: ping/, "an idle stream got keep-alive frames");
+  } finally {
+    proc.kill();
+    await new Promise((r) => holder.close(r));
+  }
+});
+
 test("the proxy refuses to start without a secret", async () => {
   const port = await freePort();
   const proc = spawn(process.execPath, [PROXY], {
@@ -211,4 +281,77 @@ test("the proxy refuses a non-loopback bind", async () => {
   });
   const [code] = await once(proc, "exit");
   assert.equal(code, 1);
+});
+
+test("gateway keys are resolved from the profile env files, cached, and never logged", async () => {
+  const home = mkdtempSync(path.join(os.tmpdir(), "hermes-home-dynamic-"));
+  mkdirSync(path.join(home, "profiles", "alpha"), { recursive: true });
+  mkdirSync(path.join(home, "profiles", "beta"), { recursive: true });
+  writeFileSync(path.join(home, ".env"), "# default profile\nAPI_SERVER_KEY=key-from-default-env\n");
+  // Quoted, `export `-prefixed and with a trailing comment: all valid in a Hermes .env.
+  writeFileSync(
+    path.join(home, "profiles", "alpha", ".env"),
+    'FOO=bar\nexport API_SERVER_KEY="key-for-alpha"  # rotated 2026-01-01\n',
+  );
+  writeFileSync(path.join(home, "profiles", "beta", ".env"), "OTHER_SETTING=1\n");
+
+  const port = await freePort();
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) if (key.startsWith("HERMES_KEY_")) delete env[key];
+  Object.assign(env, {
+    PORT: String(port),
+    GATEWAY: upstreamUrl,
+    DASHBOARD: upstreamUrl,
+    PANEL_SECRET: SECRET,
+    HERMES_HOME: home,
+    API_SERVER_KEY: "key-from-process-env",
+  });
+
+  const proc = spawn(process.execPath, [PROXY], { env, stdio: ["ignore", "pipe", "pipe"] });
+  let log = "";
+  proc.stdout.on("data", (buf) => (log += buf.toString()));
+  proc.stderr.on("data", (buf) => (log += buf.toString()));
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("proxy did not start")), 8000);
+      proc.stdout.on("data", (buf) => {
+        if (buf.toString().includes("origin proxy on")) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    const call = async (p) => {
+      const res = await fetch(`http://127.0.0.1:${port}${p}`, { headers: { "x-hermes-panel-secret": SECRET } });
+      return { status: res.status, body: await res.json() };
+    };
+
+    const alpha = await call("/gw/p/alpha/v1/runs");
+    assert.equal(alpha.status, 200);
+    assert.equal(alpha.body.auth, "Bearer key-for-alpha", "quotes, export and comments are handled");
+
+    const fallback = await call("/gw/p/default/v1/runs");
+    assert.equal(fallback.body.auth, "Bearer key-from-default-env", "default reads the Hermes home .env");
+
+    const noKey = await call("/gw/p/beta/v1/runs");
+    assert.equal(noKey.status, 404);
+    assert.equal(noKey.body.error, "unknown_bot", "a profile without a key stays a 404");
+
+    const badName = await call("/gw/p/Bad..Name/v1/runs");
+    assert.equal(badName.status, 404, "an invalid bot name is not a profile route");
+    assert.equal(badName.body.error, "unknown_bot");
+
+    const plain = await call("/gw/health");
+    assert.equal(plain.body.auth, "Bearer key-from-process-env", "/gw/ without a profile keeps using API_SERVER_KEY");
+
+    // Rotation is picked up within the cache window, not on every request.
+    writeFileSync(path.join(home, "profiles", "alpha", ".env"), "API_SERVER_KEY=key-for-alpha-rotated\n");
+    const cached = await call("/gw/p/alpha/v1/runs");
+    assert.equal(cached.body.auth, "Bearer key-for-alpha", "the key is cached for ~30 s");
+
+    assert.match(log, /gateway keys resolved from profile \.env: default, alpha, beta/, "startup log lists discovered bots");
+    assert.doesNotMatch(log, /key-for-alpha|key-from-default-env|key-from-process-env/, "no key value is ever logged");
+  } finally {
+    proc.kill();
+  }
 });

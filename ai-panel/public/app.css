@@ -292,6 +292,9 @@ a:hover { text-decoration: underline; }
 }
 .msg-meta .who { font-weight: 650; color: var(--text-dim); }
 
+/* Paged transcript: the control that pulls the page above the oldest visible row. */
+.thread-more { display: flex; justify-content: center; padding: 4px 0 16px; }
+
 .hero {
   max-width: 640px;
   margin: 12vh auto 0;
@@ -732,3 +735,22 @@ html[data-auth="out"] #app { display: none; }
 .login-btn { display: inline-block; padding: 12px 18px; border-radius: 10px; background: #5865f2; color: #fff;
   text-decoration: none; font-weight: 600; }
 .model-picker:empty { display: none; }
+
+/* Connection dot: proxy/tunnel/gateway state, so a dead backend is visible before sending. */
+.health { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mut, #8b90a0); }
+.health::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #8b90a0; }
+.health[data-state="ok"] { color: #4ade80; }
+.health[data-state="ok"]::before { background: #4ade80; }
+.health[data-state="warn"] { color: #fbbf24; }
+.health[data-state="warn"]::before { background: #fbbf24; }
+.health[data-state="down"] { color: #f87171; }
+.health[data-state="down"]::before { background: #f87171; }
+
+/* Inline error with a retry button, instead of a bare "Load failed" line. */
+.err-box { display: grid; gap: 8px; padding: 10px 12px; margin: 8px 0; border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.45); background: rgba(248, 113, 113, 0.08); }
+.err-text { font-size: 13px; color: #fca5a5; }
+.err-box button { justify-self: start; }
+
+.transcript-event { margin: 4px 0 8px 12px; display: grid; gap: 4px; font-size: 13px; }
+.transcript-event .tool-log { margin: 0; padding: 8px 10px; border-radius: 8px; background: rgba(127,127,127,.08); }

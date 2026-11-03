@@ -9,6 +9,7 @@
 import * as auth from "./auth.js";
 import * as up from "./upstream.js";
 import * as store from "./store.js";
+import { teeSseFrames } from "./sse-tap.js";
 
 export { PanelStore } from "./store.js";
 
@@ -444,6 +445,26 @@ async function getMessages(env, bot, sid, url) {
 // Runs (chat)
 // ---------------------------------------------------------------------------------------
 
+const CONVERSATION_ID = /^[A-Za-z0-9_-]{6,64}$/;
+
+/** A readable thread title from the first message. */
+function conversationTitle(input) {
+  const text = String(input || "").replace(/\s+/g, " ").trim();
+  if (!text) return "Neuer Chat";
+  return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+}
+
+function newConversationId() {
+  return `c_${crypto.randomUUID().replace(/[^A-Za-z0-9]/g, "").slice(0, 20)}`;
+}
+
+/** The conversation a run belongs to, for the SSE tap and the poll fallback. */
+async function conversationForRun(env, bot, runId) {
+  const rows = await store.runRecent(env, { bot, limit: 100 });
+  const row = rows.find((r) => r.run_id === runId);
+  return row?.conversation_id || "";
+}
+
 async function startRun(env, bot, body) {
   const input = String(body.input || "").trim();
   if (!input) return json({ error: "input_required" }, 400);
@@ -459,13 +480,160 @@ async function startRun(env, bot, body) {
     upstreamProblem("run_start", status, data);
     return json({ error: "run_start_failed" }, status === 400 ? 400 : 502);
   }
-  return json({ ok: true, run_id: data?.run_id, session_id: data?.session_id || null, status: data?.status || "queued" });
+  const runId = data?.run_id;
+  let conversationId = null;
+  if (runId) {
+    // The panel's own transcript: the thread is created on the first message and reused after.
+    const wanted = String(body.conversation_id || body.conversationId || "");
+    const isNew = !CONVERSATION_ID.test(wanted);
+    const conv = await store.conversationUpsert(env, {
+      id: isNew ? newConversationId() : wanted,
+      bot,
+      ...(isNew ? { title: conversationTitle(input) } : {}),
+      session_id: data?.session_id || payload.session_id || null,
+      run_id: String(runId),
+    });
+    conversationId = conv.id;
+    await store.messageAppend(env, {
+      conversation_id: conversationId,
+      role: "user",
+      kind: "message",
+      content: input,
+      run_id: String(runId),
+    });
+    await store.runRecord(env, {
+      bot,
+      run_id: String(runId),
+      conversation_id: conversationId,
+      session_id: data?.session_id || payload.session_id || null,
+      input,
+      status: String(data?.status || "started"),
+      started_at: Date.now(),
+    });
+  }
+  return json({
+    ok: true,
+    run_id: runId,
+    session_id: data?.session_id || null,
+    conversation_id: conversationId,
+    status: data?.status || "queued",
+  });
 }
 
-async function runEvents(env, bot, runId) {
+// --- transcript recording from the run stream -------------------------------------------------
+function textOf(value) {
+  if (typeof value === "string") return value;
+  if (value === undefined || value === null) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/** Record one run event into the conversation transcript. Returns a promise. */
+function recordRunEvent(env, conversationId, runId, event, acc) {
+  if (!conversationId) return Promise.resolve();
+  const name = String(event?.event || event?.type || "").toLowerCase();
+  const isThinking = name.includes("thinking") || name.includes("reasoning");
+
+  if (name === "approval.request" || name === "approval.requested") {
+    const what = textOf(event.command ?? event.description ?? event.message ?? event.prompt).slice(0, 1000);
+    return store.messageAppend(env, { conversation_id: conversationId, role: "tool", kind: "approval", content: what, run_id: runId });
+  }
+  if (["tool.completed", "tool.end", "tool.failed", "tool.error"].includes(name)) {
+    const out = textOf(
+      event.output ?? event.result ?? event.stdout ?? event.preview ?? (typeof event.error === "string" ? event.error : ""),
+    ).slice(0, 2000);
+    const failed = event.error === true || (typeof event.error === "string" && event.error.trim() !== "") || event.ok === false;
+    return store.messageAppend(env, {
+      conversation_id: conversationId,
+      role: "tool",
+      kind: "tool",
+      tool: textOf(event.tool || event.tool_name).slice(0, 80) || "tool",
+      content: out,
+      ok: !failed,
+      run_id: runId,
+    });
+  }
+  if (name === "run.completed" || name === "run.finished") {
+    const answer = (textOf(event.output).trim() || acc.text.trim()).slice(0, 20_000);
+    return store.messageAppend(env, { conversation_id: conversationId, role: "assistant", kind: "message", content: answer, run_id: runId });
+  }
+  if (name === "run.failed" || name === "run.error") {
+    const reason = textOf(event.error ?? event.message).slice(0, 500);
+    return store.messageAppend(env, {
+      conversation_id: conversationId,
+      role: "assistant",
+      kind: "message",
+      content: `Fehler: ${reason || "Run fehlgeschlagen"}`,
+      run_id: runId,
+    });
+  }
+  const delta = event?.delta ?? event?.text;
+  if (typeof delta === "string" && name.includes("delta") && !isThinking) acc.text += delta;
+  return Promise.resolve();
+}
+
+async function runEvents(env, bot, runId, url) {
   if (!ID.test(runId)) return json({ error: "invalid_run_id" }, 400);
-  const res = await up.stream(env, "gw", `/p/${bot}/v1/runs/${runId}/events`, { method: "GET" });
-  return await up.pipeSse(res);
+  // The cursor is a query parameter on the gateway route; pass it through untouched so a
+  // reconnecting client can resume instead of replaying the whole run.
+  const since = url?.searchParams.get("since") || url?.searchParams.get("after") || "";
+  const q = since && /^\d{1,12}$/.test(since) ? `?since=${since}` : "";
+  const res = await up.stream(env, "gw", `/p/${bot}/v1/runs/${runId}/events${q}`, { method: "GET" });
+  return await streamWithTranscript(env, bot, runId, res);
+}
+
+/** Forward the run stream and record the transcript on the way through. */
+async function streamWithTranscript(env, bot, runId, res) {
+  const type = res.headers.get("content-type") || "";
+  if (!res.body || (!res.ok && !type.includes("event-stream"))) return await up.pipeSse(res);
+  const conversationId = await conversationForRun(env, bot, runId);
+  const acc = { text: "" };
+  let pending = Promise.resolve();
+  const tap = teeSseFrames(
+    res.body,
+    (event) => {
+      pending = pending.then(() => recordRunEvent(env, conversationId, runId, event, acc)).catch(() => {});
+    },
+    () => pending,
+  );
+  return new Response(up.sseBody(tap), {
+    status: 200,
+    headers: up.sseHeaders({ "x-upstream-status": String(res.status) }),
+  });
+}
+
+const TERMINAL_RUN_STATES = new Set([
+  "completed",
+  "finished",
+  "success",
+  "failed",
+  "error",
+  "cancelled",
+  "canceled",
+  "stopped",
+  "aborted",
+]);
+
+function intOrNull(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+/**
+ * The gateway's pending approval fields. `/v1/runs/<id>` reports them under `pending_controls`
+ * (an object or a list); the id has been seen as both `request_id` and `prompt_id`.
+ */
+export function pendingControl(data) {
+  const pc = data?.pending_controls;
+  const rows = Array.isArray(pc) ? pc : Array.isArray(pc?.pending) ? pc.pending : pc && typeof pc === "object" ? [pc] : [];
+  const first = rows.find((r) => r && (r.request_id || r.prompt_id)) || rows[0] || null;
+  return {
+    request_id: first?.request_id ? String(first.request_id) : first?.prompt_id ? String(first.prompt_id) : "",
+    execution_generation: intOrNull(first?.execution_generation ?? first?.generation),
+  };
 }
 
 async function runAction(env, bot, runId, action, body) {
@@ -474,9 +642,32 @@ async function runAction(env, bot, runId, action, body) {
   if (action === "approval") {
     const choice = String(body.choice || "").toLowerCase();
     if (!["once", "session", "always", "deny"].includes(choice)) return json({ error: "invalid_choice" }, 400);
-    payload = { choice };
-    if (body.request_id) payload.request_id = String(body.request_id);
-    if (body.all === true) payload.all = true;
+
+    // The gateway's session-authority approval endpoint takes exactly
+    // {request_id, execution_generation, choice}. Anything else is rejected upstream, and a
+    // missing generation makes the approval silently not apply — so resolve them here.
+    let requestId = body.request_id ? String(body.request_id).slice(0, 200) : "";
+    let generation = intOrNull(body.execution_generation ?? body.generation);
+    if (!requestId || generation === null) {
+      const { status, data } = await up.call(env, "gw", `/p/${bot}/v1/runs/${runId}`);
+      if (status >= 400) {
+        upstreamProblem("run_get", status, data);
+        return json({ error: "run_unavailable" }, status === 404 ? 404 : 502);
+      }
+      const pending = pendingControl(data);
+      if (!requestId && pending.request_id) requestId = pending.request_id;
+      if (generation === null && pending.execution_generation !== null) generation = pending.execution_generation;
+    }
+    if (!requestId || generation === null) {
+      return json(
+        {
+          error: "approval_context_missing",
+          message: "Freigabe-Kontext fehlt (request_id/execution_generation) — Run neu laden und erneut bestätigen.",
+        },
+        409,
+      );
+    }
+    payload = { request_id: requestId, execution_generation: generation, choice };
   } else if (action === "steer") {
     const input = String(body.input || body.message || "").trim();
     if (!input) return json({ error: "input_required" }, 400);
@@ -491,6 +682,11 @@ async function runAction(env, bot, runId, action, body) {
     upstreamProblem(`run_${action}`, status, data);
     return json({ error: `${action}_failed` }, status === 400 ? 400 : 502);
   }
+  await store.runRecord(env, {
+    bot,
+    run_id: runId,
+    status: action === "approval" ? `approval:${payload.choice}` : action === "stop" ? "stopped" : "steered",
+  });
   return json({ ok: true, action, result: data });
 }
 
@@ -618,13 +814,25 @@ export async function route(request, env, ctx) {
   const method = request.method.toUpperCase();
 
   if (path === "/api/health") {
+    // Liveness is public so the browser can tell "panel down" from "tunnel down". Everything
+    // else here (which bots exist, whether the store is bound, the session version) is
+    // internal detail and only goes to a signed-in user.
+    if (method !== "GET") return json({ error: "method_not_allowed" }, 405);
+    const revokedNow = await store.revokedBefore(env);
+    const who = await auth.currentUser(env, request, { revokedBefore: revokedNow });
+    if (!who) return json({ ok: true });
+    // The panel's own view plus the origin proxy's: a red "tunnel/gateway" dot here is what the
+    // UI shows when things are down, instead of a generic "Load failed" in the chat.
+    const [health, bots] = await Promise.all([up.proxyHealth(env), up.botList(env)]);
     return json({
       ok: true,
+      authenticated: true,
       upstream: Boolean(up.origin(env)),
+      origin: { reachable: Boolean(health), gateway: Boolean(health?.gateway) },
       auth: Boolean(env.DISCORD_CLIENT_ID && env.SESSION_SECRET && env.ALLOWED_DISCORD_ID),
       store: Boolean(env.PANEL_STORE),
       session_version: auth.sessionVersion(env),
-      bots: await up.botList(env),
+      bots,
       now: new Date().toISOString(),
     });
   }
@@ -675,6 +883,14 @@ export async function route(request, env, ctx) {
   }
   if (path === "/api/usage") return await usage(env);
 
+  if (path === "/api/runs") {
+    if (method !== "GET") return json({ error: "method_not_allowed" }, 405);
+    const botQ = url.searchParams.get("bot") || "";
+    if (botQ && !(await up.isBot(env, botQ))) return json({ error: "unknown_bot" }, 404);
+    const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit")) || 25));
+    return json({ runs: await store.runRecent(env, { bot: botQ, limit }) });
+  }
+
   if (path === "/api/bots") {
     if (method === "GET") return await listBots(env);
     if (method === "POST") {
@@ -691,6 +907,53 @@ export async function route(request, env, ctx) {
   ctx.bot = bot;
   if (!(await up.isBot(env, bot))) return json({ error: "unknown_bot" }, 404);
   const rest = m[2] || "";
+
+  if (rest === "/conversations") {
+    if (method === "GET") {
+      const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit")) || 30));
+      return json({ bot, conversations: await store.conversationList(env, { bot, limit }) });
+    }
+    if (method === "POST") {
+      const body = (await readJson(request)) || {};
+      const conv = await store.conversationUpsert(env, {
+        id: newConversationId(),
+        bot,
+        title: conversationTitle(body.title || "Neuer Chat"),
+      });
+      return json({ ok: true, conversation: conv });
+    }
+    return json({ error: "method_not_allowed" }, 405);
+  }
+
+  const convMatch = rest.match(/^\/conversations\/([A-Za-z0-9_-]{1,64})\/messages$/);
+  if (convMatch) {
+    const conversationId = convMatch[1];
+    if (method === "GET") {
+      // Paged: `limit` rows, newest page by default, `before=<seq>` for the page above it.
+      const page = await store.messageList(env, {
+        conversationId,
+        limit: Number(url.searchParams.get("limit")) || store.MESSAGE_PAGE_DEFAULT,
+        before: Number(url.searchParams.get("before")) || 0,
+      });
+      return json({ bot, ...page });
+    }
+    if (method === "POST") {
+      const body = (await readJson(request)) || {};
+      const role = String(body.role || "assistant");
+      if (!["user", "assistant", "tool"].includes(role)) return json({ error: "invalid_role" }, 400);
+      const message = await store.messageAppend(env, {
+        conversation_id: conversationId,
+        role,
+        kind: body.kind || "message",
+        content: String(body.content ?? ""),
+        tool: body.tool,
+        ok: body.ok,
+        run_id: body.run_id,
+      });
+      return json({ ok: true, message });
+    }
+    return json({ error: "method_not_allowed" }, 405);
+  }
 
   if (rest === "/soul") {
     if (method === "GET") return await getSoul(env, bot);
@@ -781,11 +1044,38 @@ export async function route(request, env, ctx) {
         upstreamProblem("run_get", status, data);
         return json({ error: "run_unavailable" }, status === 404 ? 404 : 502);
       }
-      return json(data ?? { error: "empty" });
+      // Polling is also how the SPA recovers a dropped stream, so this is a good moment to
+      // refresh the persisted status instead of leaving the row at "started".
+      const state = String(data?.status || data?.state || "").toLowerCase();
+      if (state) {
+        await store.runRecord(env, {
+          bot,
+          run_id: runId,
+          status: state,
+          error: TERMINAL_RUN_STATES.has(state) && state !== "completed" && state !== "finished" && state !== "success"
+            ? String(data?.error || data?.detail || state).slice(0, 200)
+            : null,
+        });
+      }
+      const pending = pendingControl(data);
+      if (TERMINAL_RUN_STATES.has(state)) {
+        const conversationId = await conversationForRun(env, bot, runId);
+        const out = typeof data?.output === "string" ? data.output.trim() : "";
+        if (conversationId && out) {
+          await store.messageAppend(env, {
+            conversation_id: conversationId,
+            role: "assistant",
+            kind: "message",
+            content: out,
+            run_id: runId,
+          });
+        }
+      }
+      return json({ ...(data ?? {}), pending: pending.request_id ? pending : null });
     }
     if (action === "events") {
       if (method !== "GET") return json({ error: "method_not_allowed" }, 405);
-      return await runEvents(env, bot, runId);
+      return await runEvents(env, bot, runId, url);
     }
     if (method !== "POST") return json({ error: "method_not_allowed" }, 405);
     const body = (await readJson(request)) || {};

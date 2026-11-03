@@ -25,6 +25,8 @@ export function startMockHermes() {
       },
     ],
     soul: "# SOUL\ncloudflare bot\n",
+    // What GET /v1/runs/<id> reports as waiting for a decision (approval body needs both).
+    pendingControls: { request_id: "req_1", execution_generation: 3 },
     profiles: [
       { name: "cloudflare", description: "website", model: "deepseek/x", provider: "openrouter", gateway_running: true },
       { name: "minecraft", description: "plugins", model: "deepseek/x", provider: "openrouter", gateway_running: false },
@@ -53,6 +55,11 @@ export function startMockHermes() {
       }
 
       const p = url.pathname;
+
+      // ---- origin health (the Worker's bot list + status dot) ----
+      if (p === "/health" && req.method === "GET") {
+        return send(200, { ok: true, uptime_s: 42, gateway: true, bots: ["cloudflare", "minecraft", "default"] });
+      }
 
       // ---- dashboard ----
       if (p === "/dash/api/profiles" && req.method === "GET") return send(200, { profiles: state.profiles });
@@ -137,14 +144,31 @@ export function startMockHermes() {
       const runEvents = p.match(/^\/gw\/p\/[a-z0-9_-]+\/v1\/runs\/([A-Za-z0-9_-]+)\/events$/);
       if (runEvents) {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-        const frames = [
-          { event: "run.started", run_id: runEvents[1] },
-          { event: "thinking.delta", run_id: runEvents[1], delta: "überlege" },
-          { event: "tool.started", run_id: runEvents[1], tool: "terminal" },
-          { event: "run.completed", run_id: runEvents[1], output: "fertig" },
-        ];
+        const frames = state.streamDrops
+          ? [{ event: "run.started", run_id: runEvents[1] }]
+          : [
+              { event: "run.started", run_id: runEvents[1] },
+              { event: "thinking.delta", run_id: runEvents[1], delta: "überlege" },
+              { event: "tool.started", run_id: runEvents[1], tool: "terminal" },
+              { event: "tool.completed", run_id: runEvents[1], tool: "terminal", error: false, preview: "exit 0" },
+              ...(state.approvalInStream
+                ? [{ event: "approval.request", run_id: runEvents[1], request_id: "req_1", execution_generation: 3, command: "rm -rf /tmp/build", choices: ["once", "session", "always", "deny"] }]
+                : []),
+              { event: "run.completed", run_id: runEvents[1], output: "fertig" },
+            ];
         for (const [i, f] of frames.entries()) res.write(`id: ${i}\ndata: ${JSON.stringify(f)}\n\n`);
         return res.end();
+      }
+
+      const runGet = p.match(/^\/gw\/p\/[a-z0-9_-]+\/v1\/runs\/([A-Za-z0-9_-]+)$/);
+      if (runGet && req.method === "GET") {
+        const run = state.runs.get(runGet[1]) || { status: "running" };
+        return send(200, {
+          run_id: runGet[1],
+          status: run.status || "running",
+          output: run.output || "",
+          pending_controls: state.pendingControls,
+        });
       }
 
       const runAction = p.match(/^\/gw\/p\/[a-z0-9_-]+\/v1\/runs\/([A-Za-z0-9_-]+)\/(approval|steer|stop)$/);
