@@ -219,7 +219,7 @@ html.mc a.g:hover, html.mc a.g:focus-visible, html.mc a.card:hover, html.mc a.ca
 html.mc a.g:hover .qi, html.mc a.card:hover .ic, html.mc .card:hover .tile, html.mc a.card:hover .qi { animation: wiggle 0.6s ease; }
 html.mc a.g .go, html.mc .card .go { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
 html.mc a.g:hover .go, html.mc .card:hover .go { transform: translateX(4px); }
-html.mc .pixbg { display: block !important; position: absolute; inset: -8% 0 auto 0; height: 120%; z-index: -2; opacity: 0.4; }
+html.mc .pixbg { display: block !important; pointer-events: none; opacity: 0.35; }
 html.mc .stat .k, html.mc .mini .k, html.mc .kv2 small, html.mc .kv3 small {
   font-family: var(--f-body); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--muted); opacity: 1;
