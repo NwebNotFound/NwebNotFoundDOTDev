@@ -1570,6 +1570,38 @@
 .sm-reader .sm-wrap {
   max-width: var(--sm-container);
 }
+/* Feeds (plan §8 "Feeds", phase 3b): the footnote that offers the RSS/Atom feed of the page. */
+.sm-feed-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm-space-2);
+  margin: var(--sm-space-8) 0 0;
+  padding-top: var(--sm-space-4);
+  border-top: 1px solid var(--sm-border);
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+.sm-feed-note__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--sm-tap-dense);
+  padding: 0 var(--sm-space-3);
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-full);
+  background: var(--sm-surface);
+  color: var(--sm-link);
+  font-weight: var(--sm-weight-semibold);
+  text-decoration: none;
+}
+.sm-feed-note__link:hover {
+  border-color: var(--sm-border-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sm-feed-note__sep {
+  color: var(--sm-border-strong);
+}
 @media (max-width: 34rem) {
   .sm-prevnext__link {
     max-width: 100%;

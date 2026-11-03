@@ -110,6 +110,18 @@ export default {
   "writing.series.eyebrow": "Series",
   "writing.series.lead": "This series has {count} chapters.",
 
+  /* ---- feeds (docs/creative-hub-plan.md §8 "Feeds", phase 3b) ---- */
+  "writing.feed.note": "These posts are also available as a feed:",
+  "feed.rss": "RSS",
+  "feed.atom": "Atom",
+  "feed.title": "NwebNotFound – Writing",
+  "feed.title.blog": "NwebNotFound – Blog",
+  "feed.title.stories": "NwebNotFound – Stories",
+  "feed.title.series": "NwebNotFound – Series: {series}",
+  "feed.desc": "New writing from nwebnotfound.dev – stories and blog posts.",
+  "feed.desc.stories": "New chapters of the story on nwebnotfound.dev.",
+  "feed.read_more": "Read more",
+
   /* ---- page metadata ---- */
   "meta.home.title": "NwebNotFound · Nils' corner of the internet",
   "meta.home.desc": "Minecraft server, writing, music and reviews – Nils' little corner of the internet.",

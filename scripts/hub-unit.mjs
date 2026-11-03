@@ -169,7 +169,7 @@ for (const lang of LANGS) {
   /* post */
   const post = writingPostPage(all[0], all, "de");
   ok(post.startsWith('<!doctype html><html lang="de" class="sm-root">') && post.includes("<h1 class=\"sm-h1\">Post One</h1>"), "post: shell and title");
-  ok(post.includes('href="https://nwebnotfound.dev/de/writing/post-one"') && !post.includes('rel="alternate"'), "post: canonical at the original language, no hreflang alternates");
+  ok(post.includes('href="https://nwebnotfound.dev/de/writing/post-one"') && !/rel="alternate" hreflang=/.test(post), "post: canonical at the original language, no hreflang alternates");
   ok(post.includes("Min. Lesezeit") && post.includes('href="/de/writing?tag=alpha"'), "post: reading time and tag link");
   ok(post.includes('class="sm-prose" lang="de"'), "post: body in the .sm-prose reader with its own lang");
   ok(post.includes('href="/de/writing"'), "post: back link to the list");
@@ -185,6 +185,16 @@ for (const lang of LANGS) {
   ok(ch2.includes("Vorheriges Kapitel") && ch2.includes('href="/de/writing/ch-1"') && !ch2.includes("Nächstes Kapitel"), "chapter: previous link on the last chapter, no next");
   ok(writingPostPage(all[0], all, "de").includes('href="/de/writing/series/serie"') === false, "post: a blog post has no series eyebrow link");
   ok(ch1.includes('href="/de/writing/series/serie"'), "chapter: eyebrow links to the series page");
+
+  /* feeds (phase 3b) */
+  ok(list.includes('class="sm-feed-note"') && list.includes('href="/writing/feed.xml"') && list.includes('href="/writing/atom.xml"'), "list: the feed footnote offers RSS and Atom");
+  ok(list.includes('<link rel="alternate" type="application/rss+xml" title="NwebNotFound – Texte" href="/writing/feed.xml">'), "list: feed autodiscovery in the head");
+  ok(post.includes('type="application/rss+xml" title="NwebNotFound – Blog" href="/writing/blog/feed.xml"') && !post.includes("/writing/stories/feed.xml"), "post: a blog post advertises the blog feed only");
+  ok(post.includes('class="sm-feed-note"') && post.includes('href="/writing/blog/atom.xml"'), "post: the footnote links its own feed");
+  ok(ch1.includes('href="/writing/stories/feed.xml"') && ch1.includes('href="/writing/series/serie/feed.xml"'), "chapter: the kind feed and the series feed");
+  ok(writingSeriesPage({ slug: "serie", title: "Serie", chapters: ["ch-1", "ch-2"], count: 2 }, all, "de").includes('href="/writing/series/serie/atom.xml"') && writingSeriesPage({ slug: "serie", title: "Serie", chapters: ["ch-1", "ch-2"], count: 2 }, all, "de").includes("sm-feed-note"), "series: its own feed in the head and as a footnote");
+  ok(writingListPage([], "de").includes('href="/writing/feed.xml"'), "an empty writing list still advertises the (empty) feed");
+  ok(hubPage("/about", "de").includes('href="/writing/feed.xml"'), "the hub shell advertises the writing feed on other pages too");
 
   /* escaping on a writing page */
   const unsafe = writingPostPage(mk({ slug: "unsafe", title: "Unsafe", html: "<p>&lt;script&gt;alert(1)&lt;/script&gt; &lt;img src=x onerror=alert(1)&gt;</p>" }), all, "de");
