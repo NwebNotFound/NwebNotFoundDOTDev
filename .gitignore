@@ -3,3 +3,4 @@ node_modules/
 .dev.vars
 screens/qa/
 src/generated/*.e2e-bak
+public/downloads/

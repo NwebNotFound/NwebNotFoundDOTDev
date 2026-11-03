@@ -118,9 +118,18 @@ export default {
   "feed.title.blog": "NwebNotFound – Blog",
   "feed.title.stories": "NwebNotFound – Stories",
   "feed.title.series": "NwebNotFound – Series: {series}",
+  "feed.series_label": "Series: {series}",
   "feed.desc": "New writing from nwebnotfound.dev – stories and blog posts.",
   "feed.desc.stories": "New chapters of the story on nwebnotfound.dev.",
   "feed.read_more": "Read more",
+
+  /* ---- export (docs/creative-hub-plan.md §8 "Export", phase 3c) ---- */
+  "writing.export.rights": "(c) Nils, personal reading only.",
+  "writing.export.epub": "Download EPUB",
+  "writing.export.series_epub": "Whole series as EPUB",
+  "writing.export.print": "Print as PDF",
+  "writing.export.print_hint": "Opens the print dialog – choose \"Save as PDF\" there.",
+  "writing.export.note": "Stories are also available to take away:",
 
   /* ---- page metadata ---- */
   "meta.home.title": "NwebNotFound · Nils' corner of the internet",

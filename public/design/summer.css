@@ -1602,6 +1602,101 @@
 .sm-feed-note__sep {
   color: var(--sm-border-strong);
 }
+/* Export (plan §8 "Export", phase 3c): the download/print block on story and series pages. */
+.sm-export {
+  margin-top: var(--sm-space-8);
+  padding: var(--sm-space-5);
+  background: var(--sm-surface-2);
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-xl);
+}
+.sm-export__label {
+  margin: 0 0 var(--sm-space-3);
+  font-family: var(--sm-font-pixel);
+  color: var(--sm-foreground);
+}
+.sm-export__row {
+  margin: 0;
+}
+.sm-export__rights {
+  margin: var(--sm-space-3) 0 0;
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+/* Print view: a clean sheet for story and chapter pages — no navigation, no controls, page breaks
+   before chapters, link targets spelled out, the rights line at the end. */
+@media print {
+  .sm-sky,
+  .sm-nav,
+  .sm-footer,
+  .sm-skip-link,
+  .sm-theme,
+  .sm-lang,
+  .sm-mascot,
+  .sm-filters,
+  .sm-tags,
+  .sm-prevnext,
+  .sm-feed-note,
+  .sm-btn,
+  .sm-export__label,
+  .sm-export__row,
+  .sm-hint {
+    display: none;
+  }
+  .sm-root,
+  .sm-root body {
+    background-color: #ffffff;
+    color: #000000;
+  }
+  .sm-wrap {
+    max-width: none;
+    margin: 0;
+    padding: 0 18mm;
+  }
+  .sm-h1,
+  .sm-h2,
+  .sm-prose h2,
+  .sm-prose h3,
+  .sm-prose h4 {
+    font-family: var(--sm-font-body);
+  }
+  .sm-reader,
+  .sm-prose {
+    font-size: 11pt;
+    line-height: 1.55;
+  }
+  .sm-prose h2,
+  .sm-prose h3,
+  .sm-prose h4 {
+    page-break-before: always;
+    break-before: page;
+    page-break-after: avoid;
+  }
+  .sm-prose h2:first-child {
+    page-break-before: auto;
+    break-before: auto;
+  }
+  .sm-prose a {
+    color: #000000;
+    text-decoration: underline;
+  }
+  .sm-prose a::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    word-break: break-all;
+  }
+  .sm-export {
+    margin-top: 10mm;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  .sm-export__rights {
+    border-top: 0.4pt solid #666666;
+    padding-top: 2mm;
+    font-size: 9pt;
+  }
+}
 @media (max-width: 34rem) {
   .sm-prevnext__link {
     max-width: 100%;

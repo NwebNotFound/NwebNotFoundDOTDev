@@ -9,6 +9,7 @@ import "./vip-unit.mjs";
 import "./content-unit.mjs";
 import "./markdown-unit.mjs";
 import "./feed-unit.mjs";
+import "./epub-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { hubPage } from "../src/hub.js";
@@ -653,6 +654,44 @@ try {
     const seriesPage = await hub("/writing/series/test-fixture-serie");
     ok(seriesPage.t.includes('href="/writing/series/test-fixture-serie/atom.xml"'), "Serienseite wirbt für ihren Feed");
     ok(!/utm_|feedburner|feedproxy/i.test(rss.t), "Feed ohne Tracking-Parameter und ohne Drittanbieter-Dienst");
+  }
+  console.log("7e) Hub: Export (EPUB + Druckansicht)");
+  {
+    const hub = (path, opt = {}) => req(path, { testHost: "nwebnotfound.dev", ...opt });
+    const asset = (path) => fetch(BASE + path, { headers: { host: "nwebnotfound.dev" }, redirect: "manual" });
+    const chapter = await hub("/writing/test-fixture-chapter-2");
+    ok(chapter.t.includes('href="/downloads/story-test-fixture-chapter-2.epub"') && chapter.t.includes("EPUB herunterladen"), "Kapitel: EPUB-Download-Button", chapter.s);
+    ok(chapter.t.includes('href="/downloads/series-test-fixture-serie.epub"'), "Kapitel: Serien-EPUB verlinkt");
+    ok(chapter.t.includes("data-sm-print") && chapter.t.includes('<script src="/design/summer-print.js" defer></script>'), "Kapitel: Druck-Button mit externem Skript");
+    ok(chapter.t.includes("(c) Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
+    ok(!/onclick=/.test(chapter.t) && !/<script(?![^>]*\ssrc=)/i.test(chapter.t), "Kapitel: kein Inline-Handler, kein Inline-Skript");
+    const blog = await hub("/writing/test-fixture-hello");
+    ok(!blog.t.includes("/downloads/") && !blog.t.includes("data-sm-print") && !blog.t.includes("summer-print.js"), "Blog-Beitrag: kein Download, kein Druck-Button (Entscheidung Nils)");
+    ok(!(await hub("/writing/test-fixture-chapter-3")).t.includes("/downloads/"), "archiviertes Kapitel: kein Download (wird nicht exportiert)");
+    const seriesPage = await hub("/writing/series/test-fixture-serie");
+    ok(seriesPage.t.includes('href="/downloads/series-test-fixture-serie.epub"') && seriesPage.t.includes("data-sm-print"), "Serienseite: Serien-EPUB und Drucken");
+    const list = await hub("/writing");
+    ok(!list.t.includes("/downloads/") && !list.t.includes("data-sm-print"), "Liste: keine Download-/Druck-Buttons");
+    ok((await hub("/en/writing/test-fixture-chapter-2")).t.includes("Download EPUB"), "/en: englischer Button-Text");
+
+    const dl = await asset("/downloads/story-test-fixture-chapter-2.epub");
+    const bytes = new Uint8Array(await dl.arrayBuffer());
+    const decoder = new TextDecoder();
+    ok(dl.status === 200 && bytes.length > 200, "GET /downloads/story-…epub → 200 mit Inhalt", `${dl.status} ${bytes.length}`);
+    ok(bytes[0] === 0x50 && bytes[1] === 0x4b, "die Datei ist ein ZIP (PK-Signatur)");
+    ok(decoder.decode(bytes.subarray(30, 38)) === "mimetype" && decoder.decode(bytes.subarray(38, 58)) === "application/epub+zip", "mimetype ist der erste Eintrag und ungepackt");
+    ok((await asset("/downloads/story-test-fixture-hello.epub")).status === 404, "ein Blog-Slug hat keinen Export (404)");
+    ok((await asset("/downloads/story-test-fixture-chapter-3.epub")).status === 404, "ein archiviertes Kapitel hat keinen Export (404)");
+    ok((await asset("/downloads/series-test-fixture-serie.epub")).status === 200, "Serien-EPUB ist abrufbar");
+    // Static assets from public/ are served by the asset layer for every hostname of this Worker
+    // (that is how /design/*, /content-assets/* and /mc/* already behave), so the exports are no
+    // exception. No download page is rendered by the Worker on either host.
+    ok((await fetch(BASE + "/downloads/story-test-fixture-chapter-2.epub", { headers: { host: HOST }, redirect: "manual" })).status === 200, "Export ist ein statisches Asset (wie die übrigen public/-Dateien auch auf mc. erreichbar)");
+    ok((await fetch(BASE + "/design/summer.css", { headers: { host: HOST }, redirect: "manual" })).status === 200, "… was für public/-Assets schon immer gilt (Kontrollprobe)");
+    const css = await asset("/design/summer.css");
+    const cssText = await css.text();
+    ok(css.status === 200 && cssText.includes("@media print") && cssText.includes("page-break-before") && cssText.includes(".sm-export"), "Druck- und Export-CSS sind im Bundle");
+    ok((await asset("/design/summer-print.js")).status === 200, "der Druck-Helfer ist ausgeliefert");
   }
   console.log("8) UI (Chromium 390/1440)");
   { // Live-Ticks: erster Ingest legt je Item einen Tick an; gleicher Preis → kein neuer; Preisänderung → neuer Tick

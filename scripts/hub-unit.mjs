@@ -196,6 +196,17 @@ for (const lang of LANGS) {
   ok(writingListPage([], "de").includes('href="/writing/feed.xml"'), "an empty writing list still advertises the (empty) feed");
   ok(hubPage("/about", "de").includes('href="/writing/feed.xml"'), "the hub shell advertises the writing feed on other pages too");
 
+  /* export (phase 3c) */
+  ok(ch1.includes('href="/downloads/story-ch-1.epub"') && ch1.includes('href="/downloads/series-serie.epub"'), "chapter: chapter EPUB and series EPUB are linked");
+  ok(ch1.includes("data-sm-print") && ch1.includes('<script src="/design/summer-print.js" defer></script>'), "chapter: print button with the external helper");
+  ok(ch1.includes("(c) Nils, nur zum persönlichen Lesen."), "chapter: the rights line is on the page");
+  ok(ch1.includes("Öffnet den Druckdialog"), "chapter: the print hint is shown");
+  ok(!post.includes("/downloads/") && !post.includes("data-sm-print") && !post.includes("summer-print.js"), "post: a blog post gets no export and no print button");
+  const archivedChapter = writingPostPage(mk({ slug: "ch-arch", kind: "story", series: "serie", chapter: 9, archived: true, date: "2025-01-03" }), all, "de");
+  ok(!archivedChapter.includes("/downloads/") && !archivedChapter.includes("data-sm-print"), "an archived chapter offers neither download nor print");
+  ok(writingSeriesPage({ slug: "serie", title: "Serie", chapters: ["ch-1", "ch-2"], count: 2 }, all, "de").includes('href="/downloads/series-serie.epub"'), "series: the whole series is offered as one EPUB");
+  ok(!list.includes("/downloads/") && !list.includes("data-sm-print"), "list: no download or print buttons");
+
   /* escaping on a writing page */
   const unsafe = writingPostPage(mk({ slug: "unsafe", title: "Unsafe", html: "<p>&lt;script&gt;alert(1)&lt;/script&gt; &lt;img src=x onerror=alert(1)&gt;</p>" }), all, "de");
   ok(!/<script(?![^>]*\ssrc=)/i.test(unsafe), "post: a payload in the body never becomes a live script tag");

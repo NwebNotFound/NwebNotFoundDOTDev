@@ -192,6 +192,9 @@ const PAGES = [
   { group: "writing", name: "writing-post", url: `${SITE}/writing/test-fixture-hello`, fullPage: true, out: "docs/screens" },
   { group: "writing", name: "writing-chapter", url: `${SITE}/writing/test-fixture-chapter-2`, fullPage: true, out: "docs/screens" },
   { group: "writing", name: "writing-series", url: `${SITE}/writing/series/test-fixture-serie`, fullPage: true, out: "docs/screens", only: (vp) => vp.w === 1280 },
+  // Export (Phase 3c): the print view of a chapter, captured through Chromium's print media
+  // emulation — this is what "Print as PDF" produces.
+  { group: "writing", name: "writing-print", url: `${SITE}/writing/test-fixture-chapter-2`, fullPage: true, out: "docs/screens", schemes: ["light"], only: (vp) => vp.w === 1280, async script(tab) { await tab.emulateMedia({ media: "print" }); await tab.waitForTimeout(200); } },
   { group: "mc", name: "mc-home", url: `${MC}/`, fullPage: false, waitUntil: "domcontentloaded", schemes: ["dark"] },
   { group: "mc", name: "mc-wiki", url: `${MC}/wiki`, fullPage: true, waitUntil: "domcontentloaded", schemes: ["dark"] },
   // Panel: signed out (login), chat with tool output, approval card, drawer open, new-bot dialog.
