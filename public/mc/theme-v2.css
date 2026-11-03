@@ -210,7 +210,6 @@ html.mc .empty-st, html.mc .stat, html.mc .wside, html.mc table.cmd, html.mc .li
 }
 html.mc .g.pad, html.mc .dc, html.mc .card, html.mc .panel { padding: 24px; }
 html.mc .stat { padding: 18px 20px; border-radius: 18px; }
-html.mc .g.q, html.mc a.g, html.mc a.card { display: flex; }
 html.mc a.g:hover, html.mc a.g:focus-visible, html.mc a.card:hover, html.mc a.card:focus-visible {
   text-decoration: none; transform: translateY(-5px) rotate(-0.4deg);
   box-shadow: var(--bevel-2), var(--shadow-lift); background: var(--surface);
@@ -242,7 +241,14 @@ html.mc .ic { width: 32px; height: 32px; border-radius: 9px; overflow: hidden; }
 html.mc .ic img { width: 24px; height: 24px; }
 html.mc .qg { display: flex; } html.mc .q .qt b { font-size: 1.0625rem; font-weight: 900; }
 html.mc .q .qt span { display: block; color: var(--muted); font-size: 0.875rem; font-weight: 600; }
-html.mc .q { gap: 0.75rem; }
+/* Quick links: icon chip left, label right (artboards `.card` with flex-direction: row).
+   `html.mc a.g.q` outranks the ds.css rule of the same name, which forces the old column layout. */
+html.mc a.g.q { flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; min-height: 96px; padding: 1.1rem 1.2rem; }
+html.mc a.g.q .qt { flex: 1; justify-content: flex-start; gap: 2px; text-align: left; }
+html.mc a.g.q .qi { align-items: center; min-height: 0; }
+html.mc a.g.q b { font-family: var(--f-body); font-weight: 900; font-size: 1.0625rem; }
+html.mc .qgrid.q6 { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { html.mc .qgrid.q6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 /* ---------- lists, rows, ranks, avatars (pages.css `.li/.rank/.avatar`) ---------- */
 html.mc .li, html.mc .lrow, html.mc .row, html.mc .lbr, html.mc .vs, html.mc .order, html.mc .link-row, html.mc .cmd { align-items: center; gap: 14px; min-height: 56px; padding: 8px 0; border: 0; box-shadow: none; background: none; }
@@ -296,6 +302,14 @@ html.mc .field label { font-weight: 800; font-size: 0.8125rem; }
 html.mc .field input, html.mc .field textarea { min-height: 46px; padding: 10px 14px; border: 0; border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); font-family: var(--f-body); font-size: 0.9375rem; font-weight: 600; box-shadow: var(--bevel-2); margin: 0; }
 html.mc .field input:focus, html.mc .field textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--focus), 0 0 0 4px rgba(127, 228, 149, 0.25); }
 html.mc .buy input, html.mc .bidf input { min-height: 44px; border: 0; border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); font-family: var(--f-px); box-shadow: var(--bevel-2); }
+/* Dropdowns (Markt sortieren/filtern): same field shell as the search box. */
+html.mc select { appearance: none; -webkit-appearance: none; font-family: var(--f-body); font-size: 1rem; font-weight: 600; color: var(--ink); background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23aab6d4' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center; border: 0; border-radius: var(--r-sm); min-height: 44px; padding: 0 34px 0 14px; box-shadow: var(--bevel-2); }
+html.mc select:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+html.mc .fsel span { font-family: var(--f-body); font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+/* Kursticker: pill row instead of the chest-GUI rail. */
+html.mc .tick { border-radius: 999px; background: var(--surface-2); box-shadow: var(--bevel); }
+html.mc .tick a { border-radius: 999px; }
+html.mc .tick a:hover { background: var(--surface-3); }
 html.mc .stepper { border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--bevel-2); }
 html.mc .stepper button { width: 44px; height: 44px; color: var(--ink); font-family: var(--f-body); font-weight: 900; font-size: 1.25rem; }
 
