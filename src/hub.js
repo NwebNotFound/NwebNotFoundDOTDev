@@ -15,6 +15,7 @@ import { AV } from "./asset-version.js";
 import { LANGS, makeT, withLang } from "./i18n/index.js";
 import { CONTENT } from "./generated/content.js";
 import { allTags, byNewest, chaptersOf, excerpt, filterWriting, findWriting, prevNext, publishedWriting } from "./content.js";
+import { FEED_MIME } from "./feed.js";
 import { htmlToText } from "./markdown.js";
 
 export const SITE = "nwebnotfound.dev";
@@ -94,6 +95,45 @@ function tagsHtml(tags, lang, cls = "") {
   return `<ul class="sm-tags ${cls}">${items}</ul>`;
 }
 
+/* ---------- feeds (plan §8 "Feeds", phase 3b) ---------- */
+
+// Feed URLs are language-neutral: a feed carries the language of its content, not the UI language, so
+// there is exactly one URL per feed (`/writing/feed.xml`, not `/de/writing/feed.xml`).
+const feedLinks = (base, title, label) => [
+  { format: "rss", href: `${base}/feed.xml`, title },
+  { format: "atom", href: `${base}/atom.xml`, title: label },
+];
+
+/** Autodiscovery links for the `/writing` list (the whole writing feed). */
+export const writingListFeeds = (t) => feedLinks("/writing", t("feed.title"), t("feed.title"));
+
+/** Autodiscovery links for one post: its kind feed, plus the series feed for a story chapter. */
+export function writingPostFeeds(item, all, t) {
+  const kind = item.kind === "story" ? "/writing/stories" : "/writing/blog";
+  const kindTitle = t(item.kind === "story" ? "feed.title.stories" : "feed.title.blog");
+  const feeds = feedLinks(kind, kindTitle, kindTitle);
+  if (item.kind === "story" && item.series) {
+    const title = t("feed.title.series", { series: seriesTitleOf(all, item.series) });
+    feeds.push(...feedLinks(`/writing/series/${item.series}`, title, title));
+  }
+  return feeds;
+}
+
+/** Autodiscovery links for a series page. */
+export function writingSeriesFeeds(series, t) {
+  const title = t("feed.title.series", { series: series.title });
+  return feedLinks(`/writing/series/${series.slug}`, title, title);
+}
+
+/** The visible footnote: which feeds this page belongs to, so a reader can subscribe. */
+function feedNote(feeds, t) {
+  if (!feeds || !feeds.length) return "";
+  const links = feeds
+    .map((f) => `<a class="sm-feed-note__link" href="${esc(f.href)}">${esc(t(f.format === "rss" ? "feed.rss" : "feed.atom"))}</a>`)
+    .join(`<span class="sm-feed-note__sep" aria-hidden="true"> · </span>`);
+  return `<p class="sm-feed-note">${esc(t("writing.feed.note"))} ${links}</p>`;
+}
+
 /* ---------- writing: bodies ---------- */
 
 function writingCard(item, lang, t) {
@@ -140,6 +180,7 @@ export function writingListBody(items, lang, filters = {}, t = makeT(lang)) {
 <nav class="sm-filters" aria-label="${esc(t("writing.filter.label"))}">${chips}${tagChips}</nav>
 <p class="sm-muted sm-filters__count">${esc(t("writing.count", { n: filtered.length }))}</p>
 ${body}
+${feedNote(writingListFeeds(t), t)}
 </div></section>`;
 }
 
@@ -167,6 +208,7 @@ ${note}
 ${archived}
 <div class="sm-prose" lang="${esc(item.lang)}">${item.html}</div>
 ${prevNextHtml(item, all, lang, t)}
+${feedNote(writingPostFeeds(item, all, t), t)}
 <p><a class="sm-btn sm-btn--ghost" href="${href("/writing", lang)}">${esc(t("writing.back"))}</a></p>
 </div></article>`;
 }
@@ -200,6 +242,7 @@ export function writingSeriesBody(series, all, lang, t = makeT(lang)) {
 <h1 class="sm-h1">${esc(series.title)}</h1>
 <p class="sm-lead">${esc(t("writing.series.lead", { count: chapters.length }))}</p>
 <ul class="sm-chapters">${rows}</ul>
+${feedNote(writingSeriesFeeds(series, t), t)}
 <p><a class="sm-btn sm-btn--ghost" href="${href("/writing", lang)}">${esc(t("writing.back"))}</a></p>
 </div></section>`;
 }
@@ -245,7 +288,12 @@ function document_(o) {
           { hreflang: "x-default", href: `https://${SITE}${bare === "/" ? "/" : bare}` },
         ]
       : o.hreflangs;
-  const altTags = alternates.map((a) => `<link rel="alternate" hreflang="${esc(a.hreflang)}" href="${esc(a.href)}">`).join("");
+  const hreflangTags = alternates.map((a) => `<link rel="alternate" hreflang="${esc(a.hreflang)}" href="${esc(a.href)}">`).join("");
+  // Feed autodiscovery (plan §8 "Feeds"): every hub page points at the writing feeds, a writing page
+  // at the feed(s) it belongs to (its kind, plus the series for a chapter).
+  const feedTags = (o.feeds === undefined ? writingListFeeds(t) : o.feeds)
+    .map((f) => `<link rel="alternate" type="${FEED_MIME[f.format]}" title="${esc(f.title)}" href="${esc(f.href)}">`)
+    .join("");
   return `<!doctype html><html lang="${lang}" class="sm-root"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}">
@@ -253,7 +301,8 @@ function document_(o) {
 <meta name="theme-color" content="#8fd3ff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141b33" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="${canonical}">
-${altTags}
+${hreflangTags}
+${feedTags}
 <link rel="preload" href="/design/fonts/pixelify-sans-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/design/fonts/nunito-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">
@@ -380,6 +429,7 @@ export function writingListPage(all, lang, filters = {}, t = makeT(lang)) {
     title: hasContent ? t("meta.writing.list.title") : t("meta.writing.title"),
     desc: hasContent ? t("meta.writing.list.desc") : t("meta.writing.desc"),
     body: writingListBody(all, lang, filters, t),
+    feeds: writingListFeeds(t),
   });
 }
 
@@ -397,6 +447,7 @@ export function writingPostPage(item, all, lang, t = makeT(lang)) {
     body: writingPostBody(item, all, lang, t),
     canonicalTo: `https://${SITE}${withLang(`/writing/${item.slug}`, item.lang)}`,
     hreflangs: [],
+    feeds: writingPostFeeds(item, all, t),
   });
 }
 
@@ -409,6 +460,7 @@ export function writingSeriesPage(series, all, lang, t = makeT(lang)) {
     title: `${series.title} · ${t("nav.writing")} · NwebNotFound`,
     desc: t("meta.writing.series.desc", { series: series.title }),
     body: writingSeriesBody(series, all, lang, t),
+    feeds: writingSeriesFeeds(series, t),
   });
 }
 

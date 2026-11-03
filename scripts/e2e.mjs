@@ -8,6 +8,8 @@ import { faceRgba, skinOk, skinResponse, renderHead, encodePng, fetchRetry, RETR
 import "./vip-unit.mjs";
 import "./content-unit.mjs";
 import "./markdown-unit.mjs";
+import "./feed-unit.mjs";
+import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { hubPage } from "../src/hub.js";
 const ROOT = new URL("..", import.meta.url).pathname, PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
@@ -40,14 +42,15 @@ fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
 const wd = spawn("npx", ["wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: true });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
-const cleanup = () => { try { process.kill(-wd.pid); } catch {} fs.rmSync(DV, { force: true }); if (hadDV) fs.renameSync(DV + ".e2e-bak", DV); if (hadContent) { try { fs.renameSync(CONTENT_JS + ".e2e-bak", CONTENT_JS); } catch {} } };
+// Writing fixtures (phase 3a/3b): the committed src/generated/{content,feeds}.js carry Nils' real
+// content (currently none). For the e2e run we build the index *and* the feeds from
+// scripts/fixtures/content so the writing routes and the feeds have something to render; the
+// original files are restored on exit.
+const GENERATED = ["src/generated/content.js", "src/generated/feeds.js"].map((rel) => ROOT + rel);
+const hadGenerated = GENERATED.map((file) => fs.existsSync(file));
+GENERATED.forEach((file, i) => { if (hadGenerated[i]) fs.copyFileSync(file, file + ".e2e-bak"); });
+const cleanup = () => { try { process.kill(-wd.pid); } catch {} fs.rmSync(DV, { force: true }); if (hadDV) fs.renameSync(DV + ".e2e-bak", DV); GENERATED.forEach((file, i) => { if (hadGenerated[i]) { try { fs.renameSync(file + ".e2e-bak", file); } catch {} } }); };
 process.on("exit", cleanup); process.on("SIGINT", () => process.exit(130));
-// Writing fixtures (phase 3a): the committed src/generated/content.js carries Nils' real content
-// (currently none). For the e2e run we build the index from scripts/fixtures/content so the writing
-// routes have something to render; the original file is restored on exit.
-const CONTENT_JS = ROOT + "src/generated/content.js";
-const hadContent = fs.existsSync(CONTENT_JS);
-if (hadContent) fs.copyFileSync(CONTENT_JS, CONTENT_JS + ".e2e-bak");
 execSync("node scripts/build-content.mjs --fixtures", { cwd: ROOT, stdio: "ignore" });
 for (let i = 0; i < 60; i++) { try { await fetch(BASE + "/", { headers: { host: HOST } }); break; } catch { await new Promise((r) => setTimeout(r, 500)); } }
 
@@ -580,7 +583,7 @@ try {
 
     const post = await hub("/writing/test-fixture-hello");
     ok(post.s === 200 && post.t.includes("TEST FIXTURE Hello world") && post.t.includes('class="sm-prose"') && post.t.includes("Min. Lesezeit"), "Beitragsseite → 200 mit Reader und Lesezeit", post.s);
-    ok(post.t.includes('rel="canonical" href="https://nwebnotfound.dev/de/writing/test-fixture-hello"') && !post.t.includes('rel="alternate"'), "Beitrag: canonical auf die Originalsprache, kein hreflang");
+    ok(post.t.includes('rel="canonical" href="https://nwebnotfound.dev/de/writing/test-fixture-hello"') && !/rel="alternate" hreflang=/.test(post.t), "Beitrag: canonical auf die Originalsprache, kein hreflang");
     ok(post.t.includes("<h2>Eine Zwischenüberschrift</h2>") && post.t.includes("<ul><li>erster Punkt</li>") && post.t.includes("<pre><code"), "Markdown ist vorgerendert (h2, Liste, Codeblock)");
     ok(post.t.includes('href="/de/writing?tag=fixtures"') && post.t.includes('class="sm-prose" lang="de"'), "Beitrag: Tag-Link und Reader-Sprache");
     ok(!post.t.includes("Original auf") && !post.t.includes("Original in"), "deutscher Text, deutsche Hülle → kein Original-Hinweis");
@@ -604,6 +607,52 @@ try {
     ok(unsafe.t.includes('<img src="/content-assets/placeholder.svg"'), "unsafe: erlaubtes lokales Bild wird gerendert");
     ok(!/evil\.example/.test(unsafe.t), "unsafe: externes Bild wird verworfen");
     ok(!(await req("/writing")).t.includes("TEST FIXTURE"), "Writing erscheint nicht auf mc.nwebnotfound.dev");
+  }
+  console.log("7d) Hub: Feeds (Fixture-Build)");
+  {
+    const hub = (path, opt = {}) => req(path, { testHost: "nwebnotfound.dev", ...opt });
+    const rss = await hub("/writing/feed.xml");
+    ok(rss.s === 200 && (rss.h.get("content-type") || "") === "application/rss+xml; charset=utf-8", "GET /writing/feed.xml → 200 mit RSS-Content-Type", `${rss.s} ${rss.h.get("content-type")}`);
+    ok(rss.t.startsWith('<?xml version="1.0" encoding="utf-8"?>') && rss.t.includes('<rss version="2.0"'), "RSS 2.0 mit XML-Deklaration");
+    ok(checkWellFormed(rss.t).ok, "RSS ist wohlgeformtes XML", JSON.stringify(checkWellFormed(rss.t).errors));
+    ok(rss.t.includes("TEST FIXTURE Hello world") && rss.t.includes("TEST FIXTURE Chapter one"), "Feed enthält veröffentlichte Blog- und Story-Einträge");
+    ok(!rss.t.includes("TEST FIXTURE Draft post") && !rss.t.includes("TEST FIXTURE Chapter three"), "Feed ohne draft und ohne archived");
+    ok(rss.t.includes('<guid isPermaLink="true">https://nwebnotfound.dev/de/writing/test-fixture-hello</guid>'), "GUID ist der stabile Permalink");
+    ok(rss.t.includes("<lastBuildDate>Sat, 07 Nov 2026 00:00:00 GMT</lastBuildDate>") || /<lastBuildDate>[A-Z][a-z]{2}, \d\d [A-Z][a-z]{2} \d{4} 00:00:00 GMT<\/lastBuildDate>/.test(rss.t), "lastBuildDate ist RFC 822");
+    ok(rss.h.get("cache-control") === "public, max-age=300" && !!rss.h.get("etag") && !!rss.h.get("last-modified"), "Cache-Control, ETag und Last-Modified gesetzt", `${rss.h.get("cache-control")} ${rss.h.get("etag")} ${rss.h.get("last-modified")}`);
+    const cached = await hub("/writing/feed.xml", { headers: { "if-none-match": rss.h.get("etag") } });
+    ok(cached.s === 304 && !cached.t, "If-None-Match mit dem ETag → 304 ohne Body", `${cached.s} ${cached.t.slice(0, 40)}`);
+    ok((await hub("/writing/feed.xml", { headers: { "if-none-match": '"veraltet"' } })).s === 200, "fremder ETag → 200");
+
+    const atom = await hub("/writing/atom.xml");
+    ok(atom.s === 200 && (atom.h.get("content-type") || "") === "application/atom+xml; charset=utf-8", "GET /writing/atom.xml → 200 mit Atom-Content-Type", `${atom.s} ${atom.h.get("content-type")}`);
+    ok(atom.t.includes('<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="de">') && atom.t.includes("<updated>") && checkWellFormed(atom.t).ok, "Atom 1.0, xml:lang, updated, wohlgeformt");
+    ok(atom.t.includes('<content type="html">') && atom.t.includes("&lt;p&gt;"), "Atom liefert escaped HTML als content");
+
+    const blogFeed = await hub("/writing/blog/feed.xml");
+    ok(blogFeed.s === 200 && blogFeed.t.includes("TEST FIXTURE Hello world") && !blogFeed.t.includes("TEST FIXTURE Chapter one"), "Blog-Feed enthält nur Blog-Beiträge", blogFeed.s);
+    ok(blogFeed.t.includes("TEST FIXTURE English post") && blogFeed.t.includes('<link>https://nwebnotfound.dev/en/writing/test-fixture-english</link>'), "englischer Beitrag verlinkt seine Sprach-URL");
+    const storyFeed = await hub("/writing/stories/feed.xml");
+    ok(storyFeed.s === 200 && storyFeed.t.includes("Chapter one") && !storyFeed.t.includes("TEST FIXTURE Hello world") && !storyFeed.t.includes("Chapter three"), "Story-Feed: nur nicht-archivierte Kapitel", storyFeed.s);
+    ok(storyFeed.t.includes("<![CDATA[") && storyFeed.t.includes("Weiterlesen"), "Story-Eintrag: Auszug plus Link (kein Volltext)");
+    const seriesFeed = await hub("/writing/series/test-fixture-serie/feed.xml");
+    ok(seriesFeed.s === 200 && seriesFeed.t.includes("Chapter two") && seriesFeed.t.includes("Serie: Test Fixture Series"), "Serien-Feed mit Serientitel", seriesFeed.s);
+    ok((await hub("/writing/series/test-fixture-serie/atom.xml")).s === 200, "Serie hat auch einen Atom-Feed");
+    ok((await hub("/de/writing/feed.xml")).s === 200 && (await hub("/en/writing/feed.xml")).s === 200, "Sprachpräfix liefert denselben Feed (301 vermieden)");
+    ok((await hub("/writing/series/test-fixture-serie/feed.xml", { headers: { "if-none-match": "*" } })).s === 304, "If-None-Match: * → 304");
+    ok((await hub("/writing/reviews/feed.xml")).s === 404 && (await hub("/writing/unbekannt/feed.xml")).s === 404, "unbekannter Feed → 404");
+    ok(!(await req("/writing/feed.xml")).t.includes("<rss"), "kein Feed auf mc.nwebnotfound.dev");
+
+    const list = await hub("/writing");
+    ok(list.t.includes('class="sm-feed-note"') && list.t.includes('href="/writing/feed.xml"') && list.t.includes('href="/writing/atom.xml"'), "Fußnote mit RSS/Atom-Link in der Liste");
+    ok(list.t.includes('<link rel="alternate" type="application/rss+xml" title="NwebNotFound – Texte" href="/writing/feed.xml">'), "Autodiscovery im Head der Liste");
+    const post = await hub("/writing/test-fixture-hello");
+    ok(post.t.includes('type="application/rss+xml" title="NwebNotFound – Blog" href="/writing/blog/feed.xml"') && !post.t.includes("/writing/stories/feed.xml"), "Blog-Beitrag wirbt nur für den Blog-Feed");
+    const chapter = await hub("/writing/test-fixture-chapter-2");
+    ok(chapter.t.includes('href="/writing/series/test-fixture-serie/feed.xml"') && chapter.t.includes('href="/writing/stories/feed.xml"'), "Kapitel wirbt für Story- und Serien-Feed");
+    const seriesPage = await hub("/writing/series/test-fixture-serie");
+    ok(seriesPage.t.includes('href="/writing/series/test-fixture-serie/atom.xml"'), "Serienseite wirbt für ihren Feed");
+    ok(!/utm_|feedburner|feedproxy/i.test(rss.t), "Feed ohne Tracking-Parameter und ohne Drittanbieter-Dienst");
   }
   console.log("8) UI (Chromium 390/1440)");
   { // Live-Ticks: erster Ingest legt je Item einen Tick an; gleicher Preis → kein neuer; Preisänderung → neuer Tick

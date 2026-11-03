@@ -15,6 +15,8 @@ import { normInv, renderInventoryCard } from "./mc-inventory.js";
 import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
 import { hubPage, hubPageExists } from "./hub.js";
+import { FEEDS } from "./generated/feeds.js";
+import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie } from "./i18n/index.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
@@ -827,6 +829,20 @@ async function mcMarketItem(env, raw) {
 const CSP_RO = "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mc-heads.net https://cdn.jsdelivr.net https://cdn.discordapp.com; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://discord.com; object-src 'none'";
 const SEC_HEADERS = { "content-security-policy-report-only": CSP_RO, "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
 const json = (o, s = 200, extra = {}) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
+// Feeds (phase 3b): prebuilt at build time (src/generated/feeds.js), served with a validator so a
+// reader that already has the current version gets a 304. Short cache, no tracking parameters.
+const FEED_HEADERS = { "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin" };
+function feedResponse(req, feed) {
+  const headers = {
+    "content-type": `${feed.format === "atom" ? "application/atom+xml" : "application/rss+xml"}; charset=utf-8`,
+    "cache-control": "public, max-age=300",
+    etag: feed.etag,
+    ...FEED_HEADERS,
+  };
+  if (feed.lastModified) headers["last-modified"] = feed.lastModified;
+  if (matchesEtag(req.headers.get("if-none-match"), feed.etag)) return new Response(null, { status: 304, headers });
+  return new Response(feed.xml, { status: 200, headers });
+}
 const html = (h, s = 200, extra = {}) => new Response(h.replaceAll("{{Y}}", String(new Date().getUTCFullYear())), { status: s, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...SEC_HEADERS, ...extra } });
 const notFound = (mc) => html(mc
   ? shell({ title: "404 · NwebNotFound MC", desc: "", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Diesen Chunk gibt es nicht.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` })
@@ -935,6 +951,11 @@ export default {
     }
     if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden, Idee oder Sonstiges einreichen", css: MC_CSS, nav: mNav.replace(/href="\//g, `href="https://${MCD}/`), footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
     if (p === "/api/guestbook") return guestbookApi(req, env);
+    // ---- Feeds (Creative Hub, phase 3b) ----
+    // Vor dem Sprach-Redirect: /de/writing/feed.xml und /writing/feed.xml liefern denselben Feed (ein
+    // Feed trägt die Sprache seines Inhalts, nicht die der Oberfläche). Vorgerendert, kein Markdown
+    // zur Laufzeit.
+    { const feed = feedFor(FEEDS, p); if (feed) return feedResponse(req, feed); }
     // ---- Creative Hub (nwebnotfound.dev) ----
     // Sprachpfade `/de/…` und `/en/…` plus die sprachlosen Pfade. `/` selbst rendert die gewählte
     // Sprache (Cookie → Accept-Language → Deutsch), statt umzuleiten: so kann kein Redirect-Loop
