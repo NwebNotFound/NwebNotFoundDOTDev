@@ -38,3 +38,32 @@ html.mc .vip-sec .slot{display:inline-grid;place-items:center;width:40px;height:
 html.mc .vip-sec .slot img{width:28px;height:28px;image-rendering:pixelated;image-rendering:crisp-edges}
 html.mc .vip-sec .slot.big{width:56px;height:56px}
 html.mc .vip-sec .slot.big img{width:40px;height:40px}
+/* Admin-Ansicht: alle Welten mit Verwaltung und Protokoll. */
+html.mc #vip-admin-worlds,html.mc #vip-admin-log{padding-top:0;padding-bottom:0}
+html.mc #vip-admin-worlds{margin-top:var(--s6)}
+html.mc #vip-admin-log{margin-top:var(--s5);margin-bottom:var(--s6)}
+html.mc .vip-admin-tag{margin-left:.4rem;vertical-align:middle;text-transform:none;letter-spacing:.02em}
+html.mc .vip-block>.hub-h2>.tag{margin-left:.4rem;vertical-align:middle}
+html.mc .vip-say{margin:.6rem 0 0;font-size:var(--t-sm);line-height:1.45;color:var(--c-mut);opacity:0;transition:opacity .18s ease}
+html.mc .vip-say.is-on{opacity:1}
+html.mc .vip-say.is-bad{color:var(--c-red)}
+html.mc .vip-ranks.is-three{grid-template-columns:minmax(0,1fr)}
+@media(min-width:1040px){html.mc .vip-ranks.is-three{grid-template-columns:repeat(3,minmax(0,1fr))}}
+html.mc .vip-aworlds{display:grid;gap:var(--s3);grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))}
+html.mc .vip-aw{align-items:flex-start}
+html.mc .vip-world-meta{margin:.3rem 0 0;font-size:.85rem;line-height:1.45;overflow-wrap:anywhere}
+html.mc .vip-world-info{margin:.3rem 0 0;font-size:.85rem;line-height:1.45;overflow-wrap:anywhere}
+html.mc .vip-world-acts{display:flex;flex-wrap:wrap;gap:var(--s2);margin:var(--s3) 0 0}
+html.mc .vip-world-acts .btn{min-height:44px}
+@media(max-width:599px){html.mc .vip-world-acts .btn{flex:1 1 100%}}
+html.mc .vip-world.is-extra{display:none}
+html.mc .vip-aworlds.is-open .vip-world.is-extra{display:flex}
+html.mc .vip-more{margin-top:var(--s3)}
+html.mc .vip-log{list-style:none;margin:0;padding:0;display:grid;gap:var(--s2)}
+html.mc .vip-log li{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s1);padding:var(--s3) var(--s4);border:var(--b) solid var(--c-line);border-radius:var(--r);background:var(--c-s1);box-shadow:var(--sh-1);min-width:0}
+html.mc .vip-log .when{font-size:.8125rem;color:var(--c-mut);font-variant-numeric:tabular-nums}
+html.mc .vip-log .what{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:baseline;font-size:var(--t-sm);min-width:0}
+html.mc .vip-log .what b{font-family:var(--f-px);font-weight:700;color:var(--c-fg)}
+html.mc .vip-log .who{font-size:.8125rem;overflow-wrap:anywhere}
+@media(min-width:800px){html.mc .vip-log li{grid-template-columns:9.5rem minmax(0,1fr) auto;align-items:center;gap:var(--s3)}}
+@media(prefers-reduced-motion:reduce){html.mc .vip-say{transition:none}}

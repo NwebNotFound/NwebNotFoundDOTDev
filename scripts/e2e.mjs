@@ -624,12 +624,20 @@ try {
     ok((await req("/api/mc-vip", { cookie: c1 })).j?.reason === "link", "VIP-API: ohne Server-Rolle → link");
     sql(`UPDATE mc_links SET has_role = 1 WHERE discord_id = '${D1}'`);
     await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }, { uuid: U2, name: "Seller", rank: "builder", color: "&a", weight: 80 }] } });
-    const adm = await req("/api/mc-vip", { cookie: c1 }); ok(adm.j?.reason === "rank" && adm.j?.own_rank?.rank === "admin" && adm.j.own_rank.color === "c" && noPriv(adm.j), "Admin sieht die Übersicht, nicht das Panel", adm.t.slice(0, 200));
-    ok((await req("/api/mc-vip", { cookie: c2 })).j?.own_rank?.rank === "builder" && (await req("/api/mc-vip", { cookie: c2 })).j?.access === false, "Builder kein Panel");
+    const adm = await req("/api/mc-vip", { cookie: c1 });
+    ok(adm.j?.access === true && adm.j?.admin === true && adm.j?.player?.rank === "admin" && adm.j.player.color === "c" && !("uuid" in (adm.j.player || {})) && adm.j?.catalog?.length === 3 && adm.j.catalog[2].rank === "admin" && adm.j.catalog[2].yours === true && adm.j?.worlds?.placeholder === true, "Admin sieht das Panel samt Admin-Karte", adm.t.slice(0, 240));
+    ok(Array.isArray(adm.j?.admin_log?.entries) && adm.j.admin_log.entries.length === 0 && !JSON.stringify(adm.j).includes("weight") && !JSON.stringify(adm.j).includes("secretvip"), "Admin: leeres Protokoll, keine internen Felder", adm.t.slice(0, 240));
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }, { uuid: U2, name: "Seller", rank: "default", color: "&7", weight: 0 }] } });
+    { const dflt = await req("/api/mc-vip", { cookie: c2 });
+      ok(dflt.j?.access === false && dflt.j?.reason === "rank" && dflt.j?.own_rank?.rank === "default" && !("admin" in dflt.j) && !("admin_log" in dflt.j) && !("worlds" in dflt.j), "default bleibt gesperrt, kein Protokoll", dflt.t.slice(0, 200)); }
+    await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }, { uuid: U2, name: "Seller", rank: "builder", color: "&a", weight: 80 }] } });
+    { const bld = await req("/api/mc-vip", { cookie: c2 });
+      ok(bld.j?.access === false && bld.j?.reason === "rank" && bld.j?.own_rank?.rank === "builder" && bld.j.own_rank.color === "a" && noPriv(bld.j) && !("admin" in bld.j) && !("admin_log" in bld.j), "Builder bleibt gesperrt, kein Protokoll", bld.t.slice(0, 200)); }
     sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.skin_url', 'https://textures.minecraft.net/texture/secretvip') WHERE mc_uuid = '${U1}'`);
     await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }, { uuid: U2, name: "Seller", rank: "mvp", color: "&d", weight: 60 }] } });
     const vip = await req("/api/mc-vip", { cookie: c1 });
     ok(vip.j?.access === true && vip.j.player?.name === "Nils" && vip.j.player.rank === "vip" && vip.j.player.color === "6" && !("uuid" in (vip.j.player || {})) && vip.j.profile === "/profile", "VIP: eigener Rang, kein uuid", JSON.stringify(vip.j?.player));
+    ok(vip.j?.admin === false && !("admin_log" in vip.j), "VIP ohne Admin-Flag und ohne Protokoll", JSON.stringify(Object.keys(vip.j || {})));
     ok(vip.j?.stats?.money === 900 && vip.j.stats.playtime === 7200 && vip.j.stats.deaths === 3 && vip.j.stats.money !== 1200 && !("inventory" in (vip.j.stats || {})) && !JSON.stringify(vip.j).includes("diamond_sword") && !JSON.stringify(vip.j).includes("secretvip") && !JSON.stringify(vip.j).includes("weight"), "VIP-Stats kurz, ohne Inventar/Skin/weight", JSON.stringify(vip.j?.stats));
     ok(vip.j?.catalog?.[0]?.yours === true && vip.j.catalog[1].yours === false && vip.j.catalog[1].perks.some((p) => p.id === "higher") && vip.j.worlds?.placeholder === true, "VIP-Katalog markiert den eigenen Rang, Welten noch Platzhalter");
     const mvp = await req("/api/mc-vip", { cookie: c2 });
@@ -776,6 +784,27 @@ try {
     ok(adm.s === 202 && adm.j?.op === "set_visibility", "Admin verwaltet fremde Welt ohne 403", adm.t);
     const row = sqlRows(`SELECT actor_uuid, owner_uuid, action FROM mc_vip_commands WHERE request_id='${adm.j.request_id}'`)[0];
     ok(row?.action === "set_visibility" && row.owner_uuid === U2 && row.actor_uuid === U1, "Admin-Zeile nennt Admin und Owner", JSON.stringify(row));
+    // Admin: alle Welten ohne 3er-Limit plus Protokoll. VIP: nur eigene/eingeladene Welten, kein Protokoll.
+    { const U3 = "22222222-3333-4444-5555-666666666666", WID4 = "dddddddd-eeee-4fff-8aaa-bbbbbbbbbbbb";
+      await post("/api/mc-vip-worlds", { vip_admin_log: [CLOG({ at: 1793504000000 }), CLOG({ at: 1793505000000, action: "start", detail: "" })] }, { token: TOK, origin: null, cookie: null });
+      await post("/api/mc-vip-worlds", { vip_worlds: [
+        { id: WID2, owner_uuid: U2, owner_name: "Seller", name: "Basis", status: "stopped", slot: null, player_limit: 5, players: 0, invites: [{ uuid: U1, name: "Nils", role: "trusted", added_at: 1793503000000 }], created_at: 1793500000000, last_started_at: null },
+        CWORLD(),
+        CWORLD({ id: WID4, owner_uuid: U3, owner_name: "Gast", name: "Berg", status: "stopped", invites: [], player_limit: 4 }),
+      ] }, { token: TOK, origin: null, cookie: null });
+      const allW = await req("/api/mc-vip", { cookie: c1 }), slots = allW.j?.worlds?.slots || [];
+      ok(allW.j?.admin === true && allW.j?.access === true && slots.length === 3 && [WID, WID2, WID4].every((x) => slots.some((s) => s.id === x)), "Admin sieht alle VIP-Welten ohne 3er-Limit", JSON.stringify(slots.map((s) => s.id)));
+      ok(slots.every((s) => s.owner_name === null || typeof s.owner_name === "string") && slots.find((s) => s.id === WID4)?.owner_name === "Gast" && slots.find((s) => s.id === WID4)?.owner === false && slots.find((s) => s.id === WID2)?.owner === false, "Admin sieht den Besitzer jeder Welt", JSON.stringify(slots.map((s) => [s.id, s.owner_name, s.owner])));
+      const lg = allW.j?.admin_log;
+      ok(lg && Array.isArray(lg.entries) && lg.entries.length === 2 && lg.entries[0].action === "start" && lg.entries[0].action_label === "Welt gestartet" && lg.entries[0].admin_name === "Seller" && lg.entries[0].owner_name === "Nils" && lg.entries[1].action === "set_visibility" && !JSON.stringify(lg).includes("admin_uuid") && !JSON.stringify(lg).includes("owner_uuid"), "Admin-Protokoll: neueste zuerst, Aktion/Admin/Besitzer, keine UUIDs", JSON.stringify(lg));
+      // Admin startet eine fremde Welt, auch wenn deren Besitzer keinen Rang mehr hat.
+      await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }] } });
+      const ast = await post(`/api/mc-vip/worlds/${WID4}/start`, { request_id: "vip-admin-foreign" }, { cookie: c1 });
+      ok(ast.s === 202 && ast.j?.op === "start" && sqlRows("SELECT owner_uuid FROM mc_vip_commands WHERE request_id='vip-admin-foreign'")[0]?.owner_uuid === U3, "Admin startet fremde Welt ohne Rang des Besitzers", ast.t);
+      await ack([{ request_id: "vip-admin-foreign", discord_id: D1, status: "done", reason: "" }]);
+      await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U2, name: "Seller", rank: "vip", color: "&6", weight: 40 }, { uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }] } });
+      const vipV = await req("/api/mc-vip", { cookie: c2 }), vIds = (vipV.j?.worlds?.slots || []).map((s) => s.id);
+      ok(vipV.j?.access === true && vipV.j?.admin === false && vIds.join() === [WID2, WID].join() && !("admin_log" in vipV.j) && !JSON.stringify(vipV.j?.worlds || {}).includes("admin_log"), "VIP sieht nur eigene und eingeladene Welten, kein Protokoll", JSON.stringify({ ids: vIds, log: vipV.j?.admin_log })); }
     sql(`UPDATE mc_links SET verified = 0 WHERE discord_id = '${D1}'`);
     ok((await post(`/api/mc-vip/worlds/${WID2}/start`, {}, { cookie: c1 })).j?.reason === "not_linked", "ohne Link → not_linked");
     sql(`UPDATE mc_links SET verified = 1 WHERE discord_id = '${D1}'`);
