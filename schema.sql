@@ -16,15 +16,18 @@ CREATE TABLE IF NOT EXISTS mc_market_history (item TEXT NOT NULL, hour_ts INTEGE
 CREATE INDEX IF NOT EXISTS idx_mc_mh_ts ON mc_market_history(hour_ts);
 -- Phase 5: Spielershops, Auktionshaus, Website-Warteschlangen (Geld in Cent)
 CREATE TABLE IF NOT EXISTS mc_blobs (kind TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS mc_bids_pending (id TEXT PRIMARY KEY, auction_id TEXT NOT NULL, bidder_uuid TEXT NOT NULL, bidder_name TEXT, discord_id TEXT, amount INTEGER NOT NULL, source TEXT NOT NULL, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT, acked_at INTEGER, ip TEXT);
+CREATE TABLE IF NOT EXISTS mc_bids_pending (id TEXT PRIMARY KEY, auction_id TEXT NOT NULL, bidder_uuid TEXT NOT NULL, bidder_name TEXT, discord_id TEXT, amount INTEGER NOT NULL, source TEXT NOT NULL, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT, acked_at INTEGER, ip TEXT, ip_hash TEXT);
 CREATE INDEX IF NOT EXISTS idx_bids_status ON mc_bids_pending(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_bids_auction ON mc_bids_pending(auction_id);
 CREATE INDEX IF NOT EXISTS idx_bids_discord ON mc_bids_pending(discord_id, created_at);
-CREATE TABLE IF NOT EXISTS mc_shop_orders_pending (id TEXT PRIMARY KEY, shop_id TEXT, item TEXT NOT NULL, qty INTEGER NOT NULL, buyer_uuid TEXT NOT NULL, buyer_name TEXT, discord_id TEXT, unit_price INTEGER, source TEXT NOT NULL, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT, acked_at INTEGER, ip TEXT, listing_id TEXT, type TEXT NOT NULL DEFAULT 'shop');
+CREATE TABLE IF NOT EXISTS mc_shop_orders_pending (id TEXT PRIMARY KEY, shop_id TEXT, item TEXT NOT NULL, qty INTEGER NOT NULL, buyer_uuid TEXT NOT NULL, buyer_name TEXT, discord_id TEXT, unit_price INTEGER, source TEXT NOT NULL, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reason TEXT, acked_at INTEGER, ip TEXT, ip_hash TEXT, listing_id TEXT, type TEXT NOT NULL DEFAULT 'shop');
 CREATE INDEX IF NOT EXISTS idx_orders_status ON mc_shop_orders_pending(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_discord ON mc_shop_orders_pending(discord_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_bids_ip ON mc_bids_pending(ip, created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_ip ON mc_shop_orders_pending(ip, created_at);
+-- 0014: nur noch ip_hash schreiben; Altdaten behalten ihre Klartext-ip
+CREATE INDEX IF NOT EXISTS idx_bids_ip_hash ON mc_bids_pending(ip_hash, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_ip_hash ON mc_shop_orders_pending(ip_hash, created_at);
 -- (nachgetragen) Bestenlisten + Detail-Stats
 CREATE TABLE IF NOT EXISTS mc_leaderboards (kind TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL);
 -- ALTER TABLE mc_player_stats ADD COLUMN details TEXT;
@@ -70,7 +73,9 @@ CREATE TABLE IF NOT EXISTS mc_vip_commands (
   reason TEXT,
   acked_at INTEGER,
   ip TEXT,
+  ip_hash TEXT,
   UNIQUE (discord_id, request_id)
 );
 CREATE INDEX IF NOT EXISTS idx_vip_cmd_status ON mc_vip_commands(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_vip_cmd_world ON mc_vip_commands(world_id, status);
+CREATE INDEX IF NOT EXISTS idx_vip_cmd_ip_hash ON mc_vip_commands(ip_hash, created_at);
