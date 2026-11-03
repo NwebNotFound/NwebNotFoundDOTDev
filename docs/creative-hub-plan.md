@@ -86,6 +86,46 @@ Music, photos and videos live in D1 (not Markdown) because Nils uploads them via
 - **Writing & reviews:** edited as Markdown in the repo (VS Code / GitHub web editor / Hermes), merged via PR → auto deploy. Optional later: a simple admin Markdown editor that opens a PR via GitHub API.
 - Review helper: enter a title → admin fetches cover + metadata from TMDB (movies/series), AniList GraphQL (anime/manga/LN), Open Library (books). API keys (TMDB) as Worker secrets only.
 
+## 5a. Creator studio – `create.nwebnotfound.dev`
+A private studio where Nils uploads pictures, stories, videos and music and writes blog posts. Published items show up on the public hub at `nwebnotfound.dev`.
+
+**Hosting options**
+- **A (recommended): same Worker.** The `create.` hostname is added as a custom domain to the existing Worker, which routes by `Host`. One deploy, one shared D1, and no CORS.
+- **B: sibling Worker** (`nweb-studio`) bound to the **same D1 database** (and R2 bucket, if one is enabled). Keeps studio code and bundle separate, with a separate deploy. The public Worker only reads.
+
+**Access protection (free tier)**
+- A Cloudflare Access self-hosted app on `create.nwebnotfound.dev/*` with a policy allowing only Nils' email (One-time PIN or GitHub login). Free for up to 50 users.
+- The Worker also verifies the `Cf-Access-Jwt-Assertion` JWT (team domain + AUD) on every studio request and API write, and returns 403 otherwise (defense in depth). The public host never exposes write endpoints.
+- Existing `/admin` (section 5) moves into the studio.
+
+**Upload flows**
+- **Pictures:** drag & drop (multi) → client-side resize to AVIF/WebP in 480/1080/2048 + blurhash, GPS always stripped → pick album, real-life or game, caption, tags → saved as a `media` row.
+- **Music:** WAV/MP3 from FL Studio → client-side encode/check size (192 kbps MP3/Opus) → title, cover, BPM, key, loop points on a waveform, playlist.
+- **Videos:** paste a YouTube/X URL → oEmbed fetches title + thumbnail → tools, notes. Short clips under 25 MiB can be uploaded directly. Stream only with OK.
+- **Stories / blog posts:** Markdown editor (split view with live preview in the summer theme), front-matter form (title, slug, tags, cover, collection), **media picker** (search the library and insert shortcodes such as `{{photo id}}`, `{{gallery album}}`, `{{track id}}`, `{{video id}}`, `{{review id}}`), and paste/drag an image to upload it and embed it inline. Autosave of drafts to D1.
+- **Reviews:** title search via TMDB/AniList/Open Library → cover + metadata prefilled.
+
+**Drafts, scheduling, publish**
+- `status`: `draft` → `scheduled` (`publish_at`) → `published` → `archived`. Only `published` (and `publish_at <= now`) items are visible on the public hub.
+- A Cron Trigger (free) runs every 15 min and flips due scheduled items. The public site also filters by `publish_at` so nothing leaks early.
+- Preview link: open the draft rendered in the public theme, inside the studio (Access-protected).
+- Revision history: the last N versions per post in D1, with restore.
+
+**Storage options and costs**
+| Option | Cost | Notes |
+|---|---|---|
+| D1 (metadata, Markdown, drafts) | Free tier (5 GB, generous reads/writes) | Always used |
+| Commit files to repo via GitHub API → redeploy (fallback) | Free | Slow (1–2 min until live), 25 MiB/file, repo grows. Fine for photos and audio at the start |
+| R2 | Free tier 10 GB storage, 1M writes, 10M reads per month, **no egress fees**, then ~$0.015/GB-month | **Needs a payment method on the account → only with Nils' explicit OK.** Direct uploads via presigned URLs, instant publish |
+| Video via YouTube / X embeds | Free | Default for videos |
+| Cloudflare Stream | Paid (~$5 per 1,000 min stored + ~$1 per 1,000 min delivered) | **Only with Nils' explicit OK** |
+
+The studio uses a storage interface (`putMedia/getMedia`), so switching from repo commits to R2 later is just a config change.
+
+**DNS note**
+- `create.nwebnotfound.dev` gets added as a Worker **custom domain** (Cloudflare creates the proxied DNS record + certificate automatically). Nothing points to the home IP and there is no port forwarding.
+- Access app must exist **before** the custom domain goes live. No DNS changes are made as part of this plan PR.
+
 ## 6. Hosting on the free tier
 - **Workers + static assets:** HTML/CSS/JS, illustrations, optimized images and (initially) audio. Static asset limit is 25 MiB per file, 20,000 files – fine for a few dozen tracks as 128–192 kbps Opus/MP3 (~3–6 MB each).
 - **Images:** pre-generate AVIF/WebP in 3 sizes (480/1080/2048) + blurhash **at upload/commit time** with a script (sharp), since Cloudflare Images/transformations aren't free. Lazy-load, `srcset`.
@@ -163,7 +203,9 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 5b. **Shortcodes/embeds** in writing (photos, galleries, tracks, videos, reviews) + tags pages.
 6. **Music v1:** tracks, playlists, persistent player, perfect loops (assets committed manually).
 6b. **Motion & video** showcase (YouTube/X embeds).
-7. **Admin** (incl. media picker, collections manager) behind Cloudflare Access: music/photo upload, guestbook moderation.
+7. **Creator studio skeleton:** Access app + JWT check, `create.` custom domain (with Nils' OK at deploy time), status/publish_at columns, cron publisher.
+7b. **Studio uploads:** picture/music/video flows, media library + picker, storage interface (repo-commit backend first).
+7c. **Studio editor:** Markdown post/story editor with embeds, autosave drafts, preview, scheduling, revisions; review helper; guestbook moderation and collections manager.
 8. **Study mode** (ambient mixer, Pomodoro, to-dos) from PR #49.
 9. **Discord Activity** (needs Nils' Discord Developer Portal login).
 
@@ -182,3 +224,8 @@ Dark theme = "summer night": deep navy `#141B33`, fireflies, stars, lanterns; sa
 12. Real-life photos: which albums/categories to start with?
 13. Music portfolio: show stems/process notes, or just finished tracks?
 14. Photos: show EXIF/game metadata, or keep it clean?
+15. Studio: same Worker (simpler) or a sibling Worker sharing D1?
+16. Access login: email one-time PIN or GitHub?
+17. Storage at launch: free repo-commit route, or OK R2 billing for instant uploads?
+18. Scheduling: is a 15-minute granularity fine?
+19. Should stories and blog posts be separate types or one "writing" type with tags?
