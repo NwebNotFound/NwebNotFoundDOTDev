@@ -89,3 +89,25 @@ test("signed-out UI shows a login screen instead of redirecting (no reload loop)
   assert.match(html, /id="login-screen"/);
   assert.match(html, /href="\/auth\/login"/);
 });
+
+test("no native prompt/alert/confirm; the two flows use <dialog>", async () => {
+  const src = await read("app.js");
+  assert.doesNotMatch(src, /(^|[^.\w])(?:window\.)?(?:prompt|alert|confirm)\s*\(/m, "browser prompts are not allowed (DESIGN.md §0.11)");
+  assert.match(src, /showModal\(\)/, "dialogs are opened with showModal()");
+  assert.match(src, /function initDrawerSwipe\(\)/, "the drawer has an edge-swipe gesture");
+  const html = await read("index.html");
+  assert.match(html, /<dialog id="modal"/, "confirm dialog exists");
+  assert.match(html, /<dialog id="bot-dialog"/, "new-bot dialog exists");
+  assert.match(html, /id="bot-name"/, "the new-bot dialog has a real input");
+  assert.match(html, /aria-labelledby="bot-dialog-title"/, "the dialog is labelled");
+});
+
+test("the two light token blocks in app.css stay identical", async () => {
+  const css = await read("app.css");
+  const grab = (re) => (css.match(re) || [])[1];
+  const tokens = (block) => Object.fromEntries([...block.matchAll(/(--ds-[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+  const explicit = grab(/(\[data-theme="light"\]\s*\{[\s\S]*?\n\})/);
+  const media = grab(/(html:not\(\[data-theme\]\)\s*\{[\s\S]*?\n  \})/);
+  assert.ok(explicit && media, "both light blocks exist");
+  assert.deepEqual(tokens(media), tokens(explicit), "light tokens: [data-theme] and prefers-color-scheme must match");
+});
