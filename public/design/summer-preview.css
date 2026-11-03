@@ -1,0 +1,180 @@
+/* Creative hub preview page chrome — layout only.
+   Lives in the same `sm-` namespace as summer.css so the scope check applies to it too; it styles
+   nothing outside this page. Sample surfaces (swatches, rating examples) are classes here, never
+   inline styles, because the page ships a strict CSP meta tag. */
+
+.sm-preview {
+  padding-bottom: var(--sm-space-12);
+}
+.sm-preview__header {
+  position: sticky;
+  top: 0;
+  z-index: var(--sm-z-sticky);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sm-space-3) var(--sm-space-4);
+  background: color-mix(in srgb, var(--sm-background) 85%, transparent);
+  border-bottom: var(--sm-pixel) solid var(--sm-border);
+  backdrop-filter: saturate(180%) blur(12px);
+}
+.sm-preview__title {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-lg);
+  margin: 0;
+}
+.sm-preview__note {
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+  margin: 0;
+}
+.sm-preview__section {
+  padding-block: var(--sm-space-8);
+  border-top: var(--sm-pixel) dashed var(--sm-border);
+}
+.sm-preview__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: var(--sm-space-3);
+}
+.sm-preview__swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr));
+  gap: var(--sm-space-3);
+}
+.sm-preview__swatch {
+  border: var(--sm-pixel) solid var(--sm-border-strong);
+  border-radius: var(--sm-radius-sm);
+  overflow: hidden;
+}
+.sm-preview__chip {
+  height: 56px;
+  border-bottom: var(--sm-pixel) solid var(--sm-border-strong);
+}
+.sm-preview__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sm-space-2) var(--sm-space-3);
+  font-family: var(--sm-font-mono);
+  font-size: var(--sm-text-xs);
+  background: var(--sm-surface);
+}
+.sm-preview__label b {
+  font-family: var(--sm-font-body);
+  font-size: var(--sm-text-sm);
+}
+.sm-preview__shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm-space-3);
+  align-items: flex-start;
+}
+.sm-preview__panel {
+  flex: 1 1 260px;
+  min-height: 120px;
+  padding: var(--sm-space-5);
+  border: var(--sm-pixel) solid var(--sm-frame);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--sm-space-2);
+  text-align: center;
+}
+
+/* Sky samples */
+.sm-preview__sky--day {
+  background-image: linear-gradient(180deg, var(--sm-sky-1), var(--sm-sky-2));
+}
+.sm-preview__sky--night {
+  background-color: var(--sm-sky-1);
+  background-image: radial-gradient(circle at 20% 20%, var(--sm-accent-sun) 0 2px, transparent 3px),
+    radial-gradient(circle at 72% 36%, var(--sm-surface) 0 1px, transparent 2px),
+    radial-gradient(circle at 46% 70%, var(--sm-surface) 0 1px, transparent 2px),
+    linear-gradient(180deg, var(--sm-sky-1), var(--sm-sky-2));
+}
+
+/* Colour samples: one class per token so the page needs no inline style attribute. */
+.sm-preview__chip--sky1 {
+  background: var(--sm-sky-1);
+}
+.sm-preview__chip--sky2 {
+  background: var(--sm-sky-2);
+}
+.sm-preview__chip--background {
+  background: var(--sm-background);
+}
+.sm-preview__chip--surface {
+  background: var(--sm-surface);
+}
+.sm-preview__chip--surface2 {
+  background: var(--sm-surface-2);
+}
+.sm-preview__chip--surface3 {
+  background: var(--sm-surface-3);
+}
+.sm-preview__chip--foreground {
+  background: var(--sm-foreground);
+}
+.sm-preview__chip--muted {
+  background: var(--sm-muted-foreground);
+}
+.sm-preview__chip--primary {
+  background: var(--sm-primary);
+}
+.sm-preview__chip--sun {
+  background: var(--sm-accent-sun);
+}
+.sm-preview__chip--peach {
+  background: var(--sm-accent-peach);
+}
+.sm-preview__chip--sakura {
+  background: var(--sm-accent-sakura);
+}
+.sm-preview__chip--ramune {
+  background: var(--sm-accent-ramune);
+}
+.sm-preview__chip--lavender {
+  background: var(--sm-accent-lavender);
+}
+.sm-preview__chip--link {
+  background: var(--sm-link);
+}
+.sm-preview__chip--danger {
+  background: var(--sm-danger);
+}
+.sm-preview__chip--success {
+  background: var(--sm-success);
+}
+.sm-preview__chip--warning {
+  background: var(--sm-warning);
+}
+.sm-preview__chip--star {
+  background: var(--sm-star);
+}
+.sm-preview__chip--frame {
+  background: var(--sm-frame);
+}
+.sm-preview__chip--dither {
+  background-image: var(--sm-dither);
+  background-color: var(--sm-surface);
+}
+
+/* Rating examples: `--sm-rating` is the only thing that changes between them. */
+.sm-preview__rate-0 {
+  --sm-rating: 0;
+}
+.sm-preview__rate-25 {
+  --sm-rating: 2.5;
+}
+.sm-preview__rate-4 {
+  --sm-rating: 4;
+}
+.sm-preview__rate-45 {
+  --sm-rating: 4.5;
+}
+.sm-preview__rate-5 {
+  --sm-rating: 5;
+}

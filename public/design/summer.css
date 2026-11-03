@@ -1,0 +1,1066 @@
+/* NwebNotFound Creative Hub — "anime summer" theme (Phase 1: tokens + base components).
+   Spec: DESIGN.md §11. Plan: docs/creative-hub-plan.md §7.
+
+   Scope contract (do not break):
+   - This file is loaded ONLY on hub pages. It never styles the Minecraft surface (public/mc/*,
+     html.mc) or the AI panel (ai-panel/) and it adds no global element rules.
+   - Tokens are declared on `.sm-root` (a class on <html>, mirroring `html.mc`) and are `--sm-*`
+     only, so nothing can collide with `--ds-*` or `--mc-*`. Components address `.sm-*` classes,
+     never bare elements: `scripts/summer-scope-check.mjs` fails the run when a selector starts with
+     an element (body, a, h1 …), when a foreign custom property appears, or when @import/remote
+     URLs sneak in.
+
+   Themes: "summer day" (light) is the default, "summer night" is the dark mode. The user's choice
+   wins over the system: an explicit `data-theme` on the root element beats `prefers-color-scheme`.
+   `public/design/summer-theme.js` sets that attribute before first paint (no flash). */
+
+/* ---- fonts: self-hosted woff2, OFL, latin subset incl. German umlauts + typographic punctuation
+   (verified with fontTools: 217–230 glyphs each; no Google Fonts CDN, no tracking requests).
+   Licences and sources: public/design/fonts/LICENSES.md */
+@font-face {
+  font-family: "SmPixel";
+  src: url("/design/fonts/pixelify-sans-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SmPixel";
+  src: url("/design/fonts/pixelify-sans-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SmBody";
+  src: url("/design/fonts/nunito-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SmBody";
+  src: url("/design/fonts/nunito-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---- THEME: summer day (default, light) ------------------------------------------------------ */
+.sm-root {
+  color-scheme: light;
+
+  /* sky + surfaces (plan §7 palette: sky #8FD3FF → #DDF3FF, cloud #FFFFFF / #F7FBFF) */
+  --sm-sky-1: #8fd3ff;
+  --sm-sky-2: #ddf3ff;
+  --sm-sky-3: #ffffff;
+  --sm-background: #f1f9ff;
+  --sm-background-2: #e4f2fe;
+  --sm-surface: #ffffff;
+  --sm-surface-2: #eaf5fe;
+  --sm-surface-3: #dcebf9;
+
+  /* ink (plan §7: ink #1F2A44) */
+  --sm-foreground: #1f2a44;
+  --sm-muted-foreground: #4a5a7a;
+
+  /* lines: soft hairline for rhythm, strong line for anything that must be perceived as a control
+     outline (WCAG AA non-text 3:1, checked in scripts/contrast-check.mjs) */
+  --sm-border: rgba(31, 42, 68, 0.14);
+  --sm-border-strong: #647aa0;
+  --sm-frame: #24314f; /* the 2px pixel frame colour */
+
+  /* accents (plan §7). `--sm-primary` is the single interactive *fill*; the `*-ink` values are the
+     text-safe members of each pastel family (the pastel itself is a tint, never text). */
+  --sm-primary: #ffd45e; /* sunflower — primary buttons, active states */
+  --sm-primary-foreground: #2a2410; /* 10.92:1 on --sm-primary */
+  --sm-primary-deep: #7a5300; /* pressed edge / border of a primary button (4.84:1 on the fill) */
+  --sm-accent-sun: #ffd45e;
+  --sm-accent-peach: #ffb8a8;
+  --sm-peach-ink: #a6432c;
+  --sm-accent-sakura: #ffc8dd;
+  --sm-sakura-ink: #a2405f;
+  --sm-accent-ramune: #7fe0d3;
+  --sm-ramune-ink: #0e6b63;
+  --sm-accent-lavender: #c9b8ff;
+  --sm-lavender-ink: #4b3ba8;
+  /* Ink for a pastel *tint* background. The four pastels keep the same value in both themes, so
+     this one colour is shared — it is never used as a body colour on a dark surface. */
+  --sm-on-pastel: #1f2a44;
+  --sm-link: #0e6b63; /* ramune family, text-safe */
+  --sm-link-hover: #0a4f49;
+
+  /* states (always paired with text or an icon, never colour-only) */
+  --sm-danger: #b3261e;
+  --sm-danger-weak: rgba(179, 38, 30, 0.12);
+  --sm-success: #1b6b3a;
+  --sm-success-weak: rgba(27, 107, 58, 0.12);
+  --sm-warning: #8a5a00;
+  --sm-warning-weak: rgba(138, 90, 0, 0.14);
+
+  /* focus, shadows, scrim, ratings */
+  --sm-focus-ring: #0b5c8a;
+  --sm-shadow-color: rgba(31, 42, 68, 0.18);
+  --sm-shadow-hard-color: rgba(31, 42, 68, 0.5);
+  --sm-scrim: rgba(20, 27, 51, 0.45);
+  --sm-star: #b06e00;
+  --sm-star-empty: #768db0;
+
+  /* type: pixel for headings/labels only, rounded sans for running text (plan §7) */
+  --sm-font-pixel: "SmPixel", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --sm-font-body: "SmBody", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --sm-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* metric tokens (shared values, restated here like the --mc-* set in DESIGN.md §10) */
+  --sm-space-1: 0.25rem;
+  --sm-space-2: 0.5rem;
+  --sm-space-3: 0.75rem;
+  --sm-space-4: 1rem;
+  --sm-space-5: 1.5rem;
+  --sm-space-6: 2rem;
+  --sm-space-8: 3rem;
+  --sm-space-10: 4rem;
+  --sm-space-12: 6rem;
+  --sm-container: min(1080px, 100% - 2.5rem - env(safe-area-inset-left) - env(safe-area-inset-right));
+  --sm-section-space: clamp(3.5rem, 9vw, 7rem);
+
+  --sm-text-2xs: 0.6875rem;
+  --sm-text-xs: 0.75rem;
+  --sm-text-sm: 0.875rem;
+  --sm-text-base: 1rem;
+  --sm-text-lg: 1.125rem;
+  --sm-text-xl: 1.375rem;
+  --sm-text-2xl: 1.75rem;
+  --sm-text-3xl: 2.25rem;
+  --sm-text-display: clamp(2.6rem, 8vw, 5rem);
+  --sm-leading-tight: 1.15;
+  --sm-leading-snug: 1.3;
+  --sm-leading-normal: 1.5;
+  --sm-leading-body: 1.6;
+  --sm-weight-regular: 400;
+  --sm-weight-medium: 500;
+  --sm-weight-semibold: 600;
+  --sm-weight-bold: 700;
+
+  /* radii: big and soft for illustration surfaces, 0/2px for pixel chrome (plan §7) */
+  --sm-radius-sm: 6px;
+  --sm-radius-md: 10px;
+  --sm-radius-lg: 14px;
+  --sm-radius-xl: 20px;
+  --sm-radius-2xl: 28px;
+  --sm-radius-full: 999px;
+  --sm-radius-pixel: 0;
+
+  /* pixel-art detail: 2px steps, staircase notches drawn with clip-path, hard offsets */
+  --sm-pixel: 2px;
+  --sm-pixel-step: 4px;
+  --sm-pixel-notch: 8px;
+  --sm-pixel-shadow: 2px;
+  --sm-dither-size: 4px;
+  --sm-dither-opacity: 0.16;
+  --sm-dither: repeating-linear-gradient(
+    45deg,
+    var(--sm-frame) 0 calc(var(--sm-dither-size) / 2),
+    transparent calc(var(--sm-dither-size) / 2) var(--sm-dither-size)
+  );
+
+  /* shadows: a pixel offset for chrome, soft light for illustration cards */
+  --sm-shadow-1: 0 1px 2px -1px var(--sm-shadow-color);
+  --sm-shadow-2: 0 18px 40px -18px var(--sm-shadow-color);
+  --sm-shadow-pixel: 0 var(--sm-pixel-shadow) 0 0 var(--sm-shadow-hard-color);
+  --sm-outline-sticker: 0 0 0 2px var(--sm-surface), 0 0 0 4px var(--sm-frame);
+
+  /* touch + motion */
+  --sm-tap: 44px;
+  --sm-tap-dense: 36px;
+  --sm-duration-fast: 150ms;
+  --sm-duration: 200ms;
+  --sm-duration-slow: 250ms;
+  --sm-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* z-order: one place to look, no magic numbers in components (DESIGN.md §11.6) */
+  --sm-z-base: 1;
+  --sm-z-sticky: 10;
+  --sm-z-nav: 50;
+  --sm-z-scrim: 60;
+  --sm-z-drawer: 70;
+  --sm-z-popover: 80;
+  --sm-z-toast: 90;
+}
+
+/* ---- THEME: summer night (dark). No explicit choice → follow the system; explicit wins. -------- */
+@media (prefers-color-scheme: dark) {
+  .sm-root:not([data-theme]) {
+    color-scheme: dark;
+    --sm-sky-1: #101a36;
+    --sm-sky-2: #23335c;
+    --sm-sky-3: #2c3d68;
+    --sm-background: #141b33;
+    --sm-background-2: #101628;
+    --sm-surface: #1c2542;
+    --sm-surface-2: #17203a;
+    --sm-surface-3: #26304f;
+    --sm-foreground: #f1f5ff;
+    --sm-muted-foreground: #aeb9d4;
+    --sm-border: rgba(255, 255, 255, 0.14);
+    --sm-border-strong: #6e7da8;
+    --sm-frame: #a9b7d9;
+    --sm-primary: #ffd45e;
+    --sm-primary-foreground: #1a1633;
+    --sm-primary-deep: #7a5300;
+    --sm-accent-sun: #ffd45e;
+    --sm-accent-peach: #ffb8a8;
+    --sm-peach-ink: #ffb8a8;
+    --sm-accent-sakura: #ffc8dd;
+    --sm-sakura-ink: #ffc8dd;
+    --sm-accent-ramune: #7fe0d3;
+    --sm-ramune-ink: #7fe0d3;
+    --sm-accent-lavender: #c9b8ff;
+    --sm-lavender-ink: #c9b8ff;
+    --sm-link: #7fe0d3;
+    --sm-link-hover: #a6ece2;
+    --sm-danger: #ff8a80;
+    --sm-danger-weak: rgba(255, 138, 128, 0.14);
+    --sm-success: #78e0a0;
+    --sm-success-weak: rgba(120, 224, 160, 0.14);
+    --sm-warning: #ffd08a;
+    --sm-warning-weak: rgba(255, 208, 138, 0.14);
+    --sm-focus-ring: #ffd45e;
+    --sm-shadow-color: rgba(0, 0, 0, 0.6);
+    --sm-shadow-hard-color: rgba(0, 0, 0, 0.75);
+    --sm-scrim: rgba(6, 9, 20, 0.6);
+    --sm-star: #ffd45e;
+    --sm-star-empty: #6e7ca6;
+    --sm-dither-opacity: 0.22;
+  }
+}
+
+.sm-root[data-theme="summer-night"] {
+  color-scheme: dark;
+  --sm-sky-1: #101a36;
+  --sm-sky-2: #23335c;
+  --sm-sky-3: #2c3d68;
+  --sm-background: #141b33;
+  --sm-background-2: #101628;
+  --sm-surface: #1c2542;
+  --sm-surface-2: #17203a;
+  --sm-surface-3: #26304f;
+  --sm-foreground: #f1f5ff;
+  --sm-muted-foreground: #aeb9d4;
+  --sm-border: rgba(255, 255, 255, 0.14);
+  --sm-border-strong: #6e7da8;
+  --sm-frame: #a9b7d9;
+  --sm-primary: #ffd45e;
+  --sm-primary-foreground: #1a1633;
+  --sm-primary-deep: #7a5300;
+  --sm-accent-sun: #ffd45e;
+  --sm-accent-peach: #ffb8a8;
+  --sm-peach-ink: #ffb8a8;
+  --sm-accent-sakura: #ffc8dd;
+  --sm-sakura-ink: #ffc8dd;
+  --sm-accent-ramune: #7fe0d3;
+  --sm-ramune-ink: #7fe0d3;
+  --sm-accent-lavender: #c9b8ff;
+  --sm-lavender-ink: #c9b8ff;
+  --sm-link: #7fe0d3;
+  --sm-link-hover: #a6ece2;
+  --sm-danger: #ff8a80;
+  --sm-danger-weak: rgba(255, 138, 128, 0.14);
+  --sm-success: #78e0a0;
+  --sm-success-weak: rgba(120, 224, 160, 0.14);
+  --sm-warning: #ffd08a;
+  --sm-warning-weak: rgba(255, 208, 138, 0.14);
+  --sm-focus-ring: #ffd45e;
+  --sm-shadow-color: rgba(0, 0, 0, 0.6);
+  --sm-shadow-hard-color: rgba(0, 0, 0, 0.75);
+  --sm-scrim: rgba(6, 9, 20, 0.6);
+  --sm-star: #ffd45e;
+  --sm-star-empty: #6e7ca6;
+  --sm-dither-opacity: 0.22;
+}
+
+/* Touch targets: dense controls grow to 44px on coarse pointers (DESIGN.md §0.7). */
+@media (pointer: coarse) {
+  .sm-root {
+    --sm-tap-dense: 44px;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Base layer. `.sm-root` goes on <html>, so <body> is reached through the root class.
+   --------------------------------------------------------------------------------------------- */
+.sm-root {
+  background-color: var(--sm-background);
+  color: var(--sm-foreground);
+  font-family: var(--sm-font-body);
+  font-size: var(--sm-text-base);
+  line-height: var(--sm-leading-body);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.sm-root body {
+  margin: 0;
+  min-height: 100%;
+  background-color: var(--sm-background);
+  color: var(--sm-foreground);
+  font-family: var(--sm-font-body);
+  font-size: var(--sm-text-base);
+  line-height: var(--sm-leading-body);
+  overflow-x: hidden;
+}
+.sm-root *,
+.sm-root *::before,
+.sm-root *::after {
+  box-sizing: border-box;
+}
+.sm-root ::selection {
+  background: var(--sm-accent-sun);
+  color: var(--sm-primary-foreground);
+}
+.sm-root img,
+.sm-root svg {
+  max-width: 100%;
+}
+
+/* Focus is always visible and never removed without a replacement (DESIGN.md §2).
+   `:where()` keeps the specificity at 0 so components can refine their own ring. */
+:where(.sm-root) :focus-visible {
+  outline: var(--sm-pixel) solid var(--sm-focus-ring);
+  outline-offset: 2px;
+}
+:where(.sm-root) :focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Skip link: first focusable element of a hub page. */
+.sm-skip-link {
+  position: absolute;
+  left: var(--sm-space-4);
+  top: var(--sm-space-4);
+  z-index: var(--sm-z-toast);
+  transform: translateY(calc(-1 * (100% + var(--sm-space-6))));
+  padding: var(--sm-space-3) var(--sm-space-4);
+  min-height: var(--sm-tap);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm-space-2);
+  background: var(--sm-primary);
+  color: var(--sm-primary-foreground);
+  font-weight: var(--sm-weight-bold);
+  text-decoration: none;
+  border: var(--sm-pixel) solid var(--sm-frame);
+  transition: transform var(--sm-duration-fast) var(--sm-ease);
+}
+.sm-skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Typography + prose (stories, blog, reviews). Body text is never set in the pixel font.
+   --------------------------------------------------------------------------------------------- */
+.sm-h1,
+.sm-h2,
+.sm-h3,
+.sm-h4,
+.sm-pixel {
+  font-family: var(--sm-font-pixel);
+  font-weight: var(--sm-weight-bold);
+  color: var(--sm-foreground);
+  letter-spacing: 0.01em;
+  line-height: var(--sm-leading-tight);
+  margin: 0 0 var(--sm-space-3);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.sm-h1 {
+  font-size: var(--sm-text-3xl);
+}
+.sm-h2 {
+  font-size: var(--sm-text-2xl);
+}
+.sm-h3 {
+  font-size: var(--sm-text-xl);
+}
+.sm-h4 {
+  font-size: var(--sm-text-lg);
+}
+.sm-display {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-display);
+  font-weight: var(--sm-weight-bold);
+  line-height: 1.08;
+  margin: 0 0 var(--sm-space-4);
+  overflow-wrap: anywhere;
+}
+/* Pixel underline: an 8px on/off bar drawn with a gradient so it scales with zoom. */
+.sm-h1::after,
+.sm-h2::after {
+  content: "";
+  display: block;
+  width: min(100%, 72px);
+  height: 6px;
+  margin-top: var(--sm-space-3);
+  background-image: repeating-linear-gradient(90deg, var(--sm-accent-sun) 0 8px, transparent 8px 16px);
+}
+.sm-eyebrow {
+  display: inline-block;
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-xs);
+  font-weight: var(--sm-weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sm-muted-foreground);
+  margin: 0 0 var(--sm-space-2);
+}
+.sm-eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--sm-space-2);
+  background: var(--sm-accent-sun);
+  vertical-align: baseline;
+}
+.sm-lead {
+  font-size: var(--sm-text-lg);
+  line-height: var(--sm-leading-snug);
+  color: var(--sm-muted-foreground);
+  max-width: 40rem;
+  margin: 0 0 var(--sm-space-4);
+}
+.sm-muted {
+  color: var(--sm-muted-foreground);
+}
+.sm-tnum {
+  font-variant-numeric: tabular-nums;
+}
+.sm-root a {
+  color: var(--sm-link);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.sm-root a:hover {
+  color: var(--sm-link-hover);
+}
+.sm-root code,
+.sm-root kbd {
+  font-family: var(--sm-font-mono);
+  font-size: 0.9em;
+  background: var(--sm-surface-2);
+  border: 1px solid var(--sm-border);
+  padding: 0.05em 0.35em;
+  overflow-wrap: anywhere;
+}
+.sm-prose {
+  max-width: 68ch;
+  color: var(--sm-foreground);
+}
+.sm-prose > * + * {
+  margin-top: var(--sm-space-4);
+}
+.sm-prose h2 {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-2xl);
+  margin-top: var(--sm-space-8);
+}
+.sm-prose h3 {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-xl);
+  margin-top: var(--sm-space-6);
+}
+.sm-prose p,
+.sm-prose li {
+  line-height: var(--sm-leading-body);
+}
+.sm-prose ul,
+.sm-prose ol {
+  padding-left: var(--sm-space-5);
+}
+.sm-prose li + li {
+  margin-top: var(--sm-space-2);
+}
+.sm-prose blockquote {
+  margin: var(--sm-space-6) 0;
+  padding: var(--sm-space-4) var(--sm-space-5);
+  background: var(--sm-surface-2);
+  border-left: var(--sm-pixel-step) solid var(--sm-accent-ramune);
+  color: var(--sm-foreground);
+}
+.sm-prose hr {
+  border: 0;
+  height: 2px;
+  margin: var(--sm-space-8) 0;
+  background-image: repeating-linear-gradient(90deg, var(--sm-border-strong) 0 8px, transparent 8px 16px);
+}
+.sm-prose small,
+.sm-prose figcaption {
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+.sm-kaomoji {
+  font-family: var(--sm-font-body);
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Buttons. One primary action per view; every target is at least 44px tall.
+   --------------------------------------------------------------------------------------------- */
+.sm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sm-space-2);
+  min-height: var(--sm-tap);
+  padding: 0 var(--sm-space-4);
+  font-family: var(--sm-font-body);
+  font-size: var(--sm-text-base);
+  font-weight: var(--sm-weight-bold);
+  line-height: 1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  border: var(--sm-pixel) solid var(--sm-frame);
+  border-radius: var(--sm-radius-sm);
+  background: var(--sm-primary);
+  color: var(--sm-primary-foreground);
+  box-shadow: var(--sm-shadow-pixel);
+  transition: background-color var(--sm-duration-fast) var(--sm-ease),
+    border-color var(--sm-duration-fast) var(--sm-ease),
+    transform var(--sm-duration-fast) var(--sm-ease),
+    box-shadow var(--sm-duration-fast) var(--sm-ease);
+}
+.sm-btn:hover {
+  background: var(--sm-accent-sun);
+  filter: brightness(1.06);
+}
+/* The pixel press: the button slides down onto its own hard shadow. */
+.sm-btn:active {
+  transform: translateY(var(--sm-pixel-shadow));
+  box-shadow: none;
+}
+.sm-btn[disabled],
+.sm-btn[aria-disabled="true"] {
+  background: var(--sm-surface-3);
+  color: var(--sm-muted-foreground);
+  border-color: var(--sm-border-strong);
+  box-shadow: none;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+}
+.sm-btn--ghost {
+  background: transparent;
+  color: var(--sm-link);
+  border-color: var(--sm-border-strong);
+  box-shadow: none;
+}
+.sm-btn--ghost:hover {
+  background: var(--sm-surface-2);
+  color: var(--sm-link-hover);
+  filter: none;
+}
+.sm-btn--danger {
+  background: transparent;
+  color: var(--sm-danger);
+  border-color: var(--sm-danger);
+  box-shadow: none;
+}
+.sm-btn--danger:hover {
+  background: var(--sm-danger-weak);
+  filter: none;
+}
+.sm-btn--dense {
+  min-height: var(--sm-tap-dense);
+  padding: 0 var(--sm-space-3);
+  font-size: var(--sm-text-sm);
+}
+.sm-btn--icon {
+  width: var(--sm-tap);
+  padding: 0;
+}
+.sm-btn--block {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Cards. Staircase ("Treppenkante") pixel corners via clip-path; interactive cards use an inset
+   ring because clip-path clips an outline.
+   --------------------------------------------------------------------------------------------- */
+.sm-card {
+  position: relative;
+  padding: var(--sm-space-5);
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
+  border: var(--sm-pixel) solid var(--sm-border);
+  border-radius: var(--sm-radius-lg);
+  box-shadow: var(--sm-shadow-1);
+}
+.sm-card--pixel {
+  border: var(--sm-pixel) solid var(--sm-frame);
+  border-radius: var(--sm-radius-pixel);
+  box-shadow: var(--sm-shadow-pixel);
+  clip-path: polygon(
+    0 var(--sm-pixel-step),
+    var(--sm-pixel-step) var(--sm-pixel-step),
+    var(--sm-pixel-step) var(--sm-pixel),
+    var(--sm-pixel-notch) var(--sm-pixel),
+    var(--sm-pixel-notch) 0,
+    calc(100% - var(--sm-pixel-notch)) 0,
+    calc(100% - var(--sm-pixel-notch)) var(--sm-pixel),
+    calc(100% - var(--sm-pixel-step)) var(--sm-pixel),
+    calc(100% - var(--sm-pixel-step)) var(--sm-pixel-step),
+    100% var(--sm-pixel-step),
+    100% calc(100% - var(--sm-pixel-step)),
+    calc(100% - var(--sm-pixel-step)) calc(100% - var(--sm-pixel-step)),
+    calc(100% - var(--sm-pixel-step)) calc(100% - var(--sm-pixel)),
+    calc(100% - var(--sm-pixel-notch)) calc(100% - var(--sm-pixel)),
+    calc(100% - var(--sm-pixel-notch)) 100%,
+    var(--sm-pixel-notch) 100%,
+    var(--sm-pixel-notch) calc(100% - var(--sm-pixel)),
+    var(--sm-pixel-step) calc(100% - var(--sm-pixel)),
+    var(--sm-pixel-step) calc(100% - var(--sm-pixel-step)),
+    0 calc(100% - var(--sm-pixel-step))
+  );
+}
+.sm-card--sun {
+  background-image: linear-gradient(180deg, var(--sm-sky-2), var(--sm-surface) 70%);
+}
+.sm-card--dither::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: var(--sm-dither);
+  opacity: var(--sm-dither-opacity);
+  pointer-events: none;
+}
+.sm-card__title {
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-xl);
+  margin: 0 0 var(--sm-space-2);
+}
+.sm-card__meta {
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+.sm-card--link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.sm-card--link:hover {
+  border-color: var(--sm-border-strong);
+  box-shadow: var(--sm-shadow-2);
+}
+.sm-card--link:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px var(--sm-focus-ring), var(--sm-shadow-2);
+}
+@media (max-width: 600px) {
+  .sm-card {
+    padding: var(--sm-space-4);
+  }
+}
+
+/* Visual-novel dialogue box (guestbook entries, pull quotes, review verdicts; plan §7). */
+.sm-dialog {
+  position: relative;
+  margin: 0;
+  padding: var(--sm-space-5);
+  background: var(--sm-surface);
+  border: var(--sm-pixel) solid var(--sm-frame);
+  border-radius: var(--sm-radius-sm);
+  box-shadow: var(--sm-shadow-pixel);
+}
+.sm-dialog__name {
+  position: absolute;
+  top: calc(-1 * var(--sm-space-3));
+  left: var(--sm-space-4);
+  padding: var(--sm-space-1) var(--sm-space-3);
+  background: var(--sm-accent-sun);
+  color: var(--sm-primary-foreground);
+  border: var(--sm-pixel) solid var(--sm-frame);
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-sm);
+}
+.sm-dialog__body {
+  margin: 0;
+}
+.sm-dialog__more {
+  display: block;
+  text-align: right;
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+.sm-dialog__more::after {
+  content: "▼";
+  margin-left: var(--sm-space-1);
+  animation: sm-blink 1.2s steps(2, end) infinite;
+}
+@keyframes sm-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Tab bar — a real tablist (arrow keys are the caller's job in Phase 2), plus a segmented variant.
+   --------------------------------------------------------------------------------------------- */
+.sm-tabs {
+  display: flex;
+  gap: var(--sm-pixel);
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 3px;
+  background: var(--sm-surface-2);
+  border: var(--sm-pixel) solid var(--sm-border-strong);
+  border-radius: var(--sm-radius-md);
+  scrollbar-width: none;
+}
+.sm-tabs::-webkit-scrollbar {
+  display: none;
+}
+.sm-tab {
+  flex: none;
+  min-height: var(--sm-tap-dense);
+  padding: 0 var(--sm-space-4);
+  font-family: var(--sm-font-body);
+  font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-semibold);
+  color: var(--sm-muted-foreground);
+  background: transparent;
+  border: 0;
+  border-radius: var(--sm-radius-sm);
+  cursor: pointer;
+  transition: background-color var(--sm-duration-fast) var(--sm-ease),
+    color var(--sm-duration-fast) var(--sm-ease);
+}
+.sm-tab:hover {
+  background: var(--sm-surface-3);
+  color: var(--sm-foreground);
+}
+.sm-tab[aria-selected="true"],
+.sm-tab[aria-pressed="true"] {
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
+  box-shadow: inset 0 calc(-1 * var(--sm-pixel)) 0 0 var(--sm-accent-sun);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Forms. 16px text on touch so mobile Safari never zooms; label is always a real <label>.
+   --------------------------------------------------------------------------------------------- */
+.sm-field {
+  display: block;
+  margin-bottom: var(--sm-space-4);
+}
+.sm-label {
+  display: block;
+  margin-bottom: var(--sm-space-1);
+  font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-semibold);
+  color: var(--sm-foreground);
+}
+.sm-input,
+.sm-textarea,
+.sm-select {
+  width: 100%;
+  min-height: var(--sm-tap);
+  padding: var(--sm-space-2) var(--sm-space-3);
+  font-family: var(--sm-font-body);
+  font-size: 16px;
+  line-height: var(--sm-leading-normal);
+  color: var(--sm-foreground);
+  background: var(--sm-surface);
+  border: var(--sm-pixel) solid var(--sm-border-strong);
+  border-radius: var(--sm-radius-md);
+  appearance: none;
+}
+.sm-input::placeholder,
+.sm-textarea::placeholder {
+  color: var(--sm-muted-foreground);
+  opacity: 1;
+}
+.sm-textarea {
+  min-height: calc(var(--sm-tap) * 3);
+  resize: vertical;
+}
+.sm-select {
+  background-image: linear-gradient(45deg, transparent 50%, var(--sm-foreground) 50%),
+    linear-gradient(135deg, var(--sm-foreground) 50%, transparent 50%);
+  background-position: right var(--sm-space-4) center, right var(--sm-space-3) center;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: var(--sm-space-8);
+}
+.sm-input:focus-visible,
+.sm-textarea:focus-visible,
+.sm-select:focus-visible {
+  outline: none;
+  border-color: var(--sm-focus-ring);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sm-focus-ring) 25%, transparent);
+}
+.sm-input[aria-invalid="true"],
+.sm-textarea[aria-invalid="true"] {
+  border-color: var(--sm-danger);
+}
+.sm-hint {
+  display: block;
+  margin-top: var(--sm-space-1);
+  font-size: var(--sm-text-sm);
+  color: var(--sm-muted-foreground);
+}
+.sm-error {
+  display: block;
+  margin-top: var(--sm-space-1);
+  font-size: var(--sm-text-sm);
+  font-weight: var(--sm-weight-semibold);
+  color: var(--sm-danger);
+}
+.sm-error::before {
+  content: "! ";
+  font-family: var(--sm-font-pixel);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Badges and chips. Pastel tints carry dark ink; the pastel itself is never used as text.
+   --------------------------------------------------------------------------------------------- */
+.sm-badge,
+.sm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sm-space-1);
+  padding: 0.15rem var(--sm-space-2);
+  font-family: var(--sm-font-pixel);
+  font-size: var(--sm-text-xs);
+  font-weight: var(--sm-weight-bold);
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--sm-surface-2);
+  color: var(--sm-foreground);
+  border: 1px solid var(--sm-border-strong);
+  border-radius: var(--sm-radius-sm);
+}
+.sm-chip {
+  min-height: var(--sm-tap-dense);
+  padding: 0 var(--sm-space-3);
+  font-family: var(--sm-font-body);
+  font-size: var(--sm-text-sm);
+  cursor: pointer;
+  background: var(--sm-surface);
+  color: var(--sm-foreground);
+  font-weight: var(--sm-weight-medium);
+}
+.sm-chip[aria-pressed="true"],
+.sm-chip:hover {
+  background: var(--sm-surface-3);
+}
+.sm-badge--sun,
+.sm-badge--sakura,
+.sm-badge--ramune,
+.sm-badge--lavender,
+.sm-badge--peach {
+  border-color: transparent;
+}
+.sm-badge--sun {
+  background: var(--sm-accent-sun);
+  color: var(--sm-on-pastel);
+}
+.sm-badge--sakura {
+  background: var(--sm-accent-sakura);
+  color: var(--sm-on-pastel);
+}
+.sm-badge--ramune {
+  background: var(--sm-accent-ramune);
+  color: var(--sm-on-pastel);
+}
+.sm-badge--lavender {
+  background: var(--sm-accent-lavender);
+  color: var(--sm-on-pastel);
+}
+.sm-badge--peach {
+  background: var(--sm-accent-peach);
+  color: var(--sm-on-pastel);
+}
+.sm-badge--danger {
+  background: var(--sm-danger-weak);
+  color: var(--sm-danger);
+  border-color: var(--sm-danger);
+}
+.sm-badge--success {
+  background: var(--sm-success-weak);
+  color: var(--sm-success);
+  border-color: var(--sm-success);
+}
+.sm-badge--warning {
+  background: var(--sm-warning-weak);
+  color: var(--sm-warning);
+  border-color: var(--sm-warning);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Stars — 5-star display only (no rating widget, no JS). The caller sets `--sm-rating` (0–5, one
+   decimal allowed) and labels the element; the CSS clips a filled star mask to that fraction.
+   Markup: <span class="sm-stars" role="img" aria-label="4,5 von 5" style="--sm-rating:4.5">
+   --------------------------------------------------------------------------------------------- */
+.sm-stars {
+  --sm-star-size: 20px;
+  --sm-star-gap: var(--sm-space-1);
+  position: relative;
+  display: inline-block;
+  width: calc(5 * (var(--sm-star-size) + var(--sm-star-gap)) - var(--sm-star-gap));
+  height: var(--sm-star-size);
+  vertical-align: -0.15em;
+  background-color: var(--sm-star-empty);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 20'%3E%3Cpath d='M10 0l2.6 5.6 6 -.5 -4.4 4.1 1.6 5.8 -5.8 -3.1 -5.8 3.1 1.6 -5.8 -4.4 -4.1 6 .5z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 20'%3E%3Cpath d='M10 0l2.6 5.6 6 -.5 -4.4 4.1 1.6 5.8 -5.8 -3.1 -5.8 3.1 1.6 -5.8 -4.4 -4.1 6 .5z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+  -webkit-mask-size: calc(var(--sm-star-size) + var(--sm-star-gap)) var(--sm-star-size);
+  mask-size: calc(var(--sm-star-size) + var(--sm-star-gap)) var(--sm-star-size);
+  -webkit-mask-position: left center;
+  mask-position: left center;
+}
+.sm-stars::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--sm-rating, 0) / 5 * 100%);
+  background-color: var(--sm-star);
+  -webkit-mask-image: inherit;
+  mask-image: inherit;
+  -webkit-mask-repeat: inherit;
+  mask-repeat: inherit;
+  -webkit-mask-size: inherit;
+  mask-size: inherit;
+  -webkit-mask-position: inherit;
+  mask-position: inherit;
+}
+.sm-stars--lg {
+  --sm-star-size: 28px;
+}
+.sm-stars--sm {
+  --sm-star-size: 14px;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Pixel detail helpers (plan §7): sticker outline, dotted sky, mascot slot.
+   --------------------------------------------------------------------------------------------- */
+.sm-sticker {
+  box-shadow: var(--sm-outline-sticker);
+  border-radius: var(--sm-radius-sm);
+  background: var(--sm-surface);
+}
+.sm-sky {
+  background-image: linear-gradient(180deg, var(--sm-sky-1), var(--sm-sky-2));
+}
+.sm-sky--night {
+  background-image:
+    radial-gradient(circle at 20% 20%, var(--sm-accent-sun) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 70% 35%, var(--sm-surface) 0 1px, transparent 1.5px),
+    linear-gradient(180deg, var(--sm-sky-1), var(--sm-sky-2));
+}
+/* Alias so components never hard-code the name; the mascot slot is Nils' drawing box. */
+.sm-root {
+  --sm-mascot-size: 64px;
+}
+.sm-dither {
+  background-image: var(--sm-dither);
+}
+/* Mascot slot: reserves the box Nils' drawing will fill; placeholder art comes from
+   /design/summer-sprites.svg. */
+.sm-mascot {
+  display: inline-grid;
+  place-items: center;
+  width: var(--sm-mascot-size, 64px);
+  height: var(--sm-mascot-size, 64px);
+  image-rendering: pixelated;
+  flex: none;
+}
+.sm-mascot svg {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.sm-mascot--placeholder {
+  border: var(--sm-pixel) dashed var(--sm-border-strong);
+  background: var(--sm-surface-2);
+}
+/* Sprite icon: always a whole-pixel square so pixel art stays crisp. */
+.sm-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  image-rendering: pixelated;
+}
+.sm-icon--lg {
+  width: 40px;
+  height: 40px;
+}
+
+/* Layout helpers used by the shell in Phase 2. */
+.sm-wrap {
+  width: var(--sm-container);
+  margin-inline: auto;
+}
+.sm-stack > * + * {
+  margin-top: var(--sm-space-4);
+}
+.sm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sm-space-3);
+}
+.sm-section {
+  padding-block: var(--sm-section-space);
+}
+.sm-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Motion: nothing here is information-carrying, and all of it collapses when the user asks.
+   --------------------------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .sm-root {
+    --sm-duration-fast: 0ms;
+    --sm-duration: 0ms;
+    --sm-duration-slow: 0ms;
+  }
+  .sm-root *,
+  .sm-root *::before,
+  .sm-root *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .sm-skip-link {
+    transform: none;
+  }
+  .sm-btn:active {
+    transform: none;
+  }
+}
+
+/* Forced colours (Windows high contrast): keep the pixel frame and the focus ring visible. */
+@media (forced-colors: active) {
+  .sm-root .sm-card--link:focus-visible {
+    box-shadow: none;
+    outline: 3px solid CanvasText;
+    outline-offset: 2px;
+  }
+  .sm-root .sm-stars {
+    forced-color-adjust: none;
+  }
+}
