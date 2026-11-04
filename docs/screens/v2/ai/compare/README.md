@@ -17,7 +17,27 @@ profile or service is used. Values below are the first-screen changed-pixel shar
 Before the changes the phone approval actions were a tall full-width stack, the
 composer had an additional inner frame, avatars sat inside accent badges, Crew titles
 were squeezed by long IDs, and the mobile log truncated times and paths while hiding
-method and latency. Cards, headings and sidebar also differed from the mockups.
+method and latency. The inspection also found:
+
+- The shared dark lavender palette and soft card radii already largely matched; the
+  panel used pixel headings where the mockup used body text, and its desktop sidebar
+  had an additional Runs item, real bot/history rows and extra sign-out controls.
+  On phones it correctly remains an operable drawer instead of the mockup's absent rail.
+- Chat: the assistant avatar was too small, the mobile content had narrower side
+  margins, the composer had a double border, and the approval card used a tall action
+  stack and oversized status chip. The mockup's animated thinking dots depict a
+  different stream state from the captured completed mock response.
+- Bots: avatars had accent-square backplates, card titles used pixel text, and cards
+  were denser; the mockup shows sample SOUL excerpts not returned in the bot list.
+- Crew: controls and real API/CLI filter chips differ from the placeholder chips, and
+  the transcript is opened by selecting a run rather than being shown by default.
+  On mobile long IDs competed with titles and status text.
+- Cron: the mockup has three placeholder jobs; the mock backend has one real job and
+  the panel retains its edit, run and delete actions. Usage: the mockup's illustrative
+  chart and totals differ from the API's real fields and unavailable-credit state.
+- Log: the mockup has a few fabricated rows; real requests accumulate during capture.
+  Mobile time/path clipping and hidden method/latency were actual readability defects.
+
 The panel retains real controls, live-derived data and scrolling instead of inventing
 mockup-only values: the extra Runs navigation and bots remain, Crew transcripts open
 on selection, cron has management actions, and Usage and Log show actual API fields.
