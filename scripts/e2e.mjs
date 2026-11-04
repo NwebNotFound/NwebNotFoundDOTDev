@@ -663,7 +663,7 @@ try {
     ok(chapter.t.includes('href="/downloads/story-test-fixture-chapter-2.epub"') && chapter.t.includes("EPUB herunterladen"), "Kapitel: EPUB-Download-Button", chapter.s);
     ok(chapter.t.includes('href="/downloads/series-test-fixture-serie.epub"'), "Kapitel: Serien-EPUB verlinkt");
     ok(chapter.t.includes("data-sm-print") && chapter.t.includes('<script src="/design/summer-print.js" defer></script>'), "Kapitel: Druck-Button mit externem Skript");
-    ok(chapter.t.includes("(c) Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
+    ok(chapter.t.includes("© Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
     ok(!/onclick=/.test(chapter.t) && !/<script(?![^>]*\ssrc=)/i.test(chapter.t), "Kapitel: kein Inline-Handler, kein Inline-Skript");
     const blog = await hub("/writing/test-fixture-hello");
     ok(!blog.t.includes("/downloads/") && !blog.t.includes("data-sm-print") && !blog.t.includes("summer-print.js"), "Blog-Beitrag: kein Download, kein Druck-Button (Entscheidung Nils)");

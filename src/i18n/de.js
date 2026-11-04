@@ -30,6 +30,12 @@ export default {
   "theme.night": "Nacht",
   "theme.day": "Tag",
 
+  /* ---- reading (artboard Story.html: the "Aa" control) ---- */
+  "reading.size.button": "Schriftgröße: {size}",
+  "reading.size.small": "klein",
+  "reading.size.normal": "normal",
+  "reading.size.large": "groß",
+
   /* ---- home ---- */
   "home.eyebrow": "Willkommen",
   "home.title": "Hi, ich bin Nils.",
@@ -37,7 +43,8 @@ export default {
   "home.lead": "Hier sammle ich, was ich baue: einen Minecraft-Server, Texte, Musik und Rezensionen. Das meiste wächst gerade erst – schau dich um.",
   "home.mascot_alt": "Das Maskottchen: ein kleines Pixel-Wesen mit Ohren und roten Bäckchen.",
   "home.placeholder_note": "Maskottchen-Platzhalter – das echte Bild zeichnet Nils selbst.",
-  "home.sections_title": "Die Bereiche",
+  "home.sections_kicker": "Bereiche",
+  "home.sections_title": "Was es hier gibt",
   "home.sections_lead": "Manches ist schon da, manches braucht noch Zeit.",
   "tile.minecraft.title": "Minecraft-Server",
   "tile.minecraft.text": "Vanilla+ für Freunde: Status, Bestenlisten, Markt, Wiki und das eigene Profil.",
@@ -114,6 +121,7 @@ export default {
   "writing.back": "Zur Übersicht",
   "writing.prev": "Vorheriges Kapitel",
   "writing.next": "Nächstes Kapitel",
+  "writing.chapter_kicker": "Kapitel {n} von {m}",
   "writing.series.nav": "Kapitelnavigation",
   "writing.series.eyebrow": "Serie",
   "writing.series.lead": "Diese Serie hat {count} Kapitel.",
@@ -132,7 +140,7 @@ export default {
   "feed.read_more": "Weiterlesen",
 
   /* ---- export (docs/creative-hub-plan.md §8 "Export", phase 3c) ---- */
-  "writing.export.rights": "(c) Nils, nur zum persönlichen Lesen.",
+  "writing.export.rights": "© Nils, nur zum persönlichen Lesen.",
   "writing.export.epub": "EPUB herunterladen",
   "writing.export.series_epub": "Ganze Serie als EPUB",
   "writing.export.print": "Als PDF drucken",

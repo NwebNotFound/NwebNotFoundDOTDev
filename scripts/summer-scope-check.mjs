@@ -215,7 +215,7 @@ if (!/@media \(prefers-reduced-motion: reduce\)/.test(css)) cssNote("no prefers-
 /* ---------------------------------------------------------------------------------------------
    2. hub scripts — no inline handlers, no eval, no network
    --------------------------------------------------------------------------------------------- */
-const HUB_SCRIPTS = [THEME_JS_PATH, "public/design/summer-parallax.js"];
+const HUB_SCRIPTS = [THEME_JS_PATH, "public/design/summer-parallax.js", "public/design/summer-reader.js"];
 for (const file of HUB_SCRIPTS) {
   if (!exists(file)) {
     note(`${file} is missing`);

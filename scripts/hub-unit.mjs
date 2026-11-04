@@ -118,6 +118,14 @@ for (const lang of LANGS) {
   ok(home.includes('src="/mc-icon/v2/grass_block"') && home.includes("sm-mc-icon"), "the Minecraft tile shows the real grass_block texture");
   ok(home.includes("data-sm-parallax") && home.includes('class="sm-layer sm-parallax'), "the hero scene carries the parallax layers");
   ok(home.includes('<script src="/design/summer-parallax.js" defer></script>'), "the start page loads the external parallax helper");
+  // Night hero (artboard Main-night): the moon and the star field are in the markup, the swap itself
+  // is pure CSS (data-theme / prefers-color-scheme), so no script is involved.
+  ok(home.includes("sm-scene__moon") && home.includes("sm-scene__stars") && home.includes("sm-twinkle--d4"), "the hero carries the moon and the star field for the night theme");
+  ok(home.includes('class="sm-kicker"') && home.includes("Sections") && home.includes("What&#39;s here"), "the section block opens with a pixel kicker and the artboard heading");
+  ok(hubPage("/", "de").includes("Was es hier gibt") && hubPage("/", "de").includes(">Bereiche<"), "the German heading comes from the new i18n keys");
+  // One wrapper around brand + controls: narrow screens paint the pill around it alone, wide screens
+  // dissolve it (`display: contents`) and keep brand | nav | tools in one row.
+  ok(home.includes('class="sm-hdr__bar"') && home.includes('class="sm-hdr__tools"'), "the header keeps the bar wrapper for the mobile pill");
   ok(!hubPage("/about", "de").includes("summer-parallax.js"), "inner pages do not load the parallax helper");
   // Formatted numbers follow the page language.
   ok(formatNumber(1234, "de") === "1.234" && formatNumber(1234, "en") === "1,234", "counts are grouped per language", `${formatNumber(1234, "de")} / ${formatNumber(1234, "en")}`);
@@ -129,6 +137,9 @@ for (const lang of LANGS) {
   const soon = hubPage("/writing", "de");
   ok(soon.includes("sm-hammer") && soon.includes("(◕‿◕)"), "empty state shows the building mascot and a kaomoji");
   ok(soon.includes("Texte kommt bald"), "empty state names the section", soon.slice(soon.indexOf("sm-h1"), soon.indexOf("sm-h1") + 120));
+  // The call to action must not point at the page the reader is already on (review finding).
+  const soonCta = soon.slice(soon.indexOf("sm-row sm-row--center"), soon.indexOf("sm-row sm-row--center") + 500);
+  ok(soonCta.includes('href="/guestbook"') && !soonCta.includes('href="/de/writing"'), "empty state links somewhere useful instead of itself");
 }
 
 /* ---- 6. writing: list, post, series (phase 3a) -------------------------------------- */
@@ -210,8 +221,15 @@ for (const lang of LANGS) {
   /* export (phase 3c) */
   ok(ch1.includes('href="/downloads/story-ch-1.epub"') && ch1.includes('href="/downloads/series-serie.epub"'), "chapter: chapter EPUB and series EPUB are linked");
   ok(ch1.includes("data-sm-print") && ch1.includes('<script src="/design/summer-print.js" defer></script>'), "chapter: print button with the external helper");
-  ok(ch1.includes("(c) Nils, nur zum persönlichen Lesen."), "chapter: the rights line is on the page");
+  ok(ch1.includes("© Nils, nur zum persönlichen Lesen."), "chapter: the rights line is on the page");
   ok(ch1.includes("Öffnet den Druckdialog"), "chapter: the print hint is shown");
+  /* reading aids of the chapter page (review findings + artboard Story.html) */
+  ok(ch1.includes('class="sm-kicker sm-kicker--center"') && ch1.includes("Kapitel 1 von 2"), "chapter: the head names chapter and count as a centered kicker");
+  ok(ch1.includes("data-sm-progress") && ch1.includes("data-sm-reading-size") && ch1.includes('<script src="/design/summer-reader.js" defer></script>'), "chapter: progress line, Aa control and the external reader helper");
+  ok(ch1.includes('data-size-small="klein"') && ch1.includes("Schriftgröße: normal"), "chapter: the Aa control carries the German labels");
+  ok(!hubPage("/writing", "de").includes("summer-reader.js"), "the list page does not load the reader helper");
+  ok(!ch1.includes("sm-feed-note__sep") && ch1.includes("sm-feed-note__links"), "chapter: the feed note is a quiet row without separators");
+  ok(ch1.includes("sm-card sm-card--link sm-prevnext__link") && ch1.includes("sm-prevnext__title"), "chapter: previous/next are cards, not bare links");
   ok(!post.includes("/downloads/") && !post.includes("data-sm-print") && !post.includes("summer-print.js"), "post: a blog post gets no export and no print button");
   const archivedChapter = writingPostPage(mk({ slug: "ch-arch", kind: "story", series: "serie", chapter: 9, archived: true, date: "2025-01-03" }), all, "de");
   ok(!archivedChapter.includes("/downloads/") && !archivedChapter.includes("data-sm-print"), "an archived chapter offers neither download nor print");

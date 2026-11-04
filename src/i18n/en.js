@@ -28,6 +28,12 @@ export default {
   "theme.night": "Night",
   "theme.day": "Day",
 
+  /* ---- reading (artboard Story.html: the "Aa" control) ---- */
+  "reading.size.button": "Text size: {size}",
+  "reading.size.small": "small",
+  "reading.size.normal": "normal",
+  "reading.size.large": "large",
+
   /* ---- home ---- */
   "home.eyebrow": "Welcome",
   "home.title": "Hi, I am Nils.",
@@ -35,7 +41,8 @@ export default {
   "home.lead": "This is where I keep what I build: a Minecraft server, writing, music and reviews. Most of it is still growing – have a look around.",
   "home.mascot_alt": "The mascot: a small pixel creature with ears and rosy cheeks.",
   "home.placeholder_note": "Placeholder mascot – the real drawing comes from Nils.",
-  "home.sections_title": "The sections",
+  "home.sections_kicker": "Sections",
+  "home.sections_title": "What's here",
   "home.sections_lead": "Some of it is live already, the rest still needs time.",
   "tile.minecraft.title": "Minecraft server",
   "tile.minecraft.text": "Vanilla+ for friends: status, leaderboards, market, wiki and your own profile.",
@@ -112,6 +119,7 @@ export default {
   "writing.back": "Back to the list",
   "writing.prev": "Previous chapter",
   "writing.next": "Next chapter",
+  "writing.chapter_kicker": "Chapter {n} of {m}",
   "writing.series.nav": "Chapter navigation",
   "writing.series.eyebrow": "Series",
   "writing.series.lead": "This series has {count} chapters.",
@@ -130,7 +138,7 @@ export default {
   "feed.read_more": "Read more",
 
   /* ---- export (docs/creative-hub-plan.md §8 "Export", phase 3c) ---- */
-  "writing.export.rights": "(c) Nils, personal reading only.",
+  "writing.export.rights": "© Nils, personal reading only.",
   "writing.export.epub": "Download EPUB",
   "writing.export.series_epub": "Whole series as EPUB",
   "writing.export.print": "Print as PDF",

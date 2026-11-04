@@ -325,13 +325,14 @@ export function writingSeriesFeeds(series, t) {
 /** The visible footnote: which feeds this page belongs to, so a reader can subscribe. */
 function feedNote(feeds, t) {
   if (!feeds || !feeds.length) return "";
+  // A quiet line of small soft buttons (artboard Story.html): no dot separators between them.
   const links = feeds
     .map((f) => {
       const label = t(f.format === "rss" ? "feed.rss" : "feed.atom");
       return `<a class="sm-feed-note__link" href="${esc(f.href)}">${esc(f.group ? `${label} (${f.group})` : label)}</a>`;
     })
-    .join(`<span class="sm-feed-note__sep" aria-hidden="true"> · </span>`);
-  return `<p class="sm-feed-note">${esc(t("writing.feed.note"))} ${links}</p>`;
+    .join("");
+  return `<div class="sm-feed-note"><span class="sm-feed-note__note">${esc(t("writing.feed.note"))}</span><span class="sm-feed-note__links">${links}</span></div>`;
 }
 
 /* ---------- export (plan §8 "Export", phase 3c) ---------- */
@@ -470,9 +471,16 @@ export function writingPostBody(item, all, lang, t = makeT(lang)) {
   const archived = item.archived ? `<p class="sm-note sm-note--archive" role="note">${esc(t("writing.archived_note"))}</p>` : "";
   const chapters = item.kind === "story" && item.series ? chaptersOf(all, item.series) : [];
   const topBack = chapters.length ? `<a class="sm-back" href="${seriesUrl(item.series, lang)}">&#8592; ${esc(seriesTitleOf(all, item.series))}</a>` : "";
-  const eyebrow =
-    item.kind === "story" && item.series
-      ? `<p class="sm-eyebrow"><a href="${seriesUrl(item.series, lang)}">${esc(seriesTitleOf(all, item.series))}</a></p>`
+  // The kicker replaces the series link (which the back link above already carries): a chapter says
+  // "Kapitel n von m", everything else names its kind. Artboard Story.html centres the whole head.
+  const kicker =
+    item.kind === "story" && item.series && chapters.length && item.chapter
+      ? `<p class="sm-kicker sm-kicker--center">${twinkleArt(10, "var(--sm-sun-edge)", "sm-twinkle--still")}<span>${esc(t("writing.chapter_kicker", { n: num(item.chapter, lang), m: num(chapters.length, lang) }))}</span></p>`
+      : "";
+  const eyebrow = kicker
+    ? kicker
+    : item.kind === "story" && item.series
+      ? `<p class="sm-eyebrow">${esc(seriesTitleOf(all, item.series))}</p>`
       : `<p class="sm-eyebrow">${esc(kindLabel(item.kind, t))}</p>`;
   const updated = item.updated ? `<span>${esc(t("writing.updated", { date: formatDate(item.updated, lang) }))}</span>` : "";
   const archivedBadge = item.archived ? `<span class="sm-badge sm-badge--warning">${esc(t("writing.archived"))}</span>` : "";
@@ -501,13 +509,16 @@ function prevNextHtml(item, all, lang, t) {
   if (item.kind !== "story" || !item.series) return "";
   const { prev, next } = prevNext(all, item);
   if (!prev && !next) return "";
-  const link = (target, cls, label) =>
+  // Two cards like the artboard Story.html: a small label above the chapter title, the "next" one
+  // aligned to the right.
+  const link = (target, cls, label, glyph, glyphAfter) =>
     target
-      ? `<a class="sm-prevnext__link ${cls}" href="${postUrl(target.slug, lang)}"><span class="sm-prevnext__label">${esc(label)}</span><span>${esc(target.title)}</span></a>`
-      : "<span></span>";
+      ? `<a class="sm-card sm-card--link sm-prevnext__link ${cls}" href="${postUrl(target.slug, lang)}"><span class="sm-prevnext__label">${glyphBefore(glyph)}${esc(label)}${glyphAfter}</span><span class="sm-prevnext__title">${esc(target.title)}</span></a>`
+      : "";
+  const glyphBefore = (g) => (g ? `<span aria-hidden="true">${g}</span> ` : "");
   return `<nav class="sm-prevnext" aria-label="${esc(t("writing.series.nav"))}">
-${link(prev, "sm-prevnext__link--prev", t("writing.prev"))}
-${link(next, "sm-prevnext__link--next", t("writing.next"))}
+${link(prev, "sm-prevnext__link--prev", t("writing.prev"), "&#8592;", "")}
+${link(next, "sm-prevnext__link--next", t("writing.next"), "", ` <span aria-hidden="true">&#8594;</span>`)}
 </nav>`;
 }
 
@@ -569,13 +580,37 @@ function themeToggle(t, slot = "header") {
 }
 
 /**
- * The sky panel of the home hero (artboard Main-day): sun, two clouds, ground, mascot, twinkles.
- * Each layer sits in its own wrapper so the parallax (scroll-driven CSS or the mouse helper) can
- * move the wrapper while the art keeps its own bob/drift animation.
+ * The star field of the night artboard (Main-night): eight pixel stars with staggered twinkles,
+ * stretched over the panel. Only visible at night (`.sm-scene__stars`), day keeps the sun.
+ */
+const starDots = [
+  [12, 10, 2, "#ffffff", ""],
+  [34, 22, 1, "#ffffff", "sm-twinkle--d2"],
+  [58, 8, 2, "#ffd45e", "sm-twinkle--d4"],
+  [80, 30, 1, "#ffffff", "sm-twinkle--d1"],
+  [22, 40, 1, "#ffffff", "sm-twinkle--d5"],
+  [70, 18, 1, "#c9b8ff", "sm-twinkle--d3"],
+  [46, 34, 1, "#ffffff", "sm-twinkle--d3"],
+  [92, 12, 1, "#ffc8dd", "sm-twinkle--d1"],
+];
+const starField = () =>
+  `<svg class="sm-px-icon" viewBox="0 0 120 76" preserveAspectRatio="none" aria-hidden="true" focusable="false" shape-rendering="crispEdges">` +
+  starDots
+    .map(([x, y, s, fill, cls]) => `<rect class="${cls}" x="${x}" y="${y}" width="${s}" height="${s}" fill="${fill}"></rect>`)
+    .join("") +
+  `</svg>`;
+
+/**
+ * The sky panel of the home hero (artboard Main-day / Main-night): sun by day, moon and stars by
+ * night, two clouds, ground, mascot, twinkles. Each layer sits in its own wrapper so the parallax
+ * (scroll-driven CSS or the mouse helper) can move the wrapper while the art keeps its own
+ * bob/drift animation.
  */
 function scene(t) {
   return `<div class="sm-scene" data-sm-parallax>
+<span class="sm-layer sm-parallax sm-parallax--slow sm-scene__stars" aria-hidden="true">${starField()}</span>
 <span class="sm-layer sm-parallax sm-parallax--slow sm-scene__sun">${sunArt(72)}</span>
+<span class="sm-layer sm-parallax sm-parallax--slow sm-scene__moon">${moonArt(64)}</span>
 <span class="sm-layer sm-parallax sm-parallax--mid sm-scene__cloud">${cloudArt(120, 50)}</span>
 <span class="sm-layer sm-parallax sm-parallax--mid sm-scene__cloud sm-scene__cloud--far">${cloudArt(84, 34, "sm-drift--slow")}</span>
 <span class="sm-layer sm-parallax sm-scene__ground-wrap">${groundArt(96)}</span>
@@ -586,6 +621,20 @@ ${mascotArt(120, "sm-bob", t("home.mascot_alt"))}
 <span class="sm-layer sm-parallax sm-parallax--slow sm-scene__twinkle sm-scene__twinkle--a">${twinkleArt(15, "#ffd45e")}</span>
 <span class="sm-layer sm-parallax sm-parallax--slow sm-scene__twinkle sm-scene__twinkle--b">${twinkleArt(10, "#ffc8dd")}</span>
 </div>`;
+}
+
+/**
+ * The "Aa" control of the chapter pages (artboard Story.html puts it in the header). One button that
+ * cycles small → normal → large; the size is written to localStorage by /design/summer-reader.js
+ * (external file, no inline JS). Without the script the button does nothing and the prose stays at
+ * the artboard size, so the page never depends on JavaScript.
+ */
+function readingSizeControl(t) {
+  return `<button class="sm-btn sm-btn--soft sm-btn--dense sm-reader-size" type="button" data-sm-reading-size data-size="normal"` +
+    ` aria-label="${esc(t("reading.size.button", { size: t("reading.size.normal") }))}"` +
+    ` data-label="${esc(t("reading.size.button", { size: "{size}" }))}"` +
+    ` data-size-small="${esc(t("reading.size.small"))}" data-size-normal="${esc(t("reading.size.normal"))}" data-size-large="${esc(t("reading.size.large"))}">` +
+    `<span class="sm-reader-size__aa" aria-hidden="true">Aa</span></button>`;
 }
 
 function document_(o) {
@@ -616,6 +665,11 @@ function document_(o) {
   // only the page that has a hero scene loads it.
   const printScript = o.print ? `<script src="/design/summer-print.js" defer></script>` : "";
   const parallaxScript = o.parallax ? `<script src="/design/summer-parallax.js" defer></script>` : "";
+  const readerScript = o.reading ? `<script src="/design/summer-reader.js" defer></script>` : "";
+  // Reading progress: a lavender 4px line pinned above the header, driven by scroll position
+  // (artboard Story.html). Purely visual — it duplicates the scrollbar, so it is hidden from the
+  // accessibility tree instead of announcing a value that only exists once the script runs.
+  const progressBar = o.reading ? `<div class="sm-progress" data-sm-progress aria-hidden="true"><span class="sm-progress__bar"></span></div>` : "";
   return `<!doctype html><html lang="${lang}" class="sm-root"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}">
@@ -627,13 +681,16 @@ ${hreflangTags}
 ${feedTags}
 <link rel="preload" href="/design/fonts/pixelify-sans-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/design/fonts/nunito-latin-400.woff2" as="font" type="font/woff2" crossorigin>
-<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${printScript}${parallaxScript}
+<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${printScript}${parallaxScript}${readerScript}
 </head><body class="sm-shell">
+${progressBar}
 <a class="sm-skip-link" href="#main">${esc(t("skip"))}</a>
 <header class="sm-nav"><div class="sm-wrap"><div class="sm-hdr">
+<div class="sm-hdr__bar">
 <a class="sm-brand" href="${href("/", lang)}">${brandMark()}<span class="sm-brand__name">${esc(t("site.name"))}</span></a>
+<div class="sm-hdr__tools">${langSwitch(bare, lang, t)}${o.reading ? readingSizeControl(t) : ""}${themeToggle(t)}</div>
+</div>
 <nav class="sm-nav__nav" aria-label="${esc(t("nav.label"))}"><ul class="sm-nav__links">${NAV.map((n) => navLink(n, lang, bare, t)).join("")}</ul></nav>
-<div class="sm-hdr__tools">${langSwitch(bare, lang, t)}${themeToggle(t)}</div>
 </div></div></header>
 <main id="main">${body}</main>
 <footer class="sm-footer">
@@ -679,8 +736,11 @@ function homeBody(t, lang) {
 <div class="sm-hero__art sm-rise">${scene(t)}</div>
 </div></section>
 <section class="sm-section"><div class="sm-wrap">
-<div class="sm-row-between">
-<h2 class="sm-h2">${esc(t("home.sections_title"))}</h2>
+<div class="sm-section__head">
+<div>
+<p class="sm-kicker">${twinkleArt(10, "var(--sm-sun-edge)", "sm-twinkle--still")}<span>${esc(t("home.sections_kicker"))}</span></p>
+<h2 class="sm-h2 sm-h2--lg">${esc(t("home.sections_title"))}</h2>
+</div>
 <p class="sm-lead">${esc(t("home.sections_lead"))}</p>
 </div>
 <div class="sm-tiles">
@@ -753,7 +813,7 @@ function soonBody(t, lang, bare) {
 <h1 class="sm-h1">${esc(t("soon.title", { section: t(`nav.${section}`) }))}</h1>
 <p class="sm-lead">${esc(t(`soon.${section}_text`))}</p>
 <p class="sm-kaomoji">(◕‿◕)</p>
-<p class="sm-row sm-row--center"><a class="sm-btn" href="${href("/", lang)}">${esc(t("soon.back"))}</a><a class="sm-btn sm-btn--soft" href="${href("/writing", lang)}">${esc(t("nav.writing"))} ${arrow}</a></p>
+<p class="sm-row sm-row--center"><a class="sm-btn" href="${href("/", lang)}">${esc(t("soon.back"))}</a><a class="sm-btn sm-btn--soft" href="/guestbook">${esc(t("footer.guestbook"))}</a></p>
 </div></section>`;
 }
 
@@ -815,6 +875,8 @@ export function writingPostPage(item, all, lang, t = makeT(lang)) {
     hreflangs: [],
     feeds: writingPostFeeds(item, all, t),
     print: item.kind === "story",
+    // Chapter pages carry the reading progress line and the "Aa" size control (artboard Story.html).
+    reading: true,
   });
 }
 
