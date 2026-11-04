@@ -133,11 +133,17 @@ assert.deepEqual(vipRankView("mvp", ""), { rank: "mvp", color: "d", label: "MVP"
 assert.equal(vipRankView("player", "&7"), null);
 
 // Welt-Limits laut Nils, 04.11.2026: VIP 1 eigene Welt, MVP 3. Einzige Quelle ist WORLD_LIMITS.
-assert.deepEqual(WORLD_LIMITS, { vip: 1, mvp: 3 }, "Welt-Limits VIP 1 / MVP 3");
+// Der Fallback für einen unbekannten Rang ist der KLEINSTE Wert (VIP), nicht MVP: ein neuer oder
+// umbenannter Rang im Plugin darf nicht stillschweigend zwei Welten zu viel bekommen. Deshalb steht
+// der Admin (der alle Welten sieht, Zähler 3) ausdrücklich in der Tabelle statt im Fallback.
+assert.deepEqual(WORLD_LIMITS, { vip: 1, mvp: 3, admin: 3 }, "Welt-Limits VIP 1 / MVP 3 / Admin 3");
 assert.equal(worldLimit("vip"), 1);
-assert.equal(worldLimit("mvp"), 3);
+assert.equal(worldLimit("MVP"), 3, "Rang-Schreibweise egal");
 assert.equal(worldLimit("admin"), 3, "Admin sieht alle Welten, Zähler bleibt bei 3");
-assert.equal(worldLimit(null), 3, "ohne Rang bleibt der Standard 3");
+assert.equal(worldLimit(null), 1, "ohne Rang gilt das VIP-Limit");
+assert.equal(worldLimit(""), 1, "leerer Rang gilt als unbekannt");
+assert.equal(worldLimit("builder"), 1, "unbekannter Rang → VIP-Limit, nie MVP");
+assert.equal(worldLimit("vip2"), 1, "neuer Rang → VIP-Limit");
 assert.ok(cat[0].perks.find((p) => p.id === "worlds").title.includes("Eine eigene Welt"), "VIP-Karte nennt eine Welt");
 assert.ok(cat[1].perks.find((p) => p.id === "worlds").title.includes("3 eigene Welten"), "MVP-Karte nennt drei Welten");
 assert.ok(!JSON.stringify(cat).includes("Addon"), "keine Addon-Versprechen (Feature kommt später)");

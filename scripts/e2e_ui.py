@@ -22,7 +22,10 @@ def route(r):
             if not any(x in u for x in ("/mc-head/", "/mc-skin/", "/mc-icon/", "/vendor/")): raise  # Kopf-Requests dürfen beim Kontext-Schließen noch laufen
     else: r.continue_()
 with sync_playwright() as p:
-    br = p.chromium.launch(executable_path="/usr/bin/google-chrome")
+    # Im Container liegt Chrome unter /usr/bin/google-chrome; auf einem Windows-Entwicklungsrechner
+    # gibt es den Pfad nicht, dort nimmt Playwright den eigenen Chromium-Build.
+    chrome = "/usr/bin/google-chrome"
+    br = p.chromium.launch(executable_path=chrome) if os.path.exists(chrome) else p.chromium.launch()
     for w in (390, 1440):
         ctx = br.new_context(viewport={"width": w, "height": 900})
         ctx.add_cookies([{"name": cookie_name, "value": cookie_val, "domain": H, "path": "/", "secure": True, "httpOnly": True}])

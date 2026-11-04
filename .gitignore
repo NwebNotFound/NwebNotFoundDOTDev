@@ -1,6 +1,8 @@
 node_modules/
 .wrangler/
 .dev.vars
+# e2e legt .dev.vars.e2e-bak daneben (Sicherung der laufenden .dev.vars) — nie committen
+.dev.vars*
 screens/qa/
 src/generated/*.e2e-bak
 public/downloads/

@@ -96,21 +96,28 @@ export const hubNav = (MAIN) => {
 
 export const MI = (id, px = 26) => `<img class="mi" alt="" width="${px}" height="${px}" loading="lazy" src="/mc-icon/v2/${id}">`;
 
-/* Hero scene (item 4): three decorative pixel layers + the real grass_block texture as the mascot.
+/* Hero scene (item 4): decorative pixel layers + the real grass_block texture as the mascot.
    Sky/stars drift slowest, clouds medium, hills and mascot fastest — the offsets live in
    /mc/theme-v2.css (CSS scroll-driven animations, JS fallback in /mc/parallax.js). Pure deco:
-   aria-hidden, pointer-events none, inline SVG only (no remote requests, no inline JS). */
+   aria-hidden, pointer-events none, inline SVG only (no remote requests, no inline JS).
+
+   Layout contract (review round 2): clouds, hills and the mascot live in ONE landscape band at the
+   bottom of the hero (`--ground-h`, reserved as hero padding in the stylesheet). Nothing of the
+   scene is allowed into the copy area — the earlier version stretched the 24-unit hill drawing over
+   46% of the hero height, which turned single rects into dark blocks behind the heading. The
+   drawings below are authored at the band's own aspect (320x40) and flat-filled, so they read as a
+   horizon at any width instead of as floating rectangles. */
 const HSCENE = `<div class="hscene" aria-hidden="true">
 <div class="ly l-stars"><div class="in"><svg class="px" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid slice"><g fill="#fff3d9"><rect class="twinkle" x="22" y="10" width="3" height="3"></rect><rect x="74" y="42" width="2" height="2"></rect><rect class="twinkle" x="142" y="16" width="3" height="3"></rect><rect x="208" y="62" width="2" height="2"></rect><rect class="twinkle" x="262" y="22" width="3" height="3"></rect><rect x="318" y="48" width="2" height="2"></rect><rect class="twinkle" x="370" y="12" width="3" height="3"></rect><rect x="104" y="88" width="2" height="2"></rect><rect x="298" y="96" width="2" height="2"></rect></g></svg></div></div>
-<div class="ly l-clouds"><div class="in"><svg class="px drift" viewBox="0 0 400 80" preserveAspectRatio="xMidYMid slice"><g fill="rgba(255,255,255,.10)"><rect x="30" y="34" width="76" height="14"></rect><rect x="44" y="24" width="44" height="10"></rect><rect x="60" y="18" width="20" height="6"></rect><rect x="228" y="44" width="92" height="14"></rect><rect x="248" y="34" width="52" height="10"></rect><rect x="268" y="28" width="24" height="6"></rect></g></svg></div></div>
-<div class="ly l-hills"><div class="in"><svg class="px" viewBox="0 0 80 24" preserveAspectRatio="none"><g fill="#0f2318"><rect x="0" y="14" width="14" height="10"></rect><rect x="14" y="11" width="10" height="13"></rect><rect x="24" y="16" width="16" height="8"></rect><rect x="40" y="9" width="12" height="15"></rect><rect x="52" y="13" width="14" height="11"></rect><rect x="66" y="15" width="14" height="9"></rect></g><g fill="var(--grass)"><rect x="0" y="22" width="80" height="2"></rect><rect x="3" y="21" width="2" height="1"></rect><rect x="29" y="20" width="3" height="2"></rect><rect x="61" y="21" width="2" height="1"></rect></g></svg></div></div>
-<div class="ly l-mascot"><div class="in"><img class="mi" src="/mc-icon/v2/grass_block" alt="" width="72" height="72"><span class="shadow"></span></div></div>
+<div class="ly l-clouds"><div class="in"><svg class="px drift" viewBox="0 0 280 40" preserveAspectRatio="none" shape-rendering="crispEdges"><g fill="rgba(255,255,255,.10)"><rect x="150" y="20" width="96" height="9"></rect><rect x="168" y="13" width="60" height="7"></rect><rect x="186" y="8" width="30" height="5"></rect><rect x="30" y="27" width="64" height="7"></rect><rect x="44" y="21" width="34" height="6"></rect><rect x="118" y="30" width="22" height="5"></rect></g></svg></div></div>
+<div class="ly l-hills"><div class="in"><svg class="px" viewBox="0 0 320 40" preserveAspectRatio="none" shape-rendering="crispEdges"><g fill="#143026"><rect x="0" y="22" width="40" height="12"></rect><rect x="40" y="16" width="28" height="18"></rect><rect x="68" y="24" width="44" height="10"></rect><rect x="112" y="12" width="52" height="22"></rect><rect x="164" y="20" width="36" height="14"></rect><rect x="200" y="26" width="56" height="8"></rect><rect x="256" y="14" width="44" height="20"></rect><rect x="300" y="21" width="20" height="13"></rect></g><g fill="var(--grass)"><rect x="0" y="34" width="320" height="6"></rect><rect x="6" y="33" width="3" height="1"></rect><rect x="72" y="33" width="4" height="1"></rect><rect x="118" y="32" width="3" height="2"></rect><rect x="170" y="33" width="4" height="1"></rect><rect x="262" y="32" width="3" height="2"></rect><rect x="308" y="33" width="4" height="1"></rect></g></svg></div></div>
+<div class="ly l-mascot"><div class="in"><img class="mi" src="/mc-icon/v2/grass_block" alt="" width="64" height="64"><span class="shadow"></span></div></div>
 </div>`;
 const SEARCH_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 
 /* ---------- Startseite ---------- */
 export const homeBody = (HOST) => `
-<section class="hero hero-scene" style="padding-bottom:1rem"><div class="pixbg"></div>${HSCENE}<div class="hub-wrap">
+<section class="hero hero-scene"><div class="pixbg"></div>${HSCENE}<div class="hub-wrap">
 <div class="hcopy">
 <p class="eyb">Java Edition · Vanilla+</p>
 <h1 class="hub-h">Dein Server.<br><span style="color:var(--acc)">Alles an einem Ort.</span></h1>
@@ -122,7 +129,7 @@ export const homeBody = (HOST) => `
 <p class="status" style="justify-content:flex-start;margin:0"><span id="dot" class="dot"></span><span id="state">Prüfe Status…</span></p>
 <div class="addr" style="margin:0"><code class="px">${HOST}</code><button class="btn sm" id="cp">Kopieren</button></div></div>
 <div class="stats" style="margin:0"><div class="card stat"><div class="k">Spieler online</div><div class="v px tnum" id="pl">–</div><div class="bar"><i id="bar"></i></div></div>
-<div class="card stat"><div class="k">Version</div><div class="v px" id="ver">–</div></div><div class="card stat"><div class="k">Server</div><div class="v px" id="srvn">–</div></div></div>
+<div class="card stat"><div class="k">Version</div><div class="v px" id="ver">–</div></div><div class="card stat"><div class="k">Server online</div><div class="v px" id="srvn">–</div></div></div>
 <p id="names" class="mut" style="margin:0;font-size:.9rem;min-height:1.2em"></p><div id="onl" class="onl" aria-label="Gerade online" hidden></div></div>
 </div></section>
 <section class="sec" style="padding-top:1rem"><div class="hub-wrap"><div class="qgrid q6">
@@ -135,13 +142,13 @@ export const homeBody = (HOST) => `
 </div></div></section>
 <section class="sec" id="srv-sec" hidden><div class="hub-wrap"><h2 class="hub-h2">Welten.</h2><div class="qgrid" id="srv" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))"></div></div></section>
 <section class="sec"><div class="hub-wrap" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))">
-<div class="g pad"><div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="hub-h2" style="font-size:1.35rem">Top-Spieler</h2><a href="/leaderboards">Alle ›</a></div><div id="tops" class="mut">Lade…</div></div>
-<div class="g pad"><div style="display:flex;justify-content:space-between;align-items:baseline"><h2 class="hub-h2" style="font-size:1.35rem">Markt heute</h2><a href="/markt">Zum Markt ›</a></div><div id="mk" class="mut">Lade…</div></div>
+<div class="g pad"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem"><h2 class="hub-h2" style="font-size:1.35rem">Top-Spieler</h2><a class="nw" href="/leaderboards">Alle ›</a></div><div id="tops" class="mut">Lade…</div></div>
+<div class="g pad"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem"><h2 class="hub-h2" style="font-size:1.35rem">Markt heute</h2><a class="nw" href="/markt">Zum Markt ›</a></div><div id="mk" class="mut">Lade…</div></div>
 </div></section>
 <section class="sec" id="join"><div class="hub-wrap"><h2 class="hub-h2">So kommst du drauf.</h2>
 <ol class="steps"><li><h3>Starten</h3><p class="mut">Minecraft <b>Java Edition</b> öffnen, <b>Mehrspieler</b> wählen.</p></li>
 <li><h3>Hinzufügen</h3><p class="mut"><b>Server hinzufügen</b> mit der Adresse <code class="px">${HOST}</code>.</p></li>
-<li><h3>Freischalten</h3><p class="mut">Im Discord mit <code class="px">/link</code> verknüpfen und den Code im Spiel bestätigen. <a href="/wiki/erste-schritte">Anleitung ›</a></p></li></ol>
+<li><h3>Freischalten</h3><p class="mut">Im Discord mit <code class="px">/link</code> verknüpfen und den Code im Spiel bestätigen. <a class="nw" href="/wiki/erste-schritte">Anleitung ›</a></p></li></ol>
 </div></section>
 <link rel="stylesheet" href="/mc/profile.css?v=${AV}"><script src="/mc/player3d.js?v=${AV}" defer></script><script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/home.js?v=${AV}" defer></script><script src="/mc/parallax.js?v=${AV}" defer></script>`;
 

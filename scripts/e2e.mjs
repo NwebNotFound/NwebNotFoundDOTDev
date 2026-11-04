@@ -3,6 +3,8 @@
 import { spawn, execSync } from "node:child_process";
 import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { normInv, inventorySlotMap, renderInventoryCard } from "../src/mc-inventory.js";
 import { faceRgba, skinOk, skinResponse, renderHead, encodePng, fetchRetry, RETRY_MS, resolveSkin, DEFAULT_SKINS, validSkinUrl } from "../src/mc-head.js";
 import "./vip-unit.mjs";
@@ -13,8 +15,24 @@ import "./epub-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { hubPage } from "../src/hub.js";
-const ROOT = new URL("..", import.meta.url).pathname, PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
+// `new URL(...).pathname` keeps the leading slash on Windows ("/C:/…"), which every fs call then
+// resolved to "C:\C:\…" — the suite could not start there. fileURLToPath gives the native path.
+const ROOT = fileURLToPath(new URL("..", import.meta.url)), PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
+// Windows: spawn("npx") is ENOENT and spawn("npx.cmd") throws EINVAL on Node >= 18.20 (the cmd.exe
+// shell-escape fix), so a local Windows run died before the first request. Run the npm CLI's npx
+// entry with the current node binary, and end the server with taskkill — process.kill(-pid) only
+// works on POSIX. Linux/macOS keep the old path.
+const NPX = (() => {
+  if (process.platform !== "win32") return { cmd: "npx", args: [], opts: {} };
+  const cli = path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npx-cli.js");
+  if (fs.existsSync(cli)) return { cmd: process.execPath, args: [cli], opts: {} };
+  return { cmd: "npx", args: [], opts: { shell: true } };
+})();
+const killTree = (child) => {
+  if (!child || child.exitCode != null) return;
+  try { if (process.platform === "win32") spawn("taskkill", ["/F", "/T", "/PID", String(child.pid)], { stdio: "ignore" }); else process.kill(-child.pid); } catch { /* already gone */ }
+};
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
 const sql = (q) => execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --json --command ${JSON.stringify(q)}`, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] }).toString();
 const sqlRows = (q) => JSON.parse(sql(q))[0].results;
@@ -41,7 +59,7 @@ fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
 fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\nPRICE_RESET_AT=${RESET}\n`);
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
-const wd = spawn("npx", ["wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: true });
+const wd = spawn(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", ...NPX.opts });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
 // Writing fixtures (phase 3a/3b): the committed src/generated/{content,feeds}.js carry Nils' real
 // content (currently none). For the e2e run we build the index *and* the feeds from
@@ -50,7 +68,7 @@ let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) 
 const GENERATED = ["src/generated/content.js", "src/generated/feeds.js"].map((rel) => ROOT + rel);
 const hadGenerated = GENERATED.map((file) => fs.existsSync(file));
 GENERATED.forEach((file, i) => { if (hadGenerated[i]) fs.copyFileSync(file, file + ".e2e-bak"); });
-const cleanup = () => { try { process.kill(-wd.pid); } catch {} fs.rmSync(DV, { force: true }); if (hadDV) fs.renameSync(DV + ".e2e-bak", DV); GENERATED.forEach((file, i) => { if (hadGenerated[i]) { try { fs.renameSync(file + ".e2e-bak", file); } catch {} } }); };
+const cleanup = () => { killTree(wd); fs.rmSync(DV, { force: true }); if (hadDV) fs.renameSync(DV + ".e2e-bak", DV); GENERATED.forEach((file, i) => { if (hadGenerated[i]) { try { fs.renameSync(file + ".e2e-bak", file); } catch {} } }); };
 process.on("exit", cleanup); process.on("SIGINT", () => process.exit(130));
 execSync("node scripts/build-content.mjs --fixtures", { cwd: ROOT, stdio: "ignore" });
 for (let i = 0; i < 60; i++) { try { await fetch(BASE + "/", { headers: { host: HOST } }); break; } catch { await new Promise((r) => setTimeout(r, 500)); } }
