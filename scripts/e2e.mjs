@@ -525,7 +525,7 @@ try {
     ok(home.t.includes('hreflang="de"') && home.t.includes('hreflang="en"') && home.t.includes('hreflang="x-default"'), "hreflang de/en/x-default gesetzt");
     ok(home.t.includes('href="https://github.com/NwebNotFound" target="_blank" rel="noopener noreferrer"') && home.t.includes('href="https://x.com/NwebNotFound" target="_blank" rel="noopener noreferrer"'), "Footer: GitHub und X als normale Links mit rel=noopener noreferrer");
     ok(extUrls(home.t).length === 0, "keine fremden Requests (kein CDN, kein Tracker, keine externen Schriften)", extUrls(home.t).slice(0, 3).join(" "));
-    ok(home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche sind in der Navigation als 'bald' markiert");
+    ok(home.t.includes("sm-nav__link--soon") && home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche: gedaempfte Navigation mit Sonnen-Pixel, 'bald' auf den Kacheln");
     const en = await hub("/", { headers: { "accept-language": "en-GB,en;q=0.9" } });
     ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("Welcome to my corner"), "Accept-Language en → englische Oberfläche");
     ok(en.t.includes('href="/de"') && en.t.includes('href="/en"') && en.t.includes('aria-current="true"'), "Sprachumschalter verlinkt beide Sprachen und markiert die aktuelle");
@@ -542,12 +542,23 @@ try {
       const r = await hub(p), want = p.slice(3);
       ok(r.s === 301 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}`, `${p} → 301 ${want} (Hub-fremde Route ohne Präfix)`, `${r.s} ${r.h.get("location")}`);
     }
-    for (const p of ["/", "/about", "/music", "/writing", "/reviews"]) {
+    for (const p of ["/", "/about", "/music", "/writing"]) {
       const r = await hub(p);
       ok(r.s === 200 && r.t.includes("/design/summer.css?v="), `Hub-Route ${p} → 200`, r.s);
     }
+    // Rezensionen wurden am 04.11.2026 entfernt: die Route liefert die normale 404-Seite, die
+    // Sprachvarianten laufen über den üblichen 301 auf den präfixlosen Pfad.
+    {
+      const gone = await hub("/reviews");
+      const goneDe = await hub("/de/reviews");
+      const goneEn = await hub("/en/reviews");
+      ok(gone.s === 404 && gone.t.includes("Fehler 404") && !gone.t.includes("sm-root"), "/reviews → normale 404-Seite", gone.s);
+      ok(goneDe.s === 301 && (goneDe.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/de/reviews → 301 auf /reviews", goneDe.s);
+      ok(goneEn.s === 301 && (goneEn.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/en/reviews → 301 auf /reviews", goneEn.s);
+      ok(!gone.t.includes("Rezensionen") && !(await hub("/")).t.includes("Rezensionen") && !(await hub("/about")).t.includes("Rezensionen"), "nirgends mehr ein Rezensionen-Link");
+    }
     const soon = await hub("/en/music");
-    ok(soon.s === 200 && soon.t.includes("sm-mascot--placeholder") && soon.t.includes("(◕‿◕)"), "/en/music → Leerzustand mit Maskottchen-Platzhalter");
+    ok(soon.s === 200 && soon.t.includes("sm-hammer") && soon.t.includes("(◕‿◕)"), "/en/music → Leerzustand mit Maskottchen-Platzhalter");
     ok(!/undefined|\{[a-z_]+\}/.test(deAbout.t) && !/undefined|\{[a-z_]+\}/.test(soon.t), "keine Rohkeys oder {Platzhalter} im Hub-HTML");
     const port = await hub("/portfolio");
     ok(port.s === 200 && port.t.includes('id="projekte"') && !port.t.includes("sm-root"), "/portfolio → 200, frühere Startseite im Portfolio-Design");
@@ -563,7 +574,7 @@ try {
     const committed = CONTENT.writing.filter((w) => !w.draft && !w.archived).length;
     if (committed === 0) {
       const empty = hubPage("/writing", "de");
-      ok(empty.includes("sm-mascot-placeholder") && empty.includes("sm-soon") && empty.includes("Texte kommt bald"), "Leerzustand /writing (committed build, kein Inhalt)");
+      ok(empty.includes("sm-hammer") && empty.includes("sm-soon") && empty.includes("Texte kommt bald"), "Leerzustand /writing (committed build, kein Inhalt)");
     } else {
       ok(hubPage("/writing", "de").includes("sm-post-grid"), "Liste /writing mit Inhalt (committed build)");
     }
@@ -641,7 +652,7 @@ try {
     ok((await hub("/writing/series/test-fixture-serie/atom.xml")).s === 200, "Serie hat auch einen Atom-Feed");
     ok((await hub("/de/writing/feed.xml")).s === 200 && (await hub("/en/writing/feed.xml")).s === 200, "Sprachpräfix liefert denselben Feed (301 vermieden)");
     ok((await hub("/writing/series/test-fixture-serie/feed.xml", { headers: { "if-none-match": "*" } })).s === 304, "If-None-Match: * → 304");
-    ok((await hub("/writing/reviews/feed.xml")).s === 404 && (await hub("/writing/unbekannt/feed.xml")).s === 404, "unbekannter Feed → 404");
+    ok((await hub("/writing/notes/feed.xml")).s === 404 && (await hub("/writing/unbekannt/feed.xml")).s === 404, "unbekannter Feed → 404");
     ok(!(await req("/writing/feed.xml")).t.includes("<rss"), "kein Feed auf mc.nwebnotfound.dev");
 
     const list = await hub("/writing");
@@ -663,7 +674,7 @@ try {
     ok(chapter.t.includes('href="/downloads/story-test-fixture-chapter-2.epub"') && chapter.t.includes("EPUB herunterladen"), "Kapitel: EPUB-Download-Button", chapter.s);
     ok(chapter.t.includes('href="/downloads/series-test-fixture-serie.epub"'), "Kapitel: Serien-EPUB verlinkt");
     ok(chapter.t.includes("data-sm-print") && chapter.t.includes('<script src="/design/summer-print.js" defer></script>'), "Kapitel: Druck-Button mit externem Skript");
-    ok(chapter.t.includes("(c) Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
+    ok(chapter.t.includes("© Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
     ok(!/onclick=/.test(chapter.t) && !/<script(?![^>]*\ssrc=)/i.test(chapter.t), "Kapitel: kein Inline-Handler, kein Inline-Skript");
     const blog = await hub("/writing/test-fixture-hello");
     ok(!blog.t.includes("/downloads/") && !blog.t.includes("data-sm-print") && !blog.t.includes("summer-print.js"), "Blog-Beitrag: kein Download, kein Druck-Button (Entscheidung Nils)");

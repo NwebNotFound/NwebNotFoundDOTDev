@@ -129,6 +129,9 @@ const REAL_PROPS_IN = (decls) => realDeclarations(decls).filter((d) => /^[a-z-]+
 const CONTAINER = /^@(media|supports|layer|container|scope)\b/i;
 const KEYFRAMES = /^@(-webkit-)?keyframes\b/i;
 const FONT_FACE = /^@font-face\b/i;
+// `@view-transition` is a document-level at-rule by definition (it cannot be scoped to `.sm-root`)
+// and carries no selector, so it is allowed by name — the same way @font-face and @keyframes are.
+const VIEW_TRANSITION = /^@view-transition\b/i;
 
 /* ---------------------------------------------------------------------------------------------
    1. hub stylesheets — scope, namespace, no remote resources
@@ -155,6 +158,11 @@ const walk = (node, { insideKeyframes = false, label = "" } = {}) => {
       continue;
     }
     const kf = insideKeyframes || KEYFRAMES.test(rule.prelude);
+    if (VIEW_TRANSITION.test(rule.prelude)) {
+      // Only `navigation: auto` is acceptable here; anything else would change how the page loads.
+      if (!/navigation\s*:\s*auto/.test(rule.decls)) nm("@view-transition must keep `navigation: auto`");
+      continue;
+    }
     if (CONTAINER.test(rule.prelude)) {
       walk(rule, { insideKeyframes: kf, label: rule.prelude.replace(/\s*\{$/, "") });
       continue;
@@ -205,14 +213,17 @@ if (!/@media \(prefers-color-scheme: dark\)/.test(css)) cssNote("summer night ha
 if (!/@media \(prefers-reduced-motion: reduce\)/.test(css)) cssNote("no prefers-reduced-motion block");
 
 /* ---------------------------------------------------------------------------------------------
-   2. theme bootstrap — no inline handlers, no eval, no network
+   2. hub scripts — no inline handlers, no eval, no network
    --------------------------------------------------------------------------------------------- */
-if (!exists(THEME_JS_PATH)) {
-  note(`${THEME_JS_PATH} is missing`);
-} else {
-  const js = read(THEME_JS_PATH);
+const HUB_SCRIPTS = [THEME_JS_PATH, "public/design/summer-parallax.js", "public/design/summer-reader.js"];
+for (const file of HUB_SCRIPTS) {
+  if (!exists(file)) {
+    note(`${file} is missing`);
+    continue;
+  }
+  const js = read(file);
   for (const bad of [/\beval\s*\(/, /new Function\s*\(/, /document\.write\s*\(/, /https?:\/\//, /\.innerHTML\s*=/]) {
-    if (bad.test(js)) note(`${THEME_JS_PATH} contains ${bad}`);
+    if (bad.test(js)) note(`${file} contains ${bad}`);
   }
 }
 

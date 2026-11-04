@@ -47,9 +47,19 @@
     }
     var toggles = document.querySelectorAll("[data-summer-theme-toggle]");
     for (var i = 0; i < toggles.length; i++) {
-      toggles[i].setAttribute("aria-pressed", shown === NIGHT ? "true" : "false");
-      var label = toggles[i].getAttribute(shown === NIGHT ? "data-label-day" : "data-label-night");
-      if (label) toggles[i].textContent = label;
+      var el = toggles[i];
+      var night = shown === NIGHT;
+      el.setAttribute("aria-pressed", night ? "true" : "false");
+      var label = el.getAttribute(night ? "data-label-day" : "data-label-night");
+      // The round toggle of the artboards carries an icon plus a visually hidden label span: writing
+      // `textContent` on the button itself would wipe the icon, so the span is updated when present.
+      var slot = el.querySelector("[data-sm-theme-label]");
+      if (label) {
+        if (slot) slot.textContent = label;
+        else el.textContent = label;
+      }
+      var name = el.getAttribute(night ? "data-aria-day" : "data-aria-night");
+      if (name) el.setAttribute("aria-label", name);
     }
   }
 

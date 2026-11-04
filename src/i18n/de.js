@@ -14,7 +14,6 @@ export default {
   "nav.home": "Start",
   "nav.music": "Musik",
   "nav.writing": "Texte",
-  "nav.reviews": "Rezensionen",
   "nav.about": "Über mich",
   "nav.minecraft": "Minecraft-Server",
   "nav.soon": "bald",
@@ -25,17 +24,26 @@ export default {
   "lang.de.short": "DE",
   "lang.en.short": "EN",
   "theme.switch": "Design wechseln",
+  "theme.switch_to_day": "Zum Tag wechseln",
+  "theme.switch_to_night": "Zur Nacht wechseln",
   "theme.night": "Nacht",
   "theme.day": "Tag",
+
+  /* ---- reading (artboard Story.html: the "Aa" control) ---- */
+  "reading.size.button": "Schriftgröße: {size}",
+  "reading.size.small": "klein",
+  "reading.size.normal": "normal",
+  "reading.size.large": "groß",
 
   /* ---- home ---- */
   "home.eyebrow": "Willkommen",
   "home.title": "Hi, ich bin Nils.",
   "home.title2": "Willkommen in meiner Ecke.",
-  "home.lead": "Hier sammle ich, was ich baue: einen Minecraft-Server, Texte, Musik und Rezensionen. Das meiste wächst gerade erst – schau dich um.",
-  "home.mascot_alt": "Platzhalter-Maskottchen: ein Pixel-Wesen, das Nils später selbst zeichnet.",
+  "home.lead": "Hier sammle ich, was ich baue: einen Minecraft-Server, Texte und Musik. Das meiste wächst gerade erst – schau dich um.",
+  "home.mascot_alt": "Das Maskottchen: ein kleines Pixel-Wesen mit Ohren und roten Bäckchen.",
   "home.placeholder_note": "Maskottchen-Platzhalter – das echte Bild zeichnet Nils selbst.",
-  "home.sections_title": "Die Bereiche",
+  "home.sections_kicker": "Bereiche",
+  "home.sections_title": "Was es hier gibt",
   "home.sections_lead": "Manches ist schon da, manches braucht noch Zeit.",
   "tile.minecraft.title": "Minecraft-Server",
   "tile.minecraft.text": "Vanilla+ für Freunde: Status, Bestenlisten, Markt, Wiki und das eigene Profil.",
@@ -44,8 +52,6 @@ export default {
   "tile.music.text": "Eigene Loops und Beats, die ich selbst baue – später mit kleinem Player.",
   "tile.writing.title": "Texte",
   "tile.writing.text": "Eine neue Geschichte in Kapiteln, dazu Blog-Beiträge.",
-  "tile.reviews.title": "Rezensionen",
-  "tile.reviews.text": "Filme, Anime, Bücher und Spiele mit fünf Sternen und kurzem Fazit.",
   "tile.about.title": "Über mich",
   "tile.about.text": "Wer ich bin, was ich gerade mag und wo du mich sonst findest.",
   "tile.guestbook.title": "Gästebuch",
@@ -59,6 +65,9 @@ export default {
   "about.eyebrow": "Über mich",
   "about.title": "Kurzvorstellung",
   "about.lead": "Ein paar Zeilen zu mir – und die Links, über die du mich erreichst.",
+  "about.role": "Informatik-Student · baut Dinge im Homelab",
+  "about.intro_title": "Kurz zu mir",
+  "about.projects_lead": "Lust auf mehr? Hier sind meine Projekte.",
   "about.placeholder_badge": "Platzhalter",
   "about.placeholder_note": "Dieser Text ist ein Platzhalter. Nils ersetzt ihn selbst; hier stehen bewusst noch keine Angaben zu seiner Person.",
   "about.intro_p1": "Hier steht später, was ich so mache: woran ich gerade baue, womit ich meine Zeit verbringe und was mich an Technik freut.",
@@ -70,10 +79,10 @@ export default {
 
   /* ---- soon (empty states with the mascot placeholder) ---- */
   "soon.eyebrow": "Bald",
+  "soon.art_alt": "Das Maskottchen baut an {section} – mit Ziegelmütze und Hammer.",
   "soon.title": "{section} kommt bald",
   "soon.music_text": "Hier entsteht die Musik-Seite: eigene Loops und Beats mit Loop-Punkten in einem kleinen Player. Tracks sind noch keine da.",
   "soon.writing_text": "Hier entsteht die Texte-Seite: eine neue Geschichte in Kapiteln und Blog-Beiträge. Der erste Text kommt, sobald er fertig ist.",
-  "soon.reviews_text": "Hier entsteht die Rezensionen-Seite: Filme, Anime, Bücher und Spiele mit fünf Sternen und kurzem Fazit.",
   "soon.back": "Zur Startseite",
 
   /* ---- footer ---- */
@@ -108,6 +117,7 @@ export default {
   "writing.back": "Zur Übersicht",
   "writing.prev": "Vorheriges Kapitel",
   "writing.next": "Nächstes Kapitel",
+  "writing.chapter_kicker": "Kapitel {n} von {m}",
   "writing.series.nav": "Kapitelnavigation",
   "writing.series.eyebrow": "Serie",
   "writing.series.lead": "Diese Serie hat {count} Kapitel.",
@@ -126,7 +136,7 @@ export default {
   "feed.read_more": "Weiterlesen",
 
   /* ---- export (docs/creative-hub-plan.md §8 "Export", phase 3c) ---- */
-  "writing.export.rights": "(c) Nils, nur zum persönlichen Lesen.",
+  "writing.export.rights": "© Nils, nur zum persönlichen Lesen.",
   "writing.export.epub": "EPUB herunterladen",
   "writing.export.series_epub": "Ganze Serie als EPUB",
   "writing.export.print": "Als PDF drucken",
@@ -135,15 +145,13 @@ export default {
 
   /* ---- page metadata ---- */
   "meta.home.title": "NwebNotFound · Nils' Ecke im Internet",
-  "meta.home.desc": "Minecraft-Server, Texte, Musik und Rezensionen – Nils' kleine Ecke im Internet.",
+  "meta.home.desc": "Minecraft-Server, Texte und Musik – Nils' kleine Ecke im Internet.",
   "meta.about.title": "Über mich · NwebNotFound",
   "meta.about.desc": "Kurzvorstellung und Links zu GitHub und X.",
   "meta.music.title": "Musik (bald) · NwebNotFound",
   "meta.music.desc": "Eigene Loops und Beats – die Musik-Seite entsteht gerade.",
   "meta.writing.title": "Texte (bald) · NwebNotFound",
   "meta.writing.desc": "Neue Geschichte und Blog-Beiträge – die Texte-Seite entsteht gerade.",
-  "meta.reviews.title": "Rezensionen (bald) · NwebNotFound",
-  "meta.reviews.desc": "Filme, Anime, Bücher und Spiele – die Rezensionen entstehen gerade.",
   "meta.writing.list.title": "Texte · NwebNotFound",
   "meta.writing.list.desc": "Geschichten in Kapiteln und Blog-Beiträge.",
   "meta.writing.series.desc": "Die Serie {series}: alle Kapitel in der Übersicht.",

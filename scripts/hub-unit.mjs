@@ -8,7 +8,7 @@
 // The HTTP half of the same story (status codes, Set-Cookie, redirects, Minecraft regression) runs
 // in scripts/e2e.mjs against a real `wrangler dev`; this file is the cheap, deterministic half.
 import { MESSAGES, LANGS, LANG_COOKIE, makeT, missingKeys, parseAcceptLanguage, pickLang, splitLang, withLang } from "../src/i18n/index.js";
-import { GITHUB_URL, HUB_PAGES, MC_HOST, X_URL, hubPage, hubPageExists, writingListBody, writingListPage, writingPostPage, writingSeriesPage } from "../src/hub.js";
+import { GITHUB_URL, HUB_PAGES, MC_HOST, X_URL, formatNumber, hubPage, hubPageExists, writingListBody, writingListPage, writingPostPage, writingSeriesPage } from "../src/hub.js";
 
 let pass = 0;
 let fail = 0;
@@ -86,7 +86,9 @@ for (const lang of LANGS) {
     ok(html.includes('<header class="sm-nav"') && html.includes('<footer class="sm-footer"'), `${label}: header and footer landmarks`);
     ok(!/<script(?![^>]*\bsrc=)/.test(html), `${label}: no inline script (script-src 'self')`);
     ok(!/\son[a-z]+\s*=/i.test(html), `${label}: no inline event handler`);
-    ok(html.includes("summer-sprites.svg#sm-mascot-placeholder"), `${label}: uses the placeholder sprite sheet`);
+    // Summer Theme v2: the mascot is the approved inline pixel art (artboard), not the Phase 1
+    // placeholder sprite — an inline SVG follows the theme tokens and needs no second request.
+    ok(html.includes('shape-rendering="crispEdges"') && html.includes("var(--sm-cream)"), `${label}: uses the inline pixel art (crispEdges)`);
     ok(html.includes("data-summer-theme-toggle") && html.includes('data-label-day="') && html.includes('data-label-night="'), `${label}: theme toggle is wired for summer-theme.js`);
     ok(html.includes(`href="${withLang("/", lang)}"`), `${label}: brand links to the language home`);
     const urls = [...html.matchAll(/(?:href|src)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
@@ -111,13 +113,47 @@ for (const lang of LANGS) {
 
   const home = hubPage("/", "en");
   ok(home.includes(`href="https://${MC_HOST}/" target="_blank" rel="noopener noreferrer"`), "home tile opens the Minecraft server externally");
-  ok(["music", "writing", "reviews"].every((s) => home.includes(`href="/en/${s}"`)), "home links the still-empty sections");
+  // Summer Theme v2: real Minecraft texture (the same /mc-icon endpoint the MC surface uses) plus
+  // the parallax layer markup and the external parallax helper.
+  ok(home.includes('src="/mc-icon/v2/grass_block"') && home.includes("sm-mc-icon"), "the Minecraft tile shows the real grass_block texture");
+  ok(home.includes("data-sm-parallax") && home.includes('class="sm-layer sm-parallax'), "the hero scene carries the parallax layers");
+  ok(home.includes('<script src="/design/summer-parallax.js" defer></script>'), "the start page loads the external parallax helper");
+  // Night hero (artboard Main-night): the moon and the star field are in the markup, the swap itself
+  // is pure CSS (data-theme / prefers-color-scheme), so no script is involved.
+  ok(home.includes("sm-scene__moon") && home.includes("sm-scene__stars") && home.includes("sm-twinkle--d4"), "the hero carries the moon and the star field for the night theme");
+  ok(home.includes('class="sm-kicker"') && home.includes("Sections") && home.includes("What&#39;s here"), "the section block opens with a pixel kicker and the artboard heading");
+  ok(hubPage("/", "de").includes("Was es hier gibt") && hubPage("/", "de").includes(">Bereiche<"), "the German heading comes from the new i18n keys");
+  // One wrapper around brand + controls: narrow screens paint the pill around it alone, wide screens
+  // dissolve it (`display: contents`) and keep brand | nav | tools in one row.
+  ok(home.includes('class="sm-hdr__bar"') && home.includes('class="sm-hdr__tools"'), "the header keeps the bar wrapper for the mobile pill");
+  ok(!hubPage("/about", "de").includes("summer-parallax.js"), "inner pages do not load the parallax helper");
+  // Formatted numbers follow the page language.
+  ok(formatNumber(1234, "de") === "1.234" && formatNumber(1234, "en") === "1,234", "counts are grouped per language", `${formatNumber(1234, "de")} / ${formatNumber(1234, "en")}`);
+  ok(formatNumber("kaputt", "de") === "kaputt", "a non-number is passed through instead of 'NaN'");
+  ok(["music", "writing"].every((s) => home.includes(`href="/en/${s}"`)), "home links the still-empty sections");
+  // Rezensionen gibt es nicht mehr (Nils, 04.11.2026): keine Spur in Navigation, Kacheln oder Hinweisen.
+  ok(!home.includes("/reviews") && !home.includes("Rezensionen") && !home.includes("Reviews"), "die Startseite kennt keine Rezensionen mehr");
+  ok(
+    ["/", "/about", "/music", "/writing"].every((p) => !hubPage(p, "de").includes("Rezensionen") && !hubPage(p, "en").includes("Reviews")),
+    "kein Rezensionen-Hinweis mehr in Navigation, Kacheln, About oder Meta",
+  );
+  ok(hubPage("/reviews", "de") === null && hubPage("/reviews", "en") === null && !hubPageExists("/reviews"), "/reviews gehört dem Hub nicht mehr (fällt auf die 404-Seite)");
+  // Sechs Kacheln passen in ein 3-Spalten-Raster ohne Lücke: kein `sm-tile--wide` mehr, weil zwei
+  // breite Kacheln + vier normale nur acht von neun Zellen belegt hätten.
+  const tileCount = (home.match(/sm-card sm-card--link sm-tile/g) || []).length;
+  ok(tileCount === 6 && tileCount % 3 === 0 && !home.includes("sm-tile--wide"), `sechs gleich große Kacheln, Raster ohne Lücke (${tileCount})`);
+  // Und die Chips auf /about zählen dieselben Bereiche.
+  const aboutChips = (hubPage("/about", "de").match(/sm-badge sm-badge--(ramune|sakura|lavender|peach|sun)/g) || []).length;
+  ok(aboutChips >= 3 && !hubPage("/about", "de").includes("Rezensionen"), "die Bereichs-Chips auf /about passen zur Navigation");
   ok(home.includes("sm-badge--sun") && home.includes("soon"), "still-empty sections are marked as soon");
   const de = hubPage("/", "de");
   ok(de.includes("sm-badge--sun") && de.includes("bald"), "the German home says 'bald'");
   const soon = hubPage("/writing", "de");
-  ok(soon.includes("sm-mascot--placeholder") && soon.includes("(◕‿◕)"), "empty state shows the mascot placeholder and a kaomoji");
+  ok(soon.includes("sm-hammer") && soon.includes("(◕‿◕)"), "empty state shows the building mascot and a kaomoji");
   ok(soon.includes("Texte kommt bald"), "empty state names the section", soon.slice(soon.indexOf("sm-h1"), soon.indexOf("sm-h1") + 120));
+  // The call to action must not point at the page the reader is already on (review finding).
+  const soonCta = soon.slice(soon.indexOf("sm-row sm-row--center"), soon.indexOf("sm-row sm-row--center") + 500);
+  ok(soonCta.includes('href="/guestbook"') && !soonCta.includes('href="/de/writing"'), "empty state links somewhere useful instead of itself");
 }
 
 /* ---- 6. writing: list, post, series (phase 3a) -------------------------------------- */
@@ -164,7 +200,7 @@ for (const lang of LANGS) {
   ok(writingListBody(all, "de", { tag: "alpha" }).includes("1 Beiträge"), "writing list: filter by tag");
   ok(writingListBody(all, "de", { kind: "story", tag: "alpha" }).includes("Zu diesem Filter"), "writing list: empty filter result is explained");
   const emptyList = writingListPage([], "de");
-  ok(emptyList.includes("sm-mascot-placeholder") && emptyList.includes("Texte kommt bald"), "writing list: nothing published → the mascot empty state");
+  ok(emptyList.includes("sm-hammer") && emptyList.includes("Texte kommt bald"), "writing list: nothing published → the mascot empty state");
 
   /* post */
   const post = writingPostPage(all[0], all, "de");
@@ -199,8 +235,15 @@ for (const lang of LANGS) {
   /* export (phase 3c) */
   ok(ch1.includes('href="/downloads/story-ch-1.epub"') && ch1.includes('href="/downloads/series-serie.epub"'), "chapter: chapter EPUB and series EPUB are linked");
   ok(ch1.includes("data-sm-print") && ch1.includes('<script src="/design/summer-print.js" defer></script>'), "chapter: print button with the external helper");
-  ok(ch1.includes("(c) Nils, nur zum persönlichen Lesen."), "chapter: the rights line is on the page");
+  ok(ch1.includes("© Nils, nur zum persönlichen Lesen."), "chapter: the rights line is on the page");
   ok(ch1.includes("Öffnet den Druckdialog"), "chapter: the print hint is shown");
+  /* reading aids of the chapter page (review findings + artboard Story.html) */
+  ok(ch1.includes('class="sm-kicker sm-kicker--center"') && ch1.includes("Kapitel 1 von 2"), "chapter: the head names chapter and count as a centered kicker");
+  ok(ch1.includes("data-sm-progress") && ch1.includes("data-sm-reading-size") && ch1.includes('<script src="/design/summer-reader.js" defer></script>'), "chapter: progress line, Aa control and the external reader helper");
+  ok(ch1.includes('data-size-small="klein"') && ch1.includes("Schriftgröße: normal"), "chapter: the Aa control carries the German labels");
+  ok(!hubPage("/writing", "de").includes("summer-reader.js"), "the list page does not load the reader helper");
+  ok(!ch1.includes("sm-feed-note__sep") && ch1.includes("sm-feed-note__links"), "chapter: the feed note is a quiet row without separators");
+  ok(ch1.includes("sm-card sm-card--link sm-prevnext__link") && ch1.includes("sm-prevnext__title"), "chapter: previous/next are cards, not bare links");
   ok(!post.includes("/downloads/") && !post.includes("data-sm-print") && !post.includes("summer-print.js"), "post: a blog post gets no export and no print button");
   const archivedChapter = writingPostPage(mk({ slug: "ch-arch", kind: "story", series: "serie", chapter: 9, archived: true, date: "2025-01-03" }), all, "de");
   ok(!archivedChapter.includes("/downloads/") && !archivedChapter.includes("data-sm-print"), "an archived chapter offers neither download nor print");

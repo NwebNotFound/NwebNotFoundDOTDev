@@ -48,7 +48,7 @@ const used = new Set();
 for (const m of hubSrc.matchAll(/\bt\(\s*"([^"]+)"/g)) used.add(m[1]);
 // Template keys: the shell asks per language and per still-empty section.
 for (const lang of ALL_LANGS) { used.add(`lang.${lang}`); used.add(`lang.${lang}.short`); }
-const SOON_SECTIONS = ["music", "writing", "reviews"];
+const SOON_SECTIONS = ["music", "writing"];
 for (const section of SOON_SECTIONS) { used.add(`nav.${section}`); used.add(`soon.${section}_text`); }
 if (!used.size) note("src/hub.js uses no t() key at all — the extractor or the shell changed");
 for (const key of [...used].sort()) {

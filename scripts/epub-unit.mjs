@@ -168,7 +168,7 @@ assert.equal(seriesEpubPath("die-serie"), "/downloads/series-die-serie.epub");
   assert.ok(opf.includes('<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id"'), "EPUB 3 package document");
   assert.ok(opf.includes('<dc:title>Kapitel eins – Ärger &amp; Ümläute</dc:title>'), "the title is escaped in the metadata");
   assert.ok(opf.includes("<dc:language>de</dc:language>") && opf.includes('<dc:creator id="author">Nils</dc:creator>'), "language and author");
-  assert.ok(opf.includes("<dc:rights>(c) Nils, nur zum persönlichen Lesen.</dc:rights>"), "the rights line is in the metadata");
+  assert.ok(opf.includes("<dc:rights>© Nils, nur zum persönlichen Lesen.</dc:rights>"), "the rights line is in the metadata");
   assert.ok(opf.includes('<meta property="dcterms:modified">2026-11-04T00:00:00Z</meta>'), "dcterms:modified is the chapter date, not the build time");
   assert.ok(opf.includes('<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>'), "the navigation document is declared as nav");
   assert.ok(opf.includes('<itemref idref="titlepage"/>') && opf.includes('<itemref idref="ch1"/>'), "the spine lists the title page and the chapter");
@@ -198,7 +198,7 @@ assert.equal(seriesEpubPath("die-serie"), "/downloads/series-die-serie.epub");
   assert.ok(nav.includes('<a href="chapter-1.xhtml">Kapitel eins – Ärger &amp; Ümläute</a>'), "the toc links the chapter");
 
   const titlepage = text(zip, "OEBPS/titlepage.xhtml");
-  assert.ok(titlepage.includes("(c) Nils, nur zum persönlichen Lesen."), "the rights line is on the title page");
+  assert.ok(titlepage.includes("© Nils, nur zum persönlichen Lesen."), "the rights line is on the title page");
   assert.ok(titlepage.includes("2026-11-04") && titlepage.includes("Nils"), "the title page names author and date");
 
   const body = text(zip, "OEBPS/chapter-1.xhtml");
@@ -222,7 +222,7 @@ assert.equal(seriesEpubPath("die-serie"), "/downloads/series-die-serie.epub");
   assert.ok(opf.includes('<meta name="cover" content="cover-image"/>'), "the EPUB 2 cover hint is set");
   assert.ok(entry(zip, "OEBPS/cover.xhtml") && text(zip, "OEBPS/cover.xhtml").includes('src="images/cover.png"'), "the cover page shows the cover");
   assert.ok(opf.indexOf('<itemref idref="cover"/>') < opf.indexOf('<itemref idref="titlepage"/>'), "the cover is first in the spine");
-  assert.ok(opf.includes("<dc:rights>(c) Nils, personal reading only.</dc:rights>"), "an English chapter gets the English rights line");
+  assert.ok(opf.includes("<dc:rights>© Nils, personal reading only.</dc:rights>"), "an English chapter gets the English rights line");
   assert.ok(!opf.includes("cover-image.png"), "no double extension");
 }
 
@@ -263,7 +263,7 @@ assert.equal(seriesEpubPath("die-serie"), "/downloads/series-die-serie.epub");
     assert.ok(/<dc:language>de<\/dc:language>/.test(opf), `${epub.path} declares its language`);
     assert.ok(/<dc:date>\d{4}-\d{2}-\d{2}<\/dc:date>/.test(opf), `${epub.path} declares a date`);
     assert.ok(/<meta property="dcterms:modified">\d{4}-\d{2}-\d{2}T00:00:00Z<\/meta>/.test(opf), `${epub.path} declares dcterms:modified`);
-    assert.ok(/<dc:rights>\(c\) Nils/.test(opf), `${epub.path} carries the rights line`);
+    assert.ok(/<dc:rights>© Nils/.test(opf), `${epub.path} carries the rights line`);
     assert.ok(/<dc:title>[^<]+<\/dc:title>/.test(opf), `${epub.path} has a title`);
     assert.ok(/<dc:identifier id="pub-id">urn:uuid:[0-9a-f-]{36}<\/dc:identifier>/.test(opf), `${epub.path} has a stable identifier`);
   }
