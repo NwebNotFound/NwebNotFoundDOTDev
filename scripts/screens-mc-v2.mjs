@@ -69,6 +69,7 @@ const PAGES = [
 const VIEWPORTS = [
   { w: 1280, h: 900, tag: "1280" },
   { w: 390, h: 844, tag: "390" },
+  { w: 375, h: 812, tag: "375" },
 ];
 const STRESS = args.includes("--stress");
 
@@ -208,12 +209,16 @@ function fixture() {
       { id: "a3", seller_uuid: uuid(5), seller_name: "Tobsi", item: "dragon_egg", amount: 1, min_price: 500000, current_bid: null, bid_count: 0, ends_at: Date.now() + 20 * 3600000, status: "active", bids: [] },
     ],
     players_stats: Object.fromEntries(names.map((n, i) => [uuid(i), {
+      // A populated inventory for the linked account so /profile proves armour, storage, hotbar and
+      // offhand placement (an empty fixture cannot show the slot grid).
+      inventory: i === 0 ? [{ item: "diamond_helmet", slot: 39 }, { item: "iron_chestplate", slot: 38 }, { item: "iron_leggings", slot: 37 }, { item: "iron_boots", slot: 36 }, { item: "shield", slot: 40 }, { item: "diamond_sword", slot: 0 }, { item: "bread", count: 32, slot: 1 }, { item: "diamond", count: 64, slot: 9 }, { item: "oak_log", count: 48, slot: 17 }, { item: "cobblestone", count: 64, slot: 27 }] : undefined,
       money: 48200 - i * 5200, playtime: 486000 - i * 42000, kills: 480 - i * 50, deaths: 62 + i * 9, blocks_mined: 128000 - i * 12000,
       distance: 4200000 - i * 300000, online: i < 4,
       details: {
         mined: { stone: 38200 - i * 2000, deepslate: 12400 - i * 900, dirt: 9800, diamond_ore: 240 - i * 12, oak_log: 6400 },
         placed: { cobblestone: 8400, torch: 3200, oak_planks: 2100 },
-        killed: { zombie: 320 - i * 10, creeper: 180, skeleton: 96, enderman: 24 },
+        // Mob variety for the Mob-Kills list: heads that exist in /mc/heads plus German entity names.
+        killed: { zombie: 320, pig: 280, husk: 240, sheep: 180, chicken: 140, cow: 100, skeleton: 64, spider: 32 },
         crafted: { torch: 2600, stick: 1800, iron_pickaxe: 42 },
         deaths_by: { fall: 12, lava: 4, creeper: 3, void: 1 },
         distance_m: { walk: 3200000, sprint: 620000, fly: 180000, swim: 42000, boat: 33000, horse: 12000, elytra: 26000, minecart: 9000, climb: 78000, crouch: 22000 },
@@ -580,11 +585,14 @@ async function main() {
     }
     probe.style = await styleProbe(browser, session.cookie);
     // Horizontal overflow at phone width is the classic regression of a new layout layer.
-    probe.overflow390 = probe.impl.filter((x) => x.w === 390 && x.scrollWidth > 390).map((x) => ({ page: x.page, scrollWidth: x.scrollWidth }));
+    const spill = (w) => probe.impl.filter((x) => x.w === w && x.scrollWidth > w).map((x) => ({ page: x.page, scrollWidth: x.scrollWidth }));
+    probe.overflow390 = spill(390);
+    probe.overflow375 = spill(375);
   } else {
     probe.impl = prevReport.impl || [];
     probe.style = prevReport.style || {};
     probe.overflow390 = prevReport.overflow390 || [];
+    probe.overflow375 = prevReport.overflow375 || [];
   }
 
   // Stress pass (item 2): same pages, but with the longest allowed names and the biggest numbers the
@@ -614,7 +622,7 @@ async function main() {
   restore();
   console.log(JSON.stringify({
     mockups: probe.mockups.length, impl: probe.impl.length, stress: probe.stress.length,
-    style: probe.style, overflow390: probe.overflow390, overflow390Stress: probe.overflow390Stress,
+    style: probe.style, overflow390: probe.overflow390, overflow375: probe.overflow375, overflow390Stress: probe.overflow390Stress,
     stressChecks: probe.stressChecks, motion: probe.motion,
   }, null, 2));
 }
