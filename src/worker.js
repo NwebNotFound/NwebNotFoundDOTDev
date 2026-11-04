@@ -256,7 +256,7 @@ const ACCT_JS = (loginBase) => `<script>(async()=>{const el=document.getElementB
 const httpsAvatar=u=>{try{const x=new URL(String(u||''));if(x.protocol!=='https:'||x.username||x.password)return '';return x.href}catch(e){return ''}};
 const onMc=/^mc\./.test(location.hostname);const fb=onMc?'/mc-head/MHF_Steve/64?v=5':'https://cdn.discordapp.com/embed/avatars/0.png';
 if(k){if(el)el.replaceChildren();
-if(d.user){const nm=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?d.user.mc_name:'';const av=k.querySelector('.konto-av');if(av){const head=onMc&&nm?'/mc-head/'+nm+'/64?v=5':'';av.onerror=function(){this.onerror=null;if(!String(this.src||'').endsWith(fb))this.src=fb};av.src=head||(onMc?'/mc-icon/v2/player_head':httpsAvatar(d.user.avatar)||fb);av.hidden=false}
+if(d.user){const nm=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?d.user.mc_name:'';const av=k.querySelector('.konto-av');if(av){const head=nm&&onMc?'/mc-head/'+nm+'/64?v=5':'';av.onerror=function(){this.onerror=null;if(!String(this.src||'').endsWith(fb))this.src=fb};av.src=head||httpsAvatar(d.user.avatar)||fb;av.hidden=false}
 const out=k.querySelector('a.out');if(out)out.href='${loginBase}/auth/discord/logout?next='+nx;if(window.mcNavMark)window.mcNavMark()}
 else if(d.available){k.outerHTML='<a class="l" id="konto" href="${loginBase}/auth/discord/login?next='+nx+'">Mit Discord anmelden</a>'}
 else{k.outerHTML='<span class="l" id="konto">Login bald</span>'}}

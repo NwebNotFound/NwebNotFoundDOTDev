@@ -26,18 +26,19 @@ try {
       const src=await page.locator('.konto-av').getAttribute('src');
       assert.match(src,/^\/mc-head\/NwebNotFound\/64\?/);
       assert.equal(await page.locator('.konto-av').isVisible(),true,'resolved avatar is visible');
-      // MC without a linked MC name: the documented fallback, never the Discord avatar.
+      // MC without a linked MC name: the pre-existing chain (https avatar, else the Steve head) stays —
+      // never the generic player_head icon, and the https-only guard is the e2e contract.
       const page2=await browser.newPage({viewport:{width:1280,height:900}});
       await page2.route('**/*',async route=>{
         const u=new URL(route.request().url());
         if(u.hostname===host&&u.pathname===path){await route.fulfill({status:200,contentType:'text/html',body:html});return}
         if(u.hostname===host&&u.pathname==='/api/me'){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({available:true,user:{name:'Test',username:'test',avatar:'https://cdn.discordapp.com/embed/avatars/2.png'}})});return}
-        if(u.pathname.startsWith('/mc-icon/')||u.pathname.startsWith('/mc-head/')){await route.fulfill({status:200,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#333"/></svg>'});return}
+        if(u.pathname.startsWith('/mc-icon/')||u.pathname.startsWith('/mc-head/')||u.hostname==='cdn.discordapp.com'){await route.fulfill({status:200,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#333"/></svg>'});return}
         await route.fulfill({status:404,body:''});
       });
       await page2.goto(`https://${host}${path}`,{waitUntil:'domcontentloaded'});
       await page2.waitForFunction(()=>document.querySelector('.konto-av')&&!document.querySelector('.konto-av').hidden);
-      assert.equal(await page2.locator('.konto-av').getAttribute('src'),'/mc-icon/v2/player_head','unlinked account keeps the generic head on mc');
+      assert.equal(await page2.locator('.konto-av').getAttribute('src'),'https://cdn.discordapp.com/embed/avatars/2.png','unlinked account keeps the https avatar on mc');
       await page2.close();
     } else {
       await page.waitForFunction(()=>document.querySelector('#umb img'));
