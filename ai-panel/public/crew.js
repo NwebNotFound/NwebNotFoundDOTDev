@@ -14,6 +14,9 @@ export const FILTERS = [
   { id: "cli", label: "CLI-Sessions" },
 ];
 
+// de-DE grouping for the count/range labels (the panel has no language switch yet).
+const NUM_DE = new Intl.NumberFormat("de-DE");
+
 const KIND_LABEL = { run: "Run", cli: "CLI", other: "Session" };
 
 export function kindLabel(kind) {
@@ -43,15 +46,17 @@ export function formatTime(epoch) {
 
 export function messageCountLabel(count) {
   const n = Number(count) || 0;
-  return n === 1 ? "1 Nachricht" : `${n} Nachrichten`;
+  return n === 1 ? "1 Nachricht" : `${NUM_DE.format(n)} Nachrichten`;
 }
 
 /** One row of the list, as a button so it is keyboard- and touch-reachable. */
 export function crewCard(el, row, onOpen) {
   const title = String(row?.title || "").trim() || String(row?.id || "(ohne Titel)");
-  const meta = [statusLabel(row?.status), formatTime(row?.started_at), messageCountLabel(row?.message_count)]
-    .filter(Boolean)
-    .join(" · ");
+  const status = statusLabel(row?.status);
+  const rest = [formatTime(row?.started_at), messageCountLabel(row?.message_count)].filter(Boolean).join(" · ");
+  const meta = [status, rest].filter(Boolean).join(" · ");
+  // A running session gets the live chip in the meta line (mockup); everything else stays text.
+  const running = status === "läuft";
   return el(
     "button",
     {
@@ -62,13 +67,18 @@ export function crewCard(el, row, onOpen) {
         if (typeof onOpen === "function") onOpen(row);
       },
     },
+    el("span", { class: `crew-badge kind-${row?.kind || "other"}`, text: kindLabel(row?.kind) }),
     el(
       "span",
-      { class: "crew-card-head" },
-      el("span", { class: `crew-badge kind-${row?.kind || "other"}`, text: kindLabel(row?.kind) }),
+      { class: "crew-main" },
       el("span", { class: "crew-title", text: title }),
+      el(
+        "span",
+        { class: "crew-meta" },
+        running ? el("span", { class: "chip chip-live" }, el("span", { class: "dot" }), "läuft") : null,
+        running ? rest : meta,
+      ),
     ),
-    el("span", { class: "crew-meta", text: meta }),
     el("span", { class: "crew-id", text: String(row?.id || "") }),
   );
 }
@@ -93,7 +103,7 @@ export function rangeLabel({ shown, total, offset }) {
   const start = total ? offset + 1 : 0;
   const end = offset + shown;
   if (!shown) return "keine Einträge";
-  return `Zeige ${start}–${end} von ${total || end}${total > end ? "" : " (Ende)"}`;
+  return `Zeige ${NUM_DE.format(start)}–${NUM_DE.format(end)} von ${NUM_DE.format(total || end)}${total > end ? "" : " (Ende)"}`;
 }
 
 /**

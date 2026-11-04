@@ -35,9 +35,17 @@ const state = {
   models: null,
   jobs: [],
   editingJob: null,
+  chatTitle: "Neuer Chat",
 };
 
 const $ = (sel) => document.querySelector(sel);
+
+// Number formatting for every figure the UI prints: de-DE (thousands separator, comma decimals),
+// with tabular-nums in the stylesheet so columns line up. The panel has no language switch today,
+// so de-DE is the only locale — an en-GB table would go here once one exists.
+const fmtInt = new Intl.NumberFormat("de-DE");
+const fmtCost = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const fmtPrice = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
 // ---------------------------------------------------------------------------------------
 // DOM helpers
@@ -63,6 +71,69 @@ function el(tag, props = {}, ...children) {
 function clear(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
   return node;
+}
+
+// ---------------------------------------------------------------------------------------
+// Pixel mascot (Summer Theme v2)
+// ---------------------------------------------------------------------------------------
+// The bot faces are inline SVG built node by node — no HTML strings, so no untrusted data can
+// become markup. Colours come from the mockups; unknown bots fall back to the lavender accent.
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const BOT_COLORS = {
+  cloudflare: "#ffb35c",
+  minecraft: "#4fbf6a",
+  discord: "#7d8cff",
+  homelab: "#7fe0d3",
+};
+const FACE_DEFAULT = "#c9b8ff";
+const FACE_CREAM = "#fff3d9";
+const FACE_INK = "#1f2a44";
+
+function svgEl(tag, attrs) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    node.setAttribute(k, String(v));
+  }
+  return node;
+}
+
+/** A blocky mascot face in the bot's colour, 16×16 pixel grid. */
+function pixelFace(name, { size = 24, blink = false } = {}) {
+  const colour = BOT_COLORS[name] || FACE_DEFAULT;
+  const svg = svgEl("svg", { viewBox: "0 0 16 16", width: size, height: size, class: "px", "aria-hidden": "true", focusable: "false" });
+  svg.append(
+    svgEl("rect", { x: 2, y: 1, width: 3, height: 3, fill: colour }),
+    svgEl("rect", { x: 11, y: 1, width: 3, height: 3, fill: colour }),
+    svgEl("rect", { x: 1, y: 3, width: 14, height: 11, fill: colour }),
+    svgEl("rect", { x: 2, y: 4, width: 12, height: 9, fill: FACE_CREAM }),
+    svgEl("rect", { x: 5, y: 7, width: 2, height: 2, fill: FACE_INK, class: blink ? "blink" : null }),
+    svgEl("rect", { x: 9, y: 7, width: 2, height: 2, fill: FACE_INK, class: blink ? "blink" : null }),
+    svgEl("rect", { x: 6, y: 11, width: 4, height: 1, fill: FACE_INK }),
+  );
+  return svg;
+}
+
+/** The mascot wrapped in the square badge the stylesheet sizes (.avatar / .msg-face). */
+function faceBadge(name, { size = 28, blink = false, cls = "avatar" } = {}) {
+  const wrap = el("span", { class: cls });
+  wrap.append(pixelFace(name, { size, blink }));
+  return wrap;
+}
+
+/** The cron clock, drawn on the same 12×12 pixel grid as the mockup. */
+function clockIcon(paused) {
+  const colour = paused ? "#aab6d4" : "#c9b8ff";
+  const inner = paused ? "#2e2e58" : "#1d1450";
+  const svg = svgEl("svg", { viewBox: "0 0 12 12", width: 36, height: 36, class: "px clock", "aria-hidden": "true" });
+  svg.append(
+    svgEl("rect", { x: 2, y: 1, width: 8, height: 10, fill: colour }),
+    svgEl("rect", { x: 1, y: 2, width: 10, height: 8, fill: colour }),
+    svgEl("rect", { x: 3, y: 3, width: 6, height: 6, fill: inner }),
+    svgEl("rect", { x: 6, y: 3, width: 1, height: 3, fill: colour, class: paused ? null : "clock-hand" }),
+  );
+  return svg;
 }
 
 let toastTimer;
@@ -319,7 +390,8 @@ function renderBlock(block) {
       return q;
     }
     case "table":
-      return tableNode(block);
+      // A wide table on a 390px screen scrolls inside its own box instead of the page.
+      return el("div", { class: "table-wrap" }, tableNode(block));
     case "hr":
       return el("hr");
     default:
@@ -379,6 +451,10 @@ function userMessage(text) {
 
 function assistantShell() {
   const node = el("div", { class: "msg assistant" });
+  const row = el("div", { class: "msg-assistant-row" });
+  row.append(faceBadge(state.bot, { size: 24, blink: true, cls: "msg-face" }));
+  const col = el("div", { class: "msg-body" });
+
   const meta = el("div", { class: "msg-meta" });
   meta.append(el("span", { class: "who", text: state.bot }), el("span", { text: nowTime() }));
 
@@ -390,7 +466,9 @@ function assistantShell() {
   const tools = el("div", { class: "tools" });
   const answer = el("div", { class: "md" });
   const bubble = el("div", { class: "bubble" }, thinking, tools, answer);
-  node.append(meta, bubble);
+  col.append(meta, bubble);
+  row.append(col);
+  node.append(row);
 
   return {
     node,
@@ -467,7 +545,11 @@ function errorBlock(text, onRetry) {
 function approvalCard(runId, event) {
   const card = el("div", { class: "approval", role: "group", "aria-label": "Freigabe nötig" });
   const title = el("div", { class: "title" });
-  title.append(el("span", { class: "warn-dot", "aria-hidden": "true" }), document.createTextNode("Freigabe nötig"));
+  title.append(
+    el("span", { class: "warn-dot", "aria-hidden": "true" }),
+    document.createTextNode("Freigabe nötig"),
+    el("span", { class: "chip chip-warn" }, el("span", { class: "dot" }), document.createTextNode("wartet auf dich")),
+  );
   card.append(title);
   const what = approvalText(event);
   if (what) card.append(el("pre", { text: String(what).slice(0, 4000) }));
@@ -525,7 +607,10 @@ async function send() {
   const thread = $("#messages");
   if (thread.querySelector(".hero")) clear(thread);
   thread.append(userMessage(text));
-  if (!state.sessionId) $("#chat-title").textContent = text.length > 64 ? `${text.slice(0, 64)}…` : text;
+  if (!state.sessionId) {
+    state.chatTitle = text.length > 64 ? `${text.slice(0, 64)}…` : text;
+    $("#chat-title").textContent = state.chatTitle;
+  }
 
   const cur = assistantShell();
   thread.append(cur.node);
@@ -830,7 +915,7 @@ async function loadConversations() {
       const item = el("button", { class: `session-item${conv.id === state.conversationId ? " active" : ""}` });
       item.append(el("span", { class: "t", text: conv.title || conv.id }));
       const when = conv.updated_at ? new Date(conv.updated_at).toLocaleDateString("de-DE") : "";
-      const parts = [conv.bot, when, conv.messages ? `${conv.messages} Nachrichten` : ""].filter(Boolean);
+      const parts = [conv.bot, when, conv.messages ? `${fmtInt.format(conv.messages)} Nachrichten` : ""].filter(Boolean);
       item.append(el("span", { class: "m", text: parts.join(" · ") }));
       item.onclick = () => openConversation(conv);
       list.append(item);
@@ -847,7 +932,8 @@ async function openConversation(conv) {
   localStorage.setItem("ai-conversation", conv.id);
   state.view = "chat";
   switchView("chat");
-  $("#chat-title").textContent = conv.title || conv.id;
+  state.chatTitle = conv.title || conv.id;
+  $("#chat-title").textContent = state.chatTitle;
   const thread = clear($("#messages"));
   thread.append(el("div", { class: "mut", text: "lade…" }));
   try {
@@ -921,7 +1007,10 @@ function newChat() {
   state.conversationId = null;
   state.runId = null;
   localStorage.removeItem("ai-conversation");
-  $("#chat-title").textContent = "Neuer Chat";
+  state.chatTitle = "Neuer Chat";
+  $("#chat-title").textContent = state.chatTitle;
+  // Keep the rail in sync without changing which view is open.
+  for (const btn of document.querySelectorAll(".nav-item")) btn.classList.toggle("active", btn.dataset.view === state.view);
   const thread = clear($("#messages"));
   thread.append(emptyState());
   if (window.innerWidth <= 860) closeDrawer();
@@ -945,7 +1034,7 @@ function renderBotList() {
   for (const entry of state.bots) {
     const bot = typeof entry === "string" ? { name: entry, exists: true, gateway_running: false } : entry;
     const item = el("button", { class: `bot-item${bot.name === state.bot ? " active" : ""}` });
-    item.append(el("span", { class: "avatar", text: bot.name.slice(0, 1).toUpperCase() }));
+    item.append(faceBadge(bot.name, { size: 22 }));
     item.append(el("span", { class: "name", text: bot.name }));
     item.append(el("span", { class: `pip ${bot.gateway_running ? "on" : "off"}` }));
     item.onclick = () => switchBot(bot.name);
@@ -957,14 +1046,47 @@ function renderBotListFull() {
   const list = clear($("#bot-list-full"));
   for (const entry of state.bots) {
     const bot = typeof entry === "string" ? { name: entry, exists: true } : entry;
-    const card = el(
-      "div",
-      { class: "card click" },
-      el("h3", { text: bot.name }),
-      el("div", { class: "k", text: bot.description || "—" }),
-      el("div", { class: "k", text: `${bot.provider || "?"} · ${bot.model || "kein Modell"}` }),
-      el("div", { class: "k", text: bot.exists ? (bot.gateway_running ? "läuft" : "gestoppt") : "Profil fehlt" }),
+    const running = Boolean(bot.gateway_running);
+    const status = !bot.exists ? "Profil fehlt" : running ? "arbeitet" : "bereit";
+
+    const card = el("div", { class: "card click bot-card" });
+    const head = el("div", { class: "bot-card-head" });
+    head.append(faceBadge(bot.name, { size: 34, blink: running }));
+    const title = el("div", { class: "grow" });
+    title.append(el("h3", { text: bot.name }), el("div", { class: "k", text: bot.description || "—" }));
+    head.append(title, el("span", { class: `chip${running ? " chip-live" : ""}` }, el("span", { class: "dot" }), status));
+    card.append(head);
+
+    const model = el("div", { class: "row space" });
+    model.append(
+      el("span", { class: "k", text: "Modell" }),
+      el("span", { class: "select", text: `${bot.provider || "?"} · ${bot.model || "kein Modell"}` }),
     );
+    card.append(model);
+
+    const actions = el("div", { class: "actions" });
+    actions.append(
+      el("button", {
+        class: "ghost sm",
+        type: "button",
+        text: "SOUL bearbeiten",
+        onclick: (e) => {
+          e.stopPropagation();
+          openBot(bot.name);
+        },
+      }),
+      el("button", {
+        class: "ghost sm",
+        type: "button",
+        text: "Runs ansehen →",
+        onclick: (e) => {
+          e.stopPropagation();
+          switchView("runs");
+        },
+      }),
+    );
+    card.append(actions);
+
     card.onclick = () => openBot(bot.name);
     list.append(card);
   }
@@ -1116,25 +1238,37 @@ async function loadJobs() {
     state.jobs = data.jobs;
     if (!data.jobs.length) list.append(el("div", { class: "card mut", text: "Keine Jobs." }));
     for (const job of data.jobs) {
-      const card = el(
-        "div",
-        { class: "card" },
-        el("h3", { text: job.name || job.id }),
-        el("div", { class: "k", text: job.schedule || "" }),
-        el("div", { class: "k", text: job.paused ? "pausiert" : job.enabled === false ? "deaktiviert" : "aktiv" }),
-        el(
-          "div",
-          { class: "actions" },
-          el("button", { class: "ghost sm", text: "Bearbeiten", onclick: () => openJobForm(job) }),
-          el("button", {
-            class: "ghost sm",
-            text: job.paused ? "Resume" : "Pause",
-            onclick: () => jobAction(job.id, job.paused ? "resume" : "pause"),
-          }),
-          el("button", { class: "ghost sm", text: "Run", onclick: () => jobAction(job.id, "run") }),
-          el("button", { class: "danger sm", text: "Löschen", onclick: () => deleteJob(job) }),
-        ),
+      const paused = Boolean(job.paused);
+      const status = paused ? "pausiert" : job.enabled === false ? "deaktiviert" : "aktiv";
+      const card = el("div", { class: "panel job rise" });
+      card.append(clockIcon(paused));
+
+      const info = el("div", { class: "grow" });
+      info.append(
+        el("b", { class: "job-name", text: job.name || job.id }),
+        el("div", { class: "sub", text: `${job.schedule || ""} · ${status}` }),
       );
+      card.append(info);
+      card.append(el("span", { class: `chip${paused ? "" : " chip-live"}` }, el("span", { class: "dot" }), status));
+      // Pause/resume is the same action it always was — the switch is only a clearer affordance.
+      card.append(
+        el("button", {
+          class: "toggle",
+          type: "button",
+          role: "switch",
+          "aria-checked": paused ? "false" : "true",
+          "aria-label": "Job aktiv",
+          onclick: () => jobAction(job.id, paused ? "resume" : "pause"),
+        }),
+      );
+
+      const actions = el("div", { class: "actions" });
+      actions.append(
+        el("button", { class: "ghost sm", text: "Bearbeiten", onclick: () => openJobForm(job) }),
+        el("button", { class: "ghost sm", text: "Run", onclick: () => jobAction(job.id, "run") }),
+        el("button", { class: "danger sm", text: "Löschen", onclick: () => deleteJob(job) }),
+      );
+      card.append(actions);
       list.append(card);
     }
   } catch (err) {
@@ -1195,9 +1329,9 @@ async function deleteJob(job) {
 // Usage + log
 // ---------------------------------------------------------------------------------------
 
-const money = (v) => (v === null || v === undefined ? "—" : `$${Number(v).toFixed(4)}`);
+const money = (v) => (v === null || v === undefined ? "—" : `$${fmtCost.format(Number(v) || 0)}`);
 const metric = (label, value) =>
-  el("div", { class: "card" }, el("div", { class: "k", text: label }), el("div", { class: "v", text: value }));
+  el("div", { class: "stat" }, el("div", { class: "k", text: label }), el("div", { class: "v", text: value }));
 
 async function loadUsage() {
   const cards = clear($("#usage-cards"));
@@ -1217,22 +1351,41 @@ async function loadUsage() {
     if (!or.available) cards.append(el("div", { class: "card mut", text: `OpenRouter: ${or.error || "kein Key gesetzt"}` }));
 
     const bots = clear($("#usage-bots"));
+    if (!u.per_bot.length) bots.append(el("div", { class: "card mut", text: "keine Daten" }));
+    const maxBot = Math.max(...u.per_bot.map((b) => Number(b.cost_usd) || 0), 0.000001);
     for (const b of u.per_bot) {
+      const pct = Math.max(3, Math.round(((Number(b.cost_usd) || 0) / maxBot) * 100));
+      const fill = el("i");
+      fill.style.width = `${pct}%`;
+      const meter = el("div", { class: "meter" }, fill);
       bots.append(
         el(
           "div",
-          { class: "card" },
-          el("h3", { text: b.bot }),
-          el("div", { class: "v", text: money(b.cost_usd) }),
-          el("div", { class: "k", text: `${b.sessions} Sessions · ${b.input_tokens + b.output_tokens} Tokens` }),
+          { class: "li" },
+          faceBadge(b.bot, { size: 22 }),
+          el("b", { class: "grow", text: b.bot }),
+          el("div", { class: "meter-wrap" }, meter),
+          el("span", { class: "num", text: money(b.cost_usd) }),
+          el("span", { class: "k nowrap", text: `${fmtInt.format(b.sessions)} Sessions · ${fmtInt.format(b.input_tokens + b.output_tokens)} Tokens` }),
         ),
       );
     }
 
     const daily = clear($("#usage-daily"));
-    if (!u.daily.length) daily.append(el("div", { class: "card mut", text: "keine Daten" }));
-    for (const d of u.daily) {
-      daily.append(el("div", { class: "card" }, el("div", { class: "k", text: d.day }), el("div", { class: "v sm", text: money(d.cost_usd) })));
+    const days = u.daily.slice(-14);
+    if (!days.length) {
+      daily.append(el("div", { class: "card mut", text: "keine Daten" }));
+    } else {
+      const max = Math.max(...days.map((d) => Number(d.cost_usd) || 0), 0.000001);
+      const chart = el("div", { class: "bars", role: "img", "aria-label": `Tageskosten der letzten ${days.length} Tage` });
+      days.forEach((d, i) => {
+        const pct = Math.max(4, Math.round(((Number(d.cost_usd) || 0) / max) * 100));
+        const bar = el("i", { class: pct >= 90 ? "hi" : "", title: `${d.day}: ${money(d.cost_usd)}` });
+        bar.style.height = `${pct}%`;
+        bar.style.animationDelay = `${(i * 0.03).toFixed(2)}s`;
+        chart.append(bar);
+      });
+      daily.append(chart, el("p", { class: "mut small bars-caption", text: `${fmtInt.format(days.length)} Tage · Höchstwert ${money(max)}` }));
     }
 
     const recent = clear($("#usage-recent"));
@@ -1244,7 +1397,7 @@ async function loadUsage() {
           { class: "card" },
           el("h3", { text: r.title || r.id }),
           el("div", { class: "k", text: `${r.bot} · ${r.model || "?"}` }),
-          el("div", { class: "k", text: `${money(r.cost_usd)} · ${r.input_tokens}+${r.output_tokens} Tokens` }),
+          el("div", { class: "k", text: `${money(r.cost_usd)} · ${fmtInt.format(r.input_tokens)}+${fmtInt.format(r.output_tokens)} Tokens` }),
         ),
       );
     }
@@ -1252,7 +1405,7 @@ async function loadUsage() {
     const prices = clear($("#usage-prices"));
     if (!u.prices.length) prices.append(el("div", { class: "card mut", text: u.prices_error || "keine Preise" }));
     for (const p of u.prices) {
-      prices.append(el("div", { class: "card" }, el("h3", { text: p.name }), el("div", { class: "k", text: `in ${p.prompt ?? "?"} · out ${p.completion ?? "?"}` })));
+      prices.append(el("div", { class: "card" }, el("h3", { text: p.name }), el("div", { class: "k", text: `in ${p.prompt === null || p.prompt === undefined ? "?" : fmtPrice.format(p.prompt)} · out ${p.completion === null || p.completion === undefined ? "?" : fmtPrice.format(p.completion)}` })));
     }
   } catch (err) {
     clear(cards).append(el("div", { class: "card mut", text: `Usage: ${err.message}` }));
@@ -1263,14 +1416,27 @@ async function loadLog() {
   const list = clear($("#log-list"));
   try {
     const data = await api("/api/log?limit=100");
+    list.append(
+      el(
+        "div",
+        { class: "line head" },
+        el("span", { text: "Zeit" }),
+        el("span", { text: "Status" }),
+        el("span", { text: "Pfad" }),
+        el("span", { class: "c-ms", text: "ms" }),
+        el("span", { class: "c-method", text: "Methode" }),
+      ),
+    );
     for (const e of data.entries) {
       list.append(
         el(
           "div",
           { class: "line" },
           el("span", { text: (e.ts || "").slice(11, 19) }),
-          el("span", { class: `s${String(e.status)[0]}`, text: String(e.status) }),
-          el("span", { text: `${e.method} ${e.path}${e.bot ? ` · ${e.bot}` : ""} · ${e.ms}ms` }),
+          el("span", { class: `lv s${String(e.status)[0]}`, text: String(e.status) }),
+          el("span", { text: `${e.path}${e.bot ? ` · ${e.bot}` : ""}` }),
+          el("span", { class: "c-ms", text: `${fmtInt.format(e.ms)} ms` }),
+          el("span", { class: "c-method", text: e.method }),
         ),
       );
     }
@@ -1344,17 +1510,51 @@ const crewView = createCrewView({ $, el, clear, api, describeError, state });
 // Shell: views, drawer, theme, logout
 // ---------------------------------------------------------------------------------------
 
+const VIEW_TITLES = {
+  bots: "Bots",
+  cron: "Cron-Jobs",
+  usage: "Usage & Kosten",
+  runs: "Runs",
+  crew: "Crew-Runs",
+  log: "Request-Log",
+};
+
 function switchView(view) {
-  state.view = view;
-  for (const node of document.querySelectorAll(".view")) node.classList.toggle("active", node.id === `view-${view}`);
-  for (const btn of document.querySelectorAll(".nav-item")) btn.classList.toggle("active", btn.dataset.view === view);
-  if (view === "bots") loadBots().catch(() => {});
-  if (view === "cron") loadJobs();
-  if (view === "usage") loadUsage();
-  if (view === "log") loadLog();
-  if (view === "runs") loadRuns();
-  if (view === "crew") crewView.open();
-  if (window.innerWidth <= 860) closeDrawer();
+  const apply = () => {
+    state.view = view;
+    for (const node of document.querySelectorAll(".view")) node.classList.toggle("active", node.id === `view-${view}`);
+    for (const btn of document.querySelectorAll(".nav-item")) btn.classList.toggle("active", btn.dataset.view === view);
+    // The glass header shows the current view's name (mockup), and remembers the chat title while
+    // another view is open so it can be restored on the way back.
+    const title = $("#chat-title");
+    if (view === "chat") {
+      title.textContent = state.chatTitle || "Neuer Chat";
+    } else {
+      state.chatTitle = title.textContent;
+      title.textContent = VIEW_TITLES[view] || "AI Panel";
+    }
+    if (view === "bots") loadBots().catch(() => {});
+    if (view === "cron") loadJobs();
+    if (view === "usage") loadUsage();
+    if (view === "log") loadLog();
+    if (view === "runs") loadRuns();
+    if (view === "crew") crewView.open();
+    if (window.innerWidth <= 860) closeDrawer();
+  };
+
+  // Soft SPA view transition (CSS View Transitions API): content cross-fades while the topbar and
+  // the sidebar keep their place (view-transition-name in app.css). Feature-checked, skipped when
+  // reduced motion is on, and skipped on phones where the drawer animation is the transition.
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  if (typeof document.startViewTransition === "function" && !reduced && window.innerWidth > 860) {
+    try {
+      document.startViewTransition(apply);
+      return;
+    } catch {
+      /* fall through to a plain switch */
+    }
+  }
+  apply();
 }
 
 function openDrawer() {
@@ -1454,7 +1654,7 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("ai-theme", theme);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#0f1115" : "#ffffff");
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#13132b" : "#f4faff");
 }
 
 function showLogin() {
@@ -1573,6 +1773,8 @@ async function boot() {
   if (state.me.avatar) {
     const src = `https://cdn.discordapp.com/avatars/${encodeURIComponent(state.me.id)}/${encodeURIComponent(state.me.avatar)}.png?size=64`;
     who.append(el("img", { src, alt: "" }));
+  } else {
+    who.append(el("span", { class: "avatar-fallback", "aria-hidden": "true" }));
   }
   who.append(el("span", { text: state.me.name || "Nils" }));
 
