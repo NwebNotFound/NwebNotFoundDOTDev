@@ -468,6 +468,12 @@ with sync_playwright() as p:
         kpg.goto("https://" + H + "/", wait_until="domcontentloaded", timeout=45000)
         kpg.wait_for_function("() => { const s = document.querySelector('.konto-av') && document.querySelector('.konto-av').src || ''; return s.includes('MHF_Steve') || s.includes('discordapp.com') || /\\/mc-head\\/[A-Za-z0-9_]+\\//.test(s) }", timeout=10000)
         src = kpg.locator(".konto-av").get_attribute("src") or kpg.evaluate("document.querySelector('.konto-av').src")
+        # Vor dem Schließen auf ein Ende des Bild-Requests warten: der Route-Handler darf einen
+        # noch laufenden Kopf-Request ignorieren (siehe oben), aber Playwright wirft beim
+        # Browser.close() „Route.fulfill: Fetch response has been disposed", wenn genau dieser
+        # Request noch fliegt. `complete` gilt für geladen UND für fehlgeschlagen.
+        try: kpg.wait_for_function("() => { const i = document.querySelector('.konto-av'); return !i || i.complete }", timeout=3000)
+        except Exception: pass
         return {"src": src, "xss": kpg.evaluate("window.__xss || 0")}
     kb = konto('"><img src=x onerror=window.__xss=1>', None)
     ok(kb["xss"] == 0 and kb["src"].endswith(FB) and "onerror" not in kb["src"], "MC-Konto: Breakout-Avatar fällt auf Steve zurück", kb)

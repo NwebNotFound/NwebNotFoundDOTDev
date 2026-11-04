@@ -28,19 +28,24 @@ const STATS = {
   blocks_mined: ["blocks_mined", "mined_total", "blocks"],
 };
 const PANEL_TEXT = "Dein Rang, der Status der VIP-Welten und eine kurze Übersicht deiner Stats.";
-const WORLDS_TEXT = "Zugang zu den VIP-Welten, sobald sie online sind. Geplant sind bis zu drei.";
+// Welt-Limits laut Nils, 04.11.2026: VIP darf genau eine eigene Welt haben, MVP bis zu drei.
+// Einzige Quelle für die Zahlen im Panel (Rangkarten und Zähler „Deine Welten n von max").
+// Keine D1-Migration, keine Plugin-Änderung; Sichtbarkeit/Filterung der Welten bleibt unberührt.
+export const WORLD_LIMITS = { vip: 1, mvp: 3 };
+export const worldLimit = (rank) => {
+  const r = String(rank || "").toLowerCase();
+  return Number.isFinite(WORLD_LIMITS[r]) ? WORLD_LIMITS[r] : WORLD_LIMITS.mvp;
+};
 const PERKS = {
   vip: [
     { id: "badge", icon: "name_tag", title: "Rang-Badge", text: "Goldenes VIP-Badge auf Profil, Spielerliste und in der PvP-Rangliste." },
     { id: "panel", icon: "book", title: "Dieses Panel", text: PANEL_TEXT },
-    { id: "worlds", icon: "grass_block", title: "VIP-Welten", text: WORLDS_TEXT },
+    { id: "worlds", icon: "grass_block", title: "Eine eigene Welt", text: `VIP darf ${WORLD_LIMITS.vip} eigene Welt haben. Den Status siehst du unter „Deine Welten".` },
   ],
   mvp: [
     { id: "badge", icon: "name_tag", title: "Rang-Badge", text: "MVP-Badge in eigener Farbe, sichtbar über VIP, auf Profil, Spielerliste und in der PvP-Rangliste." },
     { id: "panel", icon: "book", title: "Dieses Panel", text: PANEL_TEXT },
-    { id: "worlds", icon: "grass_block", title: "VIP-Welten", text: WORLDS_TEXT },
-    { id: "worlds_more", icon: "map", title: "Mehrere eigene Welten", text: "MVP darf mehrere Welten gleichzeitig haben, VIP eine." },
-    { id: "addons_more", icon: "redstone_torch", title: "Mehr Addons gleichzeitig", text: "Bei MVP dürfen mehr Addons gleichzeitig aktiv sein." },
+    { id: "worlds", icon: "grass_block", title: `Bis zu ${WORLD_LIMITS.mvp} eigene Welten`, text: `MVP darf bis zu ${WORLD_LIMITS.mvp} eigene Welten haben, VIP ${WORLD_LIMITS.vip}.` },
     { id: "higher", icon: "golden_apple", title: "Höherer Rang", text: "MVP steht über VIP. Weitere Ingame-Vorteile folgen." },
   ],
   admin: [
@@ -120,7 +125,7 @@ export function vipRankView(rank, color) {
   return { rank: r, color: c, label: RANK_LABEL[r] };
 }
 function gate(reason, extra = {}) {
-  return { access: false, reason, catalog: vipCatalog(null), note: VIP_NOTE, ...extra };
+  return { access: false, reason, catalog: vipCatalog(null), note: VIP_NOTE, limits: { worlds: { ...WORLD_LIMITS }, mine: WORLD_LIMITS.mvp }, ...extra };
 }
 function isoFrom(at) {
   if (at == null || at === "") return null;
@@ -233,6 +238,8 @@ export async function vipApi(env, user) {
   }
   const out = {
     access: true, reason: null, catalog: vipCatalog(raw), note: VIP_NOTE,
+    // Welt-Limits laut Nils, 04.11.2026 (WORLD_LIMITS): die Zahlen für Karten und Zähler.
+    limits: { worlds: { ...WORLD_LIMITS }, mine: worldLimit(raw) },
     player, stats, stats_at, admin,
     worlds: await loadWorlds(env, { uuid, name: link.mc_name, admin }), profile: "/profile",
   };

@@ -229,7 +229,7 @@
       "file": "docs/screens/v2/mc/mockup-vip-1280.png",
       "w": 1280,
       "h": 900,
-      "pageHeight": 986,
+      "pageHeight": 1409,
       "scrollWidth": 1280
     },
     {
@@ -237,7 +237,7 @@
       "file": "docs/screens/v2/mc/mockup-vip-390.png",
       "w": 390,
       "h": 844,
-      "pageHeight": 1399,
+      "pageHeight": 2327,
       "scrollWidth": 390
     },
     {
@@ -263,7 +263,7 @@
       "file": "docs/screens/v2/mc/neu-home-1280.png",
       "w": 1280,
       "h": 900,
-      "pageHeight": 2579,
+      "pageHeight": 2382,
       "scrollWidth": 1280
     },
     {
@@ -487,7 +487,7 @@
       "file": "docs/screens/v2/mc/neu-vip-1280.png",
       "w": 1280,
       "h": 900,
-      "pageHeight": 2545,
+      "pageHeight": 2406,
       "scrollWidth": 1280
     },
     {
@@ -495,7 +495,7 @@
       "file": "docs/screens/v2/mc/neu-vip-390.png",
       "w": 390,
       "h": 844,
-      "pageHeight": 3379,
+      "pageHeight": 3220,
       "scrollWidth": 390
     },
     {
@@ -723,7 +723,7 @@
     "pointer": {
       "mx": "-5.25px",
       "my": "2.84px",
-      "mascotInner": "matrix(1, 0, 0, 1, -8.925, 4.828)"
+      "mascotInner": "matrix(1, 0, 0, 1, -8.92412, 4.8275)"
     },
     "transitionRunning": true,
     "reducedMotion": {

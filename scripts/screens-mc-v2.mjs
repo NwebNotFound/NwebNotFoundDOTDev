@@ -159,7 +159,7 @@ function fixture() {
     },
     leaderboards_weekly: { money: lead((i) => 6200 / (i + 1)), playtime: lead((i) => 42000 / (i + 1)) },
     links: [{ discord_id: D1, mc_name: "Nils", mc_uuid: U1, has_role: true, verified: true }],
-    player_ranks: names.map((n, i) => ({ uuid: uuid(i), name: n, rank: i === 0 ? "vip" : i === 1 ? "mvp" : "default", color: i === 0 ? "&a" : i === 1 ? "&b" : "&7", weight: 10 - i })),
+    player_ranks: names.map((n, i) => ({ uuid: uuid(i), name: n, rank: i === 0 ? "mvp" : i === 1 ? "vip" : "default", color: i === 0 ? "&d" : i === 1 ? "&6" : "&7", weight: 10 - i })),
     pvp_stats: names.map((n, i) => ({ uuid: uuid(i), name: n, wins: 42 - i * 4, losses: 12 + i, draws: 1, matches: 55 - i * 3, winrate_pct: 76 - i * 6, favorite_kit: ["Sword", "Axe", "Bow"][i % 3] })),
     parkour: names.slice(0, 6).flatMap((n, i) => [
       { course: "cave_rush", course_name: "Cave Rush", course_icon: "golden_boots", mc_uuid: uuid(i), mc_name: n, time_ms: 42123 + i * 4200, set_at: "2026-10-30T11:00:00Z" },
