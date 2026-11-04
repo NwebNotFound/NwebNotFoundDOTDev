@@ -17,7 +17,7 @@
 .crew-view > .crew-range,
 .crew-view > .crew-list,
 .crew-view > .crew-more,
-.crew-view > .crew-transcript { width: 100%; max-width: 880px; }
+.crew-view > .crew-transcript { width: 100%; max-width: 880px; margin-inline: auto; }
 .crew-note { margin: 0; font-size: 12.5px; color: var(--text-dim); }
 
 .crew-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
@@ -150,8 +150,10 @@
   /* 16px keeps mobile Safari from zooming on focus; 44px is the touch minimum. */
   .crew-field select { width: 100%; min-height: 44px; font-size: 16px; }
   .chip { min-height: 44px; padding: 0 16px; font-size: 14px; }
-  .crew-card { padding: 14px 12px; }
+  .crew-card { grid-template-columns: auto minmax(0, 1fr); padding: 14px 12px; }
   .crew-title { white-space: normal; overflow-wrap: anywhere; }
+  .crew-meta { flex-wrap: wrap; }
+  .crew-id { grid-column: 2; text-align: left; white-space: normal; overflow-wrap: anywhere; }
   .crew-transcript { padding: 12px; }
   .crew-more { width: 100%; min-height: 44px; }
 }

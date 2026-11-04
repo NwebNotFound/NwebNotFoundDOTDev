@@ -1773,6 +1773,8 @@ async function boot() {
   if (state.me.avatar) {
     const src = `https://cdn.discordapp.com/avatars/${encodeURIComponent(state.me.id)}/${encodeURIComponent(state.me.avatar)}.png?size=64`;
     who.append(el("img", { src, alt: "" }));
+  } else {
+    who.append(el("span", { class: "avatar-fallback", "aria-hidden": "true" }));
   }
   who.append(el("span", { text: state.me.name || "Nils" }));
 

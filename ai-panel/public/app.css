@@ -642,10 +642,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .chat-title {
   flex: 1;
   min-width: 0;
-  font-family: var(--pixel);
+  font-family: var(--sans);
   font-size: 17px;
   font-weight: 700;
-  letter-spacing: 0.01em;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -702,23 +701,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
    scannable without turning every reply into a card. */
 .msg-assistant-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
 .msg-face {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
-  background: var(--accent-weak);
   flex: none;
 }
-.msg-face svg { width: 24px; height: 24px; }
+.msg-face svg { width: 36px; height: 36px; }
 
 .msg-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
-  font-family: var(--pixel);
-  font-size: 12px;
+  font-family: var(--sans);
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-faint);
 }
@@ -930,9 +927,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .tool .state-ok { color: var(--ok); }
 .tool .state-err { color: var(--danger); }
 
-/* Approval card: mockup values verbatim — a sun-tinted gradient with a 2px sun ring; the lavender
-   accent stays reserved for the primary action. Buttons stack full width below 640px so the whole
-   card is one column of 44px targets. */
+/* Approval card: sun-tinted gradient with a 2px sun ring. Actions wrap to fit the
+   available space while retaining 44px touch targets on small screens. */
 .approval {
   margin: 0 0 var(--ds-space-3);
   padding: var(--ds-space-4);
@@ -944,6 +940,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .approval .title {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--ds-space-2);
   font-size: 16px;
   font-weight: 800;
@@ -969,9 +966,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.approval .actions { display: grid; gap: var(--ds-space-2); }
+.approval .actions { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
 .approval .actions button {
-  width: 100%;
+  max-width: 100%;
   min-height: 44px;
   font-size: var(--ds-text-md);
   border-radius: var(--radius-btn);
@@ -1008,7 +1005,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   margin: 0 auto;
   padding: 8px 8px 8px 16px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--ds-radius-input);
+  border-radius: 22px;
   background: var(--bg-elev);
   box-shadow: var(--shadow);
 }
@@ -1029,7 +1026,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   font-size: 15px;
   resize: none;
   line-height: 1.5;
+  box-shadow: none;
 }
+/* The composer itself supplies the focus ring; avoid a second inset input frame. */
+.composer textarea:focus { box-shadow: none; }
 /* Send: solid lavender "toy key" with a darker edge, 44px touch target. */
 .send {
   display: grid;
@@ -1139,7 +1139,7 @@ label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(-
 /* ---------- panels / cards ---------- */
 
 .view-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.view-head h2 { margin: 0; font-family: var(--pixel); font-size: 22px; letter-spacing: 0.01em; }
+.view-head h2 { margin: 0; font-family: var(--sans); font-size: 20px; }
 
 /* Panels and cards: one bordered surface on the violet night background, 22px radius, hairline
    border and a very soft shadow — never a second accent fill. */
@@ -1172,21 +1172,21 @@ label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(-
 .card .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
 /* Bot cards: the pixel mascot in the bot's colour as an inline SVG badge. */
+.bot-card { padding: 20px 24px; }
 .bot-card-head { display: flex; align-items: center; gap: 12px; }
 .bot-card .avatar {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
   display: grid;
   place-items: center;
-  background: var(--accent-weak);
   flex: none;
 }
-.bot-card .avatar svg { width: 34px; height: 34px; }
-.bot-card h3 { font-family: var(--pixel); font-size: 16px; }
-.bot-card .actions { margin-top: 10px; }
+.bot-card .avatar svg { width: 40px; height: 40px; }
+.bot-card h3 { font-family: var(--sans); font-size: 17px; }
+.bot-card > .row { margin-top: 14px; }
+.bot-card .actions { margin-top: 14px; }
 .bot-card-head .chip { margin-left: auto; }
-.approval .title .chip { margin-left: auto; }
+.approval .title .chip { margin-left: auto; min-height: 26px; padding-inline: 10px; font-size: 11px; }
 
 /* Model pill (read-only look, same shape as the header selector). */
 .select {
@@ -1501,21 +1501,34 @@ dialog.modal input[aria-invalid="true"] { border-color: var(--danger); }
     backdrop-filter: blur(1.5px);
   }
   .thread {
-    padding: calc(var(--header-h) + var(--ds-space-3)) max(var(--ds-space-3), env(safe-area-inset-right)) var(--ds-space-2)
-      max(var(--ds-space-3), env(safe-area-inset-left));
+    padding: calc(var(--header-h) + var(--ds-space-5)) max(var(--ds-space-5), env(safe-area-inset-right)) var(--ds-space-2)
+      max(var(--ds-space-5), env(safe-area-inset-left));
   }
   .msg.user .bubble { max-width: 88%; }
   .composer-wrap {
-    padding: var(--ds-space-2) max(var(--ds-space-3), env(safe-area-inset-right))
-      calc(var(--ds-space-3) + env(safe-area-inset-bottom)) max(var(--ds-space-3), env(safe-area-inset-left));
+    padding: var(--ds-space-2) max(var(--ds-space-5), env(safe-area-inset-right))
+      calc(var(--ds-space-3) + env(safe-area-inset-bottom)) max(var(--ds-space-5), env(safe-area-inset-left));
   }
+  .composer-hint { flex-wrap: wrap; }
+  .quick { white-space: nowrap; }
   .composer textarea { font-size: 16px; } /* no iOS zoom on focus */
   .model-picker { display: none; } /* model lives in Bots → Modell on phones, the header stays quiet */
   .panel-view {
     padding: calc(var(--header-h) + var(--ds-space-2)) max(var(--ds-space-3), env(safe-area-inset-right))
       calc(var(--ds-space-8) + env(safe-area-inset-bottom)) max(var(--ds-space-3), env(safe-area-inset-left));
   }
-  .log .line { grid-template-columns: 54px 36px 1fr; }
+  /* Keep every log field readable on phones, including long paths, without a wide table. */
+  .log .line:not(.head) { grid-template-columns: 72px auto minmax(0, 1fr) auto; row-gap: 4px; }
+  .log .line.head { display: none; }
+  .log .line > span:nth-child(3) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow: visible;
+  }
+  .log .line > .c-ms { display: block; grid-column: 3; grid-row: 1; text-align: right; }
+  .log .line > .c-method { display: block; grid-column: 4; grid-row: 1; }
 
   /* Bottom sheet instead of a floating box: thumb-reachable actions, safe-area padding. */
   dialog.modal { inset: auto 0 0; margin: 0; width: 100%; }
