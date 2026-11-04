@@ -690,7 +690,9 @@ html.mc .hero-scene .stats .card .v { font-size: clamp(1.15rem, 2.2vw, 1.5rem); 
 html.mc .hero-scene #names:empty { display: none; }
 html.mc .hero-scene .onl[hidden] { display: none; }
 html.mc .hero-scene #hs { gap: 16px !important; }
-@media (max-width: 1023px) {
+/* Unter 700px ist die Karte einspaltig; zwischen 700 und 1023px steht sie (gestapelt) in voller
+   Breite, dort bleiben drei Spalten richtig. */
+@media (max-width: 699px) {
   html.mc .hero-scene .stats { grid-template-columns: minmax(0, 1fr); }
   html.mc .hero-scene .stats .card .k { font-size: 0.72rem; }
 }
