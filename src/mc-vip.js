@@ -39,6 +39,8 @@ const PERKS = {
     { id: "badge", icon: "name_tag", title: "Rang-Badge", text: "MVP-Badge in eigener Farbe, sichtbar über VIP, auf Profil, Spielerliste und in der PvP-Rangliste." },
     { id: "panel", icon: "book", title: "Dieses Panel", text: PANEL_TEXT },
     { id: "worlds", icon: "grass_block", title: "VIP-Welten", text: WORLDS_TEXT },
+    { id: "worlds_more", icon: "map", title: "Mehrere eigene Welten", text: "MVP darf mehrere Welten gleichzeitig haben, VIP eine." },
+    { id: "addons_more", icon: "redstone_torch", title: "Mehr Addons gleichzeitig", text: "Bei MVP dürfen mehr Addons gleichzeitig aktiv sein." },
     { id: "higher", icon: "golden_apple", title: "Höherer Rang", text: "MVP steht über VIP. Weitere Ingame-Vorteile folgen." },
   ],
   admin: [

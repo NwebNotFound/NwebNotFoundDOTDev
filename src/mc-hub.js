@@ -111,9 +111,12 @@ const SEARCH_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden=
 /* ---------- Startseite ---------- */
 export const homeBody = (HOST) => `
 <section class="hero hero-scene" style="padding-bottom:1rem"><div class="pixbg"></div>${HSCENE}<div class="hub-wrap">
+<div class="hcopy">
 <p class="eyb">Java Edition · Vanilla+</p>
 <h1 class="hub-h">Dein Server.<br><span style="color:var(--acc)">Alles an einem Ort.</span></h1>
 <p class="sub">Status, Profil, Bestenlisten, Markt und Wiki für unseren Survival-Server unter Freunden.</p>
+<p class="hero-cta"><a class="btn" href="#join">So kommst du drauf <span class="arrow" aria-hidden="true">→</span></a><a class="btn sec" href="/wiki">Zum Wiki</a></p>
+</div>
 <div class="g pad" style="margin-top:1.8rem;display:grid;gap:1.2rem;grid-template-columns:1fr" id="hs">
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.8rem 1.4rem;justify-content:space-between">
 <p class="status" style="justify-content:flex-start;margin:0"><span id="dot" class="dot"></span><span id="state">Prüfe Status…</span></p>

@@ -258,6 +258,20 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
   if (inject) await page.addInitScript(inject);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForTimeout(wait || 1400);
+  // 3D models load lazily and asynchronously: give them a bounded moment so no tile is captured
+  // mid-load (this is why the "Gerade online" row still looked empty on desktop while the phone
+  // breakpoint, which renders a static frame, already showed the figures). Never blocks a run.
+  if (!blockExternal) {
+    await page.waitForFunction(() => {
+      const els = [...document.querySelectorAll(".m3d")];
+      if (!els.length) return true;
+      return els.every((e) => {
+        if (e.classList.contains("ready")) return true;
+        const i = e.querySelector("img.m3d-fb");
+        return !!i && i.complete && i.naturalWidth > 0;
+      });
+    }, { timeout: 8000 }).catch(() => {});
+  }
   await page.screenshot({ path: file, fullPage: true });
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);

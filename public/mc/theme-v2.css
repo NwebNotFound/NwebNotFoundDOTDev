@@ -97,7 +97,13 @@ html.mc .eyebrow::before, html.mc .eyb::before {
   clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%);
 }
 html.mc .center .eyebrow, html.mc .center .eyb { justify-content: center; }
-html.mc .hero, html.mc .sec { padding-top: clamp(2rem, 6vw, 3rem) !important; padding-bottom: clamp(2.5rem, 7vw, 4rem) !important; }
+/* Section padding must not leak into `<button class="btn sec">`: `.sec` is both the section class
+   and the button modifier, so scope it to the element (the market "Alle N Items anzeigen" button
+   used to inherit 48px/64px of section padding and looked like a square box). No `!important`
+   either: the page bodies set `padding-bottom:.5rem` inline on their heads on purpose, and that
+   inline value is what keeps the head close to the content below it. */
+html.mc section.hero, html.mc section.sec { padding-top: clamp(2rem, 6vw, 3rem); padding-bottom: clamp(2.5rem, 7vw, 4rem); }
+html.mc .btn.sec, html.mc .btn.sm.sec { padding-top: 0; padding-bottom: 0; }
 html.mc .hero { overflow: visible; }
 /* `.pixbg` was the pixel-texture glow of the chest GUI look. In v2 the page canvas carries the sky
    gradient; a quiet, real-texture version stays as the scroll-parallax layer of the page heads
@@ -523,3 +529,136 @@ html.mc .num, html.mc .tnum, html.mc td, html.mc .stat .v { font-variant-numeric
   html.mc .lrow > :nth-child(n + 4) { grid-column: 2 / -1; justify-self: start; }
   html.mc footer .wrap { justify-content: flex-start; }
 }
+
+/* ==========================================================================================
+   Review round 2 (Lead review of docs/screens/v2/mc). These rules come last on purpose.
+   The page modules (profile.css, vip.css, ranks.css, economy.css) are injected into the BODY,
+   i.e. AFTER this file, so an override that only matched them with the same specificity would
+   lose the tie. That is why every page-module selector below carries an extra `body` ancestor:
+   `html.mc body .pf-tile` (0,2,2) beats profile.css's `html.mc .pf-tile` (0,2,1).
+   ========================================================================================== */
+
+/* ---- 1) no dashed rule under headings: the mockup has none (ds.css draws one via ::after) ---- */
+html.mc :is(.hub-h, .hub-h2, .h-l, .h-xl, .mch-name)::after { content: none; display: none; }
+
+/* ---- 2) stat + KPI tiles: pages.css `.stat` (surface, 1px line, soft shadow, 18px radius)
+        instead of the chest-GUI frame (2px black edge + inset bevel) that still won the
+        cascade on `.stats .card` (ds.css), `.pf-tile`/`.pf-meta div` (profile.css). ---- */
+html.mc .stat, html.mc .stats .card, html.mc .mini div, html.mc .kv3 span, html.mc #pb .mch-tile,
+html.mc .empty-st, html.mc .addr,
+html.mc body .pf-tile, html.mc body .pf-meta div, html.mc body .vip-stat, html.mc body .vip-world {
+  background: var(--surface); border: 0; color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow);
+}
+html.mc .stat, html.mc .stats .card, html.mc body .pf-tile, html.mc body .vip-stat { padding: 18px 20px; border-radius: 18px; }
+html.mc .stats .card { transform: none; }
+html.mc .mini div, html.mc .kv3 span, html.mc .addr { border-radius: var(--r-sm); padding: 12px 16px; }
+html.mc body .pf-meta div { border-radius: 14px; padding: 12px 14px; }
+html.mc .stat .k, html.mc .stats .card .k { color: var(--muted); }
+html.mc .stat .v, html.mc .stats .card .v { color: var(--ink); }
+
+/* ---- 3) profile tiles: the label may wrap to two lines, a value is NEVER cut off ---- */
+html.mc body .pf-kpi { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 0 0 16px; }
+html.mc body .pf-tile { align-items: flex-start; }
+html.mc body .pf-tile .k {
+  white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+html.mc body .pf-tile .v { white-space: nowrap; overflow: visible; text-overflow: clip; }
+html.mc body .pf-tile .s { white-space: normal; overflow: visible; text-overflow: clip; font-size: 0.75rem; }
+html.mc body .pf-meta { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+html.mc body .pf-meta dd { white-space: nowrap; overflow: visible; text-overflow: clip; }
+
+/* ---- 5) footer grass edge: spans the whole footer. The line is the first child of the shell's
+        padded `<div class="wrap">`, so it is taken out of that flow and pinned to the footer box.
+        `width:100%` is required: the SVG is a replaced element, and with `width:auto` it takes its
+        intrinsic ratio (80:2 x 14px = 560px) and widened the document on every phone page. ---- */
+html.mc footer { position: relative; }
+html.mc footer .grassline {
+  display: block; position: absolute; top: 0; left: 0; right: 0; width: 100%; height: 14px; margin: 0;
+}
+
+/* ---- 6) home hero: copy left, status panel right (mockup: two 420px columns from 1024px) ---- */
+html.mc .hero-scene .hcopy { min-width: 0; }
+@media (min-width: 1024px) {
+  html.mc .hero-scene .hub-wrap { display: flex; flex-wrap: wrap; gap: 40px; align-items: center; }
+  html.mc .hero-scene .hcopy { flex: 1 1 420px; }
+  html.mc .hero-scene .hub-wrap > #hs { flex: 1 1 420px; margin-top: 0 !important; align-self: center; }
+}
+html.mc .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+
+/* ---- 7) profile tabs: segmented control like the mockup `.tabs`, and a tight gap above ---- */
+html.mc body .pf-tabs { margin: 0; }
+html.mc body .pf-tl {
+  display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 0 0 12px;
+  border-radius: 999px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line);
+  overflow: visible; max-width: 100%;
+}
+html.mc body .pf-tl button {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  border: 0; border-radius: 999px; background: transparent; color: var(--muted);
+  font-family: var(--f-body); font-size: 0.875rem; font-weight: 800; box-shadow: none; cursor: pointer;
+  transition: background-color 0.25s, color 0.25s;
+}
+html.mc body .pf-tl button img { image-rendering: pixelated; }
+html.mc body .pf-tl button:hover { color: var(--ink); background: var(--surface-3); }
+html.mc body .pf-tl button[aria-selected=true] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 0 var(--line-strong); }
+html.mc body .pf-tl button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---- 8) market: names in ink (link colour only on hover), cards on content height ---- */
+html.mc a.mrow b, html.mc a.lrow b, html.mc a.ir b, html.mc a.li b, html.mc body .il .in b { color: var(--ink); }
+html.mc a.mrow:hover b, html.mc a.mrow:focus-visible b, html.mc a.lrow:hover b, html.mc a.ir:hover b,
+html.mc a.ir:focus-visible b, html.mc a.li:hover b, html.mc body .il a:hover .in b { color: var(--link); }
+html.mc .mg { align-items: start; }
+html.mc #showall { padding: 0 16px; }
+
+/* ---- 10) VIP/MVP panel in the new mockup look (vip.css is injected by the page body) ---- */
+html.mc body .vip-me {
+  display: flex; flex-wrap: wrap; gap: 20px; align-items: center; padding: 20px;
+  background: linear-gradient(160deg, rgba(199, 123, 224, 0.18), var(--surface) 60%);
+}
+html.mc body .vip-me.is-vip { background: linear-gradient(160deg, rgba(255, 212, 94, 0.16), var(--surface) 55%); }
+html.mc body .vip-me .slot.big { width: 72px; height: 72px; border-radius: 18px; }
+html.mc body .vip-me .slot.big img { width: 72px; height: 72px; }
+html.mc body .vip-me > div { flex: 1 1 300px; min-width: 0; }
+html.mc body .vip-me .hub-h2 { margin: 6px 0 0; font-size: clamp(1.6rem, 4vw, 2.2rem); }
+html.mc body .vip-acts { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0; }
+html.mc body .vip-ranks { align-items: start; }
+html.mc body .vip-card { align-self: start; }
+html.mc body .vip-card.is-vip { background: linear-gradient(160deg, rgba(255, 212, 94, 0.16), var(--surface) 55%); }
+html.mc body .vip-card.is-mvp { background: linear-gradient(160deg, rgba(199, 123, 224, 0.24), var(--surface) 55%); box-shadow: inset 0 0 0 2px rgba(199, 123, 224, 0.6), var(--shadow-lift); }
+html.mc body .vip-card.is-admin { background: linear-gradient(160deg, rgba(255, 138, 138, 0.16), var(--surface) 55%); }
+html.mc body .vip-card .hub-h2 { font-size: 1.25rem; }
+html.mc body .vip-perks .mut { color: var(--muted); }
+html.mc body .vip-world, html.mc body .vip-soon { border-radius: 18px; }
+html.mc body .vip-world b { font-size: 1.0625rem; }
+html.mc body .vip-block > .hub-h2 { font-size: 1.35rem; }
+/* rank chips (ranks.css draws a bordered tag): the mockup uses soft, filled chips */
+html.mc body .vip-me .rk, html.mc body .vip-card .rk {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; margin: 0;
+  border: 0; border-radius: 8px; font-family: var(--f-body); font-size: 0.75rem; font-weight: 900;
+  letter-spacing: 0.04em; text-transform: none; background: rgba(255, 255, 255, 0.08); color: var(--ink);
+}
+html.mc body .vip-me .rk-6, html.mc body .vip-card .rk-6 { background: var(--sun); color: var(--sun-ink); }
+html.mc body .vip-me .rk-d, html.mc body .vip-card .rk-d { background: #c77be0; color: #2a0c36; }
+html.mc body .vip-me .rk-c, html.mc body .vip-card .rk-c { background: var(--down); color: #4a0f0f; }
+html.mc body .vip-card .tag.ts { background: #c77be0; color: #2a0c36; box-shadow: none; }
+html.mc body .vip-card.is-vip .tag.ts { background: var(--sun); color: var(--sun-ink); }
+/* worlds: status chips + a dashed free slot, and the meta line stays on one rhythm */
+html.mc body .vip-world { gap: 14px; padding: 16px 18px; }
+html.mc body .vip-world .tag { min-height: 24px; border-radius: 8px; box-shadow: none; }
+html.mc body .vip-world .tag.ts { background: var(--act); color: var(--act-ink); }
+html.mc body .vip-world .tag.tr { background: var(--surface-3); color: var(--muted); }
+html.mc body .vip-free {
+  display: flex; align-items: center; gap: 14px; min-height: 84px; padding: 16px 18px;
+  background: transparent; border-radius: 18px;
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}
+html.mc body .vip-free .slot { opacity: 0.6; }
+html.mc body .vip-free p { margin: 0; font-size: 0.875rem; color: var(--muted); }
+
+/* VIP: Kopfzeilen der Blöcke (Kicker + Titel links, Notiz bzw. Zähler rechts) */
+html.mc body .vip-head { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: flex-end; justify-content: space-between; margin: 0 0 16px; }
+html.mc body .vip-head .hub-h2 { margin: 6px 0 0; }
+html.mc body .vip-head-note, html.mc body .vip-head-n { margin: 0; max-width: 46ch; font-size: 0.8125rem; font-weight: 800; }
+html.mc body .vip-head-n { font-variant-numeric: tabular-nums; }
