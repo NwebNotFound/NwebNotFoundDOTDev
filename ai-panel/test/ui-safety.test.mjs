@@ -10,7 +10,7 @@ import path from "node:path";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.join(here, "..", "public");
 
-const JS = ["app.js", "markdown.js", "highlight.js", "run-events.js", "crew.js"];
+const JS = ["app.js", "markdown.js", "highlight.js", "run-events.js", "crew.js", "auth-reason.js"];
 
 async function read(name) {
   return readFile(path.join(pub, name), "utf8");

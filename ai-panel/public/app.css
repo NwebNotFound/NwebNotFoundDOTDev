@@ -1599,6 +1599,21 @@ html[data-auth="out"] #app { display: none; }
 .login-card .brand { font-size: var(--ds-text-lg); }
 .login-title { margin: var(--ds-space-2) 0 0; font-family: var(--pixel); font-size: var(--ds-text-2xl); line-height: var(--ds-leading-tight); letter-spacing: 0.01em; }
 .login-hint { margin: 0; color: var(--text-dim); font-size: var(--ds-text-md); }
+/* Rejected login (/auth/denied?reason=…). A state, not an accent: 1px danger ring plus text,
+   so the message never relies on colour alone and stays readable in both themes. */
+.login-notice {
+  width: 100%;
+  margin: 0;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border: 1px solid var(--ds-danger);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-danger-weak);
+  color: var(--ds-danger);
+  font-size: var(--ds-text-md);
+  line-height: var(--ds-leading-normal);
+  text-align: left;
+}
+.login-notice[hidden] { display: none; }
 .login-note { margin: 0; padding-top: var(--ds-space-3); border-top: 1px solid var(--line); font-size: var(--ds-text-xs); color: var(--text-faint); }
 .login-btn {
   display: flex;

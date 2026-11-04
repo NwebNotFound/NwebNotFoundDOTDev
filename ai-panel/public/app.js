@@ -19,6 +19,7 @@ import {
   toolOutputText,
 } from "./run-events.js";
 import { createCrewView } from "./crew.js";
+import { deniedNotice } from "./auth-reason.js";
 
 const state = {
   me: null,
@@ -1661,6 +1662,19 @@ function showLogin() {
   document.documentElement.dataset.auth = "out";
   const box = $("#login-screen");
   if (box) box.hidden = false;
+  showDeniedNotice();
+}
+
+// `/auth/denied?reason=…` has no Worker route: the SPA shell is served there and the rejected
+// login has to explain itself. Only the code-to-sentence map in auth-reason.js is rendered —
+// the query string is attacker-controlled, so it is looked up, never printed.
+function showDeniedNotice() {
+  const node = $("#login-notice");
+  if (!node) return;
+  const url = new URL(location.href);
+  const text = url.pathname === "/auth/denied" ? deniedNotice(url.searchParams.get("reason")) : "";
+  node.textContent = text;
+  node.hidden = !text;
 }
 
 function initTheme() {
