@@ -1,0 +1,33 @@
+/* Only the two profile statistics lists use these shared columns. */
+.mc-stats-list {
+  display: grid;
+  grid-template-columns: var(--ds-space-6, 2rem) minmax(0, 1fr) fit-content(45%);
+  column-gap: var(--sp3, var(--ds-space-3, .75rem));
+  min-width: 0;
+}
+.mc-stats-list > .row,
+.mc-stats-list > .prow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: inherit;
+  min-width: 0;
+}
+.mc-stats-list > .row .n,
+.mc-stats-list > .prow .n,
+.mc-stats-list > .prow .n span {
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+html .mc-stats-list > .row > b,
+html .mc-stats-list > .prow > b {
+  min-width: 0;
+  width: 100%;
+  text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.mc-stats-list .ic { width: 100%; }
