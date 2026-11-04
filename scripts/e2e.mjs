@@ -542,9 +542,20 @@ try {
       const r = await hub(p), want = p.slice(3);
       ok(r.s === 301 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}`, `${p} → 301 ${want} (Hub-fremde Route ohne Präfix)`, `${r.s} ${r.h.get("location")}`);
     }
-    for (const p of ["/", "/about", "/music", "/writing", "/reviews"]) {
+    for (const p of ["/", "/about", "/music", "/writing"]) {
       const r = await hub(p);
       ok(r.s === 200 && r.t.includes("/design/summer.css?v="), `Hub-Route ${p} → 200`, r.s);
+    }
+    // Rezensionen wurden am 04.11.2026 entfernt: die Route liefert die normale 404-Seite, die
+    // Sprachvarianten laufen über den üblichen 301 auf den präfixlosen Pfad.
+    {
+      const gone = await hub("/reviews");
+      const goneDe = await hub("/de/reviews");
+      const goneEn = await hub("/en/reviews");
+      ok(gone.s === 404 && gone.t.includes("Fehler 404") && !gone.t.includes("sm-root"), "/reviews → normale 404-Seite", gone.s);
+      ok(goneDe.s === 301 && (goneDe.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/de/reviews → 301 auf /reviews", goneDe.s);
+      ok(goneEn.s === 301 && (goneEn.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/en/reviews → 301 auf /reviews", goneEn.s);
+      ok(!gone.t.includes("Rezensionen") && !(await hub("/")).t.includes("Rezensionen") && !(await hub("/about")).t.includes("Rezensionen"), "nirgends mehr ein Rezensionen-Link");
     }
     const soon = await hub("/en/music");
     ok(soon.s === 200 && soon.t.includes("sm-hammer") && soon.t.includes("(◕‿◕)"), "/en/music → Leerzustand mit Maskottchen-Platzhalter");
@@ -641,7 +652,7 @@ try {
     ok((await hub("/writing/series/test-fixture-serie/atom.xml")).s === 200, "Serie hat auch einen Atom-Feed");
     ok((await hub("/de/writing/feed.xml")).s === 200 && (await hub("/en/writing/feed.xml")).s === 200, "Sprachpräfix liefert denselben Feed (301 vermieden)");
     ok((await hub("/writing/series/test-fixture-serie/feed.xml", { headers: { "if-none-match": "*" } })).s === 304, "If-None-Match: * → 304");
-    ok((await hub("/writing/reviews/feed.xml")).s === 404 && (await hub("/writing/unbekannt/feed.xml")).s === 404, "unbekannter Feed → 404");
+    ok((await hub("/writing/notes/feed.xml")).s === 404 && (await hub("/writing/unbekannt/feed.xml")).s === 404, "unbekannter Feed → 404");
     ok(!(await req("/writing/feed.xml")).t.includes("<rss"), "kein Feed auf mc.nwebnotfound.dev");
 
     const list = await hub("/writing");

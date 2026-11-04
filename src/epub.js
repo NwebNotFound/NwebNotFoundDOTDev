@@ -11,7 +11,7 @@
 //
 // Rules (plan §8 "Export", Nils' decisions):
 //   - one EPUB per published story chapter and one per series (all non-archived chapters in order),
-//   - blog posts and reviews get no export at all,
+//   - blog posts get no export at all,
 //   - the rights line is part of the export and of the page,
 //   - the identifier is a stable UUID derived from the slug,
 //   - a cover is only embedded when there is one,
@@ -364,7 +364,7 @@ export function buildEpub({ title, lang, identifier, date, rights, chapters, ima
 
 /**
  * Build every export of a content index: one EPUB per published story chapter, one per series with
- * published chapters. Blog posts (and later reviews) get nothing — Nils' decision (plan §0).
+ * published chapters. Blog posts get nothing — Nils' decision (plan §0).
  * `readImage(path)` resolves a `/content-assets/…` path to `{ bytes, mediaType }` or `null`.
  */
 export function buildEpubs({ writing = [], series = [], site = "nwebnotfound.dev", rights, readImage = () => null }) {

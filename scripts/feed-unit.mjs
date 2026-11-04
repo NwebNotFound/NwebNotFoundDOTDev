@@ -239,7 +239,7 @@ assert.deepEqual(feedPaths({ type: "series", series: "sommer" }), { rss: "/writi
   assert.equal(feedFor(feeds, "/de/writing/feed.xml").path, "/writing/feed.xml", "the language prefix is ignored");
   assert.equal(feedFor(feeds, "/en/writing/atom.xml").path, "/writing/atom.xml");
   assert.equal(feedFor(feeds, "/writing/feed.xml?x=1"), null, "a query string is not part of the lookup");
-  assert.equal(feedFor(feeds, "/writing/reviews/feed.xml"), null);
+  assert.equal(feedFor(feeds, "/writing/notes/feed.xml"), null);
   assert.equal(feedFor(feeds, "/writing/"), null);
   assert.equal(feedFor([], "/writing/feed.xml"), null);
 }

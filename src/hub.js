@@ -31,14 +31,13 @@ const SERIES = CONTENT.series || [];
 
 // Hub routes. The first entry is the new start page; `/portfolio` is the previous start page and
 // keeps its own (German) portfolio shell in src/worker.js.
-export const HUB_PAGES = ["/", "/about", "/music", "/writing", "/reviews"];
-const SOON = { "/music": "music", "/writing": "writing", "/reviews": "reviews" };
+export const HUB_PAGES = ["/", "/about", "/music", "/writing"];
+const SOON = { "/music": "music", "/writing": "writing" };
 
 const NAV = [
   { path: "/", key: "nav.home" },
   { path: "/music", key: "nav.music", soon: true },
   { path: "/writing", key: "nav.writing", soon: true },
-  { path: "/reviews", key: "nav.reviews", soon: true },
   { path: "/about", key: "nav.about" },
 ];
 
@@ -46,7 +45,6 @@ const META = {
   "/": ["meta.home.title", "meta.home.desc"],
   "/about": ["meta.about.title", "meta.about.desc"],
   "/music": ["meta.music.title", "meta.music.desc"],
-  "/reviews": ["meta.reviews.title", "meta.reviews.desc"],
 };
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -211,8 +209,6 @@ const TILE_ART = {
     `<rect x="4" y="1" width="5" height="1" fill="#1f2a44"></rect><rect x="8" y="1" width="1" height="6" fill="#1f2a44"></rect><rect x="4" y="1" width="1" height="7" fill="#1f2a44"></rect><rect x="2" y="7" width="3" height="2" fill="#1f2a44"></rect><rect x="6" y="6" width="3" height="2" fill="#1f2a44"></rect>`,
   writing:
     `<rect x="1" y="2" width="4" height="6" fill="#ffffff"></rect><rect x="5" y="2" width="4" height="6" fill="#f1ecff"></rect><rect x="4" y="2" width="2" height="7" fill="#1f2a44"></rect><rect x="2" y="3" width="2" height="1" fill="#1f2a44"></rect><rect x="2" y="5" width="2" height="1" fill="#1f2a44"></rect><rect x="6" y="3" width="2" height="1" fill="#1f2a44"></rect>`,
-  reviews:
-    `<rect x="4" y="0" width="2" height="2" fill="#1f2a44"></rect><rect x="0" y="3" width="10" height="2" fill="#1f2a44"></rect><rect x="2" y="2" width="6" height="5" fill="#1f2a44"></rect><rect x="1" y="7" width="3" height="2" fill="#1f2a44"></rect><rect x="6" y="7" width="3" height="2" fill="#1f2a44"></rect>`,
   guestbook:
     `<rect x="1" y="1" width="8" height="6" fill="#ffffff"></rect><rect x="2" y="7" width="2" height="2" fill="#ffffff"></rect><rect x="3" y="3" width="1" height="1" fill="#1f2a44"></rect><rect x="5" y="3" width="1" height="1" fill="#1f2a44"></rect><rect x="7" y="3" width="1" height="1" fill="#1f2a44"></rect>`,
   projects:
@@ -337,8 +333,8 @@ function feedNote(feeds, t) {
 
 /* ---------- export (plan §8 "Export", phase 3c) ---------- */
 
-// Download and print live on story pages only. Blog posts and (later) reviews get no export at all —
-// Nils' decision in plan §0. The print button calls `window.print()` from an external script
+// Download and print live on story pages only. Blog posts get no export at all — Nils' decision in
+// plan §0. The print button calls `window.print()` from an external script
 // (/design/summer-print.js), never from an inline handler, so the CSP stays clean.
 const printButton = (t) => `<button class="sm-btn sm-btn--soft sm-btn--dense" type="button" data-sm-print>${esc(t("writing.export.print"))}</button>`;
 
@@ -549,7 +545,7 @@ ${feedNote(writingSeriesFeeds(series, t), t)}
 
 function navLink(item, lang, active, t) {
   // A section is "soon" while it carries no content: `/writing` as soon as the index is empty, and
-  // `/music` + `/reviews` until they get their own source. The nav then dims the label and adds the
+  // `/music` until it gets its own source. The nav then dims the label and adds the
   // small sun pixel (artboard `.nav a.soon`) instead of a yellow text badge.
   const sectionReady = item.path === "/writing" && publishedWriting(WRITING).length > 0;
   const soon = item.soon && !sectionReady;
@@ -744,22 +740,21 @@ function homeBody(t, lang) {
 <p class="sm-lead">${esc(t("home.sections_lead"))}</p>
 </div>
 <div class="sm-tiles">
-${tile({ href_: `https://${MC_HOST}/`, mcId: "grass_block", iconKey: "minecraft", tone: "grass", title: t("tile.minecraft.title"), text: t("tile.minecraft.text"), cta: t("tile.minecraft.cta"), external: true, wide: true })}
+${tile({ href_: `https://${MC_HOST}/`, mcId: "grass_block", iconKey: "minecraft", tone: "grass", title: t("tile.minecraft.title"), text: t("tile.minecraft.text"), cta: t("tile.minecraft.cta"), external: true })}
 ${tile({ href_: href("/about", lang), iconKey: "about", tone: "sakura", title: t("tile.about.title"), text: t("tile.about.text"), cta: t("tile.cta.more") })}
 ${tile({ href_: href("/music", lang), iconKey: "music", tone: "ramune", title: t("tile.music.title"), text: t("tile.music.text"), badge: soon, cta: t("tile.cta.soon"), ctaMuted: true })}
 ${tile({ href_: href("/writing", lang), iconKey: "writing", tone: "lavender", title: t("tile.writing.title"), text: t("tile.writing.text"), badge: soon, cta: t("tile.cta.soon"), ctaMuted: true })}
-${tile({ href_: href("/reviews", lang), iconKey: "reviews", tone: "sun", title: t("tile.reviews.title"), text: t("tile.reviews.text"), badge: soon, cta: t("tile.cta.soon"), ctaMuted: true })}
 ${tile({ href_: "/guestbook", iconKey: "guestbook", tone: "peach", title: t("tile.guestbook.title"), text: t("tile.guestbook.text"), cta: t("tile.cta.more") })}
-${tile({ href_: href("/portfolio", lang), iconKey: "projects", tone: "surface", title: t("tile.portfolio.title"), text: t("tile.portfolio.text"), cta: t("tile.cta.more"), wide: true })}
+${tile({ href_: href("/portfolio", lang), iconKey: "projects", tone: "surface", title: t("tile.portfolio.title"), text: t("tile.portfolio.text"), cta: t("tile.cta.more") })}
 </div>
 </div></section>`;
 }
 
 function aboutBody(t, lang) {
-  // Pastel chips for the four sections the hub offers. No `sm-badge--sun` here: that tint marks a
+  // Pastel chips for the three sections the hub offers. No `sm-badge--sun` here: that tint marks a
   // "soon" section, and /about is not an empty state (kept as an assertion in scripts/hub-unit.mjs).
-  const chips = ["nav.minecraft", "nav.writing", "nav.music", "nav.reviews"]
-    .map((k, i) => `<span class="sm-badge sm-badge--${["ramune", "sakura", "lavender", "peach"][i]}">${esc(t(k))}</span>`)
+  const chips = ["nav.minecraft", "nav.writing", "nav.music"]
+    .map((k, i) => `<span class="sm-badge sm-badge--${["ramune", "sakura", "lavender"][i]}">${esc(t(k))}</span>`)
     .join("");
   return `
 <section class="sm-section"><div class="sm-wrap">

@@ -130,7 +130,21 @@ for (const lang of LANGS) {
   // Formatted numbers follow the page language.
   ok(formatNumber(1234, "de") === "1.234" && formatNumber(1234, "en") === "1,234", "counts are grouped per language", `${formatNumber(1234, "de")} / ${formatNumber(1234, "en")}`);
   ok(formatNumber("kaputt", "de") === "kaputt", "a non-number is passed through instead of 'NaN'");
-  ok(["music", "writing", "reviews"].every((s) => home.includes(`href="/en/${s}"`)), "home links the still-empty sections");
+  ok(["music", "writing"].every((s) => home.includes(`href="/en/${s}"`)), "home links the still-empty sections");
+  // Rezensionen gibt es nicht mehr (Nils, 04.11.2026): keine Spur in Navigation, Kacheln oder Hinweisen.
+  ok(!home.includes("/reviews") && !home.includes("Rezensionen") && !home.includes("Reviews"), "die Startseite kennt keine Rezensionen mehr");
+  ok(
+    ["/", "/about", "/music", "/writing"].every((p) => !hubPage(p, "de").includes("Rezensionen") && !hubPage(p, "en").includes("Reviews")),
+    "kein Rezensionen-Hinweis mehr in Navigation, Kacheln, About oder Meta",
+  );
+  ok(hubPage("/reviews", "de") === null && hubPage("/reviews", "en") === null && !hubPageExists("/reviews"), "/reviews gehört dem Hub nicht mehr (fällt auf die 404-Seite)");
+  // Sechs Kacheln passen in ein 3-Spalten-Raster ohne Lücke: kein `sm-tile--wide` mehr, weil zwei
+  // breite Kacheln + vier normale nur acht von neun Zellen belegt hätten.
+  const tileCount = (home.match(/sm-card sm-card--link sm-tile/g) || []).length;
+  ok(tileCount === 6 && tileCount % 3 === 0 && !home.includes("sm-tile--wide"), `sechs gleich große Kacheln, Raster ohne Lücke (${tileCount})`);
+  // Und die Chips auf /about zählen dieselben Bereiche.
+  const aboutChips = (hubPage("/about", "de").match(/sm-badge sm-badge--(ramune|sakura|lavender|peach|sun)/g) || []).length;
+  ok(aboutChips >= 3 && !hubPage("/about", "de").includes("Rezensionen"), "die Bereichs-Chips auf /about passen zur Navigation");
   ok(home.includes("sm-badge--sun") && home.includes("soon"), "still-empty sections are marked as soon");
   const de = hubPage("/", "de");
   ok(de.includes("sm-badge--sun") && de.includes("bald"), "the German home says 'bald'");
