@@ -50,12 +50,19 @@
       : "";
     return `<article class="g vip-world${manage ? " vip-aw" : ""}">${slot(s.online ? "grass_block" : "barrier")}<div><b>${E(s.label) || "VIP-Welt"}</b>${tag}<p class="mut vip-world-meta">${E(meta)}</p>${info}${acts}</div></article>`;
   };
-  const worlds = (w) => {
-    const head = `<section class="vip-block" id="vip-worlds"><h2 class="hub-h2">VIP-Welten</h2>`;
+  const worlds = (w, maxArg) => {
+    // Welt-Limit laut Nils, 04.11.2026: kommt mit /api/mc-vip (limits.mine) aus src/mc-vip.js
+    // (WORLD_LIMITS, VIP 1 / MVP 3). Ohne Angabe bleibt es beim bisherigen Standard 3.
+    const max = Number.isFinite(+maxArg) && +maxArg > 0 ? Math.floor(+maxArg) : 3;
     const slots = w && !w.placeholder && Array.isArray(w.slots) ? w.slots : [];
+    const mine = slots.filter((s) => s && s.owner === true).length;
+    const head = `<section class="vip-block" id="vip-worlds"><div class="vip-head"><h2 class="hub-h2">Deine Welten</h2><span class="mut vip-head-n">${NF(mine)} von ${NF(max)} belegt</span></div>`;
     const html = slots.map((s) => world(s, false)).filter(Boolean).join("");
-    if (!html) return `${head}<div class="g vip-soon">${slot("barrier", true)}<p class="tag tw">bald verfügbar</p><p class="mut">Bis zu drei VIP-Welten sind geplant. Sobald der Server sie meldet, steht hier der Status.</p></div></section>`;
-    return `${head}<div class="vip-worlds">${html}</div></section>`;
+    if (!html) return `${head}<div class="g vip-soon">${slot("barrier", true)}<p class="tag tw">bald verfügbar</p><p class="mut">Sobald der Server deine Welt meldet, steht hier der Status.</p></div></section>`;
+    const free = mine < max
+      ? `<article class="vip-free">${slot("barrier", true)}<div><b>Freier Platz</b><p>Eine weitere eigene Welt ist noch frei.</p></div></article>`
+      : "";
+    return `${head}<div class="vip-worlds">${html}${free}</div></section>`;
   };
   const ADMIN_PAGE = 12;
   const adminWorlds = (w) => {
@@ -106,7 +113,11 @@
     const bal = st.money == null ? "–" : NF(st.money) + " CP";
     const pub = name ? `<a class="btn sec" href="/spieler/${encodeURIComponent(name)}">Öffentliches Profil</a>` : "";
     const abadge = admin ? '<span class="tag tl vip-admin-tag">Admin-Ansicht</span>' : "";
-    return `<div class="g vip-me">${head}<div><p class="eyb">Dein Rang ${abadge}</p><h2 class="hub-h2">${E(name || "Spieler")} ${badge(p.rank, p.color)}</h2><p class="vip-acts"><a class="btn" href="/profile">Zum Profil</a>${pub}</p></div></div><p class="vip-say" id="vip-say" role="status" aria-live="polite"></p>${admin ? adminWorlds(d.worlds) + adminLog(d.admin_log) : ""}<h2 class="hub-h2">Vorteile</h2>${cards(d.catalog)}${note(d.note)}${admin ? "" : worlds(d.worlds)}<section class="vip-block" id="vip-stats"><h2 class="hub-h2">Deine Stats</h2><div class="vip-stats">${cell("gold_ingot", "Kontostand", bal)}${cell("clock", "Spielzeit", st.playtime == null ? "–" : up(st.playtime))}${cell("iron_sword", "Spieler-Kills", st.kills == null ? "–" : NF(st.kills))}${cell("skeleton_skull", "Tode", st.deaths == null ? "–" : NF(st.deaths))}${cell("iron_pickaxe", "Blöcke", st.blocks_mined == null ? "–" : NF(st.blocks_mined))}</div></section>`;
+    const rk = ["vip", "mvp", "admin"].includes(p.rank) ? p.rank : "";
+    const stats = `<section class="vip-block" id="vip-stats"><h2 class="hub-h2">Deine Stats</h2><div class="vip-stats">${cell("gold_ingot", "Kontostand", bal)}${cell("clock", "Spielzeit", st.playtime == null ? "–" : up(st.playtime))}${cell("iron_sword", "Spieler-Kills", st.kills == null ? "–" : NF(st.kills))}${cell("skeleton_skull", "Tode", st.deaths == null ? "–" : NF(st.deaths))}${cell("iron_pickaxe", "Blöcke", st.blocks_mined == null ? "–" : NF(st.blocks_mined))}</div></section>`;
+    // Rang-Karten wie im Artboard: Kicker, Titel und der Satz, dass die Ränge nichts kosten.
+    const ranks = `<section class="vip-block" id="vip-ranks"><div class="vip-head"><div><p class="eyb">Ränge</p><h2 class="hub-h2">VIP und MVP</h2></div><p class="mut vip-head-note">Beide Ränge kosten nichts. Nils vergibt sie von Hand an enge Freunde.</p></div>${cards(d.catalog)}${note(d.note)}</section>`;
+    return `<div class="g vip-me is-${rk}">${head}<div><p class="eyb">Dein Rang ${abadge}</p><h2 class="hub-h2">${E(name || "Spieler")} ${badge(p.rank, p.color)}</h2><p class="vip-acts"><a class="btn" href="/profile">Zum Profil</a>${pub}</p></div></div><p class="vip-say" id="vip-say" role="status" aria-live="polite"></p>${stats}${ranks}${admin ? adminWorlds(d.worlds) + adminLog(d.admin_log) : worlds(d.worlds, d.limits && d.limits.mine)}`;
   };
   const gate = (d) => {
     const raw = location.pathname + location.search + location.hash;
@@ -120,7 +131,7 @@
       const own = d.own_rank && RANKL[d.own_rank.rank] ? " Dein Rang ist " + E(RANKL[d.own_rank.rank]) + "." : "";
       msg = `<p class="mut">Das Panel ist für die Ränge VIP, MVP und Admin.${own} Builder und Spieler sehen die Übersicht, nicht das eigene Panel.</p><p class="vip-acts"><a class="btn sec" href="/profile">Zum Profil</a></p>`;
     }
-    return `<div class="vip-gate">${msg}</div><h2 class="hub-h2">Vorteile</h2>${cards(d.catalog)}${note(d.note)}${worlds(null)}`;
+    return `<div class="vip-gate">${msg}</div><h2 class="hub-h2">Vorteile</h2>${cards(d.catalog)}${note(d.note)}${worlds(null, d && d.limits && d.limits.mine)}`;
   };
   const rid = () => {
     try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch { /* Fallback unten */ }

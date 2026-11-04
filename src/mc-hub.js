@@ -95,14 +95,28 @@ export const hubNav = (MAIN) => {
 };
 
 export const MI = (id, px = 26) => `<img class="mi" alt="" width="${px}" height="${px}" loading="lazy" src="/mc-icon/v2/${id}">`;
+
+/* Hero scene (item 4): three decorative pixel layers + the real grass_block texture as the mascot.
+   Sky/stars drift slowest, clouds medium, hills and mascot fastest — the offsets live in
+   /mc/theme-v2.css (CSS scroll-driven animations, JS fallback in /mc/parallax.js). Pure deco:
+   aria-hidden, pointer-events none, inline SVG only (no remote requests, no inline JS). */
+const HSCENE = `<div class="hscene" aria-hidden="true">
+<div class="ly l-stars"><div class="in"><svg class="px" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid slice"><g fill="#fff3d9"><rect class="twinkle" x="22" y="10" width="3" height="3"></rect><rect x="74" y="42" width="2" height="2"></rect><rect class="twinkle" x="142" y="16" width="3" height="3"></rect><rect x="208" y="62" width="2" height="2"></rect><rect class="twinkle" x="262" y="22" width="3" height="3"></rect><rect x="318" y="48" width="2" height="2"></rect><rect class="twinkle" x="370" y="12" width="3" height="3"></rect><rect x="104" y="88" width="2" height="2"></rect><rect x="298" y="96" width="2" height="2"></rect></g></svg></div></div>
+<div class="ly l-clouds"><div class="in"><svg class="px drift" viewBox="0 0 400 80" preserveAspectRatio="xMidYMid slice"><g fill="rgba(255,255,255,.10)"><rect x="30" y="34" width="76" height="14"></rect><rect x="44" y="24" width="44" height="10"></rect><rect x="60" y="18" width="20" height="6"></rect><rect x="228" y="44" width="92" height="14"></rect><rect x="248" y="34" width="52" height="10"></rect><rect x="268" y="28" width="24" height="6"></rect></g></svg></div></div>
+<div class="ly l-hills"><div class="in"><svg class="px" viewBox="0 0 80 24" preserveAspectRatio="none"><g fill="#0f2318"><rect x="0" y="14" width="14" height="10"></rect><rect x="14" y="11" width="10" height="13"></rect><rect x="24" y="16" width="16" height="8"></rect><rect x="40" y="9" width="12" height="15"></rect><rect x="52" y="13" width="14" height="11"></rect><rect x="66" y="15" width="14" height="9"></rect></g><g fill="var(--grass)"><rect x="0" y="22" width="80" height="2"></rect><rect x="3" y="21" width="2" height="1"></rect><rect x="29" y="20" width="3" height="2"></rect><rect x="61" y="21" width="2" height="1"></rect></g></svg></div></div>
+<div class="ly l-mascot"><div class="in"><img class="mi" src="/mc-icon/v2/grass_block" alt="" width="72" height="72"><span class="shadow"></span></div></div>
+</div>`;
 const SEARCH_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 
 /* ---------- Startseite ---------- */
 export const homeBody = (HOST) => `
-<section class="hero" style="padding-bottom:1rem"><div class="pixbg"></div><div class="hub-wrap">
+<section class="hero hero-scene" style="padding-bottom:1rem"><div class="pixbg"></div>${HSCENE}<div class="hub-wrap">
+<div class="hcopy">
 <p class="eyb">Java Edition · Vanilla+</p>
 <h1 class="hub-h">Dein Server.<br><span style="color:var(--acc)">Alles an einem Ort.</span></h1>
 <p class="sub">Status, Profil, Bestenlisten, Markt und Wiki für unseren Survival-Server unter Freunden.</p>
+<p class="hero-cta"><a class="btn" href="#join">So kommst du drauf <span class="arrow" aria-hidden="true">→</span></a><a class="btn sec" href="/wiki">Zum Wiki</a></p>
+</div>
 <div class="g pad" style="margin-top:1.8rem;display:grid;gap:1.2rem;grid-template-columns:1fr" id="hs">
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.8rem 1.4rem;justify-content:space-between">
 <p class="status" style="justify-content:flex-start;margin:0"><span id="dot" class="dot"></span><span id="state">Prüfe Status…</span></p>
@@ -129,7 +143,7 @@ export const homeBody = (HOST) => `
 <li><h3>Hinzufügen</h3><p class="mut"><b>Server hinzufügen</b> mit der Adresse <code class="px">${HOST}</code>.</p></li>
 <li><h3>Freischalten</h3><p class="mut">Im Discord mit <code class="px">/link</code> verknüpfen und den Code im Spiel bestätigen. <a href="/wiki/erste-schritte">Anleitung ›</a></p></li></ol>
 </div></section>
-<link rel="stylesheet" href="/mc/profile.css?v=${AV}"><script src="/mc/player3d.js?v=${AV}" defer></script><script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/home.js?v=${AV}" defer></script>`;
+<link rel="stylesheet" href="/mc/profile.css?v=${AV}"><script src="/mc/player3d.js?v=${AV}" defer></script><script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/home.js?v=${AV}" defer></script><script src="/mc/parallax.js?v=${AV}" defer></script>`;
 
 /* ---------- Markt ---------- */
 export const marketBody = () => `

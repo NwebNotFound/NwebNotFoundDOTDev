@@ -17,7 +17,7 @@
 .crew-view > .crew-range,
 .crew-view > .crew-list,
 .crew-view > .crew-more,
-.crew-view > .crew-transcript { width: 100%; max-width: 880px; }
+.crew-view > .crew-transcript { width: 100%; max-width: 880px; margin-inline: auto; }
 .crew-note { margin: 0; font-size: 12.5px; color: var(--text-dim); }
 
 .crew-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
@@ -25,67 +25,81 @@
 .crew-field-label { font-size: 12.5px; color: var(--text-dim); }
 .crew-field select { min-width: 160px; }
 
-.crew-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.crew-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--bg-side);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
 .chip {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--border);
+  min-height: 34px;
+  padding: 0 16px;
+  border: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--text-dim);
   font-size: 13px;
-  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  font-weight: 800;
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
 .chip:hover { background: var(--bg-hover); color: var(--text); }
-.chip.active { background: var(--accent-weak); border-color: var(--accent); color: var(--text); font-weight: 600; }
+.chip.active { background: var(--bg-elev); color: var(--text); box-shadow: 0 2px 0 var(--line-strong); }
 .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .crew-range { margin: 0; font-size: 12.5px; }
-.crew-list { display: grid; gap: 8px; }
+.crew-list { display: grid; gap: 10px; }
 
 .crew-card {
   display: grid;
-  gap: 4px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
   width: 100%;
   min-height: 60px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   text-align: left;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--bg-elev);
+  box-shadow: var(--shadow-1);
   color: var(--text);
-  transition: border-color 0.18s ease, background-color 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
-.crew-card:hover { border-color: var(--accent); background: var(--bg-hover); }
+.crew-card:hover { border-color: var(--accent); box-shadow: var(--shadow-lift); transform: translateY(-2px); }
 .crew-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+.crew-main { display: grid; gap: 2px; min-width: 0; }
 .crew-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .crew-badge {
   flex: none;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--accent-weak);
-  color: var(--text);
+  padding: 3px 9px;
+  border-radius: 7px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
-.crew-badge.kind-cli,
-.crew-badge.kind-other { background: rgba(127, 127, 127, 0.16); }
+/* Badge colour by session kind (mockup .b-cli / .b-cron / .b-gw). */
+.crew-badge.kind-run { background: var(--lavender); color: var(--lavender-ink); }
+.crew-badge.kind-cli { background: var(--ramune); color: var(--ramune-ink); }
+.crew-badge.kind-other { background: var(--sun); color: var(--sun-ink); }
 .crew-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14.5px;
-  font-weight: 600;
+  font-weight: 700;
 }
-.crew-meta { font-size: 12.5px; color: var(--text-dim); }
+.crew-meta { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
 .crew-id {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: right;
   font-family: var(--mono);
   font-size: 11.5px;
   color: var(--text-dim);
@@ -97,21 +111,24 @@
   display: grid;
   gap: 12px;
   padding: 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--bg-elev);
+  box-shadow: var(--shadow-1);
 }
-.crew-transcript-head h3 { margin: 0; font-size: 15.5px; font-weight: 600; overflow-wrap: anywhere; }
+.crew-transcript-head h3 { margin: 0; font-family: var(--pixel); font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
 .crew-messages { display: grid; gap: 8px; }
 .crew-msg {
   display: grid;
   gap: 4px;
   padding: 10px 12px;
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg);
 }
 .crew-msg-head { font-size: 11.5px; letter-spacing: 0.2px; text-transform: uppercase; color: var(--text-dim); }
+.crew-msg.role-assistant .crew-msg-head { color: var(--lavender); }
+.crew-msg.role-tool .crew-msg-head { color: var(--ramune); }
 .crew-msg-body {
   margin: 0;
   max-height: 420px;
@@ -133,8 +150,10 @@
   /* 16px keeps mobile Safari from zooming on focus; 44px is the touch minimum. */
   .crew-field select { width: 100%; min-height: 44px; font-size: 16px; }
   .chip { min-height: 44px; padding: 0 16px; font-size: 14px; }
-  .crew-card { padding: 14px 12px; }
+  .crew-card { grid-template-columns: auto minmax(0, 1fr); padding: 14px 12px; }
   .crew-title { white-space: normal; overflow-wrap: anywhere; }
+  .crew-meta { flex-wrap: wrap; }
+  .crew-id { grid-column: 2; text-align: left; white-space: normal; overflow-wrap: anywhere; }
   .crew-transcript { padding: 12px; }
   .crew-more { width: 100%; min-height: 44px; }
 }
@@ -144,15 +163,16 @@
    design-system PR (#44) can rewrite app.css without colliding with them: #45's rebase does not
    need to re-add them, and if it does the rules are identical (same tokens, same values). */
 
-/* Connection dot: proxy/tunnel/gateway state, so a dead backend is visible before sending. */
-.health { display: inline-flex; align-items: center; gap: var(--ds-space-2); font-size: var(--ds-text-xs); color: var(--mut, #8b90a0); }
-.health::before { content: ""; width: var(--ds-space-2); height: var(--ds-space-2); border-radius: 50%; background: #8b90a0; }
-.health[data-state="ok"] { color: #4ade80; }
-.health[data-state="ok"]::before { background: #4ade80; }
-.health[data-state="warn"] { color: #fbbf24; }
-.health[data-state="warn"]::before { background: #fbbf24; }
-.health[data-state="down"] { color: #f87171; }
-.health[data-state="down"]::before { background: #f87171; }
+/* Connection dot: proxy/tunnel/gateway state, so a dead backend is visible before sending.
+   Styled as a chip so it reads as part of the glass header (Summer Theme v2). */
+.health { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 10px; border-radius: 999px; background: var(--bg-side); box-shadow: inset 0 0 0 1px var(--line); font-size: 11px; font-weight: 800; color: var(--text-dim); }
+.health::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--text-faint); flex: none; }
+.health[data-state="ok"] { color: var(--ok); }
+.health[data-state="ok"]::before { background: #2fbf71; animation: ping 2s ease-out infinite; }
+.health[data-state="warn"] { color: var(--sun); }
+.health[data-state="warn"]::before { background: var(--sun); }
+.health[data-state="down"] { color: var(--danger); }
+.health[data-state="down"]::before { background: var(--danger); }
 
 /* Inline error with a retry button, instead of a bare "Load failed" line. */
 .err-box { display: grid; gap: var(--ds-space-2); padding: var(--ds-space-2) var(--ds-space-3); margin: var(--ds-space-2) 0; border-radius: var(--ds-radius-md);

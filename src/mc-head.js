@@ -120,6 +120,28 @@ export async function resolveSkin(id, env, fetcher = fetch) {
   return null;
 }
 const CC = (real) => "public, max-age=" + (real ? 21600 : 600);
+// Letzter Ausweg ohne Netz: der mitgelieferte Default-Kopf (public/mc/heads/steve.png, gebacken mit
+// derselben Gesichts-Crop-Logik wie die Mob-Köpfe — scripts/gen-steve-head.py). Vorher lief dieser
+// Fall über /mc-icon/v2/player_head → mc-heads.net, also über das Netz: ohne Verbindung zu den
+// Skin-Quellen blieb das <img> kaputt, jeder Avatar (auch der eines verknüpften Namens) fiel auf
+// MHF_Steve zurück. Jetzt antwortet /mc-head/<name> immer mit einem echten PNG.
+async function localHeadAsset(env, req) {
+  try {
+    if (!env?.ASSETS) return null;
+    const url = new URL("/mc/heads/steve.png", req.url).toString();
+    const r = await env.ASSETS.fetch(new Request(url, { headers: { accept: "image/png" } }));
+    if (!r || !r.ok) return null;
+    const b = await r.arrayBuffer();
+    if (!b || b.byteLength < 100) return null;
+    return new Response(b, {
+      status: 200,
+      headers: {
+        "content-type": "image/png", "cache-control": "public, max-age=600",
+        "x-skin-source": "asset:steve", "x-content-type-options": "nosniff",
+      },
+    });
+  } catch { return null; }
+}
 export async function renderHead(name, size, fetcher = fetch, env = null) {
   const k = await resolveSkin(name, env, fetcher); if (!k) return null;
   return { png: await encodePng(size, size, faceRgba(k.s, size)), fallback: !k.real, src: k.src };
@@ -132,7 +154,12 @@ export async function headResponse(req, path, ctx, env = null, fetcher = fetch) 
   const cache = typeof caches !== "undefined" ? caches.default : null;
   const hit = cache && (await cache.match(key)); if (hit) return hit;
   const r = await renderHead(m[1], size, fetcher, env);
-  if (!r) return new Response(null, { status: 302, headers: { location: "/mc-icon/v2/player_head", "cache-control": "public, max-age=300" } });
+  if (!r) {
+    // Ohne erreichbare Skin-Quelle: eigener Default-Kopf statt Weiterleitung ins Netz.
+    const local = await localHeadAsset(env, req);
+    if (local) return local;
+    return new Response(null, { status: 302, headers: { location: "/mc-icon/v2/player_head", "cache-control": "public, max-age=300" } });
+  }
   const res = new Response(r.png, { headers: { "content-type": "image/png", "cache-control": CC(!r.fallback), "x-skin-source": r.src, "x-content-type-options": "nosniff" } });
   if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
   return res;
