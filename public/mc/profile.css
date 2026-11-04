@@ -81,3 +81,26 @@ html:not(.mc) .pk-card.pk-one .pk-run{background:#f4f5f7;border:1px solid var(--
 .pk-card.pk-one .pk-tm{font-size:1.2rem}
 .pvp-arena .mini{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:560px){.pvp-arena .mini{grid-template-columns:1fr 1fr}.pk-card.pk-one .prow .n span{font-size:1rem}}
+
+html.mc .plc{flex-wrap:wrap}
+html.mc .plc .m3d-pop{position:relative;z-index:auto;flex:0 0 100%;width:auto;height:160px;overflow:hidden;opacity:0;transform:none;background:var(--surface-2);border:0;border-radius:var(--r-sm);box-shadow:var(--bevel);transition:opacity var(--mc-duration-fast,150ms) ease}
+html.mc .plc .m3d-pop.on{opacity:1}
+html.mc .plc .m3d-pop[hidden]{display:none!important}
+html.mc .plc .m3d-pop canvas{width:100%!important;height:100%!important;object-fit:contain}
+
+/* Personal inventory: one common slot unit for armour, storage, hotbar and offhand.
+   Real Minecraft pane shape at every width: armour as a single column on the left, the 9x3 storage in
+   the middle, the 9-slot hotbar below it (separated) and the offhand slot level with the hotbar.
+   Eleven equal columns keep every slot the same square at 375 px too. */
+html.mc #pb .inv{display:block;min-width:0}
+html.mc #pb .inv h3{margin:0 0 var(--sp2)}
+html.mc #pb .inv>p{margin-bottom:var(--sp3)}
+html.mc #pb .inv .iv-pane{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:var(--sp1);max-width:480px;margin:0 auto;align-items:start}
+html.mc #pb .inv .iv-arm,html.mc #pb .inv .iv-off,html.mc #pb .inv .ivg{display:grid;gap:var(--sp1);padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;max-width:none;min-width:0}
+html.mc #pb .inv .iv-arm{grid-column:1;grid-template-columns:minmax(0,1fr)}
+html.mc #pb .inv .iv-stack{grid-column:2/span 9;display:grid;gap:var(--sp2);min-width:0}
+html.mc #pb .inv .ivg{grid-template-columns:repeat(9,minmax(0,1fr))}
+html.mc #pb .inv .iv-off{grid-column:11;grid-template-columns:minmax(0,1fr);align-self:end;justify-self:stretch}
+html.mc #pb .inv .ivs{box-sizing:border-box;width:100%;height:auto;aspect-ratio:1;min-width:0}
+html.mc #pb .inv .ivs img{width:72%;height:72%;object-fit:contain;object-position:center}
+html.mc #pb .inv .ivs b{font-family:var(--f-px,monospace);color:#fff;text-shadow:1px 1px 2px #000;font-size:.7rem}
