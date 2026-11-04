@@ -436,39 +436,51 @@ html.mc main { view-transition-name: mc-page; }
 /* ---------- hero scene + parallax (item 4) ----------
    Layers: sky/stars (slowest), clouds (medium), hills + grass edge + mascot (fastest). The scroll
    offset rides on `.ly` (CSS scroll-driven animation, JS fallback), the pointer offset on `.in`, so
-   the two never fight over `transform`. Only transform/opacity, no layout thrash, no scroll hijack. */
-html.mc .hero-scene { overflow: hidden; }
+   the two never fight over `transform`. Only transform/opacity, no layout thrash, no scroll hijack.
+
+   Review round 2: clouds, hills and the mascot are pinned to ONE landscape band at the bottom of the
+   hero (`--ground-h`). The hero reserves that height as padding-bottom, so the scene can never grow
+   into the copy area — the old rules sized the hills at 46% of the hero height with
+   `preserveAspectRatio="none"`, which stretched single 12-unit rects into the dark blocks that sat
+   behind the heading, and the mascot ended up half under the status card. */
+html.mc section.hero-scene {
+  --ground-h: clamp(72px, 10vw, 128px);
+  overflow: hidden;
+}
+/* ds.css pins the hero's own padding with !important, so the band is reserved on the inner wrap: the
+   scene is absolutely positioned against the hero box, the wrap's padding-bottom keeps the copy AND
+   the status card out of the band. Without it the card's lower third covered the hills, which is
+   exactly the "half hidden under the status card" complaint. */
+html.mc section.hero-scene .hub-wrap { padding-bottom: var(--ground-h); }
 html.mc .hscene { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 html.mc .hscene .ly { position: absolute; inset: 0; will-change: transform; }
 html.mc .hscene .in { position: absolute; inset: 0; transform: translate3d(calc(var(--mx, 0px) * var(--k, 1)), calc(var(--my, 0px) * var(--k, 1)), 0); transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
 html.mc .hscene .l-stars { --k: 0.3; --py: 34; }
-html.mc .hscene .l-clouds { --k: 0.65; --py: 108; }
-html.mc .hscene .l-hills { --k: 1.15; --py: 186; }
-html.mc .hscene .l-mascot { --k: 1.7; --py: 236; }
-html.mc .hscene svg { display: block; position: absolute; }
+html.mc .hscene .l-clouds { --k: 0.55; --py: 96; inset: auto 6% calc(var(--ground-h) - 4px) auto; width: min(42%, 480px); height: clamp(26px, 3.6vw, 46px); }
+/* Ground stays pinned to the hero box: the hills and the mascot get no scroll offset. With the old
+   offsets the grass edge slid out of the (overflow:hidden) hero a third of the way down and the
+   band read as a cut-off rectangle; only the sky (stars, clouds) moves while scrolling. */
+html.mc .hscene .l-hills { --k: 1.1; inset: auto 0 0 0; height: var(--ground-h); }
+html.mc .hscene .l-mascot { --k: 1.5; }
+html.mc .hscene svg { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
 html.mc .hscene .l-stars svg { top: 0; left: 0; width: 100%; height: 58%; }
 html.mc .hscene .l-stars g > rect:nth-child(3) { animation-delay: 0.7s; }
 html.mc .hscene .l-stars g > rect:nth-child(5) { animation-delay: 1.3s; }
 html.mc .hscene .l-stars g > rect:nth-child(7) { animation-delay: 1.9s; }
-html.mc .hscene .l-clouds svg { top: 6%; left: -5%; width: 110%; height: 34%; }
-html.mc .hscene .l-hills svg { bottom: -2px; left: 0; width: 100%; height: 46%; }
-html.mc .hscene .l-mascot .in { inset: auto auto 22px clamp(16px, 5vw, 72px); width: clamp(44px, 6vw, 72px); }
+/* The mascot stands ON the grass edge: the band's last 15% is the grass strip, plus a few px so the
+   block never sinks into it (the pointer/scroll offsets move it a couple of px). */
+html.mc .hscene .l-mascot .in { inset: auto auto calc(var(--ground-h) * 0.15 + 6px) clamp(16px, 5vw, 64px); width: clamp(40px, 4.4vw, 64px); }
 html.mc .hscene .l-mascot img { display: block; width: 100%; height: auto; animation: bob 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
-html.mc .hscene .l-mascot .shadow { position: absolute; left: 8%; right: 8%; bottom: -9px; height: 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.35); animation: shadow-pulse 3.2s ease-in-out infinite; }
-@media (max-width: 760px) { html.mc .hscene .l-mascot .in { bottom: 14px } }
+html.mc .hscene .l-mascot .shadow { position: absolute; left: 8%; right: 8%; bottom: -8px; height: 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.35); animation: shadow-pulse 3.2s ease-in-out infinite; }
 /* Scroll-driven parallax where the browser can do it in CSS. */
 @supports (animation-timeline: scroll()) {
   html.mc .hscene .ly { animation: linear both; animation-timeline: scroll(root block); animation-range: 0 130vh; }
   html.mc .hscene .l-stars { animation-name: par-stars; }
   html.mc .hscene .l-clouds { animation-name: par-clouds; }
-  html.mc .hscene .l-hills { animation-name: par-hills; }
-  html.mc .hscene .l-mascot { animation-name: par-mascot; }
   html.mc .pixbg::before { animation: linear both; animation-name: par-glow; animation-timeline: scroll(root block); animation-range: 0 100vh; }
 }
 @keyframes par-stars { to { transform: translate3d(0, 34px, 0); } }
 @keyframes par-clouds { to { transform: translate3d(0, 108px, 0); } }
-@keyframes par-hills { to { transform: translate3d(0, 186px, 0); } }
-@keyframes par-mascot { to { transform: translate3d(0, 236px, 0); } }
 @keyframes par-glow { to { transform: translate3d(0, 70px, 0); } }
 /* JS fallback (`/mc/parallax.js`): same offsets from a rAF loop when scroll timelines are missing. */
 html.mc .hscene.par-js .ly { transform: translate3d(0, var(--sy, 0px), 0); }
@@ -661,3 +673,32 @@ html.mc body .vip-head { display: flex; flex-wrap: wrap; gap: 8px 24px; align-it
 html.mc body .vip-head .hub-h2 { margin: 6px 0 0; }
 html.mc body .vip-head-note, html.mc body .vip-head-n { margin: 0; max-width: 46ch; font-size: 0.8125rem; font-weight: 800; }
 html.mc body .vip-head-n { font-variant-numeric: tabular-nums; }
+
+/* ---- 11) Startseite: Statuskarte, Welt-Zeile, Chips (Review-Runde 2) ----
+   (a) The three stat tiles sat in a `repeat(auto-fit,minmax(180px,1fr))` grid that fitted two of
+       them at desktop width: the third dropped into a second row, the fourth cell stayed empty and
+       the card looked like it was missing its right half. The hero card has exactly three values, so
+       the hero grid gets three equal columns from 1024px and one column on the phone.
+   (b) An empty `#names` (no player list) still reserved a line and the `[hidden]` online row kept
+       its grid gap, which stacked ~90px of empty card under the last tile in the loading state.
+   (c) Meta line of a world tile: "Version 26.3" must not wrap between the label and its number. */
+html.mc .hero-scene .hub-wrap > #hs { align-self: stretch; }
+html.mc .hero-scene .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html.mc .hero-scene .stats .card { padding: 16px 18px; }
+html.mc .hero-scene .stats .card .k { font-size: 0.68rem; letter-spacing: 0.06em; }
+html.mc .hero-scene .stats .card .v { font-size: clamp(1.15rem, 2.2vw, 1.5rem); }
+html.mc .hero-scene #names:empty { display: none; }
+html.mc .hero-scene .onl[hidden] { display: none; }
+html.mc .hero-scene #hs { gap: 16px !important; }
+/* Unter 700px ist die Karte einspaltig; zwischen 700 und 1023px steht sie (gestapelt) in voller
+   Breite, dort bleiben drei Spalten richtig. */
+@media (max-width: 699px) {
+  html.mc .hero-scene .stats { grid-template-columns: minmax(0, 1fr); }
+  html.mc .hero-scene .stats .card .k { font-size: 0.72rem; }
+}
+/* Meta lines ("Survival · Vanilla+ · Modus dev · Version 26.3") break between their parts but never
+   inside one, so a label can't be separated from its value. */
+html.mc .vm span { white-space: nowrap; }
+html.mc .vm .sep { padding: 0 0.3em; color: var(--muted); }
+/* "Alle ›", "Zum Markt ›", "Anleitung ›": the chevron belongs to the word. */
+html.mc .nw { white-space: nowrap; }

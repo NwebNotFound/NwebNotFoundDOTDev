@@ -31,10 +31,13 @@ const PANEL_TEXT = "Dein Rang, der Status der VIP-Welten und eine kurze Übersic
 // Welt-Limits laut Nils, 04.11.2026: VIP darf genau eine eigene Welt haben, MVP bis zu drei.
 // Einzige Quelle für die Zahlen im Panel (Rangkarten und Zähler „Deine Welten n von max").
 // Keine D1-Migration, keine Plugin-Änderung; Sichtbarkeit/Filterung der Welten bleibt unberührt.
-export const WORLD_LIMITS = { vip: 1, mvp: 3 };
+// `admin` steht ausdrücklich drin: der Admin sieht alle Welten, der Zähler bleibt bei 3. Fehlt ein
+// Rang hier, gilt der kleinste Wert (VIP) — ein unbekannter oder neuer Rang darf nie stillschweigend
+// das MVP-Limit bekommen, sonst öffnet eine Rang-Umbenennung im Plugin zwei Welten zu viel.
+export const WORLD_LIMITS = { vip: 1, mvp: 3, admin: 3 };
 export const worldLimit = (rank) => {
   const r = String(rank || "").toLowerCase();
-  return Number.isFinite(WORLD_LIMITS[r]) ? WORLD_LIMITS[r] : WORLD_LIMITS.mvp;
+  return Number.isFinite(WORLD_LIMITS[r]) ? WORLD_LIMITS[r] : WORLD_LIMITS.vip;
 };
 const PERKS = {
   vip: [

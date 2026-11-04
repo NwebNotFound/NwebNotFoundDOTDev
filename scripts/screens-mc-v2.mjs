@@ -85,8 +85,18 @@ const STRESS_PAGES = [
 ];
 
 const children = [];
+// `spawn("npx", …)` is ENOENT on Windows and `spawn("npx.cmd", …)` throws EINVAL on Node 18.20+/20+
+// (the cmd.exe shell-escape fix), so a local run of this harness died before the first screenshot.
+// Run the npm CLI's npx entry with the current node binary instead: same command, no shell and no
+// argument re-quoting, and it works on Linux/macOS unchanged.
+const NPX = (() => {
+  if (process.platform !== "win32") return { cmd: "npx", args: [], opts: {} };
+  const cli = path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npx-cli.js");
+  if (fs.existsSync(cli)) return { cmd: process.execPath, args: [cli], opts: {} };
+  return { cmd: "npx", args: [], opts: { shell: true } };
+})();
 function serve(cmd, cmdArgs) {
-  const child = spawn(cmd, cmdArgs, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
+  const child = spawn(cmd, cmdArgs, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", ...NPX.opts });
   child.stdout.on("data", () => {});
   child.stderr.on("data", () => {});
   children.push(child);
@@ -129,7 +139,10 @@ function fixture() {
   const names = ["Nils", "KaiDasEi", "hadzyc05", "Mira", "Fuchsi", "Tobsi", "Lena", "Bene"];
   // Nils' row is the linked account (U1), so /profile and /spieler/Nils render the full profile.
   const uuid = (i) => (i === 0 ? U1 : `aaaaaaaa-0000-4000-8000-00000000000${i}`);
-  const lead = (f) => names.map((n, i) => ({ name: n, value: Math.round(f(i)) }));
+  // `rot` rotates the names independently of the values, so each list has its own leader. With one
+  // shared order every list head on the start page was the same player and the four avatars looked
+  // like one repeated placeholder instead of four heads.
+  const lead = (f, rot = 0) => names.map((n, i) => ({ name: names[(i + rot) % names.length], value: Math.round(f(i)) }));
   const market = [
     ["diamond", 120.5, 96.4, 100, 340, 38200, 57, 4.25],
     ["iron_ingot", 18.2, 14.5, 16, 900, 16400, 120, -2.1],
@@ -141,10 +154,21 @@ function fixture() {
     item, buy_price: buy, sell_price: sell, base_price: base, volume_24h_qty: vol, volume_24h_cp: cp, trades_24h: trades, change_24h_pct: ch, updated_at: Math.floor(Date.now() / 1000),
   }));
   const history = [];
+  // Every item gets its own series: phase, amplitude and period differ, plus a mild trend. One shared
+  // sine for all items made the sparklines pixel-identical and every 24h-change the same -12.6x %,
+  // which reads like a rendering bug in review. This is fixture data either way — /api/mc-market keys
+  // `spark` per item (worker.js mcMarket) and the page reads `spark[item]`.
+  const HIST = {
+    diamond: [120, 0.085, 1.1, 9],
+    iron_ingot: [18, 0.14, 3.6, 5.5],
+    netherite_scrap: [880, 0.055, 5.2, 13],
+    emerald: [42, 0.1, 0.35, 7.5],
+  };
   for (let h = 0; h < 72; h += 1) {
-    for (const [item, buy] of [["diamond", 120], ["iron_ingot", 18], ["netherite_scrap", 880]]) {
-      const wave = 1 + Math.sin((72 - h) / 7) * 0.06 + (h / 400);
-      history.push({ item, hour_ts: hoursAgo(h), avg_price: +(buy * wave).toFixed(2), min_price: +(buy * wave * 0.94).toFixed(2), max_price: +(buy * wave * 1.07).toFixed(2), volume_qty: 12 + (h % 9) });
+    for (const [item, [buy, amp, phase, period]] of Object.entries(HIST)) {
+      const ago = 72 - h;
+      const wave = 1 + Math.sin(ago / period + phase) * amp - (ago / 72) * amp * 1.2;
+      history.push({ item, hour_ts: hoursAgo(h), avg_price: +(buy * wave).toFixed(2), min_price: +(buy * wave * 0.94).toFixed(2), max_price: +(buy * wave * 1.07).toFixed(2), volume_qty: 12 + ((h * 7 + item.length * 3) % 41) });
     }
   }
   return {
@@ -154,10 +178,10 @@ function fixture() {
       vip1: { online: false, players: [], max: 5, tps: 20, version: "26.3", mode: "dev" },
     },
     leaderboards: {
-      money: lead((i) => 48200 / (i + 1)), playtime: lead((i) => 486000 / (i + 1)), blocks_mined: lead((i) => 128000 / (i + 1)),
-      kills: lead((i) => 480 / (i + 1)), distance: lead((i) => 4200000 / (i + 1)), kd: lead((i) => 4.2 / (i + 1)),
+      money: lead((i) => 48200 / (i + 1)), playtime: lead((i) => 486000 / (i + 1), 1), blocks_mined: lead((i) => 128000 / (i + 1), 2),
+      kills: lead((i) => 480 / (i + 1), 3), distance: lead((i) => 4200000 / (i + 1), 4), kd: lead((i) => 4.2 / (i + 1), 5),
     },
-    leaderboards_weekly: { money: lead((i) => 6200 / (i + 1)), playtime: lead((i) => 42000 / (i + 1)) },
+    leaderboards_weekly: { money: lead((i) => 6200 / (i + 1), 6), playtime: lead((i) => 42000 / (i + 1), 7) },
     links: [{ discord_id: D1, mc_name: "Nils", mc_uuid: U1, has_role: true, verified: true }],
     player_ranks: names.map((n, i) => ({ uuid: uuid(i), name: n, rank: i === 0 ? "mvp" : i === 1 ? "vip" : "default", color: i === 0 ? "&d" : i === 1 ? "&6" : "&7", weight: 10 - i })),
     pvp_stats: names.map((n, i) => ({ uuid: uuid(i), name: n, wins: 42 - i * 4, losses: 12 + i, draws: 1, matches: 55 - i * 3, winrate_pct: 76 - i * 6, favorite_kit: ["Sword", "Axe", "Bow"][i % 3] })),
@@ -226,7 +250,7 @@ async function startServer() {
     console.warn("! schema.sql did not apply — the pages will show their error states");
   }
   execSync(`npx wrangler d1 execute DB --local --persist-to "${persist}" --command ${JSON.stringify(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('s-screens','${D1}','nils','Nils',datetime('now','+1 day'))`)}`, { cwd: ROOT, stdio: "ignore" });
-  serve("npx", ["wrangler", "dev", "--port", PORT, "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", persist]);
+  serve(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", PORT, "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", persist]);
   await reachable(`${MC}/`);
   return restore;
 }
@@ -271,12 +295,26 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
         return !!i && i.complete && i.naturalWidth > 0;
       });
     }, { timeout: 8000 }).catch(() => {});
+    // The start page's status box is server-truth: /api/mc-status asks two public status APIs, so it
+    // resolves seconds after the paint. A fixed timeout caught the desktop shot mid-load ("Prüfe
+    // Status…", "–" values) while the phone shot, taken later in the same run, already had numbers —
+    // that read as a layout bug in review. The page sets data-mc-home="ready" once status, servers,
+    // top players and market have all settled; wait for that, bounded, and never fail the run on it.
+    await page.waitForFunction(() => {
+      if (!document.getElementById("state")) return true;
+      return document.documentElement.dataset.mcHome === "ready";
+    }, { timeout: 25_000 }).catch(() => {});
+    await page.waitForTimeout(350);
   }
   await page.screenshot({ path: file, fullPage: true });
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
+  const status = await page.evaluate(() => {
+    const s = document.getElementById("state");
+    return s ? (s.textContent || "").trim() : null;
+  });
   await ctx.close();
-  return { file: path.relative(ROOT, file), w: vp.w, h: vp.h, pageHeight: height, scrollWidth: width };
+  return { file: path.relative(ROOT, file), w: vp.w, h: vp.h, pageHeight: height, scrollWidth: width, ...(status ? { status } : {}) };
 }
 
 // Style probe: proves the v2 layer is actually applied and that reduced motion switches it off.
