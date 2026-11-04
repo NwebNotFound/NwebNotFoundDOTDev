@@ -623,8 +623,7 @@ html.mc body .vip-me .slot.big img { width: 72px; height: 72px; }
 html.mc body .vip-me > div { flex: 1 1 300px; min-width: 0; }
 html.mc body .vip-me .hub-h2 { margin: 6px 0 0; font-size: clamp(1.6rem, 4vw, 2.2rem); }
 html.mc body .vip-acts { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0; }
-html.mc body .vip-ranks { align-items: start; }
-html.mc body .vip-card { align-self: start; }
+html.mc body .vip-ranks { align-items: stretch; }
 html.mc body .vip-card.is-vip { background: linear-gradient(160deg, rgba(255, 212, 94, 0.16), var(--surface) 55%); }
 html.mc body .vip-card.is-mvp { background: linear-gradient(160deg, rgba(199, 123, 224, 0.24), var(--surface) 55%); box-shadow: inset 0 0 0 2px rgba(199, 123, 224, 0.6), var(--shadow-lift); }
 html.mc body .vip-card.is-admin { background: linear-gradient(160deg, rgba(255, 138, 138, 0.16), var(--surface) 55%); }
