@@ -1,0 +1,663 @@
+/* NwebNotFound MC — "Summer Theme v2" (night mc), the Minecraft surface in the v2 look.
+   Source of truth for every value here: /opt/data/mockups/summer-v2/theme.css and pages.css
+   (artboards Mc*, variant `.night.mc`: grass green as the action colour). Tokens, radii,
+   shadows, easings, keyframes and durations are copied verbatim from those files.
+
+   Scope contract:
+   - Loaded after /mc/ds.css and only addresses `html.mc`, so it never touches the Creative Hub
+     (`/design/summer.css`), the portfolio or the AI panel.
+   - No remote requests: the pixel + body faces are the self-hosted OFL woff2 files under
+     /design/fonts/ that the hub theme already uses (SmPixel = Pixelify Sans, SmBody = Nunito).
+   - No inline JS, no markup behaviour: this is a pure design layer. Every existing component,
+     script, route and data slot keeps working.
+
+   Deliberate deviations from the artboards are marked with `v2-note:` below. */
+
+/* ---------- fonts: self-hosted, OFL, latin subset (no CDN) ---------- */
+@font-face { font-family: "SmPixel"; src: url("/design/fonts/pixelify-sans-latin-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "SmPixel"; src: url("/design/fonts/pixelify-sans-latin-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "SmBody"; src: url("/design/fonts/nunito-latin-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "SmBody"; src: url("/design/fonts/nunito-latin-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+
+html.mc {
+  /* ---- palette: theme.css `.night` + the `.night.mc` override ---- */
+  --bg: #0e1613; --bg-2: #0a110e;
+  --sky-1: #0b1a14; --sky-2: #16301f;
+  --surface: #15211c; --surface-2: #1b2a24; --surface-3: #25382f;
+  --ink: #f1f5ff; --muted: #aab6d4;
+  --line: rgba(255, 255, 255, 0.08); --line-strong: rgba(255, 255, 255, 0.16);
+  --glass: rgba(18, 30, 25, 0.74);
+  --sun: #ffd45e; --sun-ink: #2a2410; --sun-edge: #c48712;
+  --ramune: #7fe0d3; --sakura: #ffc8dd; --lavender: #c9b8ff; --peach: #ffb8a8; --grass: #4fbf6a; --dirt: #8a5d3a;
+  --link: #7be495;
+  --cream: #fff3d9; --cheek: #ff8fb4;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 36px -16px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+  --focus: #7be495;
+  /* The MC action colour is grass green, not the sun (pages.css `.mc .btn-sun`). */
+  --act: #5fd67a; --act-ink: #0b2614; --act-edge: #2f9a4b;
+  --up: #6fe39a; --down: #ff8a8a;
+
+  /* Type: SmPixel for headings/pixel numbers, SmBody for everything else. */
+  --f-px: "SmPixel", ui-monospace, monospace;
+  --f-body: "SmBody", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  color-scheme: dark;
+  /* Old aliases that the earlier sheets (BASE_CSS, ds.css, HUB_CSS and the page modules) still
+     address: repoint them at the v2 palette so nothing renders in the old chest-GUI colours. */
+  --fg: var(--ink); --mut: var(--muted);
+  --c-bg: var(--bg); --c-fg: var(--ink); --c-mut: var(--muted); --c-dim: var(--muted);
+  --c-s1: var(--surface); --c-s2: var(--surface-2); --c-s3: var(--surface-3); --c-s4: var(--surface-3);
+  --c-line: var(--line); --c-line2: var(--line-strong);
+  --c-acc: var(--act); --c-acc-d: var(--act-edge); --c-acc-bg: rgba(95, 214, 122, 0.14);
+  --c-gold: var(--sun); --c-red: var(--down); --c-dia: var(--ramune); --c-purple: var(--lavender);
+  --card: var(--surface); --navbg: var(--glass); --menubg: var(--surface-2); --field: var(--surface);
+  --acc: var(--act); --accfg: var(--act-ink); --acc2: var(--act);
+  --gold: var(--sun); --pf: var(--f-px); --ring: rgba(127, 228, 149, 0.3);
+  /* Radii + shape (theme.css/pages.css: cards 22, buttons 14, pills 999). */
+  --r: 22px; --r-md: 14px; --r-sm: 12px; --b: 1px;
+  --bevel: inset 0 0 0 1px var(--line);
+  --bevel-2: inset 0 0 0 1px var(--line-strong);
+}
+
+/* ---------- page canvas + typography ---------- */
+html.mc body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body);
+  background-image: linear-gradient(180deg, var(--sky-1) 0px, var(--sky-2) 360px, var(--bg) 640px);
+  background-repeat: no-repeat; background-attachment: fixed;
+}
+html.mc ::selection { background: var(--ramune); color: #0b2614; }
+html.mc h1, html.mc h2, html.mc h3, html.mc h4, html.mc .brand, html.mc .wk h2, html.mc .wk h3,
+html.mc .dc h3, html.mc .px, html.mc code, html.mc kbd, html.mc .stat .v, html.mc .mini .v,
+html.mc .pod .r, html.mc .lbr .px, html.mc .kv2 .big, html.mc .pixel { font-family: var(--f-px); }
+html.mc .hub-h, html.mc .h-xl, html.mc .h-l {
+  font-family: var(--f-px); font-weight: 700; font-size: clamp(2rem, 6vw, 3.25rem);
+  line-height: 1.05; letter-spacing: -0.01em; margin: 12px 0 0; text-shadow: none;
+}
+html.mc .hub-h2 { font-family: var(--f-body); font-size: clamp(1.4rem, 3.4vw, 1.625rem); font-weight: 900; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 var(--s4); }
+html.mc .card h3, html.mc .g > h3, html.mc .dc h3, html.mc .wk h2 { font-family: var(--f-body); font-weight: 900; }
+html.mc .wk h2 { font-size: 1.625rem; letter-spacing: -0.01em; }
+html.mc .wk h3 { font-family: var(--f-body); font-size: 1.125rem; font-weight: 900; }
+html.mc .sub, html.mc .lead { color: var(--muted); font-size: clamp(1rem, 2vw, 1.1875rem); line-height: 1.55; font-weight: 600; max-width: 56ch; }
+html.mc .mut { color: var(--muted); }
+html.mc code, html.mc kbd { font-family: var(--f-px); font-size: 0.95em; background: var(--surface-2); border: 0; box-shadow: var(--bevel); border-radius: var(--r-sm); padding: 0.1em 0.4em; color: var(--ink); }
+html.mc .up { color: var(--up); } html.mc .dn, html.mc .down { color: var(--down); } html.mc .gold { color: var(--sun); }
+html.mc .tnum { font-variant-numeric: tabular-nums; }
+html.mc .px, html.mc .mi, html.mc svg.px, html.mc img[src^="/mc-icon/"], html.mc img[src^="/mc-head/"],
+html.mc img[src^="/mc-mob/"], html.mc img[src^="/mc-skin/"] { image-rendering: pixelated; }
+html.mc svg.px { shape-rendering: crispEdges; }
+
+/* Kicker: pixel plus marker in front (pages.css `.kicker`). */
+html.mc .eyebrow, html.mc .eyb {
+  display: flex; align-items: center; gap: 8px; font-family: var(--f-px); font-size: 0.875rem;
+  font-weight: 400; letter-spacing: 0.01em; text-transform: none; color: var(--muted); margin: 0;
+}
+html.mc .eyebrow::before, html.mc .eyb::before {
+  content: ""; width: 10px; height: 10px; flex: none; background: var(--act);
+  clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%);
+}
+html.mc .center .eyebrow, html.mc .center .eyb { justify-content: center; }
+/* Section padding must not leak into `<button class="btn sec">`: `.sec` is both the section class
+   and the button modifier, so scope it to the element (the market "Alle N Items anzeigen" button
+   used to inherit 48px/64px of section padding and looked like a square box). No `!important`
+   either: the page bodies set `padding-bottom:.5rem` inline on their heads on purpose, and that
+   inline value is what keeps the head close to the content below it. */
+html.mc section.hero, html.mc section.sec { padding-top: clamp(2rem, 6vw, 3rem); padding-bottom: clamp(2.5rem, 7vw, 4rem); }
+html.mc .btn.sec, html.mc .btn.sm.sec { padding-top: 0; padding-bottom: 0; }
+html.mc .hero { overflow: visible; }
+/* `.pixbg` was the pixel-texture glow of the chest GUI look. In v2 the page canvas carries the sky
+   gradient; a quiet, real-texture version stays as the scroll-parallax layer of the page heads
+   (see the hero scene below). The home hero brings its own scene, so its pixbg stays off. */
+html.mc .hero-scene > .pixbg { display: none !important; }
+
+/* ---------- header: floating glass pill (pages.css `.hdr` + `.hdr-wrap`) ---------- */
+html.mc .nav {
+  background: transparent; border-bottom: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+  position: sticky; top: 0; z-index: 50; padding: 16px 0 calc(16px + env(safe-area-inset-top)) 0; margin-top: env(safe-area-inset-top);
+}
+html.mc .nav .wrap {
+  display: flex; align-items: center; gap: 12px; height: auto; min-height: 60px;
+  padding: 8px 8px 8px 16px; border-radius: 999px; background: var(--glass);
+  backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: var(--bevel), var(--shadow);
+}
+html.mc .brand { font-family: var(--f-px); font-weight: 700; font-size: 1.125rem; color: var(--ink); gap: 10px; margin-right: auto; }
+html.mc .brand .mi { width: 26px; height: 26px; border-radius: 7px; }
+html.mc .nl { align-items: center; gap: 4px; }
+html.mc .nl .l, html.mc .nl .ngb {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+  padding: 0 14px; border-radius: 999px; border: 0; background: transparent;
+  color: var(--ink); font-family: var(--f-body); font-size: 0.95rem; font-weight: 700;
+  text-decoration: none; transition: background-color 0.2s;
+}
+html.mc .nl .l::after, html.mc .nl .ngb::after { display: none !important; }
+html.mc .nl .l:is(:hover, :focus-visible), html.mc .nl .ngb:is(:hover, :focus-visible), html.mc .nl .ng.open > .ngb { background: var(--surface-2); color: var(--ink); }
+html.mc .nl .l[aria-current=page], html.mc .nl .ngb[data-cur] {
+  background: var(--surface) !important; color: var(--ink) !important; font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 0 var(--line-strong) !important;
+}
+html.mc .nl .ngm {
+  display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; min-width: 232px;
+  max-height: min(70vh, 440px); overflow: auto; padding: 6px; gap: 2px;
+  background: var(--surface); border: 0; border-radius: 18px;
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lift);
+}
+html.mc .nl .ng.open > .ngm { display: grid; }
+html.mc .nl .ng.ng-end .ngm { left: auto; right: 0; }
+html.mc .nl .ngm a { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; color: var(--ink); font-size: 0.95rem; font-weight: 700; white-space: nowrap; text-decoration: none; box-shadow: none; }
+/* Hover of dropdown entries and buttons stays on ONE shared token pair (--hl-bg/--hl-ring from
+   /mc/ds.css) — e2e_ui.py asserts both compute the same background and shadow. */
+html.mc .nl .ngm a[aria-current=page] { background: var(--surface-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+html.mc .nl .ngm a img { width: 20px; height: 20px; flex: none; }
+html.mc .nl .ngm a.out { color: var(--down); }
+html.mc .nl .ngb .chev { opacity: 0.7; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+html.mc .nl .ng.open > .ngb .chev { transform: rotate(180deg); }
+html.mc .acct .um > button { color: var(--ink); border-radius: 999px; }
+html.mc .acct .um > button:hover, html.mc .acct .um > button[aria-expanded=true] { background: var(--surface-2); }
+html.mc .menu { background: var(--surface); border: 0; border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lift); }
+html.mc .menu .hd { border-bottom: 1px solid var(--line); }
+html.mc .menu a { border-radius: 12px; min-height: 44px; }
+html.mc .menu a:hover, html.mc .menu a:focus-visible { background: var(--surface-2); }
+
+/* ---------- focus ring (theme.css: 3px, offset 3) ---------- */
+html.mc :focus-visible, html.mc .btn:focus-visible, html.mc .seg button:focus-visible,
+html.mc .tabs button:focus-visible, html.mc .icon-btn:focus-visible, html.mc .nav a:focus-visible,
+html.mc .nl :is(.l, .ngb, .ngm a):focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+/* ---------- buttons: toy keys (theme.css `.btn`, `.mc .btn-sun` = grass) ---------- */
+html.mc .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
+  padding: 0 22px; border: 0; border-radius: var(--r-md); font-family: var(--f-body);
+  font-size: 1rem; font-weight: 700; line-height: 1; white-space: nowrap; text-decoration: none;
+  background: var(--act); color: var(--act-ink);
+  box-shadow: 0 3px 0 var(--act-edge), 0 10px 22px -10px rgba(47, 154, 75, 0.8);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease, background-color 0.3s ease;
+}
+html.mc .btn:hover { background: var(--act); color: var(--act-ink); transform: translateY(-2px); text-decoration: none; box-shadow: 0 5px 0 var(--act-edge), 0 14px 26px -10px rgba(47, 154, 75, 0.85); }
+html.mc .btn:active, html.mc .btn.is-pressed { transform: translateY(2px) !important; transition-duration: 0.08s; box-shadow: 0 1px 0 var(--act-edge); }
+html.mc .btn.sec, html.mc .btn.sm.sec, html.mc .btn.go.sec {
+  background: var(--surface); color: var(--ink); box-shadow: var(--bevel-2), 0 3px 0 var(--line-strong);
+}
+html.mc .btn.sec:hover, html.mc .btn.sm.sec:hover { background: var(--surface); color: var(--ink); box-shadow: var(--bevel-2), 0 5px 0 var(--line-strong); }
+html.mc .btn.sec:active, html.mc .btn.sm.sec:active, html.mc .btn.is-pressed.sec { box-shadow: var(--bevel-2), 0 1px 0 var(--line-strong); }
+html.mc .btn.sm { min-height: 44px; padding: 0 16px; font-size: 0.875rem; border-radius: var(--r-sm); }
+/* v2-note: theme.css has `.btn-sm{min-height:40px}`; the brief asks for 44px targets, so the
+   dense button keeps the mockup's padding/font/radius and only grows to the touch minimum. */
+html.mc .btn.ghost, html.mc .btn.btn-ghost { background: transparent; color: var(--link); box-shadow: none; padding: 0 6px; }
+html.mc .btn.ghost:hover, html.mc .btn.btn-ghost:hover { background: transparent; transform: none; text-decoration: underline; }
+html.mc .btn.discord { background: #5865f2; color: #fff; box-shadow: 0 3px 0 #4450d6, 0 10px 22px -10px rgba(68, 80, 214, 0.8); }
+html.mc .btn.discord:hover { background: #6b77ff; color: #fff; }
+html.mc .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; background: var(--surface-2); color: var(--muted); }
+html.mc .btn .arrow { transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
+html.mc .btn:hover .arrow { transform: translateX(4px); }
+html.mc .go { display: inline-flex; align-items: center; gap: 6px; color: var(--link); font-weight: 800; font-size: 0.875rem; }
+html.mc a.go:hover { text-decoration: none; }
+
+/* ---------- chips, tags, badges ---------- */
+html.mc .chip, html.mc .pill, html.mc .tag, html.mc .soon, html.mc .wip, html.mc .todo {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 10px; border: 0;
+  border-radius: 999px; background: var(--surface-2); color: var(--muted);
+  box-shadow: var(--bevel); font-family: var(--f-body); font-size: 0.75rem; font-weight: 800;
+  line-height: 1; text-transform: none; letter-spacing: 0;
+}
+html.mc .pill { font-size: 0.85rem; font-weight: 700; padding: 0.35rem 0.8rem; }
+html.mc .tag { border-radius: 999px; }
+html.mc .chip .dot, html.mc .tag .dot { width: 7px; height: 7px; border-radius: 2px; background: var(--sun); }
+html.mc .chip-live .dot { background: #2fbf71; animation: ping 2s ease-out infinite; }
+html.mc .chip.t-new, html.mc .tag.ts { color: var(--up); } html.mc .chip.t-fix, html.mc .tag.tr { color: var(--down); }
+html.mc .chip.t-chg, html.mc .tag.tw { color: var(--sun); } html.mc .tag.tb { color: var(--ramune); }
+html.mc .soon { color: var(--act); } html.mc .wip { color: var(--ramune); }
+html.mc .todo { color: var(--sun); background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 212, 94, 0.5); }
+
+/* ---------- surfaces: cards, panels, stat tiles (theme.css `.card`, pages.css `.panel`) ---------- */
+html.mc .g, html.mc .card, html.mc .dc, html.mc .panel, html.mc .steps li, html.mc .pod > div,
+html.mc .empty-st, html.mc .stat, html.mc .wside, html.mc table.cmd, html.mc .list, html.mc .ts {
+  background: var(--surface); border: 0; border-radius: var(--r);
+  box-shadow: var(--bevel), var(--shadow); color: var(--ink);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, background-color 0.5s ease;
+}
+html.mc .g.pad, html.mc .dc, html.mc .card, html.mc .panel { padding: 24px; }
+html.mc .stat { padding: 18px 20px; border-radius: 18px; }
+html.mc a.g:hover, html.mc a.g:focus-visible, html.mc a.card:hover, html.mc a.card:focus-visible {
+  text-decoration: none; transform: translateY(-5px) rotate(-0.4deg);
+  box-shadow: var(--bevel-2), var(--shadow-lift); background: var(--surface);
+}
+html.mc a.g:hover .qi, html.mc a.card:hover .ic, html.mc .card:hover .tile, html.mc a.card:hover .qi { animation: wiggle 0.6s ease; }
+html.mc a.g .go, html.mc .card .go { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+html.mc a.g:hover .go, html.mc .card:hover .go { transform: translateX(4px); }
+html.mc .pixbg { display: block !important; pointer-events: none; opacity: 0.35; }
+html.mc .stat .k, html.mc .mini .k, html.mc .kv2 small, html.mc .kv3 small {
+  font-family: var(--f-body); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted); opacity: 1;
+}
+html.mc .stat .v, html.mc .mini .v, html.mc .kv2 .big { font-family: var(--f-px); font-weight: 700; }
+html.mc .stat .v { font-size: 30px; margin-top: 6px; }
+html.mc .mini div, html.mc .kv3 span, html.mc .addr { background: var(--surface-2); border: 0; border-radius: var(--r-sm); box-shadow: var(--bevel); padding: 0.75rem 1rem; transform: none; }
+html.mc .meter { height: 8px; margin-top: 10px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+html.mc .meter i { display: block; height: 100%; border-radius: 4px; background: var(--grass); }
+html.mc .bar { height: 8px; border-radius: 4px; background: var(--surface-3); }
+html.mc .bar i { background: var(--act); }
+html.mc .addr { display: inline-flex; align-items: center; gap: 0.6rem; padding: 8px 8px 8px 14px; border-radius: var(--r-md); }
+html.mc .addr code { background: transparent; box-shadow: none; font-size: 1rem; padding: 0; }
+html.mc .code { font-family: var(--f-px); font-size: 1.125rem; padding: 10px 14px; border-radius: var(--r-sm); background: var(--surface-2); box-shadow: var(--bevel); }
+
+/* pixel tile (mockup `.tile`) — the icon chip used inside cards/links */
+html.mc .tile, html.mc .qi, html.mc .ic { border-radius: 14px; background: var(--surface-2); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18); color: var(--ink); }
+html.mc .qi { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px; }
+html.mc .qi .mi { width: 40px; height: 40px; }
+html.mc .ic { width: 32px; height: 32px; border-radius: 9px; overflow: hidden; }
+html.mc .ic img { width: 24px; height: 24px; }
+html.mc .qg { display: flex; } html.mc .q .qt b { font-size: 1.0625rem; font-weight: 900; }
+html.mc .q .qt span { display: block; color: var(--muted); font-size: 0.875rem; font-weight: 600; }
+/* Quick links: icon chip left, label right (artboards `.card` with flex-direction: row).
+   `html.mc a.g.q` outranks the ds.css rule of the same name, which forces the old column layout. */
+html.mc a.g.q { flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; min-height: 96px; padding: 1.1rem 1.2rem; }
+html.mc a.g.q .qt { flex: 1; justify-content: flex-start; gap: 2px; text-align: left; }
+html.mc a.g.q .qi { align-items: center; min-height: 0; }
+html.mc a.g.q b { font-family: var(--f-body); font-weight: 900; font-size: 1.0625rem; }
+html.mc .qgrid.q6 { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { html.mc .qgrid.q6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ---------- lists, rows, ranks, avatars (pages.css `.li/.rank/.avatar`) ---------- */
+html.mc .li, html.mc .lrow, html.mc .row, html.mc .lbr, html.mc .vs, html.mc .order, html.mc .link-row, html.mc .cmd { align-items: center; gap: 14px; min-height: 56px; padding: 8px 0; border: 0; box-shadow: none; background: none; }
+html.mc .li + .li, html.mc .lrow + .lrow, html.mc .row + .row, html.mc .lbr + .lbr, html.mc .vs + .vs, html.mc .order + .order, html.mc .cmd + .cmd { border-top: 1px solid var(--line); }
+html.mc .lrow { grid-template-columns: auto 1fr auto auto auto; padding: 0.65rem 0.2rem; min-height: 56px; }
+html.mc a.lrow:hover, html.mc .li:hover { background: var(--surface-2); }
+html.mc .rank { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: var(--surface-2); font-family: var(--f-px); font-weight: 700; }
+html.mc .rank.r1 { background: var(--sun); color: #2a2410; }
+html.mc .rank.r2 { background: #dfe7f3; color: #1f2a44; }
+html.mc .rank.r3 { background: #f1c7a3; color: #4a2a10; }
+html.mc .avatar { width: 40px; height: 40px; border-radius: 10px; background: var(--surface-3); display: grid; place-items: center; flex: none; overflow: hidden; }
+html.mc .avatar img { width: 100%; height: 100%; }
+html.mc .num { font-variant-numeric: tabular-nums; font-weight: 800; }
+html.mc .skin { border-radius: 14px; overflow: hidden; }
+
+/* ---------- tabs + segmented control ---------- */
+html.mc .tabs, html.mc .seg, html.mc .kind {
+  display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 0; border-radius: 999px;
+  background: var(--surface-2); box-shadow: var(--bevel); max-width: 100%;
+}
+html.mc .tabs { display: inline-flex; overflow-x: auto; scrollbar-width: none; }
+html.mc .tabs::-webkit-scrollbar, html.mc .seg::-webkit-scrollbar { display: none; }
+html.mc .tabs button, html.mc .seg button, html.mc .kind button {
+  min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--muted); font-family: var(--f-body); font-size: 0.875rem; font-weight: 800; cursor: pointer;
+  transition: background-color 0.25s, color 0.25s;
+}
+html.mc .seg button { min-height: 40px; min-width: 44px; padding: 0 12px; font-size: 0.8125rem; }
+html.mc .tabs button[aria-selected=true], html.mc .tabs button[aria-pressed=true],
+html.mc .seg button[aria-pressed=true], html.mc .kind button[aria-pressed=true] {
+  background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 0 var(--line-strong);
+}
+html.mc .tabs .tg { align-self: center; font-family: var(--f-body); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0 0.35rem 0 0.7rem; }
+html.mc .tabs .tg ~ .tg { border-left: 1px solid var(--line); margin-left: 0.15rem; padding-left: 0.75rem; }
+html.mc .tabs button[aria-selected=false], html.mc .tabs button[aria-pressed=false] { box-shadow: none; }
+
+/* ---------- search + form fields ---------- */
+html.mc .srch .inp, html.mc input.inp, html.mc .search input {
+  width: 100%; min-height: 52px; padding: 0 18px 0 2.6rem; border: 0; border-radius: 16px;
+  background: var(--surface); color: var(--ink); font-family: var(--f-body); font-size: 1rem; font-weight: 600;
+  box-shadow: var(--bevel-2), var(--shadow);
+}
+html.mc .srch .inp:focus, html.mc .search input:focus { outline: none; box-shadow: inset 0 0 0 2px var(--focus), 0 0 0 4px rgba(127, 228, 149, 0.25); }
+html.mc .srch svg { left: 1rem; opacity: 0.6; }
+html.mc .ac, html.mc .srch { border-radius: 18px; }
+html.mc .ac { background: var(--surface); border: 0; border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lift); overflow: hidden; }
+html.mc .ac a { border-radius: 12px; min-height: 44px; }
+html.mc .ac a:hover, html.mc .ac a[aria-selected=true] { background: var(--surface-2); }
+html.mc .field { display: flex; flex-direction: column; gap: 6px; }
+html.mc .field label { font-weight: 800; font-size: 0.8125rem; }
+html.mc .field input, html.mc .field textarea { min-height: 46px; padding: 10px 14px; border: 0; border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); font-family: var(--f-body); font-size: 0.9375rem; font-weight: 600; box-shadow: var(--bevel-2); margin: 0; }
+html.mc .field input:focus, html.mc .field textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--focus), 0 0 0 4px rgba(127, 228, 149, 0.25); }
+html.mc .buy input, html.mc .bidf input { min-height: 44px; border: 0; border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); font-family: var(--f-px); box-shadow: var(--bevel-2); }
+/* Dropdowns (Markt sortieren/filtern): same field shell as the search box. */
+html.mc select { appearance: none; -webkit-appearance: none; font-family: var(--f-body); font-size: 1rem; font-weight: 600; color: var(--ink); background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23aab6d4' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center; border: 0; border-radius: var(--r-sm); min-height: 44px; padding: 0 34px 0 14px; box-shadow: var(--bevel-2); }
+html.mc select:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+html.mc .fsel span { font-family: var(--f-body); font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+/* Kursticker: pill row instead of the chest-GUI rail. */
+html.mc .tick { border-radius: 999px; background: var(--surface-2); box-shadow: var(--bevel); }
+html.mc .tick a { border-radius: 999px; }
+html.mc .tick a:hover { background: var(--surface-3); }
+html.mc .stepper { border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--bevel-2); }
+html.mc .stepper button { width: 44px; height: 44px; color: var(--ink); font-family: var(--f-body); font-weight: 900; font-size: 1.25rem; }
+
+/* ---------- number/step cards, FAQ details, prose ---------- */
+html.mc .steps li::before { content: counter(s); display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--act); color: var(--act-ink); font-family: var(--f-px); font-weight: 700; margin-bottom: 14px; }
+html.mc .wk p, html.mc .wk li { color: color-mix(in srgb, var(--ink) 88%, transparent); line-height: 1.7; }
+html.mc .wk blockquote { border-left: 4px solid var(--lavender); color: var(--muted); }
+html.mc details { border-top: 1px solid var(--line); }
+html.mc details summary { font-weight: 800; cursor: pointer; padding: 4px 0; }
+html.mc table.cmd { border-collapse: separate; border-spacing: 0; width: 100%; padding: 0; overflow: hidden; }
+html.mc table.cmd td { padding: 0.6rem 0.75rem; border: 0 !important; border-top: 1px solid var(--line) !important; }
+html.mc table.cmd th { border: 0 !important; color: var(--muted); font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.6rem 0.75rem; }
+html.mc .cmd { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; padding: 0.7rem 0; }
+
+/* ---------- inventory + vanilla-GUI slots: new shell, same renderer ---------- */
+html.mc .slot { border-radius: 8px; background: var(--surface-2); box-shadow: var(--bevel); overflow: hidden; }
+html.mc .slot.huge { border-radius: 12px; }
+html.mc .slot i { font-family: var(--f-px); }
+html.mc .inv { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ---------- hero/quick-link/online-player motion ---------- */
+html.mc .onl { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+html.mc .onl a.g {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 4px; width: auto; padding: 8px;
+  border-radius: 14px; background: var(--surface-2); box-shadow: var(--bevel); animation: bob 3.2s ease-in-out infinite;
+}
+html.mc .onl a.g:nth-child(2) { animation-delay: 0.4s; } html.mc .onl a.g:nth-child(3) { animation-delay: 0.8s; }
+html.mc .onl a.g:nth-child(4) { animation-delay: 1.2s; } html.mc .onl a.g:nth-child(5) { animation-delay: 1.6s; }
+html.mc .onl a.g:nth-child(6) { animation-delay: 2s; } html.mc .onl a.g:nth-child(7) { animation-delay: 2.4s; }
+html.mc .onl a.g:nth-child(8) { animation-delay: 2.8s; }
+html.mc .onl a.g:hover { animation-play-state: paused; transform: translateY(-5px) rotate(-0.4deg); }
+html.mc .onl a.g b { font-size: 0.75rem; font-weight: 800; }
+html.mc .onl a.g canvas { display: block; }
+html.mc .status { font-size: clamp(1.1rem, 3vw, 1.5rem); font-weight: 800; }
+html.mc .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--muted); }
+html.mc .dot.on { background: #2fbf71; animation: ping 2s ease-out infinite; }
+html.mc .dot.off { background: var(--down); }
+html.mc .avatar.bob, html.mc .head.bob, html.mc .bob { animation: bob 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
+html.mc .podium .p:nth-child(2) .avatar, html.mc .pod .p1 img { animation: bob 3.2s ease-in-out infinite; }
+html.mc .spark, html.mc svg.spark { display: block; }
+html.mc .tl { position: relative; }
+html.mc .tl-item .panel { position: relative; }
+html.mc .timer { font-variant-numeric: tabular-nums; font-weight: 800; }
+html.mc .timer.urgent { color: var(--down); }
+html.mc .vs .win { color: var(--up); font-weight: 800; } html.mc .vs .lose { color: var(--down); font-weight: 800; }
+html.mc .perk { display: flex; gap: 12px; align-items: flex-start; }
+html.mc .perk .check { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 7px; background: var(--act); color: var(--act-ink); }
+html.mc aside .tile, html.mc .vipcard .tile { border-radius: 12px; }
+
+/* ---------- footer: grass line + pill links (pages.css `.footer`, `.grassline`) ---------- */
+html.mc footer { position: relative; background: var(--bg-2); border-top: 0; margin-top: 32px; padding: 0 0 calc(36px + env(safe-area-inset-bottom)); font-size: 0.8125rem; color: var(--muted); }
+html.mc footer::before { display: none; }
+html.mc .grassline { display: block; width: 100vw; margin-left: calc(50% - 50vw); height: 14px; }
+html.mc footer .wrap { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; justify-content: space-between; padding-top: 28px; }
+html.mc footer .fbrand { order: 1; }
+html.mc footer .fnl { order: 2; display: flex; gap: 4px; flex-wrap: wrap; }
+html.mc footer p { order: 3; width: 100%; margin: 0; font-size: 0.8125rem; color: var(--muted); }
+html.mc footer .brand { font-size: 1rem; }
+html.mc footer a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; color: var(--link); font-weight: 800; }
+html.mc footer a:hover { background: var(--surface-2); text-decoration: none; }
+
+/* ---------- motion (theme.css, verbatim) ---------- */
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-8px) rotate(-1.5deg); } }
+@keyframes shadow-pulse { 0%, 100% { transform: scaleX(1); opacity: 0.25; } 50% { transform: scaleX(0.8); opacity: 0.15; } }
+@keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes drift { from { transform: translateX(-24px); } to { transform: translateX(28px); } }
+@keyframes twinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg) scale(1.06); } 60% { transform: rotate(6deg) scale(1.06); } }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes pop-spin { from { transform: rotate(-120deg) scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(47, 191, 113, 0.55); } 80%, 100% { box-shadow: 0 0 0 8px rgba(47, 191, 113, 0); } }
+html.mc .rise { animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+html.mc .drift { animation: drift 22s ease-in-out infinite alternate; }
+html.mc .drift-slow { animation: drift 34s ease-in-out infinite alternate-reverse; }
+html.mc .twinkle { animation: twinkle 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+html.mc .blink { animation: blink 5s infinite; transform-box: fill-box; transform-origin: center; }
+/* Staggered entrance for the hero block, its quick links and the timeline — no markup change. */
+html.mc .hero .wrap > * { animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+html.mc .hero .wrap > *:nth-child(2) { animation-delay: 0.06s; }
+html.mc .hero .wrap > *:nth-child(3) { animation-delay: 0.12s; }
+html.mc .hero .wrap > *:nth-child(4) { animation-delay: 0.18s; }
+html.mc .qgrid > * { animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+html.mc .qgrid > *:nth-child(2) { animation-delay: 0.04s; } html.mc .qgrid > *:nth-child(3) { animation-delay: 0.08s; }
+html.mc .qgrid > *:nth-child(4) { animation-delay: 0.12s; } html.mc .qgrid > *:nth-child(5) { animation-delay: 0.16s; }
+html.mc .qgrid > *:nth-child(6) { animation-delay: 0.2s; }
+html.mc .tl-item { animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+html.mc .tl-item:nth-child(2) { animation-delay: 0.06s; } html.mc .tl-item:nth-child(3) { animation-delay: 0.12s; }
+html.mc .tl-item:nth-child(4) { animation-delay: 0.18s; }
+html.mc .icon-btn { width: 44px; height: 44px; display: inline-grid; place-items: center; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--ink); box-shadow: var(--bevel); cursor: pointer; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+html.mc .icon-btn:hover { transform: rotate(-12deg) scale(1.06); }
+
+/* prefers-reduced-motion: every v2 animation off (theme.css `.still` rule, page-wide). */
+@media (prefers-reduced-motion: reduce) {
+  html.mc *, html.mc *::before, html.mc *::after { animation: none !important; transition-duration: 0s !important; }
+  html.mc a.g:hover, html.mc a.card:hover { transform: none; }
+  html.mc .onl a.g:hover { transform: none; }
+  html.mc .hscene .in, html.mc .hscene .ly { transform: none !important; }
+}
+
+/* ---------- cross-document view transitions (item 3) ----------
+   `@view-transition { navigation: auto }` is already set by BASE_CSS; here the chrome keeps its own
+   names so the header pill and the footer stay put while the page body fades and slides. Chrome
+   without support just navigates normally, and reduced motion opts out entirely. */
+html.mc .nav { view-transition-name: mc-header; }
+html.mc footer { view-transition-name: mc-footer; }
+html.mc main { view-transition-name: mc-page; }
+::view-transition-group(mc-header), ::view-transition-group(mc-footer) { animation: none; }
+::view-transition-old(mc-page) { animation: vt-out 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+::view-transition-new(mc-page) { animation: vt-in 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes vt-out { to { opacity: 0; transform: translateY(-10px); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+/* ---------- hero scene + parallax (item 4) ----------
+   Layers: sky/stars (slowest), clouds (medium), hills + grass edge + mascot (fastest). The scroll
+   offset rides on `.ly` (CSS scroll-driven animation, JS fallback), the pointer offset on `.in`, so
+   the two never fight over `transform`. Only transform/opacity, no layout thrash, no scroll hijack. */
+html.mc .hero-scene { overflow: hidden; }
+html.mc .hscene { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+html.mc .hscene .ly { position: absolute; inset: 0; will-change: transform; }
+html.mc .hscene .in { position: absolute; inset: 0; transform: translate3d(calc(var(--mx, 0px) * var(--k, 1)), calc(var(--my, 0px) * var(--k, 1)), 0); transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+html.mc .hscene .l-stars { --k: 0.3; --py: 34; }
+html.mc .hscene .l-clouds { --k: 0.65; --py: 108; }
+html.mc .hscene .l-hills { --k: 1.15; --py: 186; }
+html.mc .hscene .l-mascot { --k: 1.7; --py: 236; }
+html.mc .hscene svg { display: block; position: absolute; }
+html.mc .hscene .l-stars svg { top: 0; left: 0; width: 100%; height: 58%; }
+html.mc .hscene .l-stars g > rect:nth-child(3) { animation-delay: 0.7s; }
+html.mc .hscene .l-stars g > rect:nth-child(5) { animation-delay: 1.3s; }
+html.mc .hscene .l-stars g > rect:nth-child(7) { animation-delay: 1.9s; }
+html.mc .hscene .l-clouds svg { top: 6%; left: -5%; width: 110%; height: 34%; }
+html.mc .hscene .l-hills svg { bottom: -2px; left: 0; width: 100%; height: 46%; }
+html.mc .hscene .l-mascot .in { inset: auto auto 22px clamp(16px, 5vw, 72px); width: clamp(44px, 6vw, 72px); }
+html.mc .hscene .l-mascot img { display: block; width: 100%; height: auto; animation: bob 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
+html.mc .hscene .l-mascot .shadow { position: absolute; left: 8%; right: 8%; bottom: -9px; height: 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.35); animation: shadow-pulse 3.2s ease-in-out infinite; }
+@media (max-width: 760px) { html.mc .hscene .l-mascot .in { bottom: 14px } }
+/* Scroll-driven parallax where the browser can do it in CSS. */
+@supports (animation-timeline: scroll()) {
+  html.mc .hscene .ly { animation: linear both; animation-timeline: scroll(root block); animation-range: 0 130vh; }
+  html.mc .hscene .l-stars { animation-name: par-stars; }
+  html.mc .hscene .l-clouds { animation-name: par-clouds; }
+  html.mc .hscene .l-hills { animation-name: par-hills; }
+  html.mc .hscene .l-mascot { animation-name: par-mascot; }
+  html.mc .pixbg::before { animation: linear both; animation-name: par-glow; animation-timeline: scroll(root block); animation-range: 0 100vh; }
+}
+@keyframes par-stars { to { transform: translate3d(0, 34px, 0); } }
+@keyframes par-clouds { to { transform: translate3d(0, 108px, 0); } }
+@keyframes par-hills { to { transform: translate3d(0, 186px, 0); } }
+@keyframes par-mascot { to { transform: translate3d(0, 236px, 0); } }
+@keyframes par-glow { to { transform: translate3d(0, 70px, 0); } }
+/* JS fallback (`/mc/parallax.js`): same offsets from a rAF loop when scroll timelines are missing. */
+html.mc .hscene.par-js .ly { transform: translate3d(0, var(--sy, 0px), 0); }
+
+/* ---------- long names + big numbers (item 2) ---------- */
+/* Names ellipsize, values must stay complete: only the name-ish element gets the ellipsis, numbers
+   (b.tnum, .num, the value cell after .lbr's name span) keep their full digits and tabular widths. */
+html.mc :is(.lrow, .li, .shh, .auh, .link-row, .order, .vs, .ir, .cmd) b:not(.tnum),
+html.mc .shh b:not(.tnum), html.mc .auh b:not(.tnum) {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+html.mc b.tnum, html.mc .num, html.mc .lbr > b { flex: none; white-space: nowrap; }
+html.mc :is(.lrow, .li, .lbr, .shh, .auh, .order, .mrow, .ir, .vs, .link-row) { min-width: 0; }
+html.mc .lbr { min-width: 0; }
+html.mc .lbr .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The podium is the one grid a 16-char name used to widen: minmax(0,1fr) + min-width:0 keeps it in. */
+html.mc .pod { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html.mc .pod > div { min-width: 0; }
+html.mc .pod b { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.mc .hub-h, html.mc .hub-h2, html.mc .card h3, html.mc .shh b, html.mc .wk h1 {
+  overflow-wrap: anywhere; word-break: break-word;
+}
+html.mc .num, html.mc .tnum, html.mc td, html.mc .stat .v { font-variant-numeric: tabular-nums; }
+/* Wide prose tables become a scrollable box on the phone instead of stretching the page. */
+@media (max-width: 700px) {
+  html.mc .wk table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  html.mc .wk th, html.mc .wk td { white-space: normal; }
+  html.mc .g.pad:has(table.cmd) { overflow-x: auto; }
+  html.mc .pod { gap: 0.5rem; }
+  html.mc .pod > div { padding: 1rem 0.35rem; }
+  html.mc .pod img { width: 44px; height: 44px; }
+  html.mc .pod .p1 img { width: 56px; height: 56px; }
+  html.mc .pod b { font-size: 0.82rem; }
+  html.mc .pod span { font-size: 0.72rem; }
+}
+
+/* ---------- responsive (pages.css @media 760px + the nav breakpoint of ds.css) ---------- */
+@media (max-width: 900px) {
+  html.mc .nbur { display: inline-grid; align-content: center; gap: 4px; width: 44px; height: 44px; padding: 0 11px; background: var(--surface-2); border: 0; border-radius: var(--r-md); box-shadow: var(--bevel); cursor: pointer; }
+  html.mc .nbur span { display: block; height: 2px; background: var(--ink); transition: transform 0.22s ease, opacity 0.22s ease; }
+  html.mc .nl { position: absolute; top: calc(100% + 8px); left: 0; right: 0; display: none; flex-direction: column; align-items: stretch; gap: 2px; padding: 8px; border-radius: 22px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lift); }
+  html.mc .nav.open .nl { display: flex; }
+  html.mc .nl .l, html.mc .nl .ngb { width: 100%; justify-content: space-between; min-height: 46px; padding: 0 14px; font-size: 1rem; border-radius: var(--r-sm); }
+  html.mc .nl .ng { display: block; width: 100%; }
+  html.mc .nl .ngm { position: static; min-width: 0; max-height: none; overflow: visible; box-shadow: none; background: transparent; padding: 0 0 0 8px; }
+  html.mc .nl .ng.open > .ngm { display: grid; }
+  html.mc .nav .wrap { padding: 8px 8px 8px 14px; }
+  html.mc .wrap { padding-inline: 16px; }
+}
+@media (max-width: 760px) {
+  html.mc .h1, html.mc .h-xl, html.mc .h-l, html.mc .hub-h { font-size: clamp(1.9rem, 9vw, 2.5rem); }
+  html.mc .wrap { padding-inline: 16px; }
+  html.mc .g.pad, html.mc .dc, html.mc .card, html.mc .panel { padding: 18px; }
+  html.mc .g, html.mc .card, html.mc .dc, html.mc .panel, html.mc .steps li { border-radius: 18px; }
+  html.mc .qgrid, html.mc .g3, html.mc .g4 { grid-template-columns: 1fr; }
+  html.mc .li, html.mc .lrow { min-height: 52px; }
+  html.mc .lrow { grid-template-columns: auto 1fr auto; row-gap: 0.3rem; }
+  html.mc .lrow > :nth-child(n + 4) { grid-column: 2 / -1; justify-self: start; }
+  html.mc footer .wrap { justify-content: flex-start; }
+}
+
+/* ==========================================================================================
+   Review round 2 (Lead review of docs/screens/v2/mc). These rules come last on purpose.
+   The page modules (profile.css, vip.css, ranks.css, economy.css) are injected into the BODY,
+   i.e. AFTER this file, so an override that only matched them with the same specificity would
+   lose the tie. That is why every page-module selector below carries an extra `body` ancestor:
+   `html.mc body .pf-tile` (0,2,2) beats profile.css's `html.mc .pf-tile` (0,2,1).
+   ========================================================================================== */
+
+/* ---- 1) no dashed rule under headings: the mockup has none (ds.css draws one via ::after) ---- */
+html.mc :is(.hub-h, .hub-h2, .h-l, .h-xl, .mch-name)::after { content: none; display: none; }
+
+/* ---- 2) stat + KPI tiles: pages.css `.stat` (surface, 1px line, soft shadow, 18px radius)
+        instead of the chest-GUI frame (2px black edge + inset bevel) that still won the
+        cascade on `.stats .card` (ds.css), `.pf-tile`/`.pf-meta div` (profile.css). ---- */
+html.mc .stat, html.mc .stats .card, html.mc .mini div, html.mc .kv3 span, html.mc #pb .mch-tile,
+html.mc .empty-st, html.mc .addr,
+html.mc body .pf-tile, html.mc body .pf-meta div, html.mc body .vip-stat, html.mc body .vip-world {
+  background: var(--surface); border: 0; color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow);
+}
+html.mc .stat, html.mc .stats .card, html.mc body .pf-tile, html.mc body .vip-stat { padding: 18px 20px; border-radius: 18px; }
+html.mc .stats .card { transform: none; }
+html.mc .mini div, html.mc .kv3 span, html.mc .addr { border-radius: var(--r-sm); padding: 12px 16px; }
+html.mc body .pf-meta div { border-radius: 14px; padding: 12px 14px; }
+html.mc .stat .k, html.mc .stats .card .k { color: var(--muted); }
+html.mc .stat .v, html.mc .stats .card .v { color: var(--ink); }
+
+/* ---- 3) profile tiles: the label may wrap to two lines, a value is NEVER cut off ---- */
+html.mc body .pf-kpi { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 0 0 16px; }
+html.mc body .pf-tile { align-items: flex-start; }
+html.mc body .pf-tile .k {
+  white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+html.mc body .pf-tile .v { white-space: nowrap; overflow: visible; text-overflow: clip; }
+html.mc body .pf-tile .s { white-space: normal; overflow: visible; text-overflow: clip; font-size: 0.75rem; }
+html.mc body .pf-meta { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+html.mc body .pf-meta dd { white-space: nowrap; overflow: visible; text-overflow: clip; }
+
+/* ---- 5) footer grass edge: spans the whole footer. The line is the first child of the shell's
+        padded `<div class="wrap">`, so it is taken out of that flow and pinned to the footer box.
+        `width:100%` is required: the SVG is a replaced element, and with `width:auto` it takes its
+        intrinsic ratio (80:2 x 14px = 560px) and widened the document on every phone page. ---- */
+html.mc footer { position: relative; }
+html.mc footer .grassline {
+  display: block; position: absolute; top: 0; left: 0; right: 0; width: 100%; height: 14px; margin: 0;
+}
+
+/* ---- 6) home hero: copy left, status panel right (mockup: two 420px columns from 1024px) ---- */
+html.mc .hero-scene .hcopy { min-width: 0; }
+@media (min-width: 1024px) {
+  html.mc .hero-scene .hub-wrap { display: flex; flex-wrap: wrap; gap: 40px; align-items: center; }
+  html.mc .hero-scene .hcopy { flex: 1 1 420px; }
+  html.mc .hero-scene .hub-wrap > #hs { flex: 1 1 420px; margin-top: 0 !important; align-self: center; }
+}
+html.mc .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+
+/* ---- 7) profile tabs: segmented control like the mockup `.tabs`, and a tight gap above ---- */
+html.mc body .pf-tabs { margin: 0; }
+html.mc body .pf-tl {
+  display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 0 0 12px;
+  border-radius: 999px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line);
+  overflow: visible; max-width: 100%;
+}
+html.mc body .pf-tl button {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  border: 0; border-radius: 999px; background: transparent; color: var(--muted);
+  font-family: var(--f-body); font-size: 0.875rem; font-weight: 800; box-shadow: none; cursor: pointer;
+  transition: background-color 0.25s, color 0.25s;
+}
+html.mc body .pf-tl button img { image-rendering: pixelated; }
+html.mc body .pf-tl button:hover { color: var(--ink); background: var(--surface-3); }
+html.mc body .pf-tl button[aria-selected=true] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 0 var(--line-strong); }
+html.mc body .pf-tl button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---- 8) market: names in ink (link colour only on hover), cards on content height ---- */
+html.mc a.mrow b, html.mc a.lrow b, html.mc a.ir b, html.mc a.li b, html.mc body .il .in b { color: var(--ink); }
+html.mc a.mrow:hover b, html.mc a.mrow:focus-visible b, html.mc a.lrow:hover b, html.mc a.ir:hover b,
+html.mc a.ir:focus-visible b, html.mc a.li:hover b, html.mc body .il a:hover .in b { color: var(--link); }
+html.mc .mg { align-items: start; }
+html.mc #showall { padding: 0 16px; }
+
+/* ---- 10) VIP/MVP panel in the new mockup look (vip.css is injected by the page body) ---- */
+html.mc body .vip-me {
+  display: flex; flex-wrap: wrap; gap: 20px; align-items: center; padding: 20px;
+  background: linear-gradient(160deg, rgba(199, 123, 224, 0.18), var(--surface) 60%);
+}
+html.mc body .vip-me.is-vip { background: linear-gradient(160deg, rgba(255, 212, 94, 0.16), var(--surface) 55%); }
+html.mc body .vip-me .slot.big { width: 72px; height: 72px; border-radius: 18px; }
+html.mc body .vip-me .slot.big img { width: 72px; height: 72px; }
+html.mc body .vip-me > div { flex: 1 1 300px; min-width: 0; }
+html.mc body .vip-me .hub-h2 { margin: 6px 0 0; font-size: clamp(1.6rem, 4vw, 2.2rem); }
+html.mc body .vip-acts { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0; }
+html.mc body .vip-ranks { align-items: stretch; }
+html.mc body .vip-card.is-vip { background: linear-gradient(160deg, rgba(255, 212, 94, 0.16), var(--surface) 55%); }
+html.mc body .vip-card.is-mvp { background: linear-gradient(160deg, rgba(199, 123, 224, 0.24), var(--surface) 55%); box-shadow: inset 0 0 0 2px rgba(199, 123, 224, 0.6), var(--shadow-lift); }
+html.mc body .vip-card.is-admin { background: linear-gradient(160deg, rgba(255, 138, 138, 0.16), var(--surface) 55%); }
+html.mc body .vip-card .hub-h2 { font-size: 1.25rem; }
+html.mc body .vip-perks .mut { color: var(--muted); }
+html.mc body .vip-world, html.mc body .vip-soon { border-radius: 18px; }
+html.mc body .vip-world b { font-size: 1.0625rem; }
+html.mc body .vip-block > .hub-h2 { font-size: 1.35rem; }
+/* rank chips (ranks.css draws a bordered tag): the mockup uses soft, filled chips */
+html.mc body .vip-me .rk, html.mc body .vip-card .rk {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; margin: 0;
+  border: 0; border-radius: 8px; font-family: var(--f-body); font-size: 0.75rem; font-weight: 900;
+  letter-spacing: 0.04em; text-transform: none; background: rgba(255, 255, 255, 0.08); color: var(--ink);
+}
+html.mc body .vip-me .rk-6, html.mc body .vip-card .rk-6 { background: var(--sun); color: var(--sun-ink); }
+html.mc body .vip-me .rk-d, html.mc body .vip-card .rk-d { background: #c77be0; color: #2a0c36; }
+html.mc body .vip-me .rk-c, html.mc body .vip-card .rk-c { background: var(--down); color: #4a0f0f; }
+html.mc body .vip-card .tag.ts { background: #c77be0; color: #2a0c36; box-shadow: none; }
+html.mc body .vip-card.is-vip .tag.ts { background: var(--sun); color: var(--sun-ink); }
+/* worlds: status chips + a dashed free slot, and the meta line stays on one rhythm */
+html.mc body .vip-world { gap: 14px; padding: 16px 18px; }
+html.mc body .vip-world .tag { min-height: 24px; border-radius: 8px; box-shadow: none; }
+html.mc body .vip-world .tag.ts { background: var(--act); color: var(--act-ink); }
+html.mc body .vip-world .tag.tr { background: var(--surface-3); color: var(--muted); }
+html.mc body .vip-free {
+  display: flex; align-items: center; gap: 14px; min-height: 84px; padding: 16px 18px;
+  background: transparent; border-radius: 18px;
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}
+html.mc body .vip-free .slot { opacity: 0.6; }
+html.mc body .vip-free p { margin: 0; font-size: 0.875rem; color: var(--muted); }
+
+/* VIP: Kopfzeilen der Blöcke (Kicker + Titel links, Notiz bzw. Zähler rechts) */
+html.mc body .vip-head { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: flex-end; justify-content: space-between; margin: 0 0 16px; }
+html.mc body .vip-head .hub-h2 { margin: 6px 0 0; }
+html.mc body .vip-head-note, html.mc body .vip-head-n { margin: 0; max-width: 46ch; font-size: 0.8125rem; font-weight: 800; }
+html.mc body .vip-head-n { font-variant-numeric: tabular-nums; }

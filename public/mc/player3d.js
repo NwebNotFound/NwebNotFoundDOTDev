@@ -29,8 +29,10 @@ v.controls.enableZoom=false;v.controls.enablePan=false;v.globalLight.intensity=2
 return v.loadSkin(skin(n)).then(()=>{v.animation=new skinview3d.IdleAnimation();v.animation.speed=.6;if(!el.isConnected){v.dispose();live--;return}el.appendChild(cv);el.classList.add('ready');VS.push([el,v]);look(v,el);
 new IntersectionObserver(e=>{v.renderPaused=!e[0].isIntersecting}).observe(el);new ResizeObserver(()=>{if(el.clientWidth&&el.clientHeight)v.setSize(el.clientWidth,el.clientHeight)}).observe(el);return v})}
 async function draw(el){const n=el.dataset.name;if(!NAME.test(n)||!OK)return;const w=Math.max(60,el.clientWidth||160),h=Math.max(80,el.clientHeight||220),rot=+(el.dataset.rot||-.4);
-try{if(!STATIC()&&el.dataset.mode!=='still'&&live<MAX_LIVE){live++;await load();await live3d(el,n,w,h,rot).catch(e=>{live--;throw e});return}
-const url=await still(n,w*2,h*2,rot);const img=new Image();img.alt='';img.className='m3d-still';img.width=w;img.height=h;img.src=url;el.appendChild(img);el.classList.add('ready')}catch(e){console.warn('skinview3d',e)}}
+// A live viewer that fails must never leave an empty tile behind: the same viewer then renders one
+// static frame, and only if that fails too the head image from the markup stays.
+try{if(!STATIC()&&el.dataset.mode!=='still'&&live<MAX_LIVE){live++;await load();await live3d(el,n,w,h,rot).catch(e=>{live--;throw e});return}}catch(e){console.warn('skinview3d live',e)}
+try{const url=await still(n,w*2,h*2,rot);const img=new Image();img.alt='';img.className='m3d-still';img.width=w;img.height=h;img.src=url;el.appendChild(img);el.classList.add('ready')}catch(e){console.warn('skinview3d',e)}}
 const io='IntersectionObserver' in window?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);draw(e.target)}}),{rootMargin:'200px'}):null;
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 window.MC3D={

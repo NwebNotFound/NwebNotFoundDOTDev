@@ -53,7 +53,9 @@ with sync_playwright() as p:
         ok("C" in curve and "H" not in curve and "V" not in curve, f"{w}px Item: glatte Kurve statt Stufe", curve[:90])
         mk = pg.locator("#cw .rmk")
         ok(mk.count() == 1 and mk.locator("text").text_content() == "neue Preise", f"{w}px Item: vertikale Linie 'neue Preise'")
-        ok("Monocraft" in pg.eval_on_selector("#cw .rmk text", "e=>getComputedStyle(e).fontFamily"), f"{w}px Item: Marker in Pixel-Schrift", pg.eval_on_selector("#cw .rmk text", "e=>getComputedStyle(e).fontFamily"))
+        # Summer Theme v2: the MC surface renders pixel text in the self-hosted SmPixel
+        # (Pixelify Sans) instead of Monocraft — the assertion keeps checking a pixel face.
+        ok("SmPixel" in pg.eval_on_selector("#cw .rmk text", "e=>getComputedStyle(e).fontFamily"), f"{w}px Item: Marker in Pixel-Schrift", pg.eval_on_selector("#cw .rmk text", "e=>getComputedStyle(e).fontFamily"))
         bb = pg.eval_on_selector("#cw .rmk text", "e=>{const a=e.getBoundingClientRect(),b=e.closest('svg').getBoundingClientRect();return a.left>=b.left-1&&a.right<=b.right+1}")
         ok(bb, f"{w}px Item: Marker-Label im Chart sichtbar")
         rc = pg.inner_text("#rc"); ok("+20,00" in rc and "seit Reset" in rc, f"{w}px Item: Änderung seit Reset", rc)
@@ -237,7 +239,9 @@ with sync_playwright() as p:
         go("/vip"); pg.locator("#vip-worlds").wait_for(timeout=10000); vt = pg.inner_text("#vip")
         ok("Das Panel ist für die Ränge VIP, MVP und Admin." in vt and "bald verfügbar" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 0 and pg.locator("#vip a[href='/profile']").count() == 1, f"{w}px VIP ohne Rang: Übersicht, kein Panel", vt[:240])
         ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator('.ng[data-g=konto] a[href="/vip"]').count() == 1 and pg.locator('.ng[data-g=community] a[href="/vip"]').count() == 0 and pg.locator('a[href="/vip"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=konto] .ngb[data-cur]').count() == 1, f"{w}px VIP: Konto-Menü aktiv, kein Formular")
-        ok("Monocraft" in pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"), f"{w}px VIP: Pixel-Schrift", pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"))
+        # Summer Theme v2: page headings use the self-hosted SmPixel (Pixelify Sans); Monocraft
+        # left the MC surface with the redesign.
+        ok("SmPixel" in pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"), f"{w}px VIP: Pixel-Schrift", pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"))
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Übersicht: kein horizontales Scrollen")
         lay = pg.evaluate("""() => {
           const R = e => e.getBoundingClientRect();
@@ -464,6 +468,12 @@ with sync_playwright() as p:
         kpg.goto("https://" + H + "/", wait_until="domcontentloaded", timeout=45000)
         kpg.wait_for_function("() => { const s = document.querySelector('.konto-av') && document.querySelector('.konto-av').src || ''; return s.includes('MHF_Steve') || s.includes('discordapp.com') || /\\/mc-head\\/[A-Za-z0-9_]+\\//.test(s) }", timeout=10000)
         src = kpg.locator(".konto-av").get_attribute("src") or kpg.evaluate("document.querySelector('.konto-av').src")
+        # Vor dem Schließen auf ein Ende des Bild-Requests warten: der Route-Handler darf einen
+        # noch laufenden Kopf-Request ignorieren (siehe oben), aber Playwright wirft beim
+        # Browser.close() „Route.fulfill: Fetch response has been disposed", wenn genau dieser
+        # Request noch fliegt. `complete` gilt für geladen UND für fehlgeschlagen.
+        try: kpg.wait_for_function("() => { const i = document.querySelector('.konto-av'); return !i || i.complete }", timeout=3000)
+        except Exception: pass
         return {"src": src, "xss": kpg.evaluate("window.__xss || 0")}
     kb = konto('"><img src=x onerror=window.__xss=1>', None)
     ok(kb["xss"] == 0 and kb["src"].endswith(FB) and "onerror" not in kb["src"], "MC-Konto: Breakout-Avatar fällt auf Steve zurück", kb)

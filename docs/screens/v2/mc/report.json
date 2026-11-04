@@ -1,0 +1,739 @@
+{
+  "mockups": [
+    {
+      "page": "home",
+      "file": "docs/screens/v2/mc/mockup-home-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1635,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "home",
+      "file": "docs/screens/v2/mc/mockup-home-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3173,
+      "scrollWidth": 419
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/mockup-markt-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1245,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/mockup-markt-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1885,
+      "scrollWidth": 424
+    },
+    {
+      "page": "item",
+      "file": "docs/screens/v2/mc/mockup-item-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1030,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "item",
+      "file": "docs/screens/v2/mc/mockup-item-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1602,
+      "scrollWidth": 390
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/mockup-shops-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1002,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/mockup-shops-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1493,
+      "scrollWidth": 390
+    },
+    {
+      "page": "auktionen",
+      "file": "docs/screens/v2/mc/mockup-auktionen-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 981,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "auktionen",
+      "file": "docs/screens/v2/mc/mockup-auktionen-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1670,
+      "scrollWidth": 390
+    },
+    {
+      "page": "parkour",
+      "file": "docs/screens/v2/mc/mockup-parkour-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1231,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "parkour",
+      "file": "docs/screens/v2/mc/mockup-parkour-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1816,
+      "scrollWidth": 390
+    },
+    {
+      "page": "pvp",
+      "file": "docs/screens/v2/mc/mockup-pvp-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1074,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "pvp",
+      "file": "docs/screens/v2/mc/mockup-pvp-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1746,
+      "scrollWidth": 390
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/mockup-spieler-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1064,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/mockup-spieler-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2537,
+      "scrollWidth": 390
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/mockup-player-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1151,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/mockup-player-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1896,
+      "scrollWidth": 390
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/mockup-leaderboards-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1221,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/mockup-leaderboards-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1816,
+      "scrollWidth": 390
+    },
+    {
+      "page": "changelog",
+      "file": "docs/screens/v2/mc/mockup-changelog-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1237,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "changelog",
+      "file": "docs/screens/v2/mc/mockup-changelog-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1298,
+      "scrollWidth": 390
+    },
+    {
+      "page": "feedback",
+      "file": "docs/screens/v2/mc/mockup-feedback-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1155,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "feedback",
+      "file": "docs/screens/v2/mc/mockup-feedback-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1244,
+      "scrollWidth": 390
+    },
+    {
+      "page": "wiki",
+      "file": "docs/screens/v2/mc/mockup-wiki-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1464,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "wiki",
+      "file": "docs/screens/v2/mc/mockup-wiki-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2132,
+      "scrollWidth": 390
+    },
+    {
+      "page": "wiki-artikel",
+      "file": "docs/screens/v2/mc/mockup-wiki-artikel-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1464,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "wiki-artikel",
+      "file": "docs/screens/v2/mc/mockup-wiki-artikel-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2132,
+      "scrollWidth": 390
+    },
+    {
+      "page": "vip",
+      "file": "docs/screens/v2/mc/mockup-vip-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1409,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "vip",
+      "file": "docs/screens/v2/mc/mockup-vip-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2327,
+      "scrollWidth": 390
+    },
+    {
+      "page": "account",
+      "file": "docs/screens/v2/mc/mockup-account-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 979,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "account",
+      "file": "docs/screens/v2/mc/mockup-account-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1685,
+      "scrollWidth": 390
+    }
+  ],
+  "impl": [
+    {
+      "page": "home",
+      "file": "docs/screens/v2/mc/neu-home-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2382,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "home",
+      "file": "docs/screens/v2/mc/neu-home-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 4238,
+      "scrollWidth": 390
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/neu-markt-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2811,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/neu-markt-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3502,
+      "scrollWidth": 390
+    },
+    {
+      "page": "item",
+      "file": "docs/screens/v2/mc/neu-item-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1803,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "item",
+      "file": "docs/screens/v2/mc/neu-item-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1787,
+      "scrollWidth": 390
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/neu-shops-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1104,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/neu-shops-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1464,
+      "scrollWidth": 390
+    },
+    {
+      "page": "auktionen",
+      "file": "docs/screens/v2/mc/neu-auktionen-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1016,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "auktionen",
+      "file": "docs/screens/v2/mc/neu-auktionen-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1346,
+      "scrollWidth": 390
+    },
+    {
+      "page": "parkour",
+      "file": "docs/screens/v2/mc/neu-parkour-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2058,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "parkour",
+      "file": "docs/screens/v2/mc/neu-parkour-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2080,
+      "scrollWidth": 390
+    },
+    {
+      "page": "pvp",
+      "file": "docs/screens/v2/mc/neu-pvp-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1067,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "pvp",
+      "file": "docs/screens/v2/mc/neu-pvp-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1065,
+      "scrollWidth": 390
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/neu-spieler-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 900,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/neu-spieler-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 844,
+      "scrollWidth": 390
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/neu-player-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2057,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/neu-player-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2968,
+      "scrollWidth": 390
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/neu-leaderboards-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1493,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/neu-leaderboards-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1518,
+      "scrollWidth": 390
+    },
+    {
+      "page": "changelog",
+      "file": "docs/screens/v2/mc/neu-changelog-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1013,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "changelog",
+      "file": "docs/screens/v2/mc/neu-changelog-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1080,
+      "scrollWidth": 390
+    },
+    {
+      "page": "feedback",
+      "file": "docs/screens/v2/mc/neu-feedback-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1207,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "feedback",
+      "file": "docs/screens/v2/mc/neu-feedback-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1261,
+      "scrollWidth": 390
+    },
+    {
+      "page": "wiki",
+      "file": "docs/screens/v2/mc/neu-wiki-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1183,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "wiki",
+      "file": "docs/screens/v2/mc/neu-wiki-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1936,
+      "scrollWidth": 390
+    },
+    {
+      "page": "wiki-artikel",
+      "file": "docs/screens/v2/mc/neu-wiki-artikel-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2005,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "wiki-artikel",
+      "file": "docs/screens/v2/mc/neu-wiki-artikel-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2965,
+      "scrollWidth": 390
+    },
+    {
+      "page": "vip",
+      "file": "docs/screens/v2/mc/neu-vip-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2406,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "vip",
+      "file": "docs/screens/v2/mc/neu-vip-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3220,
+      "scrollWidth": 390
+    },
+    {
+      "page": "account",
+      "file": "docs/screens/v2/mc/neu-account-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 3397,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "account",
+      "file": "docs/screens/v2/mc/neu-account-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 5095,
+      "scrollWidth": 390
+    }
+  ],
+  "stress": [
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/stress-spieler-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 900,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "spieler",
+      "file": "docs/screens/v2/mc/stress-spieler-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 844,
+      "scrollWidth": 390
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/stress-player-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1738,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "player",
+      "file": "docs/screens/v2/mc/stress-player-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 2388,
+      "scrollWidth": 390
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/stress-leaderboards-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 1325,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "leaderboards",
+      "file": "docs/screens/v2/mc/stress-leaderboards-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1374,
+      "scrollWidth": 390
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/stress-markt-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2540,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "markt",
+      "file": "docs/screens/v2/mc/stress-markt-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3047,
+      "scrollWidth": 390
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/stress-shops-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 924,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "shops",
+      "file": "docs/screens/v2/mc/stress-shops-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 1103,
+      "scrollWidth": 390
+    },
+    {
+      "page": "bestellungen",
+      "file": "docs/screens/v2/mc/stress-bestellungen-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 900,
+      "scrollWidth": 1280
+    },
+    {
+      "page": "bestellungen",
+      "file": "docs/screens/v2/mc/stress-bestellungen-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 844,
+      "scrollWidth": 390
+    }
+  ],
+  "style": {
+    "no-preference": {
+      "bodyFont": "SmBody, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+      "headingFont": "SmPixel, ui-monospace, monospace",
+      "cardRadius": "22px",
+      "cardBackground": "rgb(21, 33, 28)",
+      "quickLinkAnimation": "rise",
+      "buttonShadow": "rgb(47, 154, 75) 0px 3px 0px 0px, rgba(47, 154, 75, 0.8) 0px 10px 22px -10px",
+      "buttonHeight": 48,
+      "navRadius": "999px",
+      "navBlur": "blur(14px) saturate(1.4)",
+      "themeCss": true
+    },
+    "reduce": {
+      "bodyFont": "SmBody, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+      "headingFont": "SmPixel, ui-monospace, monospace",
+      "cardRadius": "22px",
+      "cardBackground": "rgb(21, 33, 28)",
+      "quickLinkAnimation": "none",
+      "buttonShadow": "rgb(47, 154, 75) 0px 3px 0px 0px, rgba(47, 154, 75, 0.8) 0px 10px 22px -10px",
+      "buttonHeight": 48,
+      "navRadius": "999px",
+      "navBlur": "blur(14px) saturate(1.4)",
+      "themeCss": true
+    },
+    "diff": {
+      "quickLinkAnimation": [
+        "rise",
+        "none"
+      ]
+    }
+  },
+  "stressChecks": {
+    "player": {
+      "docOverflowPx": 0,
+      "checkedNames": 0,
+      "ellipsizedNames": [],
+      "spilledText": [],
+      "groupedThousands": true,
+      "sample": "1.234.567.890 CP",
+      "ellipsisOnRows": null
+    },
+    "leaderboards": {
+      "docOverflowPx": 0,
+      "checkedNames": 2,
+      "ellipsizedNames": [
+        "Neunzehn_Zeichen",
+        "LangLangLangLang"
+      ],
+      "spilledText": [],
+      "groupedThousands": true,
+      "sample": "617.283.945 CP",
+      "ellipsisOnRows": "ellipsis"
+    },
+    "shops": {
+      "docOverflowPx": 0,
+      "checkedNames": 2,
+      "ellipsizedNames": [
+        "Der allerallerallerlaengste ",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      ],
+      "spilledText": [],
+      "groupedThousands": false,
+      "sample": null,
+      "ellipsisOnRows": "ellipsis"
+    },
+    "bestellungen": {
+      "docOverflowPx": 0,
+      "checkedNames": 1,
+      "ellipsizedNames": [],
+      "spilledText": [],
+      "groupedThousands": true,
+      "sample": null,
+      "ellipsisOnRows": "clip"
+    }
+  },
+  "motion": {
+    "shots": [
+      "parallax-home-top.png",
+      "parallax-home-scrolled.png",
+      "parallax-home-pointer.png",
+      "transition-same-document.png"
+    ],
+    "supportsScrollTimeline": true,
+    "viewTransition": {
+      "header": "mc-header",
+      "footer": "mc-footer",
+      "main": "mc-page",
+      "jsFallbackActive": false,
+      "scenePresent": true
+    },
+    "layers": {
+      "scroll0": {
+        "stars": "matrix(1, 0, 0, 1, 0, 0)",
+        "clouds": "matrix(1, 0, 0, 1, 0, 0)",
+        "hills": "matrix(1, 0, 0, 1, 0, 0)",
+        "mascot": "matrix(1, 0, 0, 1, 0, 0)",
+        "glow": "none"
+      },
+      "scroll280": {
+        "stars": "matrix(1, 0, 0, 1, 0, 8.13675)",
+        "clouds": "matrix(1, 0, 0, 1, 0, 25.8462)",
+        "hills": "matrix(1, 0, 0, 1, 0, 44.5128)",
+        "mascot": "matrix(1, 0, 0, 1, 0, 56.4786)",
+        "glow": "none"
+      }
+    },
+    "pointer": {
+      "mx": "-5.25px",
+      "my": "2.84px",
+      "mascotInner": "matrix(1, 0, 0, 1, -8.92412, 4.8275)"
+    },
+    "transitionRunning": true,
+    "reducedMotion": {
+      "stars": "none",
+      "clouds": "none",
+      "hills": "none",
+      "mascot": "none",
+      "glow": "none"
+    }
+  },
+  "overflow390": [],
+  "overflow390Stress": []
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Reine VIP-Helfer (ohne Worker). Wird von scripts/e2e.mjs importiert und kann allein laufen.
 import assert from "node:assert/strict";
-import { isVipWorldKey, pickVipWorlds, vipStats, vipWorldLabel, vipCatalog, vipRankView, normU } from "../src/mc-vip.js";
+import { isVipWorldKey, pickVipWorlds, vipStats, vipWorldLabel, vipCatalog, vipRankView, normU, WORLD_LIMITS, worldLimit } from "../src/mc-vip.js";
 import { sanitizeInfo, cleanWorlds, cleanLog } from "../src/mc-vip-cmd.js";
 
 const worlds = {
@@ -131,5 +131,15 @@ assert.deepEqual(vipRankView("builder", "&a"), null, "Builder bleibt ohne Panel"
 assert.deepEqual(vipRankView("vip", "&z"), { rank: "vip", color: "6", label: "VIP" }, "ungültige Farbe → Standard &6");
 assert.deepEqual(vipRankView("mvp", ""), { rank: "mvp", color: "d", label: "MVP" }, "fehlende Farbe → Standard &d");
 assert.equal(vipRankView("player", "&7"), null);
+
+// Welt-Limits laut Nils, 04.11.2026: VIP 1 eigene Welt, MVP 3. Einzige Quelle ist WORLD_LIMITS.
+assert.deepEqual(WORLD_LIMITS, { vip: 1, mvp: 3 }, "Welt-Limits VIP 1 / MVP 3");
+assert.equal(worldLimit("vip"), 1);
+assert.equal(worldLimit("mvp"), 3);
+assert.equal(worldLimit("admin"), 3, "Admin sieht alle Welten, Zähler bleibt bei 3");
+assert.equal(worldLimit(null), 3, "ohne Rang bleibt der Standard 3");
+assert.ok(cat[0].perks.find((p) => p.id === "worlds").title.includes("Eine eigene Welt"), "VIP-Karte nennt eine Welt");
+assert.ok(cat[1].perks.find((p) => p.id === "worlds").title.includes("3 eigene Welten"), "MVP-Karte nennt drei Welten");
+assert.ok(!JSON.stringify(cat).includes("Addon"), "keine Addon-Versprechen (Feature kommt später)");
 
 console.log("vip-unit ok");
