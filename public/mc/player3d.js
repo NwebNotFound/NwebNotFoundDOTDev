@@ -39,11 +39,11 @@ window.MC3D={
  // Container mit Kopf als Fallback; cls z. B. "pf-model" / "pod-model"
  html:(n,cls,head)=>NAME.test(n)?'<div class="m3d '+E(cls||'')+'" data-name="'+n+'"><img class="m3d-fb" alt="" loading="lazy" width="'+(head||64)+'" height="'+(head||64)+'" src="/mc-head/'+n+'/'+(head||64)+'?v=5" onerror="this.onerror=null;this.src=\'/mc-head/MHF_Steve/'+(head||64)+'?v=5\'"></div>':'',
  scan(root){gc();(root||document).querySelectorAll('.m3d[data-name]:not([data-m3d])').forEach(el=>{el.dataset.m3d='1';io?io.observe(el):draw(el)})},
- // Hover-Vorschau (nur Maus): ein gemeinsamer Viewer im Popover
- hover(root,sel){if(!OK||STATIC())return;const pop=document.createElement('div');pop.className='m3d-pop';pop.setAttribute('aria-hidden','true');document.body.appendChild(pop);let v=null,cur='',tm;
-  const show=async(a)=>{const n=a.dataset.player;if(!NAME.test(n))return;const r=a.getBoundingClientRect();pop.style.left=Math.min(innerWidth-180,Math.max(8,r.left+r.width/2-80))+'px';pop.style.top=(r.top+scrollY-232)+'px';if(r.top<240)pop.style.top=(r.bottom+scrollY+8)+'px';pop.classList.add('on');
-   if(cur===n)return;cur=n;try{await load();if(!v){const cv=document.createElement('canvas');v=new skinview3d.SkinViewer({canvas:cv,width:160,height:220,zoom:.86,fov:40});v.controls.enableZoom=false;v.controls.enablePan=false;v.controls.enableRotate=false;v.globalLight.intensity=2.6;v.cameraLight.intensity=.7;v.animation=new skinview3d.WalkingAnimation();v.animation.speed=.7;v.playerObject.rotation.y=-.5;pop.appendChild(cv)}v.renderPaused=false;await v.loadSkin(skin(n))}catch(_){}};
-  const hide=()=>{pop.classList.remove('on');if(v)v.renderPaused=true};
+ // Hover-Vorschau: nur nach erfolgreich geladenem Skin, innerhalb der Karte statt über Seitentext.
+ hover(root,sel){if(!OK||STATIC())return;const pop=document.createElement('div');pop.className='m3d-pop';pop.hidden=true;pop.setAttribute('aria-hidden','true');let v=null,tm,generation=0,queue=Promise.resolve();
+  const hide=()=>{generation++;pop.hidden=true;pop.classList.remove('on');if(v)v.renderPaused=true};
+  const show=a=>{const n=a.dataset.player;if(!NAME.test(n))return;const current=++generation;pop.hidden=true;pop.classList.remove('on');
+   queue=queue.catch(()=>{}).then(async()=>{if(current!==generation||!a.isConnected)return;await load();if(!v){const cv=document.createElement('canvas');v=new skinview3d.SkinViewer({canvas:cv,width:160,height:160,zoom:.86,fov:40});v.controls.enableZoom=false;v.controls.enablePan=false;v.controls.enableRotate=false;v.globalLight.intensity=2.6;v.cameraLight.intensity=.7;v.animation=new skinview3d.WalkingAnimation();v.animation.speed=.7;v.playerObject.rotation.y=-.5;pop.appendChild(cv)}await v.loadSkin(skin(n));if(current!==generation||!a.isConnected){v.renderPaused=true;return}a.appendChild(pop);pop.hidden=false;v.renderPaused=false;pop.classList.add('on')}).catch(()=>{if(current===generation)hide()})};
   root.addEventListener('pointerover',e=>{const a=e.target.closest(sel);if(!a||e.pointerType!=='mouse')return;clearTimeout(tm);tm=setTimeout(()=>show(a),120)});
   root.addEventListener('pointerout',e=>{const a=e.target.closest(sel);if(!a||(e.relatedTarget&&a.contains(e.relatedTarget)))return;clearTimeout(tm);hide()});
   addEventListener('scroll',hide,{passive:true})}
