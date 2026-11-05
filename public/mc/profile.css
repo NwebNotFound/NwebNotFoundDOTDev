@@ -91,7 +91,7 @@ html.mc .plc .m3d-pop canvas{width:100%!important;height:100%!important;object-f
 /* Personal inventory: one common slot unit for armour, storage, hotbar and offhand.
    Real Minecraft pane shape at every width: armour as a single column on the left, the 9x3 storage in
    the middle, the 9-slot hotbar below it (separated) and the offhand slot level with the hotbar.
-   Eleven equal columns keep every slot the same square at 375 px too. */
+   On phones armour and offhand move below the storage to preserve slot size and padding. */
 html.mc #pb .inv{display:block;min-width:0}
 html.mc #pb .inv h3{margin:0 0 var(--sp2)}
 html.mc #pb .inv>p{margin-bottom:var(--sp3)}
@@ -107,7 +107,10 @@ html.mc #pb .inv .ivs b{font-family:var(--f-px,monospace);color:#fff;text-shadow
 
 @media(max-width:560px){
  html.mc #pb{width:100%;padding-left:8px;padding-right:8px}
- html.mc #pb .inv{padding-left:4px;padding-right:4px}
- html.mc #pb .inv .iv-pane,html.mc #pb .inv .iv-arm,html.mc #pb .inv .iv-off,html.mc #pb .inv .ivg{gap:1px}
+ html.mc #pb .inv{padding-left:var(--sp3);padding-right:var(--sp3)}
+ html.mc #pb .inv .iv-pane{grid-template-columns:repeat(9,minmax(0,1fr))}
+ html.mc #pb .inv .iv-stack{grid-column:1/-1;grid-row:1}
+ html.mc #pb .inv .iv-arm{grid-column:1/span 4;grid-row:2;grid-template-columns:repeat(4,minmax(0,1fr))}
+ html.mc #pb .inv .iv-off{grid-column:9;grid-row:2}
  html.mc #pb .inv .ivs b{font-size:.5rem;right:1px;bottom:0}
 }

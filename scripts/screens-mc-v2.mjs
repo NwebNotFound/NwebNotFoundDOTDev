@@ -339,7 +339,7 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     }, { timeout: 25_000 }).catch(() => {});
     await page.waitForTimeout(350);
   }
-  const mobImages = page.locator('img[src^="/mc-mob/"]');
+  const mobImages = page.locator('img[src^="/mc-mob/"]:visible');
   for (const img of await mobImages.all()) {
     await img.scrollIntoViewIfNeeded();
     await img.evaluate(el => el.decode());
@@ -347,6 +347,28 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
   const mobIcons = await mobImages.evaluateAll(images => images.map(el => ({ src: el.getAttribute("src"), loaded: el.complete && el.naturalWidth > 0 })));
   if (mobIcons.length && (mobResponses.filter(r => r.status === 200).length !== mobIcons.length || mobResponses.some(r => r.status >= 400))) throw new Error(`Mob icon requests failed: ${JSON.stringify(mobResponses)}`);
   await page.evaluate(() => scrollTo(0, 0));
+  const layout = await page.evaluate(() => {
+    const box = el => { const r = el.getBoundingClientRect(); return { left:r.left, right:r.right, top:r.top, width:r.width, height:r.height }; };
+    const inventory = document.querySelector('#pb .inv');
+    const meta = document.querySelector('.pf-meta');
+    const cards = [...document.querySelectorAll('#det .dgr > .dcard')];
+    return {
+      ...(inventory ? { inventory: { card:box(inventory), slots:[...inventory.querySelectorAll('.ivs')].map(box) } } : {}),
+      ...(meta ? { meta:[...meta.children].map(box) } : {}),
+      ...(cards.length ? { stats:cards.map(el => ({ title:el.querySelector('h3').textContent, ...box(el) })) } : {}),
+    };
+  });
+  if (vp.w === 375 && layout.inventory) {
+    const { card, slots } = layout.inventory;
+    if (slots.some(s => s.width < 28 || s.left - card.left < 12 || card.right - s.right < 12)) throw new Error(`Inventory spacing failed: ${JSON.stringify(layout.inventory)}`);
+  }
+  if (vp.w <= 560 && layout.meta?.length && layout.meta.some(r => Math.abs(r.width - layout.meta[0].width) > 1)) throw new Error('Uneven mobile hero rows');
+  if (vp.w === 1280 && layout.stats?.length) {
+    for (let i = 0; i + 1 < layout.stats.length; i += 2) {
+      const a = layout.stats[i], b = layout.stats[i + 1];
+      if (Math.abs(a.top - b.top) > 1 || Math.abs(a.height - b.height) > 1) throw new Error('Unbalanced player stat row');
+    }
+  }
   await page.screenshot({ path: file, fullPage: true });
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -355,7 +377,7 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     return s ? (s.textContent || "").trim() : null;
   });
   await ctx.close();
-  return { file: path.relative(ROOT, file), w: vp.w, h: vp.h, pageHeight: height, scrollWidth: width, ...(mobIcons.length ? { mobIcons, mobResponses } : {}), ...(status ? { status } : {}) };
+  return { file: path.relative(ROOT, file), w: vp.w, h: vp.h, pageHeight: height, scrollWidth: width, layout, ...(mobIcons.length ? { mobIcons, mobResponses } : {}), ...(status ? { status } : {}) };
 }
 
 // Style probe: proves the v2 layer is actually applied and that reduced motion switches it off.
