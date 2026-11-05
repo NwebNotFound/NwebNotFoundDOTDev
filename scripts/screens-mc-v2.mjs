@@ -372,10 +372,18 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
       ...(inventory ? { inventory: { card:box(inventory), slots:[...inventory.querySelectorAll('.ivs')].map(box) } } : {}),
       ...(meta ? { meta:[...meta.children].map(box) } : {}),
       ...(cards.length ? { stats:cards.map(el => ({ title:el.querySelector('h3').textContent, ...box(el) })) } : {}),
-      ...(drawer ? { drawer: { scrollWidth: drawer.scrollWidth, clientWidth: drawer.clientWidth, groups: drawer.querySelectorAll(".ng").length, account: !!drawer.querySelector(".l"), items: drawer.children.length } } : {}),
+      ...(drawer ? { drawer: (() => {
+        const r = drawer.getBoundingClientRect();
+        return { scrollWidth: drawer.scrollWidth, clientWidth: drawer.clientWidth,
+          top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height),
+          room: Math.round(innerHeight - r.bottom),
+          groups: drawer.querySelectorAll(".ng").length, account: !!drawer.querySelector(".l"), items: drawer.children.length };
+      })() } : {}),
     };
   });
   if (layout.drawer && layout.drawer.scrollWidth > layout.drawer.clientWidth + 1) throw new Error(`Nav-Drawer scrollt seitwärts: ${JSON.stringify(layout.drawer)}`);
+  // Der Drawer muss mit Abstand im Bild enden (Designer-QA: unten lief die Kante bei 812 px raus).
+  if (layout.drawer && layout.drawer.room < 8) throw new Error(`Nav-Drawer endet zu nah am Rand: ${JSON.stringify(layout.drawer)}`);
   if (vp.w === 375 && layout.inventory) {
     const { card, slots } = layout.inventory;
     if (slots.some(s => s.width < 28 || s.left - card.left < 12 || card.right - s.right < 12)) throw new Error(`Inventory spacing failed: ${JSON.stringify(layout.inventory)}`);

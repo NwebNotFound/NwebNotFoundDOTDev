@@ -523,7 +523,7 @@ html.mc .num, html.mc .tnum, html.mc td, html.mc .stat .v { font-variant-numeric
   html.mc .nbur span { display: block; height: 2px; background: var(--ink); transition: transform 0.22s ease, opacity 0.22s ease; }
   /* Der Drawer ist eine Spalte: ohne nowrap wickelt ds.css (flex-wrap:wrap) die Gruppen bei
      max-height in eine zweite Spalte nach rechts — Wiki und Anmelden rutschten aus dem Bild. */
-  html.mc .nl { position: absolute; top: calc(100% + 8px); left: 0; right: 0; display: none; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 2px; padding: 8px; border-radius: 22px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lift); max-height: calc(100dvh - 76px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+  html.mc .nl { position: absolute; top: calc(100% + 8px); left: 0; right: 0; display: none; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 2px; padding: 8px; border-radius: 22px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lift); max-height: calc(100dvh - 96px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
   html.mc .nav.open .nl { display: flex; }
   html.mc .nl .l, html.mc .nl .ngb { width: 100%; justify-content: space-between; min-height: 46px; padding: 0 14px; font-size: 1rem; border-radius: var(--r-sm); }
   html.mc .nl .ng { display: block; width: 100%; }
