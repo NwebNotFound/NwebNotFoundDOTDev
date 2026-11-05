@@ -406,7 +406,7 @@ html.mc .nl .ngb:is(:hover,:focus-visible),html.mc .nl .ng.open>.ngb{color:var(-
 html.mc .nl .ngb[data-cur]{color:var(--c-fg);font-weight:600}
 html.mc .nl .ngb[data-cur]::after{content:"";position:absolute;left:var(--s2);right:var(--s2);bottom:6px;height:2px;background:var(--c-acc)}
 html.mc .acct{display:none}
-html.mc.nav-lock,html.mc.nav-lock body{overflow:hidden}
+html.mc.nav-lock{overflow:hidden}html.mc.nav-lock body{overflow:visible}/* body must not become the scroller, or the sticky header detaches (#69) */
 html.mc .nl .ngb .mi{width:20px;height:20px;image-rendering:pixelated}
 html.mc .nl .ng.ng-end .ngm{left:auto;right:0}
 html.mc .nl .ngm{display:none;position:absolute;top:calc(100% - 4px);left:0;z-index:60;min-width:220px;max-height:min(70vh,420px);overflow:auto;padding:6px;gap:2px;background:linear-gradient(180deg,var(--c-s3) 0%,var(--c-s2) 100%);border:2px solid var(--mc-edge);box-shadow:var(--mc-inset-panel),0 18px 36px -16px rgba(0,0,0,.9)}
