@@ -2,7 +2,8 @@
 // Reine VIP-Helfer (ohne Worker). Wird von scripts/e2e.mjs importiert und kann allein laufen.
 import assert from "node:assert/strict";
 import { isVipWorldKey, pickVipWorlds, vipStats, vipWorldLabel, vipCatalog, vipRankView, normU, WORLD_LIMITS, worldLimit } from "../src/mc-vip.js";
-import { sanitizeInfo, cleanWorlds, cleanLog } from "../src/mc-vip-cmd.js";
+import { sanitizeInfo, cleanWorlds, cleanLog, cleanSettings, ACTIONS } from "../src/mc-vip-cmd.js";
+import { WORLD_DEFAULTS } from "../src/mc-vip.js";
 
 const worlds = {
   lobby: { online: true, players: ["Nils"], max: 20, tps: 20 },
@@ -147,5 +148,23 @@ assert.equal(worldLimit("vip2"), 1, "neuer Rang → VIP-Limit");
 assert.ok(cat[0].perks.find((p) => p.id === "worlds").title.includes("Eine eigene Welt"), "VIP-Karte nennt eine Welt");
 assert.ok(cat[1].perks.find((p) => p.id === "worlds").title.includes("3 eigene Welten"), "MVP-Karte nennt drei Welten");
 assert.ok(!JSON.stringify(cat).includes("Addon"), "keine Addon-Versprechen (Feature kommt später)");
+
+// Panel v2: Weltregeln und neue Aktionen. Nur die sechs Regeln aus dem Vertrag, Teil-Updates erlaubt.
+assert.deepEqual(ACTIONS, ["create", "rename", "start", "stop", "settings", "set_visibility", "invite", "uninvite", "trust", "delete"], "Panel v2 ops");
+assert.deepEqual(cleanSettings({ pvp: true }), { settings: { pvp: true } }, "Teil-Update bleibt Teil-Update");
+assert.deepEqual(cleanSettings({ gamemode: "creative", difficulty: "hard" }).settings, { gamemode: "creative", difficulty: "hard" });
+assert.equal(cleanSettings({ weather: "rain" }).error.includes("weather"), true, "unbekannter Schlüssel ist ein Fehler");
+assert.equal(cleanSettings({ pvp: "yes" }).error.includes("pvp"), true, "Bool muss Bool sein");
+assert.equal(cleanSettings({ gamemode: "hardcore" }).error.includes("gamemode"), true, "nur erlaubte Spielmodi");
+assert.equal(cleanSettings({ difficulty: "nightmare" }).error, "ungültiger Wert für difficulty");
+assert.equal(cleanSettings(null).error.length > 0, true);
+assert.equal(cleanSettings([[]]).error.length > 0, true, "Array ist kein Objekt");
+assert.deepEqual(cleanSettings({}), { settings: {} }, "leer wird vom Aufrufer abgelehnt, nicht hier");
+// Der Sync darf settings weglassen; dann gelten im Panel die Vertrags-Defaults.
+assert.deepEqual(WORLD_DEFAULTS, { gamemode: "survival", difficulty: "normal", pvp: false, keepInventory: false, mobGriefing: true, doDaylightCycle: true });
+assert.equal(cleanWorlds([{ ...CW, settings: { pvp: true } }]).worlds[0].settings.pvp, true);
+assert.equal(cleanWorlds([{ ...CW, settings: { pvp: true } }]).worlds[0].settings.gamemode, undefined, "Sync speichert nur die gesendeten Regeln");
+assert.equal(cleanWorlds([{ ...CW, settings: { pvp: 1 } }]).worlds.length, 0, "ungültige settings: Welt raus statt Absturz");
+assert.equal(cleanWorlds([{ ...CW }]).worlds[0].settings, null, "ohne settings bleibt null (Defaults im Panel)");
 
 console.log("vip-unit ok");

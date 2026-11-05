@@ -66,6 +66,8 @@ const PAGES = [
   { slug: "wiki", file: "McWiki.html", url: "/wiki" },
   { slug: "wiki-artikel", file: "McWiki.html", url: "/wiki/economy" },
   { slug: "vip", file: "McVip.html", url: "/vip" },
+  // Dieselbe Seite mit zugeklappter Verwaltung: zeigt, dass der Verwalten-Schalter schließt.
+  { slug: "vip-collapsed", file: "McVip.html", url: "/vip", click: 'button[data-manage]' },
   { slug: "account", file: "McAccount.html", url: "/profile" },
 ];
 const VIEWPORTS = [
@@ -188,6 +190,27 @@ function fixture() {
     },
     leaderboards_weekly: { money: lead((i) => 6200 / (i + 1), 6), playtime: lead((i) => 42000 / (i + 1), 7) },
     links: [{ discord_id: D1, mc_name: "Nils", mc_uuid: U1, has_role: true, verified: true }],
+    // VIP-Panel v2 (Phase 1B): eine eigene Welt des angemeldeten MVP (mit Regeln und Mitgliedern)
+    // und eine Welt eines Freundes, in die er eingeladen ist. Beides zusammen zeigt Kopfkarte,
+    // Verwaltung, Mitglieder, freien Platz und die Sektion "Welten von Freunden".
+    vip_worlds: [
+      {
+        id: "7f1e0000-0000-4000-8000-000000000010", owner_uuid: U1, owner_name: "Nils",
+        name: "Kirschtal", type: "normal", status: "running", visibility: "friends", slot: "vipworld-2",
+        player_limit: 10, players: 2, info: "Basis am Fluss",
+        invites: [{ uuid: uuid(1), name: "KaiDasEi", role: "trusted", added_at: Date.now() - 86400000 }, { uuid: uuid(3), name: "Mira", role: "member", added_at: Date.now() - 3600000 }],
+        settings: { gamemode: "survival", difficulty: "normal", pvp: true, keepInventory: true, mobGriefing: true, doDaylightCycle: true },
+        created_at: Date.now() - 2592000000, last_started_at: Date.now() - 1800000,
+      },
+      {
+        id: "7f1e0000-0000-4000-8000-000000000011", owner_uuid: uuid(1), owner_name: "KaiDasEi",
+        name: "Inselwelt", type: "flat", status: "stopped", visibility: "friends", slot: "vipworld-3",
+        player_limit: 6, players: 0,
+        invites: [{ uuid: U1, name: "Nils", role: "trusted", added_at: Date.now() - 7200000 }],
+        settings: { gamemode: "creative", difficulty: "easy", pvp: false, keepInventory: true, mobGriefing: false, doDaylightCycle: false },
+        created_at: Date.now() - 1296000000,
+      },
+    ],
     player_ranks: names.map((n, i) => ({ uuid: uuid(i), name: n, rank: i === 0 ? "mvp" : i === 1 ? "vip" : "default", color: i === 0 ? "&d" : i === 1 ? "&6" : "&7", weight: 10 - i })),
     pvp_stats: names.map((n, i) => ({ uuid: uuid(i), name: n, wins: 42 - i * 4, losses: 12 + i, draws: 1, matches: 55 - i * 3, winrate_pct: 76 - i * 6, favorite_kit: ["Sword", "Axe", "Bow"][i % 3] })),
     parkour: names.slice(0, 6).flatMap((n, i) => [
@@ -241,6 +264,14 @@ async function seed(session) {
   const txt = await res.text();
   if (!res.ok) throw new Error(`ingest ${res.status}: ${txt.slice(0, 400)}`);
   console.log("seed:", txt.slice(0, 300));
+  // VIP-Welten laufen nicht über den Ingest, sondern über den Sync des Vertrags (Token, sonst 401).
+  const vip = await fetch(`${MC}/api/mc-vip-worlds`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ingest-token": TOK, host: HOST },
+    body: JSON.stringify({ vip_worlds: fixture().vip_worlds }),
+  });
+  console.log("seed vip:", (await vip.text()).slice(0, 200));
+  if (!vip.ok) throw new Error(`vip sync ${vip.status}`);
   session.cookie = await sessionCookie("s-screens");
 }
 
@@ -298,7 +329,7 @@ async function routeMc(context) {
   });
 }
 
-async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal } = {}) {
+async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal, click } = {}) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1, reducedMotion: "no-preference", colorScheme: "dark" });
   if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
   // The artboards ask Google for their fonts; the offline run must not depend on that request, so
@@ -315,6 +346,12 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
   if (inject) await page.addInitScript(inject);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForTimeout(wait || 1400);
+  // Panel v2: die Verwaltung ist zugeklappt, bis jemand sie öffnet. Der Screenshot der offenen
+  // Karte braucht denselben Klick wie ein Besucher, sonst zeigt er nur die Kopfzeile.
+  if (click) {
+    const target = page.locator(click).first();
+    if (await target.count()) { await target.click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(600); }
+  }
   // 3D models load lazily and asynchronously: give them a bounded moment so no tile is captured
   // mid-load (this is why the "Gerade online" row still looked empty on desktop while the phone
   // breakpoint, which renders a static frame, already showed the figures). Never blocks a run.
@@ -352,10 +389,21 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     const inventory = document.querySelector('#pb .inv');
     const meta = document.querySelector('.pf-meta');
     const cards = [...document.querySelectorAll('#det .dgr > .dcard')];
+    // VIP-Panel v2: Kopf und Texturen muessen wirklich geladen sein, sonst ist der Screenshot blind.
+    const vHead = document.querySelector('#vip .v2-head');
+    const vIcons = [...document.querySelectorAll('#vip .v2-toggles img, #vip .v2-types img, #vip .v2-slots img, #vip .vip-card .slot img')];
+    const vWorld = document.querySelector('#vip .v2-world');
     return {
       ...(inventory ? { inventory: { card:box(inventory), slots:[...inventory.querySelectorAll('.ivs')].map(box) } } : {}),
       ...(meta ? { meta:[...meta.children].map(box) } : {}),
       ...(cards.length ? { stats:cards.map(el => ({ title:el.querySelector('h3').textContent, ...box(el) })) } : {}),
+      ...(vHead || vIcons.length || vWorld ? {
+        vip: {
+          head: vHead ? { src: vHead.getAttribute('src'), loaded: vHead.complete && vHead.naturalWidth > 0 } : null,
+          icons: vIcons.map(i => ({ src: i.getAttribute('src'), loaded: i.complete && i.naturalWidth > 0 })),
+          world: vWorld ? box(vWorld) : null,
+        },
+      } : {}),
     };
   });
   if (vp.w === 375 && layout.inventory) {
@@ -641,7 +689,7 @@ async function main() {
   if (impl) {
     for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600 });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600, click: p.click });
         probe.impl.push({ page: p.slug, ...r });
       }
     }

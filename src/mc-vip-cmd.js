@@ -1,11 +1,32 @@
 // VIP-Queue und Sync. Vertrag: docs/vip-api.md (mc-stack 956683c).
 // Browser sendet op über den Pfad. Gespeichert und an mc-stack ausgeliefert wird action.
 // expired setzt nur mc-stack, frühestens 600000 ms nach created_at.
-import { normU } from "./mc-vip.js";
+import { normU, WORLD_LIMITS, worldLimit } from "./mc-vip.js";
 import { hashIp } from "./ip-hash.js";
 
 // Vom Browser erlaubte ops (Pfad → action).
-export const ACTIONS = ["start", "set_visibility", "invite", "uninvite"];
+export const ACTIONS = ["create", "rename", "start", "stop", "settings", "set_visibility", "invite", "uninvite", "trust", "delete"];
+// Weltnamen laut Vertrag: 3–24 Zeichen aus [A-Za-z0-9_-].
+const WORLD_NAME = /^[A-Za-z0-9_-]{3,24}$/;
+// Weltregeln laut Vertrag. Nur diese Schlüssel, nur diese Werte.
+const SETTINGS = {
+  gamemode: ["survival", "creative", "adventure"],
+  difficulty: ["peaceful", "easy", "normal", "hard"],
+  pvp: "bool", keepInventory: "bool", mobGriefing: "bool", doDaylightCycle: "bool",
+};
+export const DEFAULT_SETTINGS = { gamemode: "survival", difficulty: "normal", pvp: false, keepInventory: false, mobGriefing: true, doDaylightCycle: true };
+// Teil-Update: fehlende Schlüssel bleiben gespeichert. Unbekannte Schlüssel und falsche Typen sind ein Fehler.
+export function cleanSettings(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { error: "settings muss ein Objekt sein" };
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!(k in SETTINGS)) return { error: "unbekannte Einstellung: " + k.slice(0, 40) };
+    if (SETTINGS[k] === "bool") { if (typeof v !== "boolean") return { error: k + " muss true oder false sein" }; }
+    else if (!SETTINGS[k].includes(v)) return { error: "ungültiger Wert für " + k };
+    out[k] = v;
+  }
+  return { settings: out };
+}
 // Alle Aktionen des Vertrags. Nur diese dürfen im Admin-Log stehen.
 export const CONTRACT_ACTIONS = ["create", "rename", "start", "stop", "settings", "set_visibility", "invite", "uninvite", "trust", "addons", "delete"];
 export const ROLES = ["member", "trusted"];
@@ -79,6 +100,9 @@ export function cleanWorlds(raw) {
     if (w?.visibility != null && w.visibility !== "friends" && w.visibility !== "private") continue;
     const invites = cleanInvites(w?.invites);
     if (invites == null) continue;
+    // settings ist im Sync optional. Fehlt der Block, gelten die Vertrags-Defaults im Panel.
+    const settings = w?.settings == null ? null : cleanSettings(w.settings);
+    if (settings && settings.error) continue;
     seen.add(id);
     const limit = num(w?.player_limit);
     const slot = typeof w?.slot === "string" && /^[A-Za-z0-9_-]{1,32}$/.test(w.slot) ? w.slot : null;
@@ -97,6 +121,7 @@ export function cleanWorlds(raw) {
       info: sanitizeInfo(w?.info),
       invites: invites.filter((i) => !(i.name && ownerName && i.name.toLowerCase() === ownerName.toLowerCase()) && i.uuid !== owner),
       addons,
+      settings: settings ? settings.settings : null,
       created_at: ms(w?.created_at),
       last_started_at: ms(w?.last_started_at),
     });
@@ -143,11 +168,12 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
   function deny(status, reason) { return json({ error: reason, reason }, status); }
 
   async function mutate(req, env, worldId, action, body) {
+    const create = action === "create";
     if (req.method !== "POST" && !(req.method === "DELETE" && action === "uninvite")) return json({ error: "Method not allowed" }, 405);
     const a = await actor(req, env); if (a.err) return deny(a.err[0], a.err[2] || a.err[1]);
-    const id = normU(worldId); if (!id) return json({ error: "world_id ist keine UUID" }, 400);
+    const id = create ? "" : normU(worldId); if (!create && !id) return json({ error: "world_id ist keine UUID" }, 400);
     if (body && typeof body === "object" && "op" in body && body.op != null && body.op !== action) return json({ error: "op passt nicht zum Pfad" }, 400);
-    let name = null, role = null, visibility = null;
+    let name = null, role = null, visibility = null, worldType = null, settings = null, info = null, confirm = "";
     if (action === "set_visibility") {
       visibility = body?.visibility;
       if (visibility !== "friends" && visibility !== "private") return json({ error: "visibility nur friends oder private" }, 400);
@@ -162,38 +188,75 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       name = typeof body?.name === "string" ? body.name : "";
       if (!NAME.test(name)) return json({ error: "Name ungültig" }, 400);
     }
-    const list = await worlds(env);
-    const world = (list || []).find((w) => w.id === id);
-    if (!world) return a.admin ? json({ error: "Welt nicht gefunden" }, 404) : deny(403, action === "start" ? "not_trusted" : "not_owner");
-    // Vertrag: trusted wird bevorzugt über die UUID geprüft, der Name ist nur der Fallback.
-    const invite = (world.invites || []).find((i) => (i.uuid ? normU(i.uuid) === a.uuid : !!i.name && i.name.toLowerCase() === a.name.toLowerCase()));
-    const isOwner = world.owner_uuid === a.uuid;
-    const isAdmin = a.admin === true;
-    // Admin darf jede Welt verwalten, der Owner seine eigene, trusted nur starten.
-    const allowed = isAdmin || isOwner || (invite?.role === "trusted" && action === "start");
-    if (!allowed) return deny(403, action === "start" ? "not_trusted" : "not_owner");
-    // Die Rangprüfung gilt nur für Spieler: ein Admin braucht für fremde Welten keinen VIP-Rang,
-    // ein Owner muss einen Panel-Rang haben und trusted startet nur Welten mit berechtigtem Owner.
-    if (!isAdmin) {
-      if (isOwner && !OWNER_RANKS.has(a.rank)) return deny(403, "no_rank");
-      if (!isOwner && action === "start") {
-        const ownerRank = await env.DB.prepare("SELECT rank FROM mc_player_ranks WHERE lower(replace(uuid, '-', '')) = ?").bind(world.owner_uuid.replace(/-/g, "")).first().catch(() => null);
-        if (!OWNER_RANKS.has(String(ownerRank?.rank || "").toLowerCase())) return deny(403, "no_rank");
-      }
+    // create und rename teilen die Namensregel aus dem Vertrag (3–24, [A-Za-z0-9_-]).
+    if (create || action === "rename") {
+      name = sanitizeInfo(body?.name);
+      if (!WORLD_NAME.test(name)) return json({ error: "Name muss 3-24 Zeichen [A-Za-z0-9_-] haben", reason: "invalid_name" }, 400);
     }
-    if (action === "invite" || action === "uninvite") {
+    if (create) {
+      worldType = body?.type == null ? "normal" : String(body.type);
+      if (!WORLD_TYPES.has(worldType)) return json({ error: "type nur normal, flat oder void", reason: "invalid_type" }, 400);
+      info = sanitizeInfo(body?.info) || null;
+    }
+    if (action === "settings") {
+      const c = cleanSettings(body?.settings);
+      if (c.error) return json({ error: c.error, reason: "invalid_setting" }, 400);
+      if (!Object.keys(c.settings).length) return json({ error: "settings ist leer", reason: "invalid_setting" }, 400);
+      settings = c.settings;
+    }
+    if (action === "trust") {
+      name = typeof body?.name === "string" ? body.name : "";
+      if (!NAME.test(name)) return json({ error: "Name ungültig" }, 400);
+      // Standard ist trusted; "member" hebt die Vertrauensstufe wieder auf (Panel-Schalter).
+      role = body?.role == null ? "trusted" : body.role;
+      if (role !== "member" && role !== "trusted") return json({ error: "role nur member oder trusted", reason: "invalid_role" }, 400);
+    }
+    if (action === "delete") confirm = typeof body?.confirm === "string" ? body.confirm.trim() : "";
+    const list = await worlds(env);
+    const world = create ? null : (list || []).find((w) => w.id === id);
+    if (!create && !world) return a.admin ? json({ error: "Welt nicht gefunden" }, 404) : deny(403, action === "start" ? "not_trusted" : "not_owner");
+    let isOwner = false, isAdmin = a.admin === true, invite = null;
+    if (!create) {
+      // Vertrag: trusted wird bevorzugt über die UUID geprüft, der Name ist nur der Fallback.
+      invite = (world.invites || []).find((i) => (i.uuid ? normU(i.uuid) === a.uuid : !!i.name && i.name.toLowerCase() === a.name.toLowerCase()));
+      isOwner = world.owner_uuid === a.uuid;
+      // Admin darf jede Welt verwalten, der Owner seine eigene, trusted nur starten.
+      const allowed = isAdmin || isOwner || (invite?.role === "trusted" && action === "start");
+      if (!allowed) return deny(403, action === "start" ? "not_trusted" : "not_owner");
+      // Die Rangprüfung gilt nur für Spieler: ein Admin braucht für fremde Welten keinen VIP-Rang,
+      // ein Owner muss einen Panel-Rang haben und trusted startet nur Welten mit berechtigtem Owner.
+      if (!isAdmin) {
+        if (isOwner && !OWNER_RANKS.has(a.rank)) return deny(403, "no_rank");
+        if (!isOwner && action === "start") {
+          const ownerRank = await env.DB.prepare("SELECT rank FROM mc_player_ranks WHERE lower(replace(uuid, '-', '')) = ?").bind(world.owner_uuid.replace(/-/g, "")).first().catch(() => null);
+          if (!OWNER_RANKS.has(String(ownerRank?.rank || "").toLowerCase())) return deny(403, "no_rank");
+        }
+      }
+    } else if (!OWNER_RANKS.has(a.rank)) return deny(403, "no_rank");
+    if (create) {
+      // Ein freier Platz zählt nur eigene Welten; der Rang bestimmt das Limit (VIP 1, MVP 3).
+      const mine = (list || []).filter((w) => w.owner_uuid === a.uuid).length;
+      if (mine >= worldLimit(a.rank)) return json({ error: "Kein freier Weltplatz", reason: "no_free_slot" }, 409);
+      if ((list || []).some((w) => String(w.name || "").toLowerCase() === name.toLowerCase())) return json({ error: "Name schon vergeben", reason: "name_taken" }, 409);
+    }
+    if (action === "rename" && (list || []).some((w) => w.id !== id && String(w.name || "").toLowerCase() === name.toLowerCase())) return json({ error: "Name schon vergeben", reason: "name_taken" }, 409);
+    if (action === "invite" || action === "uninvite" || action === "trust") {
       const has = (world.invites || []).some((i) => i.name && i.name.toLowerCase() === name.toLowerCase());
       if (name.toLowerCase() === String(world.owner_name || "").toLowerCase()) return json({ error: "Owner ist schon auf der Welt", reason: "not_owner" }, 409);
       if (action === "invite" && has) return json({ error: "schon eingeladen" }, 409);
       if (action === "uninvite" && !has) return json({ error: "nicht eingeladen" }, 409);
+      if (action === "trust" && !has) return json({ error: "nicht eingeladen", reason: "member_not_found" }, 409);
       if (action === "invite" && (world.invites || []).length >= 12) return json({ error: "höchstens 12 Mitglieder" }, 400);
     }
+    // Löschen ist endgültig: der Weltname muss exakt eingetippt werden.
+    if (action === "delete" && (!world.name || confirm !== world.name)) return json({ error: "Zum Löschen den Weltnamen eintippen", reason: "invalid_name" }, 400);
     const spec = { action, world_id: id, name, role, visibility };
     const rid = body?.request_id != null ? String(body.request_id) : crypto.randomUUID();
     if (!RID.test(rid)) return json({ error: "request_id ungültig (1-64 Zeichen [A-Za-z0-9_-])" }, 400);
-    const ex = await env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, status FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
+    const ex = await env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, info, world_type, settings, status FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
     if (ex) {
-      const same = ex.action === spec.action && ex.world_id === spec.world_id && (ex.name || null) === name && (ex.role || null) === role && (ex.visibility || null) === visibility;
+      const same = ex.action === spec.action && (ex.world_id || "") === spec.world_id && (ex.name || null) === name && (ex.role || null) === role && (ex.visibility || null) === visibility
+        && (ex.world_type || null) === worldType && (ex.settings || null) === (settings ? JSON.stringify(settings) : null);
       if (!same) return json({ error: "request_id schon benutzt" }, 409);
       return json({ ok: true, duplicate: true, request_id: rid, op: ex.action, status: ex.status }, 200);
     }
@@ -222,7 +285,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       }
     }
     const rowId = crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'web', ?, 'pending', NULL, ?)").bind(rowId, rid, action, id, a.uuid, a.name, world.owner_uuid, a.user.id, name, role, visibility, now, ipHash).run();
+    await env.DB.prepare("INSERT INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, world_type, settings, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web', ?, 'pending', NULL, ?)").bind(rowId, rid, action, id, a.uuid, a.name, create ? a.uuid : world.owner_uuid, a.user.id, name, role, visibility, info, worldType, settings ? JSON.stringify(settings) : null, now, ipHash).run();
     return json({ ok: true, request_id: rid, op: action, status: "pending" }, 202);
   }
 
@@ -231,8 +294,16 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     if (!tokenOk(req, env, safeEq)) return json({ error: "unauthorized" }, 401);
     const since = Math.max(0, Number(url.searchParams.get("since")) || 0);
     const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 100));
-    const { results } = await env.DB.prepare("SELECT request_id, discord_id, action, world_id, actor_uuid, actor_name, owner_uuid, name, role, visibility, info, created_at FROM mc_vip_commands WHERE status = 'pending' AND created_at > ? ORDER BY created_at ASC LIMIT ?").bind(since, limit).all();
-    return json({ now: Date.now(), items: results });
+    const { results } = await env.DB.prepare("SELECT request_id, discord_id, action, world_id, actor_uuid, actor_name, owner_uuid, name, role, visibility, info, world_type, settings, created_at FROM mc_vip_commands WHERE status = 'pending' AND created_at > ? ORDER BY created_at ASC LIMIT ?").bind(since, limit).all();
+    // create hat noch keine Welt-ID: der Vertrag laesst world_id dann weg. settings kommt als Objekt.
+    const items = results.map((r) => {
+      let settings = null;
+      if (r.settings) { try { settings = cleanSettings(JSON.parse(r.settings)).settings || null; } catch { settings = null; } }
+      const item = { request_id: r.request_id, discord_id: r.discord_id, action: r.action, actor_uuid: r.actor_uuid, actor_name: r.actor_name, owner_uuid: r.owner_uuid, name: r.name, role: r.role, visibility: r.visibility, info: r.info, world_type: r.world_type, settings, created_at: r.created_at };
+      if (r.action !== "create") item.world_id = r.world_id;
+      return item;
+    });
+    return json({ now: Date.now(), items });
   }
   async function ack(req, env) {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -278,12 +349,19 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       if (p === "/api/mc-vip-commands/pending") return pending(req, env, url);
       if (p === "/api/mc-vip-commands/ack") return ack(req, env);
       if (p === "/api/mc-vip-worlds") return sync(req, env);
-      const m = p.match(/^\/api\/mc-vip\/worlds\/([^/]+)\/(start|visibility|members)(?:\/([^/]+))?$/);
+      // v2: create hat noch keine Welt-ID; die Verwaltungs-Aktionen haengen an der Welt.
+      if (p === "/api/mc-vip/worlds") return mutate(req, env, "", "create", await bodyOf(req));
+      const m = p.match(/^\/api\/mc-vip\/worlds\/([^/]+)\/(start|stop|rename|settings|delete|visibility|members)(?:\/([^/]+))?(?:\/(trust))?$/);
       if (!m) return null;
       const worldId = decodeURIComponent(m[1]);
       const body = m[2] === "members" && req.method === "DELETE" ? { name: decodeURIComponent(m[3] || "") } : await bodyOf(req);
       if (m[2] === "start") return mutate(req, env, worldId, "start", body);
+      if (m[2] === "stop") return mutate(req, env, worldId, "stop", body);
+      if (m[2] === "rename") return mutate(req, env, worldId, "rename", body);
+      if (m[2] === "settings") return mutate(req, env, worldId, "settings", body);
+      if (m[2] === "delete") return mutate(req, env, worldId, "delete", body);
       if (m[2] === "visibility") return mutate(req, env, worldId, "set_visibility", body);
+      if (m[2] === "members" && m[4] === "trust") return mutate(req, env, worldId, "trust", { ...body, name: decodeURIComponent(m[3] || "") });
       if (m[2] === "members" && req.method === "DELETE") return mutate(req, env, worldId, "uninvite", body);
       if (m[2] === "members") return mutate(req, env, worldId, "invite", body);
       return null;

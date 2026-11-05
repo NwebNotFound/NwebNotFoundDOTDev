@@ -130,6 +130,19 @@ export function vipRankView(rank, color) {
 function gate(reason, extra = {}) {
   return { access: false, reason, catalog: vipCatalog(null), note: VIP_NOTE, limits: { worlds: { ...WORLD_LIMITS }, mine: WORLD_LIMITS.mvp }, ...extra };
 }
+// Vertrags-Defaults der Weltregeln. Der Sync darf settings weglassen; dann gelten diese Werte.
+export const WORLD_DEFAULTS = { gamemode: "survival", difficulty: "normal", pvp: false, keepInventory: false, mobGriefing: true, doDaylightCycle: true };
+const GM = new Set(["survival", "creative", "adventure"]);
+const DIFF = new Set(["peaceful", "easy", "normal", "hard"]);
+// Nur die sechs Regeln aus dem Vertrag, nur erlaubte Werte. Unbekanntes faellt auf den Default.
+function worldSettings(raw) {
+  const out = { ...WORLD_DEFAULTS };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  if (GM.has(raw.gamemode)) out.gamemode = raw.gamemode;
+  if (DIFF.has(raw.difficulty)) out.difficulty = raw.difficulty;
+  for (const k of ["pvp", "keepInventory", "mobGriefing", "doDaylightCycle"]) if (typeof raw[k] === "boolean") out[k] = raw[k];
+  return out;
+}
 function isoFrom(at) {
   if (at == null || at === "") return null;
   const n = typeof at === "number" ? at : Date.parse(at);
@@ -142,18 +155,29 @@ function worldSlot(w, viewer) {
   const id = normU(w.id);
   if (!id) return null;
   const mine = normU(w.owner_uuid) === viewer?.uuid;
+  const admin = !!viewer?.admin;
   const players = Math.max(0, Math.min(100, Math.floor(numOrNull(w.players) ?? 0)));
   const max = numOrNull(w.player_limit);
+  const invites = (Array.isArray(w.invites) ? w.invites : []);
+  // Vertrag: UUID bevorzugt, Name nur wenn der Eintrag keine UUID hat.
+  const invite = invites.find((i) => i && (i.uuid ? normU(i.uuid) === viewer?.uuid : !!i.name && String(i.name).toLowerCase() === String(viewer?.name || "").toLowerCase())) || null;
   return {
     id, label: typeof w.name === "string" && w.name ? w.name : "VIP-Welt",
+    type: typeof w.type === "string" && ["normal", "flat", "void"].includes(w.type) ? w.type : "normal",
     visibility: w.visibility === "private" ? "private" : "friends",
     status: typeof w.status === "string" ? w.status : "stopped",
     online: w.status === "running", players,
     max: max == null ? null : Math.max(0, Math.floor(max)), tps: null,
     info: typeof w.info === "string" ? w.info : "",
+    settings: worldSettings(w.settings),
     owner_name: NAME_OK.test(String(w.owner_name || "")) ? String(w.owner_name) : null,
     owner: mine,
-    members: (Array.isArray(w.invites) ? w.invites : []).map((i) => ({
+    invited: !mine && !!invite,
+    role: invite?.role === "trusted" ? "trusted" : invite ? "member" : null,
+    // Owner und Admin verwalten; trusted darf nur starten. Genau die Tabelle aus dem Vertrag.
+    can_manage: mine || admin,
+    can_start: mine || admin || invite?.role === "trusted",
+    members: invites.map((i) => ({
       name: NAME_OK.test(String(i?.name || "")) ? String(i.name) : null,
       role: i?.role === "trusted" ? "trusted" : "member",
     })),
@@ -186,12 +210,14 @@ async function loadWorlds(env, viewer) {
         ...all.filter((w) => !owns(w) && Array.isArray(w.invites) && w.invites.some(isMine)),
       ];
       const slots = (admin ? visible : visible.slice(0, 3)).map((w) => worldSlot(w, viewer)).filter(Boolean);
-      return { placeholder: slots.length === 0, updated_at: synced.updated_at, slots };
+      // Zähler im Kopf: alle eigenen Welten, nicht nur die sichtbaren Karten.
+      const mine = all.filter(owns).length;
+      return { placeholder: slots.length === 0, updated_at: synced.updated_at, slots, mine };
     }
   }
   const slots = pickVipWorlds(servers, admin ? Infinity : 3);
-  if (!slots.length) return { placeholder: true, slots: [] };
-  return { placeholder: false, updated_at: isoFrom(at), slots };
+  if (!slots.length) return { placeholder: true, slots: [], mine: 0 };
+  return { placeholder: false, updated_at: isoFrom(at), slots, mine: 0 };
 }
 // Admin-Protokoll (mc_blobs kind vip_admin_log). Nur für Admins, nur Vertrags-Aktionen,
 // neueste zuerst. Namen und Details sind beim Ingest geprüft und werden hier erneut gefiltert.
