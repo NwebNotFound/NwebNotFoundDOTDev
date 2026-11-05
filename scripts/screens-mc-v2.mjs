@@ -418,6 +418,7 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     // Trefferflaeche der Regler und Zustand des Speichern-Knopfs als Zahlen im Report.
     const vTgl = document.querySelector('#vip .v2-tgl');
     const vSave = document.querySelector('#vip .v2-save .btn');
+    const vDanger = document.querySelector('#vip .v2-delconfirm .btn');
     return {
       ...(inventory ? { inventory: { card:box(inventory), slots:[...inventory.querySelectorAll('.ivs')].map(box) } } : {}),
       ...(meta ? { meta:[...meta.children].map(box) } : {}),
@@ -429,6 +430,7 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
           world: vWorld ? box(vWorld) : null,
           toggle: vTgl ? { w: Math.round(box(vTgl).width), h: Math.round(box(vTgl).height) } : null,
           save: vSave ? { disabled: vSave.disabled, bg: getComputedStyle(vSave).backgroundColor } : null,
+          danger: vDanger ? { bg: getComputedStyle(vDanger).backgroundColor, color: getComputedStyle(vDanger).color } : null,
         },
       } : {}),
     };
