@@ -54,18 +54,19 @@ try {
       assert.equal(d.armorCols, 4, `${width}: armour wraps into a row`);
       assert.ok(d.armor.every(s => s.y > d.hot[0].bottom), `${width}: armour below hotbar`);
       assert.ok(Math.abs(d.off.cy - d.armor[0].cy) < 2, `${width}: offhand shares equipment row`);
+      assert.ok(Math.abs(d.off.right - d.main[8].right) < 1, `${width}: offhand aligns with storage right edge`);
     } else {
       assert.equal(d.armorCols, 1, `${width}: armour is one column`);
       assert.ok(Math.abs(d.armor[0].x - d.armor[3].x) < 1, `${width}: armour slots share one column`);
       assert.ok(d.armor[0].y < d.armor[3].y, `${width}: armour runs top to bottom`);
       assert.ok(d.armor[3].right <= d.main[0].x + 1, `${width}: armour sits left of the storage`);
       assert.ok(Math.abs(d.off.cy - d.hot[0].cy) < 2, `${width}: offhand is level with the hotbar`);
+      assert.ok(d.off.x >= d.main[8].right - 1, `${width}: offhand sits right of the storage`);
     }
     assert.ok(d.hot[0].y > d.main[26].bottom, `${width}: hotbar below storage`);
     const rowGap = d.main[9].y - d.main[0].bottom;
     const hotGap = d.hot[0].y - d.main[26].bottom;
     assert.ok(hotGap > rowGap, `${width}: hotbar is visually separated (${hotGap} > ${rowGap})`);
-    assert.ok(d.off.x >= d.main[8].right - 1, `${width}: offhand sits right of the storage`);
     // Item icons centred in their slot.
     assert.ok(Math.abs(d.icon.cx - d.iconSlot.cx) <= 1 && Math.abs(d.icon.cy - d.iconSlot.cy) <= 1, `${width}: icon centred in its slot`);
     // Stack counts bottom-right in the pixel font.
