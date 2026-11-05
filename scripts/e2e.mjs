@@ -427,12 +427,12 @@ try {
   const iau = JSON.parse(execSync("node scripts/icon-audit.mjs --json", { cwd: ROOT }).toString());
   ok(iau.placeholder.length === 0 && iau.approx.length === 0, "icon-audit: 0 Platzhalter, 0 falsche Icons", JSON.stringify({ p: iau.placeholder, a: iau.approx }).slice(0, 300));
   console.log("9c) Navigation, Theme, Seiten");
-  const home = (await req("/")).t; ok(!/<nav class="nl"[^]*?href="\/profile">Profil<\/a>[^]*?<\/nav>/.test(home), "kein doppelter Profil-Tab in der Nav");
-  { const port = await req("/portfolio", { testHost: "nwebnotfound.dev" }); const chip = (port.t.split("else if(d.user)")[1] || "").split("else if(d.available)")[0];
-    ok(port.s === 200 && port.t.includes("protocol!=='https:'") && chip.includes("createElement('img')") && chip.includes("httpsAvatar(d.user.avatar)") && !chip.includes("innerHTML") && !/onerror\s*=\s*["']/.test(chip), "Portfolio-Chip: Avatar nur als DOM-Property, nur https", chip.slice(0, 160));
-    const mc = (port.t.split("if(k)")[1] || "").split("else if(d.user)")[0];
-    ok(mc.includes("httpsAvatar(d.user.avatar)") && !mc.includes("this.src=d.user.avatar") && !/av\.src=nm\?/.test(mc), "MC-Konto: Avatar nur über httpsAvatar", mc.slice(0, 180)); }
-  ok(home.includes('href="/bestellungen"') && home.includes("item(orders,'Bestellungen')"), "Dropdown verlinkt zusammengelegte Bestellungen");
+  const home = (await req("/")).t; ok(!/<ul class="u-links">[^]*?href="\/profile"[^]*?<\/ul>/.test(home), "kein doppelter Profil-Tab in der Nav");
+  // The account slot of the unified nav is filled by the external /design/unav.js (no inline script).
+  { const port = await req("/portfolio", { testHost: "nwebnotfound.dev" }); const js = fs.readFileSync(ROOT + "public/design/unav.js", "utf8"); const chip = js.slice(js.indexOf("function render(d)"), js.indexOf("} else if (d && d.available)"));
+    ok(port.s === 200 && port.t.includes('<script src="/design/unav.js?v=') && js.includes('x.protocol === "https:"') && js.includes('var i = el("img")') && chip.includes("img(pic, fb)") && chip.includes("httpsUrl(d.user.avatar)") && !chip.includes("innerHTML") && !/onerror\s*=\s*["']/.test(port.t.slice(port.t.indexOf("<header"), port.t.indexOf("</header>"))), "Portfolio-Chip: Avatar nur als DOM-Property, nur https", chip.slice(0, 160));
+    ok(chip.includes('isMc ? (nm ? "/mc-head/" + nm + "/64?v=5" : "") : httpsUrl(d.user.avatar)') && !chip.includes("src = d.user.avatar"), "Konto: MC-Kopf auf mc.*, sonst nur https-Discord-Avatar", chip.slice(0, 180)); }
+  ok(home.includes("&quot;/bestellungen&quot;") && fs.readFileSync(ROOT + "public/design/unav.js", "utf8").includes("L.menu"), "Dropdown verlinkt zusammengelegte Bestellungen");
   for (const p of ["/bestellungen", "/abholungen"]) { const x = await req(p); ok(x.s === 200 && x.t.includes("/mc/orders.js"), p + " → 200, gemeinsame Liste"); }
   ok((await req("/markt/diamond")).t.includes('id="bbuy"'), "Item-Seite hat Bank-Kauf");
   const css = fs.readFileSync(ROOT + "public/mc/ds.css", "utf8");
@@ -543,7 +543,8 @@ try {
     ok(home.t.includes('hreflang="de"') && home.t.includes('hreflang="en"') && home.t.includes('hreflang="x-default"'), "hreflang de/en/x-default gesetzt");
     ok(home.t.includes('href="https://github.com/NwebNotFound" target="_blank" rel="noopener noreferrer"') && home.t.includes('href="https://x.com/NwebNotFound" target="_blank" rel="noopener noreferrer"'), "Footer: GitHub und X als normale Links mit rel=noopener noreferrer");
     ok(extUrls(home.t).length === 0, "keine fremden Requests (kein CDN, kein Tracker, keine externen Schriften)", extUrls(home.t).slice(0, 3).join(" "));
-    ok(home.t.includes("sm-nav__link--soon") && home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche: gedaempfte Navigation mit Sonnen-Pixel, 'bald' auf den Kacheln");
+    { const nav = home.t.slice(home.t.indexOf("<header"), home.t.indexOf("</header>"));
+      ok(!nav.includes(">Musik<") && home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche: nicht in der Navigation (Nils 05.11.), 'bald' auf den Kacheln"); }
     const en = await hub("/", { headers: { "accept-language": "en-GB,en;q=0.9" } });
     ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("Welcome to my corner"), "Accept-Language en → englische Oberfläche");
     ok(en.t.includes('href="/de"') && en.t.includes('href="/en"') && en.t.includes('aria-current="true"'), "Sprachumschalter verlinkt beide Sprachen und markiert die aktuelle");
@@ -559,7 +560,14 @@ try {
     for (const p of ["/de/guestbook", "/en/guestbook", "/en/portfolio", "/de/unbekannt"]) {
       const r = await hub(p), want = p.slice(3);
       ok(r.s === 301 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}`, `${p} → 301 ${want} (Hub-fremde Route ohne Präfix)`, `${r.s} ${r.h.get("location")}`);
+      ok((r.h.get("set-cookie") || "").includes(`nnf_lang=${p.slice(1, 3)}`), `${p} merkt sich die Sprache (DE/EN-Schalter bleibt auf der Seite)`, r.h.get("set-cookie"));
     }
+    // Unified nav on the German-only pages: EN stays on the page and the nav follows the cookie.
+    { const gde = await hub("/guestbook"), gen = await hub("/guestbook", { cookie: "nnf_lang=en" });
+      const nav = (t) => t.slice(t.indexOf("<header"), t.indexOf("</header>"));
+      ok(nav(gde.t).includes('href="/en/guestbook"') && nav(gde.t).includes('href="/de/guestbook" hreflang="de" lang="de" aria-current="true"'), "/guestbook: EN-Link bleibt auf der Seite, DE markiert", nav(gde.t).slice(0, 120));
+      ok(nav(gen.t).includes('href="/en/guestbook" hreflang="en" lang="en" aria-current="true"') && nav(gen.t).includes(">Guestbook<") && nav(gen.t).includes('aria-current="page">Guestbook<'), "/guestbook mit nnf_lang=en: EN markiert, Navigation englisch");
+      ok(!/<img[^>]*class="[^"]*u-acct/.test(nav(gde.t)) && nav(gde.t).includes("data-u-acct></div>"), "kein Avatar im HTML, bevor die Sitzung bekannt ist"); }
     for (const p of ["/", "/about", "/music", "/writing"]) {
       const r = await hub(p);
       ok(r.s === 200 && r.t.includes("/design/summer.css?v="), `Hub-Route ${p} → 200`, r.s);
@@ -882,8 +890,8 @@ try {
     sql("DELETE FROM mc_player_ranks");
     sql(`UPDATE mc_player_stats SET stats = json_remove(stats, '$.skin_url') WHERE mc_uuid = '${U1}'`);
     const pg = await req("/vip"); const sec = pg.t.slice(pg.t.indexOf('id="vip"'));
-    { const comm = (pg.t.split('data-g="community"')[1] || "").split("</div></div>")[0], konto = (pg.t.split('data-g="konto"')[1] || "").split("</div></div>")[0];
-      ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && konto.includes('href="/vip"') && !comm.includes('href="/vip"'), "GET /vip bindet Panel ein, Link im Konto-Menü", String(pg.s)); }
+    { const comm = (pg.t.split('data-g="community"')[1] || "").split("</li>")[0], konto = pg.t.match(/data-l="([^"]*)"/)?.[1] || "";
+      ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && konto.includes("&quot;/vip&quot;") && !comm.includes('href="/vip"'), "GET /vip bindet Panel ein, Link im Konto-Menü", String(pg.s)); }
     ok(!/<script|<style| style=/.test(sec.slice(0, sec.indexOf("</section>"))), "/vip-Inhalt ohne Inline-Script/-Style");
     { const m = await req("/vip", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes('id="vip"')), "/vip nur auf mc-Domain", String(m.s)); }
     { const js = await req("/mc/vip.js"); ok(js.s === 200 && js.t.includes("E(p.title)") && js.t.includes("E(s.label)") && js.t.includes('href="/profile"') && js.t.includes("encodeURIComponent(rel)") && !js.t.includes("location.href") && !/style=|\.style\./.test(js.t), "vip.js escaped, Login-next relativ, keine Inline-Styles"); }

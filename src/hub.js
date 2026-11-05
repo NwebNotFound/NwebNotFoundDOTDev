@@ -19,6 +19,7 @@ import { allTags, byNewest, chaptersOf, excerpt, filterWriting, findWriting, pre
 import { epubPath, seriesEpubPath } from "./epub.js";
 import { FEED_MIME } from "./feed.js";
 import { htmlToText } from "./markdown.js";
+import { mainNav, mainItems, UNAV_HEAD } from "./unav.js";
 
 export const SITE = "nwebnotfound.dev";
 export const MC_HOST = "mc.nwebnotfound.dev";
@@ -34,11 +35,11 @@ const SERIES = CONTENT.series || [];
 export const HUB_PAGES = ["/", "/about", "/music", "/writing"];
 const SOON = { "/music": "music", "/writing": "writing" };
 
-const NAV = [
-  { path: "/", key: "nav.home" },
-  { path: "/music", key: "nav.music", soon: true },
-  { path: "/writing", key: "nav.writing", soon: true },
-  { path: "/about", key: "nav.about" },
+// Sections that only enter the nav once they have content (Nils, 05.11.: hide Musik/Texte until
+// their pages exist). `/writing` is ready as soon as one text is published; `/music` has no source yet.
+const LATER = [
+  { path: "/music", key: "nav.music", ready: () => false },
+  { path: "/writing", key: "nav.writing", ready: () => publishedWriting(WRITING).length > 0 },
 ];
 
 const META = {
@@ -61,17 +62,6 @@ const href = (path, lang) => withLang(path, lang);
 
 /* ---------- pixel art (inline SVG, whole-pixel grid, crispEdges) ---------- */
 
-/** Brand mark: the mascot's head, 28px, in the artboard's day colouring. */
-const brandMark = () =>
-  `<svg class="sm-px-icon" width="28" height="28" viewBox="0 0 16 16" aria-hidden="true" focusable="false" shape-rendering="crispEdges">` +
-  `<rect x="2" y="1" width="3" height="3" fill="currentColor"></rect>` +
-  `<rect x="11" y="1" width="3" height="3" fill="currentColor"></rect>` +
-  `<rect x="1" y="3" width="14" height="11" fill="currentColor"></rect>` +
-  `<rect x="2" y="4" width="12" height="9" fill="var(--sm-cream)"></rect>` +
-  `<rect x="5" y="7" width="2" height="2" fill="#1f2a44"></rect>` +
-  `<rect x="9" y="7" width="2" height="2" fill="#1f2a44"></rect>` +
-  `<rect x="7" y="10" width="2" height="1" fill="#1f2a44"></rect>` +
-  `</svg>`;
 
 /** The full creature (artboard Main-day): ears, cheeks, blinking eyes, feet. */
 const mascotArt = (size, cls = "sm-bob", label = "") =>
@@ -543,20 +533,6 @@ ${feedNote(writingSeriesFeeds(series, t), t)}
 
 /* ---------- shell ---------- */
 
-function navLink(item, lang, active, t) {
-  // A section is "soon" while it carries no content: `/writing` as soon as the index is empty, and
-  // `/music` until it gets its own source. The nav then dims the label and adds the
-  // small sun pixel (artboard `.nav a.soon`) instead of a yellow text badge.
-  const sectionReady = item.path === "/writing" && publishedWriting(WRITING).length > 0;
-  const soon = item.soon && !sectionReady;
-  const cur = item.path === active ? ' aria-current="page"' : "";
-  // A section that is not ready yet is dimmed and carries a small sun pixel (the artboard's
-  // `.nav a.soon`), not a yellow text badge — the badge stays on the home tiles where there is room.
-  const cls = soon ? "sm-nav__link sm-nav__link--soon" : "sm-nav__link";
-  const label = soon ? `${esc(t(item.key))} (${esc(t("nav.soon_label"))})` : esc(t(item.key));
-  return `<li><a class="${cls}" href="${href(item.path, lang)}"${cur} aria-label="${label}">${esc(t(item.key))}</a></li>`;
-}
-
 function langSwitch(bare, lang, t, cls = "") {
   return `<nav class="sm-lang ${cls}" aria-label="${esc(t("lang.label"))}">${LANGS.map((l) =>
     `<a class="sm-lang__link" href="${href(bare, l)}" hreflang="${l}" lang="${l}"${l === lang ? ' aria-current="true"' : ""} aria-label="${esc(t(`lang.${l}`))}" title="${esc(t(`lang.${l}`))}">${esc(t(`lang.${l}.short`))}</a>`).join("")}</nav>`;
@@ -633,6 +609,14 @@ function readingSizeControl(t) {
     `<span class="sm-reader-size__aa" aria-hidden="true">Aa</span></button>`;
 }
 
+/** The shared bar of both sites (src/unav.js) with the hub's links, language and theme. */
+function hubNav(lang, bare, t, extra) {
+  const cur = bare === "/" ? "start" : bare.split("/")[1];
+  const items = mainItems(lang, cur, (p) => href(p, lang));
+  for (const s of LATER) if (s.ready()) items.push({ href: href(s.path, lang), label: t(s.key), cur: bare === s.path || bare.startsWith(s.path + "/") });
+  return mainNav({ lang, items, langHrefs: { de: href(bare, "de"), en: href(bare, "en") }, brandHref: href("/", lang), extra });
+}
+
 function document_(o) {
   const { lang, bare, title, desc, body } = o;
   const t = o.t;
@@ -677,17 +661,11 @@ ${hreflangTags}
 ${feedTags}
 <link rel="preload" href="/design/fonts/pixelify-sans-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/design/fonts/nunito-latin-400.woff2" as="font" type="font/woff2" crossorigin>
-<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${printScript}${parallaxScript}${readerScript}
+<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${UNAV_HEAD}${printScript}${parallaxScript}${readerScript}
 </head><body class="sm-shell">
 ${progressBar}
 <a class="sm-skip-link" href="#main">${esc(t("skip"))}</a>
-<header class="sm-nav"><div class="sm-wrap"><div class="sm-hdr">
-<div class="sm-hdr__bar">
-<a class="sm-brand" href="${href("/", lang)}">${brandMark()}<span class="sm-brand__name">${esc(t("site.name"))}</span></a>
-<div class="sm-hdr__tools">${langSwitch(bare, lang, t)}${o.reading ? readingSizeControl(t) : ""}${themeToggle(t)}</div>
-</div>
-<nav class="sm-nav__nav" aria-label="${esc(t("nav.label"))}"><ul class="sm-nav__links">${NAV.map((n) => navLink(n, lang, bare, t)).join("")}</ul></nav>
-</div></div></header>
+${hubNav(lang, bare, t, o.reading ? readingSizeControl(t) : "")}
 <main id="main">${body}</main>
 <footer class="sm-footer">
 ${grassline()}

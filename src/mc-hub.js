@@ -1,10 +1,9 @@
 import { AV } from "./asset-version.js";
+import { mcNav } from "./unav.js";
 // MC-Hub: gemeinsames Design-System, Startseite, Markt, Wiki (mc.nwebnotfound.dev)
 export const HUB_CSS = String.raw`
 .seg{display:inline-flex;padding:.25rem;border-radius:12px;background:rgba(255,255,255,.06)}.seg button{border:0;background:transparent;color:var(--mut);font:inherit;font-size:.82rem;padding:.4rem .9rem;border-radius:9px;cursor:pointer;transition:background .2s,color .2s}
-.acct .btn{white-space:nowrap}
 .tabs button,.seg button{min-height:44px}*,*::before,*::after{box-sizing:border-box}#hs{grid-template-columns:minmax(0,1fr)!important}#hs>*{min-width:0;width:100%}#hs .addr{display:flex;width:100%;justify-content:space-between}#hs .addr code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats{gap:.8rem!important}.stats>*,.kv2>*,.kv3>*,.shg>*,.lrow>*,.wgrid>*,.grid>*,[style*="display:grid"]>*,[style*="display:flex"]>*{min-width:0}.stats .card{width:100%;padding:1rem 1.1rem}@media(max-width:600px){.g.pad,.card.pad{padding:1rem}#hs{gap:.8rem!important}#hs>div:first-child{gap:.8rem!important}#hs .addr code{font-size:.78rem}}.nl{display:flex;align-items:center;gap:1.2rem}.nl .l{display:inline-flex;align-items:center;min-height:44px;white-space:nowrap}
-@media(max-width:900px){.nav .wrap{flex-wrap:wrap;height:auto;min-height:52px}}
 .seg button{min-height:44px}@media(pointer:coarse){.seg button{min-height:44px}}
 .wgrid>*{min-width:0}
 .addr .btn{flex:none}
@@ -12,8 +11,6 @@ export const HUB_CSS = String.raw`
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.28s}
 main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{opacity:0;transform:translateY(6px)}}
 @media (prefers-reduced-motion:reduce){main{animation:none}}
-.nav .l[aria-current=page]{color:var(--fg);font-weight:600}.nl a.l:hover{text-decoration:none;color:var(--fg)}
-.nav .l{transition:color .2s}
 /* Layout-Helfer (Panels: ds.css) */
 .hub-wrap{max-width:1120px;margin:0 auto;padding:0 clamp(1rem,4vw,2rem)}
 .hub-h{font-size:clamp(2.2rem,6.5vw,4.4rem);line-height:1.04;letter-spacing:-.035em;font-weight:700;margin:.2rem 0 .8rem}
@@ -24,7 +21,7 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 .pill{display:inline-flex;align-items:center;gap:.5rem;padding:.35rem .8rem;border-radius:99px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-size:.85rem}
 .qgrid{display:grid;gap:.9rem;grid-template-columns:repeat(2,1fr)}@media(min-width:900px){.qgrid{grid-template-columns:repeat(3,1fr)}}@media(min-width:1100px){.qgrid.q6{grid-template-columns:repeat(6,1fr)}}
 .q{padding:1.2rem;min-height:128px;display:flex!important;flex-direction:column;justify-content:space-between}
-.mi{image-rendering:pixelated;image-rendering:crisp-edges;display:inline-block;flex:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}.konto-av[hidden]{display:none!important}.wside a{display:flex!important;align-items:center;gap:.5rem;min-height:40px}
+.mi{image-rendering:pixelated;image-rendering:crisp-edges;display:inline-block;flex:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}.wside a{display:flex!important;align-items:center;gap:.5rem;min-height:40px}
 .bigpct small{font-size:.75rem;font-weight:500;opacity:.75}.bigpct.bu{background:rgba(74,222,128,.14);color:#4ade80}.bigpct.bd{background:rgba(248,113,113,.14);color:#f87171}.bigpct.bf{background:rgba(255,255,255,.06);color:var(--mut)}.bigpct span{color:inherit}
 .tnum{font-variant-numeric:tabular-nums}
 .todo{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:#fbbf24;border:1px dashed rgba(251,191,36,.5);border-radius:6px;padding:.05rem .4rem;margin:0 .2rem}
@@ -53,45 +50,17 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 .mctip{display:inline-block;max-width:100%;background:rgba(16,0,16,.95);border:2px solid #100010;box-shadow:inset 0 0 0 2px #3a0f8f;padding:.6rem .8rem;font-family:var(--pf);font-size:.85rem;color:#c9a8ff}.mctip b{color:#fff}
 `;
 
-// Eine Navigationsquelle. Wiki-Artikel kommen aus WIKI (weiter unten), aufgerufen erst nach dem Modul-Init.
-const CHEV = `<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3h2v2h2v2h0V5h2V3h2v2H7v2H5v2h0V7H3V5H1z" fill="currentColor"/></svg>`;
-const NAV_JS = `(()=>{const s=document.currentScript,N=s.closest('.nav'),bur=N.querySelector('.nbur');
-const mob=()=>matchMedia('(max-width:900px)').matches,groups=()=>[...N.querySelectorAll('.ng')];
-function mark(){const p=location.pathname.replace(/\\/$/,'')||'/';const links=[...N.querySelectorAll('.nl a[href^="/"]')];let best=null;
-for(const a of links){const h=a.getAttribute('href').split('#')[0].split('?')[0];if(!(h===p||(h!=='/'&&p.startsWith(h+'/'))))continue;if(!best||h.length>best.h.length)best={a,h}}
-N.querySelectorAll('.nl a[aria-current]').forEach(a=>a.removeAttribute('aria-current'));
-groups().forEach(g=>{g.classList.remove('cur');const b=g.querySelector('.ngb');if(b)b.removeAttribute('data-cur')});
-if(best){best.a.setAttribute('aria-current','page');const g=best.a.closest('.ng');if(g){g.classList.add('cur');const b=g.querySelector('.ngb');if(b)b.setAttribute('data-cur','')}}}
-const set=(g,o)=>{g.classList.toggle('open',!!o);const b=g.querySelector('.ngb');if(b)b.setAttribute('aria-expanded',o?'true':'false')};
-const shut=x=>groups().forEach(g=>{if(g!==x)set(g,false)});
-const lock=o=>{document.documentElement.classList.toggle('nav-lock',!!o&&mob())};
-const drawer=o=>{N.classList.toggle('open',!!o);if(bur){bur.setAttribute('aria-expanded',o?'true':'false');bur.setAttribute('aria-label',o?'Menü schließen':'Menü öffnen')}lock(o);if(o){const c=N.querySelector('.ng.cur');shut(c);if(c)set(c,true)}else shut()};
-function bind(g){const b=g.querySelector('.ngb');if(!b||b.dataset.bound)return;b.dataset.bound='1';let t=0;
-b.addEventListener('click',e=>{e.stopPropagation();clearTimeout(t);const open=b.getAttribute('aria-expanded')==='true';if(!mob())shut(g);set(g,!open)});
-g.addEventListener('keydown',e=>{const I=[...g.querySelectorAll('.ngm a')];const i=I.indexOf(document.activeElement);
-if(e.key==='Escape'&&(g.classList.contains('open')||N.classList.contains('open'))){if(mob()&&N.classList.contains('open')){drawer(false);bur&&bur.focus()}else{set(g,false);b.focus()}e.preventDefault();e.stopPropagation()}
-else if(e.key==='ArrowDown'){e.preventDefault();if(!g.classList.contains('open')){if(!mob())shut(g);set(g,true)}const n=I[i<0?0:Math.min(I.length-1,i+1)];n&&n.focus()}
-else if(e.key==='ArrowUp'&&i>=0){e.preventDefault();(i?I[i-1]:b).focus()}});
-g.addEventListener('focusout',e=>{if(!mob()&&!g.contains(e.relatedTarget))set(g,false)});
-if(matchMedia('(hover:hover) and (pointer:fine)').matches){g.addEventListener('mouseenter',()=>{clearTimeout(t);if(!mob()&&!g.classList.contains('open')){shut(g);set(g,true)}});g.addEventListener('mouseleave',()=>{if(mob())return;clearTimeout(t);t=setTimeout(()=>{if(!g.contains(document.activeElement))set(g,false)},150)})}}
-groups().forEach(bind);
-if(bur)bur.addEventListener('click',()=>drawer(!N.classList.contains('open')));
-document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(N.classList.contains('open')){drawer(false);bur&&bur.focus()}else shut()});
-document.addEventListener('click',e=>{if(!N.contains(e.target)){shut();if(N.classList.contains('open'))drawer(false)}});
-matchMedia('(max-width:900px)').addEventListener('change',()=>{if(N.classList.contains('open'))drawer(false)});
-mark();window.mcNavMark=()=>{mark();groups().forEach(bind)}})()`;
-const navGroup = (k, label, links, end) => `<div class="ng${end ? " ng-end" : ""}" data-g="${k}"><button class="l ngb" type="button" aria-expanded="false" aria-controls="ng-${k}">${label}${CHEV}</button><div class="ngm" id="ng-${k}">${links.map(([h, n, i]) => `<a href="${h}"><img alt="" width="20" height="20" src="/mc-icon/v2/${i}">${n}</a>`).join("")}</div></div>`;
-export const hubNav = (MAIN) => {
+// Eine Navigationsquelle (gemeinsame Leiste: src/unav.js). Wiki-Artikel kommen aus WIKI (weiter unten),
+// aufgerufen erst nach dem Modul-Init. Das Konto steht ganz rechts in der Leiste, nicht als Gruppe.
+export const hubNav = () => {
   const wiki = [["/wiki", "Übersicht", "bookshelf"], ...WIKI.map((a) => [`/wiki/${a.slug}`, a.title, a.icon])];
-  const groups = [
-    navGroup("server", "Server", [["/", "Status", "grass_block"], ["/changelog", "Changelog", "writable_book"]]),
-    navGroup("wirtschaft", "Wirtschaft", [["/markt", "Markt", "emerald"], ["/shops", "Shops", "barrel"], ["/auktionen", "Auktionen", "bell"]]),
-    navGroup("minispiele", "Minispiele", [["/parkour", "Parkour", "golden_boots"], ["/pvp", "PvP", "iron_sword"]]),
-    navGroup("community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"], ["/feedback", "Feedback", "writable_book"]]),
-    navGroup("wiki", "Wiki", wiki, true),
-  ].join("");
-  const konto = `<div class="ng ng-end" data-g="konto" id="konto"><button class="l ngb" type="button" aria-expanded="false" aria-controls="ng-konto"><img class="mi konto-av" alt="" width="20" height="20" hidden><span class="konto-lab">Mein Konto</span>${CHEV}</button><div class="ngm" id="ng-konto"><a href="/profile"><img alt="" width="20" height="20" src="/mc-icon/v2/name_tag">Profil</a><a href="/vip"><img alt="" width="20" height="20" src="/mc-icon/v2/nether_star">VIP</a><a href="/bestellungen"><img alt="" width="20" height="20" src="/mc-icon/v2/chest">Bestellungen</a><a class="out" href="https://${MAIN}/auth/discord/logout">Abmelden</a></div></div>`;
-  return `<a class="brand" href="/"><img class="mi" alt="" width="22" height="22" src="/mc-icon/v2/grass_block"> NwebNotFound MC</a><button class="nbur" type="button" aria-expanded="false" aria-controls="nl" aria-label="Menü öffnen"><span></span><span></span><span></span></button><nav class="nl" id="nl" aria-label="Bereiche">${groups}${konto}</nav><script>${NAV_JS}</script>`;
+  return mcNav([
+    ["server", "Server", [["/", "Status", "grass_block"], ["/changelog", "Changelog", "writable_book"]]],
+    ["wirtschaft", "Wirtschaft", [["/markt", "Markt", "emerald"], ["/shops", "Shops", "barrel"], ["/auktionen", "Auktionen", "bell"]]],
+    ["minispiele", "Minispiele", [["/parkour", "Parkour", "golden_boots"], ["/pvp", "PvP", "iron_sword"]]],
+    ["community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"], ["/feedback", "Feedback", "writable_book"]]],
+    ["wiki", "Wiki", wiki],
+  ]);
 };
 
 export const MI = (id, px = 26) => `<img class="mi" alt="" width="${px}" height="${px}" loading="lazy" src="/mc-icon/v2/${id}">`;

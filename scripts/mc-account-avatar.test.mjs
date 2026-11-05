@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import worker from '../src/worker.js';
+import { readFileSync } from 'node:fs';
+// The nav behaviour is an external file (/design/unav.js); serve it from public/.
+const asset=async(route,u)=>{if(!u.pathname.startsWith('/design/'))return false;await route.fulfill({status:200,contentType:u.pathname.endsWith('.js')?'text/javascript':'text/css',body:readFileSync('public'+u.pathname)});return true};
 
 const browser = await chromium.launch();
 const api = {available:true,user:{name:'Test',username:'test',mc_name:'NwebNotFound',avatar:'https://cdn.discordapp.com/embed/avatars/2.png'}};
@@ -15,17 +18,18 @@ try {
       if(u.hostname===host&&u.pathname===path){await route.fulfill({status:200,contentType:'text/html',body:html});return}
       if(u.hostname===host&&u.pathname==='/api/me'){await new Promise(resolve=>setTimeout(resolve,300));await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(api)});return}
       if(u.pathname.startsWith('/mc-head/')||u.hostname==='cdn.discordapp.com'){await route.fulfill({status:200,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#333"/></svg>'});return}
+      if(await asset(route,u))return;
       await route.fulfill({status:404,body:''});
     });
     await page.goto(`https://${host}${path}`,{waitUntil:'domcontentloaded'});
     if(host.startsWith('mc.')) {
       // Shipped markup: no head at all while /api/me is in flight (hidden, no src) — no placeholder flash.
-      assert.match(html,/<img class="mi konto-av"[^>]*hidden/);
-      assert.equal(/<img class="mi konto-av"[^>]*src=/.test(html),false,'no generic head is shipped before the session is known');
-      await page.waitForFunction(()=>document.querySelector('.konto-av')?.getAttribute('src')?.includes('/mc-head/NwebNotFound/'));
-      const src=await page.locator('.konto-av').getAttribute('src');
+      assert.match(html,/<div class="u-acct-slot" data-u-acct><\/div>/);
+      assert.equal(/<img[^>]*\/mc-head\//.test(html.slice(html.indexOf('<header'),html.indexOf('</header>'))),false,'no generic head is shipped before the session is known');
+      await page.waitForFunction(()=>document.querySelector('#umb img')?.getAttribute('src')?.includes('/mc-head/NwebNotFound/'));
+      const src=await page.locator('#umb img').getAttribute('src');
       assert.match(src,/^\/mc-head\/NwebNotFound\/64\?/);
-      assert.equal(await page.locator('.konto-av').isVisible(),true,'resolved avatar is visible');
+      assert.equal(await page.locator('#umb img').isVisible(),true,'resolved avatar is visible');
       // MC without a linked MC name: the pre-existing chain (https avatar, else the Steve head) stays —
       // never the generic player_head icon, and the https-only guard is the e2e contract.
       const page2=await browser.newPage({viewport:{width:1280,height:900}});
@@ -34,11 +38,12 @@ try {
         if(u.hostname===host&&u.pathname===path){await route.fulfill({status:200,contentType:'text/html',body:html});return}
         if(u.hostname===host&&u.pathname==='/api/me'){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({available:true,user:{name:'Test',username:'test',avatar:'https://cdn.discordapp.com/embed/avatars/2.png'}})});return}
         if(u.pathname.startsWith('/mc-icon/')||u.pathname.startsWith('/mc-head/')||u.hostname==='cdn.discordapp.com'){await route.fulfill({status:200,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#333"/></svg>'});return}
-        await route.fulfill({status:404,body:''});
+        if(await asset(route,u))return;
+      await route.fulfill({status:404,body:''});
       });
       await page2.goto(`https://${host}${path}`,{waitUntil:'domcontentloaded'});
-      await page2.waitForFunction(()=>document.querySelector('.konto-av')&&!document.querySelector('.konto-av').hidden);
-      assert.equal(await page2.locator('.konto-av').getAttribute('src'),'/mc-head/MHF_Steve/64?v=5','unlinked account uses Steve on mc');
+      await page2.waitForFunction(()=>document.querySelector('#umb img'));
+      assert.equal(await page2.locator('#umb img').getAttribute('src'),'/mc-head/MHF_Steve/64?v=5','unlinked account uses Steve on mc');
       await page2.close();
     } else {
       await page.waitForFunction(()=>document.querySelector('#umb img'));
@@ -78,15 +83,15 @@ try {
       const errors = [];
       page3.on('pageerror', (e) => errors.push(e.message));
       await page3.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
-      await page3.waitForFunction(() => { const a = document.querySelector('.konto-av'); return a && !a.hidden && a.getAttribute('src'); }, { timeout: 15000 });
-      assert.match(await page3.locator('.konto-av').getAttribute('src'), /^\/mc-head\//, `${vp.tag}: the account avatar is a Minecraft head`);
-      if (!(await page3.locator('.konto-av').isVisible())) { await page3.locator('.nbur').click({ force: true }); await page3.waitForTimeout(400); }
-      assert.equal(await page3.locator('.konto-av').isVisible(), true, `${vp.tag}: the head is visible in the nav`);
+      await page3.waitForFunction(() => { const a = document.querySelector('#umb img'); return a && a.getAttribute('src'); }, { timeout: 15000 });
+      assert.match(await page3.locator('#umb img').getAttribute('src'), /^\/mc-head\//, `${vp.tag}: the account avatar is a Minecraft head`);
+      if (!(await page3.locator('#umb img').isVisible())) { await page3.locator('.u-burger').click({ force: true }); await page3.waitForTimeout(400); }
+      assert.equal(await page3.locator('#umb img').isVisible(), true, `${vp.tag}: the head is visible in the nav`);
       assert.deepEqual(errors, [], `${vp.tag}: no page errors`);
-      await page3.locator('header.nav').screenshot({ path: `docs/screens/v2/mc/nav-konto-${vp.tag}.png` });
-      await page3.locator('.konto-av').screenshot({ path: `docs/screens/v2/mc/nav-konto-head-${vp.tag}.png` });
+      await page3.locator('header.u-nav').screenshot({ path: `docs/screens/v2/mc/nav-konto-${vp.tag}.png` });
+      await page3.locator('#umb img').screenshot({ path: `docs/screens/v2/mc/nav-konto-head-${vp.tag}.png` });
       await page3.screenshot({ path: `docs/screens/v2/mc/nav-konto-menu-${vp.tag}.png` });
-      console.log(`mc nav head ${vp.tag}: ${await page3.locator('.konto-av').getAttribute('src')}`);
+      console.log(`mc nav head ${vp.tag}: ${await page3.locator('#umb img').getAttribute('src')}`);
       await ctx.close();
     }
   }

@@ -7,6 +7,7 @@ import { makeVip } from "./mc-vip-cmd.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { headResponse, skinResponse, validSkinUrl } from "./mc-head.js";
+import { mainNav, mainItems, UNAV_HEAD } from "./unav.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
 import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
@@ -17,7 +18,7 @@ import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-p
 import { hubPage, hubPageExists } from "./hub.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
-import { LANG_COOKIE, pickLang, splitLang, langCookie } from "./i18n/index.js";
+import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -32,18 +33,8 @@ body{margin:0;font-family:var(--ds-font-sans,-apple-system,BlinkMacSystemFont,"S
 a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 img{max-width:100%;display:block}
 .wrap{width:var(--ds-container,min(1080px,100% - 2.5rem));margin-inline:auto}
-.nav{position:sticky;top:0;z-index:50;padding-top:env(safe-area-inset-top);background:var(--navbg);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line)}
-.nav .wrap{display:flex;align-items:center;gap:1.4rem;height:52px}
 .brand{white-space:nowrap;font-weight:600;color:var(--fg);font-size:1.02rem;margin-right:auto;display:flex;align-items:center;gap:.5rem}.brand:hover{text-decoration:none}
-.nav a.l{color:var(--mut);font-size:.86rem}.nav a.l:hover,.nav a.l[aria-current]{color:var(--fg);text-decoration:none}
-.acct{display:flex;align-items:center;gap:.5rem;font-size:.82rem}
-.acct img{width:26px;height:26px;border-radius:50%}
-.only-s{display:none}.um{position:relative}.um>button{display:flex;min-height:44px;align-items:center;gap:.5rem;background:transparent;border:0;color:var(--fg);font:inherit;font-size:.82rem;padding:.25rem .5rem .25rem .25rem;border-radius:99px;cursor:pointer;transition:background .2s}
-.um>button:hover,.um>button[aria-expanded=true]{background:var(--line)}.um .chev{width:10px;height:10px;opacity:.6;transition:transform .25s}.um>button[aria-expanded=true] .chev{transform:rotate(180deg)}
-.menu{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:var(--menubg,var(--card));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:var(--ds-radius-xl,14px);padding:.4rem;box-shadow:0 20px 50px -20px var(--shadow);opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top right;pointer-events:none;transition:opacity var(--ds-duration,180ms) ease,transform var(--ds-duration,180ms) ease;z-index:60}
-.menu.open{opacity:1;transform:none;pointer-events:auto}.menu .hd{padding:.55rem .7rem .6rem;border-bottom:1px solid var(--line);margin-bottom:.3rem}.menu .hd b{display:block;font-size:.88rem}.menu .hd span{font-size:.75rem;color:var(--mut)}
-.menu a{display:flex;align-items:center;gap:.6rem;padding:.6rem .7rem;border-radius:9px;color:var(--fg);font-size:.88rem}.menu a:hover,.menu a:focus-visible{background:var(--line);text-decoration:none;outline:none}.menu a.out{color:#ff453a}
-@media (max-width:640px){.menu{position:fixed;left:max(.75rem,env(safe-area-inset-left));right:max(.75rem,env(safe-area-inset-right));top:calc(60px + env(safe-area-inset-top));min-width:0}.menu a{padding:.8rem .8rem;font-size:.95rem}}
+.only-s{display:none}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--ds-space-2,8px);border:0;border-radius:var(--ds-radius-full,980px);min-height:44px;padding:0 1.25rem;line-height:1.2;white-space:nowrap;max-width:100%;font:inherit;font-size:.95rem;font-weight:500;cursor:pointer;background:var(--acc);color:var(--accfg);transition:transform var(--ds-duration,180ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)),opacity var(--ds-duration,180ms) ease,background var(--ds-duration,180ms)}
 .btn:hover{text-decoration:none;transform:translateY(-1px)}.btn:active{transform:scale(.98)}
 .btn.sec{background:transparent;color:var(--link);box-shadow:inset 0 0 0 1px currentColor}
@@ -73,7 +64,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0
 .js .reveal{opacity:0;transform:translateY(24px);transition:opacity var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1)),transform var(--ds-duration-slow,250ms) var(--ds-ease-out,cubic-bezier(.2,.8,.2,1))}
 .js .reveal.in{opacity:1;transform:none}
 .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
-@media (max-width:420px){.nav .wrap{gap:.55rem!important}.nav a.l{font-size:.76rem!important}.brand{font-size:.95rem}}@media (max-width:640px){.only-s{display:inline}.nav .wrap{gap:.9rem}.nav a.l{font-size:.8rem}.hide-s{display:none}input,textarea,select{font-size:16px}}@media (pointer:coarse){.nav a.l,.btn.sm{min-height:44px;display:inline-flex;align-items:center}}
+@media (max-width:420px){.brand{font-size:.95rem}}@media (max-width:640px){.only-s{display:inline}.hide-s{display:none}input,textarea,select{font-size:16px}}@media (pointer:coarse){.btn.sm{min-height:44px;display:inline-flex;align-items:center}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.js .reveal{opacity:1;transform:none}@view-transition{navigation:none}}`;
 
 // Farben, Abstände, Typo, Radien und Schatten: siehe DESIGN.md und /design/tokens.css.
@@ -120,47 +111,6 @@ body{background-color:var(--bg);background-image:linear-gradient(180deg,var(--sk
 .px{shape-rendering:crispEdges;image-rendering:pixelated}
 img[src^="/mc-icon/"]{image-rendering:pixelated}
 .pxfont{font-family:var(--px-font)}
-.nav{position:sticky;top:0;z-index:50;padding:16px 0;padding-top:calc(16px + env(safe-area-inset-top));background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;border-bottom:0}
-.nav .wrap{height:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;padding:8px 8px 8px 16px;border-radius:999px;background:var(--navbg);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);box-shadow:inset 0 0 0 1px var(--line),var(--sh1)}
-.brand{margin-right:0;font-family:var(--px-font);font-size:18px;font-weight:700;gap:.6rem}
-.pnl{display:flex;flex-wrap:wrap;align-items:center;gap:4px;order:3;flex:1 1 100%}
-.pnl a{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:700;color:var(--fg);text-decoration:none}
-.pnl a:hover{background:var(--panel2);color:var(--fg);text-decoration:none}
-.pnl a[aria-current=page]{background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06),0 2px 0 var(--edge)}
-@media(min-width:760px){.pnl{order:0;flex:1 1 auto;justify-content:center}}
-/* Kopfleiste: Marke + Werkzeuge in einer Zeile, darunter (schmal) die Bereiche als Chip-Zeile. */
-.pbar{display:contents}
-.ptools{display:flex;align-items:center;gap:8px;margin-left:auto}
-.bname{white-space:nowrap}
-.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}
-.plang{display:inline-flex;align-items:center;gap:2px;padding:4px;border-radius:999px;background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line)}
-.plang__link{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:36px;padding:0 10px;border-radius:999px;font-size:13px;font-weight:900;color:var(--mut);text-decoration:none}
-.plang__link:hover{background:var(--card);color:var(--fg);text-decoration:none}
-.plang__link[aria-current=true]{background:var(--card);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08),0 2px 0 var(--edge)}
-.iconbtn{width:44px;height:44px;display:inline-grid;place-items:center;border:0;border-radius:999px;background:var(--panel2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
-.iconbtn:hover{transform:rotate(-12deg) scale(1.06)}
-.iconbtn svg{animation:pspin .5s cubic-bezier(.34,1.56,.64,1)}
-@keyframes pspin{from{transform:rotate(-120deg) scale(.4);opacity:0}to{transform:none;opacity:1}}
-.themeicon{display:inline-grid;place-items:center}
-.themeicon--moon{display:none}
-:root[data-theme="summer-night"] .themeicon--sun{display:none}
-:root[data-theme="summer-night"] .themeicon--moon{display:inline-grid}
-@media (prefers-color-scheme: dark){:root:not([data-theme]) .themeicon--sun{display:none}:root:not([data-theme]) .themeicon--moon{display:inline-grid}}
-/* Schmal: eine Zeile Leiste (Marke, Sprache, Theme, Konto), darunter die Bereiche scrollbar. */
-@media (max-width:760px){
-.nav{padding:12px 0 8px}
-.nav .wrap{display:block;padding:0;background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
-.pbar{display:flex;align-items:center;gap:8px;min-height:56px;padding:6px 6px 6px 14px;border-radius:999px;background:var(--navbg);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);box-shadow:inset 0 0 0 1px var(--line),var(--sh1)}
-.pbar .brand{order:1;min-width:0;flex:1 1 auto;font-size:16px}
-.pbar .bname{overflow:hidden;text-overflow:ellipsis}
-.ptools{order:2;flex:none;gap:6px}
-.plang{padding:0}
-.plang__link{min-width:44px;min-height:44px;padding:0 6px}
-.pnl{order:3;flex:1 1 100%;flex-wrap:nowrap;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none;-ms-overflow-style:none;margin-top:8px;padding-bottom:2px}
-.pnl::-webkit-scrollbar{display:none}
-.pnl a{flex:0 0 auto;scroll-snap-align:start;min-height:44px;font-size:14px;background:var(--navbg);box-shadow:inset 0 0 0 1px var(--line)}
-}
-.acct{gap:.4rem}
 .btn{border-radius:14px;min-height:48px;padding:0 22px;font-size:1rem;font-weight:700;background:var(--acc);color:var(--accfg);box-shadow:0 3px 0 var(--sunedge),0 10px 22px -10px rgba(226,165,42,.8);transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,background-color .3s ease}
 .btn:hover{transform:translateY(-2px);box-shadow:0 5px 0 var(--sunedge),0 14px 26px -10px rgba(226,165,42,.85)}
 .btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--sunedge);transition-duration:.08s}
@@ -203,7 +153,8 @@ textarea{min-height:110px;padding:.8rem 1rem;border-radius:12px;background:var(-
 textarea:focus{outline:none;box-shadow:inset 0 0 0 2px var(--link),0 0 0 4px var(--ring)}
 footer{border:0;background:var(--bg2);padding:0 0 calc(2rem + env(safe-area-inset-bottom));font-size:.82rem;color:var(--mut)}
 footer .wrap{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:center;justify-content:space-between;padding-top:24px}
-footer .pnl a{font-size:.82rem;color:var(--mut);min-height:36px;padding:0 10px}
+footer .pnl{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+footer .pnl a{display:inline-flex;align-items:center;border-radius:999px;font-weight:700;text-decoration:none;font-size:.82rem;color:var(--mut);min-height:36px;padding:0 10px}
 footer .pnl a:hover{color:var(--fg)}
 .grassline{display:block;width:100%;height:14px}
 .e404{position:relative;overflow:hidden;text-align:center;padding:40px 0 80px}
@@ -221,7 +172,6 @@ footer .pnl a:hover{color:var(--fg)}
 .sky .tw:nth-child(4){animation-delay:.3s}
 .sky .tw:nth-child(5){animation-delay:1.8s}
 @media (prefers-reduced-motion: reduce){.tilt,.tw{animation:none}}
-@media(max-width:640px){.nav .wrap{gap:8px}.pnl a{min-height:44px}}
 `;
 
 // Minecraft-Sub-Theme: Palette, Pixel-Schrift, Slots und Bevels stehen als --ds-mc-* in
@@ -250,48 +200,16 @@ const MC_CSS = `:root{--menubg:#1b2a24}
 
 const REVEAL_JS = `<script>(()=>{const els=document.querySelectorAll('.reveal');if(!('IntersectionObserver'in window)||matchMedia('(prefers-reduced-motion: reduce)').matches){els.forEach(e=>e.classList.add('in'));return}const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12,rootMargin:'0px 0px -40px 0px'});els.forEach(e=>io.observe(e))})();</script>`;
 
-// Account: auf MC füllt das die Gruppe „Mein Konto“ (eine Leiste). Auf dem Portfolio bleibt der Chip.
-// Kein Aufruf von /api/mc-vip. Rang und Welten bleiben auf der VIP-Seite.
-const ACCT_JS = (loginBase) => `<script>(async()=>{const el=document.getElementById('acct');const k=document.getElementById('konto');if(!el&&!k)return;try{const d=await(await fetch('/api/me',{credentials:'include'})).json();const nx=encodeURIComponent(location.href);
-const httpsAvatar=u=>{try{const x=new URL(String(u||''));if(x.protocol!=='https:'||x.username||x.password)return '';return x.href}catch(e){return ''}};
-const onMc=/^mc\./.test(location.hostname);const fb=onMc?'/mc-head/MHF_Steve/64?v=5':'https://cdn.discordapp.com/embed/avatars/0.png';
-if(k){if(el)el.replaceChildren();
-if(d.user){const nm=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?d.user.mc_name:'';const av=k.querySelector('.konto-av');if(av){const head=nm&&onMc?'/mc-head/'+nm+'/64?v=5':'';av.onerror=function(){this.onerror=null;if(!String(this.src||'').endsWith(fb))this.src=fb};av.src=onMc?(head||fb):(httpsAvatar(d.user.avatar)||fb);av.hidden=false}
-const out=k.querySelector('a.out');if(out)out.href='${loginBase}/auth/discord/logout?next='+nx;if(window.mcNavMark)window.mcNavMark()}
-else if(d.available){k.outerHTML='<a class="l" id="konto" href="${loginBase}/auth/discord/login?next='+nx+'">Mit Discord anmelden</a>'}
-else{k.outerHTML='<span class="l" id="konto">Login bald</span>'}}
-else if(d.user){const n=String(d.user.name||''),un=String(d.user.username||'');
-const head=onMc&&d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?'/mc-head/'+d.user.mc_name+'/64?v=5':'';
-const pic=head||httpsAvatar(d.user.avatar)||fb;
-const um=document.createElement('div');um.className='um';
-const b=document.createElement('button');b.type='button';b.id='umb';b.setAttribute('aria-haspopup','menu');b.setAttribute('aria-expanded','false');b.setAttribute('aria-controls','umm');
-const img=document.createElement('img');img.alt='';img.src=pic;img.onerror=function(){this.onerror=null;if(!String(this.src||'').endsWith(fb))this.src=fb};
-const sp=document.createElement('span');sp.className='hide-s';sp.textContent=n;
-const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','chev');svg.setAttribute('viewBox','0 0 10 10');svg.setAttribute('aria-hidden','true');
-const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M1 3l4 4 4-4');path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.6');path.setAttribute('stroke-linecap','round');svg.append(path);
-b.append(img,sp,svg);
-const m=document.createElement('div');m.className='menu';m.id='umm';m.setAttribute('role','menu');
-const hd=document.createElement('div');hd.className='hd';const bn=document.createElement('b');bn.textContent=n;const su=document.createElement('span');su.textContent='@'+un;hd.append(bn,su);
-const item=(href,text,cls)=>{const a=document.createElement('a');a.setAttribute('role','menuitem');a.href=href;a.textContent=text;if(cls)a.className=cls;return a};
-const orders=(/^mc\\./.test(location.hostname)||!/\\./.test(location.hostname)?'':'https://mc.'+location.hostname.replace(/^www\\./,''))+'/bestellungen';
-m.append(hd,item('/profile','Profil'),item(orders,'Bestellungen'),item('${loginBase}/auth/discord/logout?next='+nx,'Abmelden','out'));
-um.append(b,m);el.replaceChildren(um);
-const it=()=>[...m.querySelectorAll('a')];const set=o=>{b.setAttribute('aria-expanded',o);m.classList.toggle('open',o);if(o)setTimeout(()=>it()[0].focus(),20)};
-b.onclick=e=>{e.stopPropagation();set(!m.classList.contains('open'))};document.addEventListener('click',e=>{if(!m.contains(e.target))set(false)});
-document.addEventListener('keydown',e=>{if(!m.classList.contains('open'))return;if(e.key==='Escape'){set(false);b.focus()}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const a=it(),i=a.indexOf(document.activeElement);a[(i+(e.key==='ArrowDown'?1:a.length-1))%a.length].focus()}});}
-else if(d.available){el.innerHTML='<a class="btn discord sm" href="${loginBase}/auth/discord/login?next='+nx+'"><span class="hide-s">Mit Discord anmelden</span><span class="only-s">Anmelden</span></a>';}
-else{el.innerHTML='<button class="btn sm sec" disabled title="Discord-Login ist bald verfügbar">Login <span class="hide-s">bald</span></button>';}
-window.__me=d;document.dispatchEvent(new CustomEvent('me',{detail:d}));}catch(_){}})();</script>`;
 
 const DISCORD_SVG = `<svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor" aria-hidden="true"><path d="M60.1 4.9A58.5 58.5 0 0045.4.4a40 40 0 00-1.9 3.8 54 54 0 00-16.2 0A40 40 0 0025.4.4 58.4 58.4 0 0010.7 4.9C1.4 18.7-1.1 32.2.1 45.5a59 59 0 0018 9.1 43 43 0 003.8-6.2 38 38 0 01-6-2.9l1.5-1.1a42 42 0 0036 0l1.5 1.1a38 38 0 01-6 2.9 43 43 0 003.8 6.2 58.7 58.7 0 0018-9.1c1.5-15.4-2.5-28.8-10.6-40.6zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2z"/></svg>`;
 
-function shell({ title, desc, css, nav, body, head = "", footer, loginBase = "", themeColor, acctInNav = false }) {
+function shell({ title, desc, css, nav, body, head = "", footer, themeColor }) {
   return `<!doctype html><html lang="de"${css === MC_CSS ? ' class="mc"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${themeColor}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
-<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/design/minecraft.css?v=${AV}"><link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/mc/ds.css?v=${AV}"><link rel="stylesheet" href="/mc/theme-v2.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>` : ""}${head}</head><body>
-<header class="nav"><div class="wrap">${nav}${acctInNav ? "" : `<div class="acct" id="acct"></div>`}</div></header>
-<main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}${ACCT_JS(loginBase)}</body></html>`;
+<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/design/minecraft.css?v=${AV}"><link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/mc/ds.css?v=${AV}"><link rel="stylesheet" href="/mc/theme-v2.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>` : ""}${UNAV_HEAD}${head}</head><body>
+${nav}
+<main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}</body></html>`;
 }
 
 /* ---------- Portfolio ---------- */
@@ -300,22 +218,17 @@ function shell({ title, desc, css, nav, body, head = "", footer, loginBase = "",
 const BRAND_PX = `<svg class="px" width="28" height="28" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="2" y="1" width="3" height="3" fill="currentColor"/><rect x="11" y="1" width="3" height="3" fill="currentColor"/><rect x="1" y="3" width="14" height="11" fill="currentColor"/><rect x="2" y="4" width="12" height="9" fill="var(--cream)"/><rect x="5" y="7" width="2" height="2" fill="#1f2a44"/><rect x="9" y="7" width="2" height="2" fill="#1f2a44"/><rect x="7" y="10" width="2" height="1" fill="#1f2a44"/></svg>`;
 const GRASSLINE = `<svg class="px grassline" viewBox="0 0 80 2" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect x="0" y="1" width="80" height="1" fill="var(--grass)"/><rect x="3" y="0" width="2" height="1" fill="var(--grass)"/><rect x="17" y="0" width="1" height="1" fill="var(--grass)"/><rect x="29" y="0" width="3" height="1" fill="var(--grass)"/><rect x="48" y="0" width="1" height="1" fill="var(--grass)"/><rect x="61" y="0" width="2" height="1" fill="var(--grass)"/><rect x="74" y="0" width="1" height="1" fill="var(--grass)"/></svg>`;
 
-// Glas-Pille wie im Hub (public/design/summer.css): Marke, Bereiche, Sprach- und Theme-Schalter
-// sowie der Kontobereich. Auf schmalen Geräten bleibt die Leiste eine Zeile (Marke + Werkzeuge +
-// Konto), darunter scrollen die Bereiche als eine Chip-Zeile – nie eine Pille mit zwei Zeilen.
-const THEME_ICON_SUN = `<svg class="px" width="22" height="22" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><rect x="4" y="4" width="4" height="4" fill="#e2a52a"/><rect x="3" y="5" width="6" height="2" fill="#ffd45e"/><rect x="5" y="3" width="2" height="6" fill="#ffd45e"/></svg>`;
-const THEME_ICON_MOON = `<svg class="px" width="22" height="22" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><rect x="4" y="1" width="4" height="1" fill="#ffd45e"/><rect x="2" y="2" width="3" height="1" fill="#ffd45e"/><rect x="1" y="3" width="3" height="6" fill="#ffd45e"/><rect x="2" y="9" width="3" height="1" fill="#ffd45e"/><rect x="4" y="10" width="4" height="1" fill="#ffd45e"/></svg>`;
+// The German-only pages share the unified nav (src/unav.js). Its labels and the DE/EN switch follow
+// the language cookie, so the marker is filled per request by legacyNav(); /de/… and /en/… of these
+// pages set the cookie and come back to the same page.
 const THEME_BOOT = `<script src="/design/summer-theme.js"></script>`;
-const pTheme = `<button class="iconbtn" type="button" data-summer-theme-toggle aria-pressed="false" aria-label="Zur Nacht wechseln" data-label-day="Tag" data-label-night="Nacht" data-aria-day="Zum Tag wechseln" data-aria-night="Zur Nacht wechseln"><span class="themeicon themeicon--sun">${THEME_ICON_SUN}</span><span class="themeicon themeicon--moon">${THEME_ICON_MOON}</span><span class="vh" data-sm-theme-label>Nacht</span></button>`;
-// Diese Seiten gibt es nur auf Deutsch: DE bleibt hier, EN führt auf die englische Startseite.
-const pLang = (bare) => `<nav class="plang" aria-label="Sprache"><a class="plang__link" href="${bare}" hreflang="de" lang="de" aria-current="true" aria-label="Deutsch">DE</a><a class="plang__link" href="/en/" hreflang="en" lang="en" aria-label="English (Startseite)">EN</a></nav>`;
-const pNav = (cur, bare = "/") => `<div class="pbar">
-<a class="brand" href="/">${BRAND_PX}<span class="bname">NwebNotFound</span></a>
-<div class="ptools">${pLang(bare)}${pTheme}<div class="acct" id="acct"></div></div>
-</div>
-<nav class="pnl" aria-label="Bereiche"><a href="/"${cur === "start" ? ' aria-current="page"' : ""}>Start</a><a class="hide-s" href="/portfolio"${cur === "portfolio" ? ' aria-current="page"' : ""}>Projekte</a><a href="/guestbook"${cur === "gb" ? ' aria-current="page"' : ""}>Gästebuch</a><a href="https://${MCD}/">Minecraft</a></nav>`;
+const pNav = (cur, bare = "") => `{{UNAV:${cur}:${bare}}}`;
+const legacyNav = (h, req) => h.replace(/\{\{UNAV:([a-z]*):([^}]*)\}\}/, (_, cur, bare) => {
+  const lang = pickLang(null, cookies(req)[LANG_COOKIE]);
+  return mainNav({ lang, items: mainItems(lang, cur, (x) => withLang(x, lang)), langHrefs: { de: withLang(bare || "/", "de"), en: withLang(bare || "/", "en") }, brandHref: withLang("/", lang) });
+});
 const pFoot = `${GRASSLINE}<span class="brand brand--sm">${BRAND_PX}<span class="bname">NwebNotFound</span></span><nav class="pnl" aria-label="Links"><a href="/">Start</a><a href="/portfolio">Projekte</a><a href="/guestbook">Gästebuch</a><a href="https://${MCD}/">Minecraft</a></nav><p class="hint">© {{Y}} Nils Weberruß · Made with Cloudflare Workers · kein Tracking.</p>`;
-const portfolio = (o) => shell({ css: PORT_CSS + PORT_V2_CSS, footer: pFoot, themeColor: "#f4faff", loginBase: "", acctInNav: true, ...o, head: `${THEME_BOOT}${o.head || ""}` });
+const portfolio = (o) => shell({ css: PORT_CSS + PORT_V2_CSS, footer: pFoot, themeColor: "#f4faff", ...o, head: `${THEME_BOOT}${o.head || ""}` });
 
 // Die frühere Startseite: seit Phase 2 unter /portfolio (der Hub besitzt `/`). Inhalte unverändert.
 const PORTFOLIO = portfolio({ title: "Projekte · Nils Weberruß", desc: "Informatik-Student an der TH Ulm. Web- und Server-Projekte.", nav: pNav("portfolio", "/portfolio"), body: `
@@ -346,7 +259,7 @@ const PORTFOLIO = portfolio({ title: "Projekte · Nils Weberruß", desc: "Inform
 <p class="rowcta reveal d2"><a class="btn" href="/guestbook">Zum Gästebuch</a></p>
 </div></section>` });
 
-const GUEST = portfolio({ title: "Gästebuch · NwebNotFound", desc: "Hinterlass eine Nachricht.", nav: pNav("gb", "/guestbook"),
+const GUEST = portfolio({ title: "Gästebuch · NwebNotFound", desc: "Hinterlass eine Nachricht.", nav: pNav("guestbook", "/guestbook"),
   head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: `
 <section class="ph center"><div class="wrap"><p class="pk reveal">Gästebuch</p><h1 class="h1x reveal d1">Sag Hallo!</h1><p class="lead reveal d2">Lass einen Gruß da. Zum Schreiben meldest du dich mit Discord an.</p></div></section>
 <section class="gb"><div class="wrap gbwrap">
@@ -373,11 +286,11 @@ load();
 // (The hand-drawn pixel grass block that used to stand in for a block texture is gone: v2 renders
 // every block/item/mob/head through the real, self-hosted textures under /mc-icon/v2, /mc-head,
 // /mc-mob and /mc-skin.)
-const mNav = hubNav(MAIN);
+const mNav = hubNav();
 const MC_GRASSLINE = `<svg class="px grassline" viewBox="0 0 80 2" preserveAspectRatio="none" aria-hidden="true"><rect x="0" y="1" width="80" height="1" fill="var(--grass)"></rect><rect x="3" y="0" width="2" height="1" fill="var(--grass)"></rect><rect x="29" y="0" width="3" height="1" fill="var(--grass)"></rect><rect x="61" y="0" width="2" height="1" fill="var(--grass)"></rect></svg>`;
 const mFoot = `${MC_GRASSLINE}<span class="fbrand brand">NwebNotFound MC</span><span class="fnl"><a href="/feedback">Feedback</a><a href="https://${MAIN}/">Hauptseite</a></span><p>© {{Y}} Nils Weberruß · Kein offizielles Minecraft-Produkt. Nicht von Mojang oder Microsoft genehmigt oder mit ihnen verbunden.</p>`;
 
-const mcPage = (title, desc, body) => shell({ title, desc, css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body });
+const mcPage = (title, desc, body) => shell({ title, desc, css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", body });
 const MC_HOME = mcPage("Minecraft-Server · NwebNotFound", "Status, Profil, Bestenlisten, Markt und Wiki für mc.nwebnotfound.dev", homeBody(MC_HOST));
 
 /* ---------- Detail-Stats (Profil) + Bestenlisten ---------- */
@@ -408,7 +321,7 @@ const h='<div class="dg">'+card('Top-Blöcke','abgebaut','<div class="mc-stats-l
 +card('Gesetzt & gecraftet','',[list(d.placed,ICO,5),list(d.crafted,ICO,5)].filter(x=>!x.includes('class="emp"')).join('<div style="height:.8rem"></div>')||'<div class="emp"></div>')
 +card('Sonstiges','',MS.length?'<div class="mini">'+MS.map(([k,t])=>'<div><div class="k">'+t+'</div><div class="v">'+NF(Math.round(d[k]))+'</div></div>').join('')+'</div>':'<div class="emp">Noch keine Daten.</div>')+'</div>';
 const w=document.createElement('div');w.innerHTML=h;const ps=document.getElementById('pstat');if(ps)ps.replaceWith(w.firstChild);else B.prepend(w.firstChild);});})();</script>`;
-const LEADERBOARDS_MC = () => shell({ title: "Bestenlisten · NwebNotFound MC", desc: "Bestenlisten des Minecraft-Servers", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `${DET_CSS}<style>
+const LEADERBOARDS_MC = () => shell({ title: "Bestenlisten · NwebNotFound MC", desc: "Bestenlisten des Minecraft-Servers", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", body: `${DET_CSS}<style>
 .tabs{display:flex;gap:.35rem;overflow-x:auto;padding:.3rem;border-radius:99px;background:color-mix(in srgb,var(--fg) 6%,transparent);border:1px solid var(--line);scrollbar-width:none;max-width:100%;min-width:0;align-self:stretch}.tabs::-webkit-scrollbar{display:none}
 .tabs .tg{flex:none;align-self:center;font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);padding:0 .35rem 0 .7rem;white-space:nowrap}.tabs .tg~.tg{border-left:1px solid var(--line);margin-left:.15rem;padding-left:.75rem}
 .tabs button{flex:none;border:0;background:transparent;color:var(--mut);font:inherit;font-size:.88rem;font-weight:500;padding:.5rem 1rem;border-radius:99px;cursor:pointer;transition:background .2s,color .2s}.tabs button[aria-selected=true]{background:var(--acc);color:var(--accfg)}
@@ -520,8 +433,8 @@ B.innerHTML=h;MC3D.scan(B);MCP.bindTabs(B);document.dispatchEvent(new CustomEven
 {const L=document.getElementById('pordl');if(L)fetch('/api/mc-bestellungen',{credentials:'include'}).then(r=>r.json()).then(o=>{const S={pending:['wird bestätigt','tw'],bought:['gekauft','ts'],ready:['abholbereit','ts'],collected:['erledigt','ts'],failed:['abgelehnt','tr']};const O=(o.orders||[]).slice(0,5),P=(o.pickup||[]).length;
 L.innerHTML=(P?'<p class="mut" style="margin:0 0 .5rem">'+P+' Stapel im Abholfach · im Spiel <code>/abholen</code></p>':'')+(O.length?'<ul class="pord">'+O.map(x=>{const g=S[x.stage]||S.pending;return '<li class="hl"><span class="ic"><img alt="" loading="lazy" src="/mc-icon/v2/'+encodeURIComponent(x.item)+'"></span><span><b>'+(+x.qty).toLocaleString('de-DE')+'× '+E((window.MC_DE&&MC_DE[x.item])||String(x.item).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase()))+'</b> <span class="mut" style="font-size:.8rem">'+(x.order_type==='bank_buy'?'Bank':'Shop')+'</span></span><span class="tag '+g[1]+'">'+g[0]+'</span></li>'}).join('')+'</ul>':'<p class="mut" style="margin:0">Noch keine Bestellungen.</p>')}).catch(()=>{L.innerHTML='<p class="mut">Konnte Bestellungen nicht laden.</p>'})}})();
 </script>${PROFILE_DETAILS}`;
-const PROFILE_MAIN = () => portfolio({ title: "Profil · NwebNotFound", desc: "Dein Profil", nav: pNav("profile", "/profile"), body: PROFILE_BODY(false) });
-const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein Profil", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: PROFILE_BODY(true) });
+const PROFILE_MAIN = () => portfolio({ title: "Profil · NwebNotFound", desc: "Dein Profil", nav: pNav("", "/profile"), body: PROFILE_BODY(false) });
+const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein Profil", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", body: PROFILE_BODY(true) });
 
 async function profileApi(req, env) {
   const origin = req.headers.get("origin");
@@ -619,7 +532,7 @@ async function auth(p, req, env, url) {
   const next = safeNext(url.searchParams.get("next") || `https://${MAIN}/`);
   const redirectUri = `https://${MAIN}/auth/discord/callback`;
   if (p === "/auth/discord/login") {
-    if (!authReady(env)) return html(portfolio({ title: "Login bald verfügbar", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Discord-Login ist bald verfügbar.</h1><p class="lead">Der Login wird gerade eingerichtet. Schau bald wieder vorbei.</p><p style="margin-top:2rem"><a class="btn" href="${esc(next)}">Zurück</a></p></div></section>` }), 503);
+    if (!authReady(env)) return html(legacyNav(portfolio({ title: "Login bald verfügbar", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Discord-Login ist bald verfügbar.</h1><p class="lead">Der Login wird gerade eingerichtet. Schau bald wieder vorbei.</p><p style="margin-top:2rem"><a class="btn" href="${esc(next)}">Zurück</a></p></div></section>` }), req), 503);
     const state = rand(24);
     const st = await sign(env, `${state}|${b64u(enc.encode(next))}`);
     const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, response_type: "code", redirect_uri: redirectUri, scope: "identify", state, prompt: "none" });
@@ -1025,15 +938,15 @@ const NOTFOUND_BODY = `
 <p class="rowcta"><a class="btn" href="/">Zur Startseite</a><a class="btn sec" href="/portfolio">Projekte</a><a class="btn sec" href="https://${MCD}/">Minecraft-Server</a></p>
 </div></section>`;
 
-const notFound = (mc) => html(mc
-  ? shell({ title: "404 · NwebNotFound MC", desc: "", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Diesen Chunk gibt es nicht.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` })
-  : portfolio({ title: "404 · NwebNotFound", desc: "", nav: pNav(""), body: NOTFOUND_BODY }), 404);
+const notFound = (mc, req) => html(mc
+  ? shell({ title: "404 · NwebNotFound MC", desc: "", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", body: `<section class="hero center"><div class="wrap"><h1 class="h-xl">404</h1><p class="lead">Diesen Chunk gibt es nicht.</p><p style="margin-top:2rem"><a class="btn" href="/">Zur Startseite</a></p></div></section>` })
+  : legacyNav(portfolio({ title: "404 · NwebNotFound", desc: "", nav: pNav(""), body: NOTFOUND_BODY }), req), 404);
 async function assetOrNotFound(req, env, mc) {
   if (env.ASSETS) {
     const ar = await env.ASSETS.fetch(req);
     if (ar.status !== 404) return ar;
   }
-  return notFound(mc);
+  return notFound(mc, req);
 }
 
 async function guestbookApi(req, env) {
@@ -1111,7 +1024,7 @@ export default {
       if (p === "/changelog") return html(mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", changelogBody()));
       if (p === "/parkour") return html(mcPage("Parkour · NwebNotFound MC", "Parkour-Bestzeiten aus der Lobby: Top 10 pro Kurs", parkourBody()));
       if (p === "/bestellungen" || p === "/abholungen") return html(mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));
-      if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
+      if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
       if (p === "/spieler") return html(mcPage("Spieler · NwebNotFound MC", "Spieler suchen: Skin, öffentliche Stats und Profil", playersBody()));
       if (p.startsWith("/spieler/")) { const n = decodeURIComponent(p.slice(9)); if (!/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
       if (p === "/markt" && url.searchParams.has("item")) {
@@ -1130,7 +1043,7 @@ export default {
       if (p.startsWith("/wiki/")) { const a = WIKI.find((x) => x.slug === p.slice(6)); if (!a) return notFound(true); return html(mcPage(a.title + " · Wiki · NwebNotFound MC", a.sum, wikiArticleBody(a, MC_HOST))); }
       return assetOrNotFound(req, env, true);
     }
-    if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden, Idee oder Sonstiges einreichen", css: MC_CSS, nav: mNav.replace(/href="\//g, `href="https://${MCD}/`), footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
+    if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden, Idee oder Sonstiges einreichen", css: MC_CSS, nav: mNav.replace(/href="\//g, `href="https://${MCD}/`), footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
     if (p === "/api/guestbook") return guestbookApi(req, env);
     // ---- Feeds (Creative Hub, phase 3b) ----
     // Vor dem Sprach-Redirect: /de/writing/feed.xml und /writing/feed.xml liefern denselben Feed (ein
@@ -1143,15 +1056,17 @@ export default {
     // entstehen. Ein Sprachpräfix vor einer Hub-fremden Route fällt auf den Pfad ohne Präfix zurück
     // (301), damit z. B. /en/guestbook nicht in einem 404 endet.
     const pre = splitLang(p);
-    if (pre.lang && !hubPageExists(pre.path)) return Response.redirect(`https://${MAIN}${pre.path}`, 301);
+    // The redirect also remembers the language, so the DE/EN switch of the German-only pages stays on
+    // the same page and the nav there follows the choice.
+    if (pre.lang && !hubPageExists(pre.path)) return new Response(null, { status: 301, headers: { location: `https://${MAIN}${pre.path}`, "set-cookie": langCookie(pre.lang) } });
     if (hubPageExists(pre.path)) {
       const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
       const page = hubPage(pre.path, lang, { query: url.searchParams });
       if (page) return html(page, 200, pre.lang ? { "set-cookie": langCookie(pre.lang), vary: "accept-language" } : { vary: "accept-language" });
     }
-    if (p === "/portfolio") return html(PORTFOLIO);
-    if (p === "/guestbook") return html(GUEST);
-    if (p === "/profile") return html(PROFILE_MAIN());
+    if (p === "/portfolio") return html(legacyNav(PORTFOLIO, req));
+    if (p === "/guestbook") return html(legacyNav(GUEST, req));
+    if (p === "/profile") return html(legacyNav(PROFILE_MAIN(), req));
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
     return assetOrNotFound(req, env, false);
   },
