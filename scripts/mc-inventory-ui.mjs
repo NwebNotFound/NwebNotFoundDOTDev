@@ -45,20 +45,27 @@ try {
     assert.ok(d.slots.every(s => Math.abs(s.w - d.slots[0].w) < 1 && Math.abs(s.h - s.w) < 1), `${width}: all inventory slots equally sized squares`);
     assert.ok(d.slots.every(s => s.x >= d.card.x - 1 && s.right <= d.card.right + 1), `${width}: all slots within card`);
     assert.ok(d.slots.every(s => s.y >= d.card.y - 1 && s.bottom <= d.card.bottom + 1), `${width}: all slots vertically within card`);
-    // Real Minecraft shape: storage 3x9, armour a single 4-slot column on the left, hotbar one row, offhand right.
+    // Storage stays 3x9; phones move equipment below it to preserve padding and slot size.
     assert.equal(d.mainRows, 3, `${width}: storage is three rows`);
     assert.equal(d.mainCols, 9, `${width}: storage is nine columns`);
-    assert.equal(d.armorCols, 1, `${width}: armour is one column`);
     assert.equal(d.hotRows, 1, `${width}: hotbar is one row`);
-    assert.ok(Math.abs(d.armor[0].x - d.armor[3].x) < 1, `${width}: armour slots share one column`);
-    assert.ok(d.armor[0].y < d.armor[3].y, `${width}: armour runs top to bottom`);
-    assert.ok(d.armor[3].right <= d.main[0].x + 1, `${width}: armour sits left of the storage`);
+    if (width <= 560) {
+      assert.ok(d.slots.every(s => s.x - d.card.x >= 12 && d.card.right - s.right >= 12), `${width}: at least 12px inner space on both sides`);
+      assert.equal(d.armorCols, 4, `${width}: armour wraps into a row`);
+      assert.ok(d.armor.every(s => s.y > d.hot[0].bottom), `${width}: armour below hotbar`);
+      assert.ok(Math.abs(d.off.cy - d.armor[0].cy) < 2, `${width}: offhand shares equipment row`);
+    } else {
+      assert.equal(d.armorCols, 1, `${width}: armour is one column`);
+      assert.ok(Math.abs(d.armor[0].x - d.armor[3].x) < 1, `${width}: armour slots share one column`);
+      assert.ok(d.armor[0].y < d.armor[3].y, `${width}: armour runs top to bottom`);
+      assert.ok(d.armor[3].right <= d.main[0].x + 1, `${width}: armour sits left of the storage`);
+      assert.ok(Math.abs(d.off.cy - d.hot[0].cy) < 2, `${width}: offhand is level with the hotbar`);
+    }
     assert.ok(d.hot[0].y > d.main[26].bottom, `${width}: hotbar below storage`);
     const rowGap = d.main[9].y - d.main[0].bottom;
     const hotGap = d.hot[0].y - d.main[26].bottom;
     assert.ok(hotGap > rowGap, `${width}: hotbar is visually separated (${hotGap} > ${rowGap})`);
     assert.ok(d.off.x >= d.main[8].right - 1, `${width}: offhand sits right of the storage`);
-    assert.ok(Math.abs(d.off.cy - d.hot[0].cy) < 2, `${width}: offhand is level with the hotbar`);
     // Item icons centred in their slot.
     assert.ok(Math.abs(d.icon.cx - d.iconSlot.cx) <= 1 && Math.abs(d.icon.cy - d.iconSlot.cy) <= 1, `${width}: icon centred in its slot`);
     // Stack counts bottom-right in the pixel font.
