@@ -67,7 +67,8 @@ const PAGES = [
   // Wiki mit offenem Burger-Drawer: sichert den Fix gegen den seitlichen Schub der Gruppe "Wiki".
   { slug: "wiki-menu", file: "McWiki.html", url: "/wiki", click: ".nbur" },
   // Derselbe Drawer bis zum Konto durchgescrollt (der Punkt "Wiki" klappt seine Unterliste auf).
-  { slug: "wiki-menu-end", file: "McWiki.html", url: "/wiki", click: ".nbur", scroll: "(() => { const n = document.querySelector('.nl'); if (n) n.scrollTop = n.scrollHeight; })()" },
+  // viewport: echtes 375x812-Bild statt voller Seite, sonst ist die untere Kante nicht zu sehen.
+  { slug: "wiki-menu-end", viewport: true, file: "McWiki.html", url: "/wiki", click: ".nbur", scroll: "(() => { const n = document.querySelector('.nl'); if (n) n.scrollTop = n.scrollHeight; })()" },
   { slug: "wiki-artikel", file: "McWiki.html", url: "/wiki/economy" },
   { slug: "vip", file: "McVip.html", url: "/vip" },
   { slug: "account", file: "McAccount.html", url: "/profile" },
@@ -302,7 +303,7 @@ async function routeMc(context) {
   });
 }
 
-async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal, click, scroll } = {}) {
+async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal, click, scroll, viewport } = {}) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1, reducedMotion: "no-preference", colorScheme: "dark" });
   if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
   // The artboards ask Google for their fonts; the offline run must not depend on that request, so
@@ -395,7 +396,7 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
       if (Math.abs(a.top - b.top) > 1 || Math.abs(a.height - b.height) > 1) throw new Error('Unbalanced player stat row');
     }
   }
-  await page.screenshot({ path: file, fullPage: true });
+  await page.screenshot({ path: file, fullPage: !viewport });
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   const status = await page.evaluate(() => {
@@ -667,7 +668,7 @@ async function main() {
   if (impl) {
     for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600, click: p.click, scroll: p.scroll });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600, click: p.click, scroll: p.scroll, viewport: p.viewport });
         probe.impl.push({ page: p.slug, ...r });
       }
     }
