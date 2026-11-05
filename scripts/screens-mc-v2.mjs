@@ -64,6 +64,11 @@ const PAGES = [
   { slug: "changelog", file: "McChangelog.html", url: "/changelog" },
   { slug: "feedback", file: "McFeedback.html", url: "/feedback" },
   { slug: "wiki", file: "McWiki.html", url: "/wiki" },
+  // Wiki mit offenem Burger-Drawer: sichert den Fix gegen den seitlichen Schub der Gruppe "Wiki".
+  { slug: "wiki-menu", file: "McWiki.html", url: "/wiki", click: ".nbur" },
+  // Derselbe Drawer bis zum Konto durchgescrollt (der Punkt "Wiki" klappt seine Unterliste auf).
+  // viewport: echtes 375x812-Bild statt voller Seite, sonst ist die untere Kante nicht zu sehen.
+  { slug: "wiki-menu-end", viewport: true, file: "McWiki.html", url: "/wiki", click: ".nbur", scroll: "(() => { const n = document.querySelector('.nl'); if (n) n.scrollTop = n.scrollHeight; })()" },
   { slug: "wiki-artikel", file: "McWiki.html", url: "/wiki/economy" },
   { slug: "vip", file: "McVip.html", url: "/vip" },
   { slug: "account", file: "McAccount.html", url: "/profile" },
@@ -298,7 +303,7 @@ async function routeMc(context) {
   });
 }
 
-async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal } = {}) {
+async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal, click, scroll, viewport } = {}) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1, reducedMotion: "no-preference", colorScheme: "dark" });
   if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
   // The artboards ask Google for their fonts; the offline run must not depend on that request, so
@@ -315,6 +320,15 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
   if (inject) await page.addInitScript(inject);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForTimeout(wait || 1400);
+  // Optionaler Klick vor dem Schuss (z. B. Burger-Drawer), damit auch eingeklappte Zustände
+  // prüfbar sind. Fehlt das Ziel, bleibt der Schuss unverändert.
+  if (click) {
+    const target = page.locator(click).first();
+    if (await target.count()) { await target.click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(500); }
+  }
+  // Optionales Scrollen nach dem Klick (z. B. ans Ende des Drawers), damit auch der untere
+  // Teil eines scrollenden Menüs im Bild ist.
+  if (scroll) { await page.evaluate(scroll).catch(() => {}); await page.waitForTimeout(250); }
   // 3D models load lazily and asynchronously: give them a bounded moment so no tile is captured
   // mid-load (this is why the "Gerade online" row still looked empty on desktop while the phone
   // breakpoint, which renders a static frame, already showed the figures). Never blocks a run.
@@ -352,12 +366,25 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     const inventory = document.querySelector('#pb .inv');
     const meta = document.querySelector('.pf-meta');
     const cards = [...document.querySelectorAll('#det .dgr > .dcard')];
+    // Nav-Drawer offen? Dann darf er nicht breiter als breit sein: mit ds.css (flex-wrap:wrap)
+    // und max-height liefen die Gruppen sonst in eine zweite Spalte, Wiki und Anmelden fehlten.
+    const drawer = document.querySelector(".nav.open .nl");
     return {
       ...(inventory ? { inventory: { card:box(inventory), slots:[...inventory.querySelectorAll('.ivs')].map(box) } } : {}),
       ...(meta ? { meta:[...meta.children].map(box) } : {}),
       ...(cards.length ? { stats:cards.map(el => ({ title:el.querySelector('h3').textContent, ...box(el) })) } : {}),
+      ...(drawer ? { drawer: (() => {
+        const r = drawer.getBoundingClientRect();
+        return { scrollWidth: drawer.scrollWidth, clientWidth: drawer.clientWidth,
+          top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height),
+          room: Math.round(innerHeight - r.bottom),
+          groups: drawer.querySelectorAll(".ng").length, account: !!drawer.querySelector(".l"), items: drawer.children.length };
+      })() } : {}),
     };
   });
+  if (layout.drawer && layout.drawer.scrollWidth > layout.drawer.clientWidth + 1) throw new Error(`Nav-Drawer scrollt seitwärts: ${JSON.stringify(layout.drawer)}`);
+  // Der Drawer muss mit Abstand im Bild enden (Designer-QA: unten lief die Kante bei 812 px raus).
+  if (layout.drawer && layout.drawer.room < 8) throw new Error(`Nav-Drawer endet zu nah am Rand: ${JSON.stringify(layout.drawer)}`);
   if (vp.w === 375 && layout.inventory) {
     const { card, slots } = layout.inventory;
     if (slots.some(s => s.width < 28 || s.left - card.left < 12 || card.right - s.right < 12)) throw new Error(`Inventory spacing failed: ${JSON.stringify(layout.inventory)}`);
@@ -369,7 +396,7 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
       if (Math.abs(a.top - b.top) > 1 || Math.abs(a.height - b.height) > 1) throw new Error('Unbalanced player stat row');
     }
   }
-  await page.screenshot({ path: file, fullPage: true });
+  await page.screenshot({ path: file, fullPage: !viewport });
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   const status = await page.evaluate(() => {
@@ -641,7 +668,7 @@ async function main() {
   if (impl) {
     for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600 });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600, click: p.click, scroll: p.scroll, viewport: p.viewport });
         probe.impl.push({ page: p.slug, ...r });
       }
     }
