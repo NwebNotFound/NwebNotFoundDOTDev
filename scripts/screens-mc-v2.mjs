@@ -68,6 +68,12 @@ const PAGES = [
   { slug: "vip", file: "McVip.html", url: "/vip" },
   // Dieselbe Seite mit zugeklappter Verwaltung: zeigt, dass der Verwalten-Schalter schließt.
   { slug: "vip-collapsed", file: "McVip.html", url: "/vip", click: 'button[data-manage]' },
+  // Eine Regel umgelegt: "Aenderungen speichern" ist dann aktiv.
+  { slug: "vip-save", file: "McVip.html", url: "/vip", click: '.v2-tgl' },
+  // Loeschbestaetigung mit getipptem Namen.
+  { slug: "vip-delete", file: "McVip.html", url: "/vip", click: 'button[data-del]' },
+  // Admin-Ansicht: alle Welten, dafuer wird der Rang des Kontos kurz auf admin gesetzt.
+  { slug: "vip-admin", file: "McVip.html", url: "/vip", admin: true },
   { slug: "account", file: "McAccount.html", url: "/profile" },
 ];
 const VIEWPORTS = [
@@ -255,6 +261,18 @@ function fixture() {
   };
 }
 
+/** Nur fuer die Admin-Aufnahme: der Rang des Kontos kommt aus dem Ingest. */
+async function setRank(rank) {
+  const f = fixture();
+  f.player_ranks = f.player_ranks.map((r, i) => (i === 0 ? { ...r, rank } : r));
+  const res = await fetch(`${MC}/api/mc-ingest`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ingest-token": TOK, host: HOST },
+    body: JSON.stringify(f),
+  });
+  if (!res.ok) throw new Error(`rank ${rank}: ${res.status}`);
+}
+
 async function seed(session) {
   const res = await fetch(`${MC}/api/mc-ingest`, {
     method: "POST",
@@ -397,6 +415,9 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     const vHead = document.querySelector('#vip .v2-head');
     const vIcons = [...document.querySelectorAll('#vip .v2-toggles img, #vip .v2-types img, #vip .v2-slots img, #vip .vip-card .slot img')];
     const vWorld = document.querySelector('#vip .v2-world');
+    // Trefferflaeche der Regler und Zustand des Speichern-Knopfs als Zahlen im Report.
+    const vTgl = document.querySelector('#vip .v2-tgl');
+    const vSave = document.querySelector('#vip .v2-save .btn');
     return {
       ...(inventory ? { inventory: { card:box(inventory), slots:[...inventory.querySelectorAll('.ivs')].map(box) } } : {}),
       ...(meta ? { meta:[...meta.children].map(box) } : {}),
@@ -406,6 +427,8 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
           head: vHead ? { src: vHead.getAttribute('src'), loaded: vHead.complete && vHead.naturalWidth > 0 } : null,
           icons: vIcons.map(i => ({ src: i.getAttribute('src'), loaded: i.complete && i.naturalWidth > 0 })),
           world: vWorld ? box(vWorld) : null,
+          toggle: vTgl ? { w: Math.round(box(vTgl).width), h: Math.round(box(vTgl).height) } : null,
+          save: vSave ? { disabled: vSave.disabled, bg: getComputedStyle(vSave).backgroundColor } : null,
         },
       } : {}),
     };
@@ -692,9 +715,14 @@ async function main() {
   } else if (prevReport.mockups) probe.mockups = prevReport.mockups;
   if (impl) {
     for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
-      for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600, click: p.click });
-        probe.impl.push({ page: p.slug, ...r });
+      if (p.admin) await setRank("admin");
+      try {
+        for (const vp of VIEWPORTS) {
+          const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600, click: p.click });
+          probe.impl.push({ page: p.slug, ...r });
+        }
+      } finally {
+        if (p.admin) await setRank("mvp");
       }
     }
     probe.style = await styleProbe(browser, session.cookie);

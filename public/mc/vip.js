@@ -74,7 +74,7 @@
     return `<section class="v2-pane" aria-label="Einstellungen"><h3 class="v2-h3">Einstellungen</h3>${seg("Sichtbarkeit", "visibility", vis, [["friends", "Für Freunde"], ["private", "Privat"]])}<p class="mut v2-hint">Freunde aus deiner Freundesliste dürfen rein. Privat: nur eingeladene Spieler.</p>${seg("Spielmodus", "gamemode", st.gamemode, GM)}${seg("Schwierigkeit", "difficulty", st.difficulty, DIFF)}<ul class="v2-toggles">${TOGGLES.map(([k, icon, title, text]) => {
       const on = st[k] === true;
       return `<li>${slot(icon)}<span><b>${E(title)}</b><span class="mut">${E(text)}</span></span><button class="v2-tgl" type="button" role="switch" data-set="${k}" data-val="${on ? "false" : "true"}" aria-checked="${on}" aria-label="${E(title)}"></button></li>`;
-    }).join("")}</ul><div class="v2-save"><button class="btn sm" type="button" data-save="${E(s.id)}" disabled>Änderungen speichern</button><span class="mut v2-hint">Regeln werden zusammen gesendet.</span></div></section>`;
+    }).join("")}</ul><div class="v2-save"><button class="btn" type="button" data-save="${E(s.id)}" disabled>Änderungen speichern</button><span class="mut v2-hint">Regeln werden zusammen gesendet.</span></div></section>`;
   };
   const membersPane = (s) => {
     const list = (Array.isArray(s.members) ? s.members : []).filter((m) => NAME.test(m && m.name || ""));
@@ -82,10 +82,10 @@
       const trusted = m.role === "trusted";
       return `<li>${head(m.name, 32, "v2-mhead")}<span class="v2-mname"><b>${E(m.name)}</b><span class="mut">${trusted ? "darf starten" : "darf mitspielen"}</span></span><div class="seg v2-role" role="group" aria-label="Rolle von ${E(m.name)}"><button type="button" data-act="trust" data-id="${E(s.id)}" data-name="${E(m.name)}" data-role="member" aria-pressed="${!trusted}">Mitglied</button><button type="button" data-act="trust" data-id="${E(s.id)}" data-name="${E(m.name)}" data-role="trusted" aria-pressed="${trusted}">Vertraut</button></div><button class="v2-icbtn v2-x" type="button" data-act="uninvite" data-id="${E(s.id)}" data-name="${E(m.name)}" aria-label="${E(m.name)} entfernen">×</button></li>`;
     }).join("");
-    return `<section class="v2-pane" aria-label="Mitglieder"><h3 class="v2-h3">Mitglieder <span class="mut v2-count">${NF(list.length)} / 12</span></h3><ul class="v2-members">${rows || '<li class="v2-empty"><span class="mut">Noch niemand eingeladen.</span></li>'}</ul><form class="v2-invite" data-id="${E(s.id)}"><div class="field"><label for="inv-${E(s.id)}">Spieler einladen</label><input id="inv-${E(s.id)}" name="name" placeholder="Minecraft-Name" autocomplete="off" maxlength="16" pattern="[A-Za-z0-9_]{1,16}" required></div><button class="btn sm" type="submit">Einladen</button></form><p class="mut v2-hint">Vertraut = darf die Welt starten. Verwalten, einladen und löschen kannst nur du.</p></section>`;
+    return `<section class="v2-pane" aria-label="Mitglieder"><h3 class="v2-h3">Mitglieder <span class="mut v2-count">${NF(list.length)} / 12</span></h3><ul class="v2-members">${rows || '<li class="v2-empty"><span class="mut">Noch niemand eingeladen.</span></li>'}</ul><form class="v2-invite" data-id="${E(s.id)}"><div class="field"><label for="inv-${E(s.id)}">Spieler einladen</label><input id="inv-${E(s.id)}" name="name" placeholder="Minecraft-Name" autocomplete="off" maxlength="16" pattern="[A-Za-z0-9_]{1,16}" required></div><button class="btn" type="submit">Einladen</button></form><p class="mut v2-hint">Vertraut = darf die Welt starten. Verwalten, einladen und löschen kannst nur du.</p></section>`;
   };
   const renameForm = (s) => `<form class="v2-rename" id="rn-${E(s.id)}" data-id="${E(s.id)}" hidden><div class="field"><label for="rn-in-${E(s.id)}">Neuer Name</label><input id="rn-in-${E(s.id)}" name="name" value="${E(s.label)}" maxlength="24" minlength="3" pattern="[A-Za-z0-9_-]{3,24}" autocomplete="off" required></div><button class="btn sm" type="submit">Umbenennen</button></form>`;
-  const deleteForm = (s) => `<form class="v2-delconfirm" id="dc-${E(s.id)}" data-id="${E(s.id)}" data-name="${E(s.label)}" hidden><div class="field"><label for="dc-in-${E(s.id)}">Zum Löschen <b>${E(s.label)}</b> eintippen</label><input id="dc-in-${E(s.id)}" name="confirm" autocomplete="off" required></div><button class="btn sm danger" type="submit">Endgültig löschen</button></form>`;
+  const deleteForm = (s) => `<form class="v2-delconfirm" id="dc-${E(s.id)}" data-id="${E(s.id)}" data-name="${E(s.label)}" hidden><div class="field"><label for="dc-in-${E(s.id)}">Zum Löschen <b>${E(s.label)}</b> eintippen</label><input id="dc-in-${E(s.id)}" name="confirm" autocomplete="off" placeholder="${E(s.label)}" maxlength="24" required></div><button class="btn danger" type="submit">Endgültig löschen</button><p class="mut v2-hint">Löschen lässt sich nicht rückgängig machen. Die Welt und ihre Einstellungen sind danach weg.</p></form>`;
   // Eine Weltkarte. Verwalten nur für Owner/Admin; trusted und Mitglieder sehen Starten.
   const world = (s, opts = {}) => {
     if (!s || typeof s !== "object" || !WID.test(s.id || "")) return "";
@@ -105,7 +105,7 @@
     const info = (s.info || "").trim() ? `<p class="mut v2-hint">${E(s.info)}</p>` : "";
     const acts = [];
     if (uuid && s.can_start) acts.push(`<button class="btn sm${online ? " sec" : ""}" type="button" data-act="${online ? "stop" : "start"}" data-id="${E(s.id)}">${online ? "Stoppen" : "Starten"}</button>`);
-    if (uuid && s.can_manage) acts.push(`<button class="btn sm sec v2-more" type="button" data-manage="${E(s.id)}" aria-expanded="true" aria-controls="wb-${E(s.id)}">Verwalten <span class="arrow">›</span></button>`);
+    if (uuid && s.can_manage) acts.push(`<button class="btn sm sec v2-more" type="button" data-manage="${E(s.id)}" aria-expanded="true" aria-controls="wb-${E(s.id)}"><span class="v2-more-t">Schließen</span> <span class="arrow">›</span></button>`);
     if (online) acts.push(`<span class="chip v2-join">${ico("ender_pearl", 16)}<code>/vw join ${E(s.label)}</code></span>`);
     const manage = uuid && s.can_manage;
     const body = manage ? `<div class="v2-wbody" id="wb-${E(s.id)}">${settingsPane(s)}${membersPane(s)}</div><footer class="v2-wfoot"><span class="mut v2-hint">Änderungen laufen über den Server, meist in ein paar Sekunden.</span><button class="btn sm ghost v2-danger" type="button" data-del="${E(s.id)}" aria-controls="dc-${E(s.id)}" aria-expanded="false">Welt löschen…</button></footer>${deleteForm(s)}` : "";
@@ -118,10 +118,16 @@
     const own = all.filter((s) => s && s.owner === true);
     const mine = w && Number.isFinite(+w.mine) ? Math.max(own.length, Math.floor(+w.mine)) : own.length;
     const invited = all.filter((s) => s && s.owner !== true && s.invited === true);
-    const cardsHtml = [...own.map((s) => world(s, { admin })), ...invited.map((s) => world(s, {}))].filter(Boolean).join("");
+    const ownHtml = own.map((s) => world(s, { admin })).filter(Boolean).join("");
+    const invitedHtml = invited.map((s) => world(s, {})).filter(Boolean).join("");
     const add = mine < max ? createCard() : full(max);
-    const empty = cardsHtml ? "" : `<p class="mut v2-hint">Sobald der Server deine Welt meldet, steht hier ihr Status.</p>`;
-    return `<section class="vip-block" id="${admin ? "vip-admin-worlds" : "v2-worlds"}"><div class="vip-head v2-head-row"><div><p class="eyb">${admin ? "Verwaltung" : "Verwalten"}</p><h2 class="hub-h2">${admin ? "Alle VIP-Welten" : "Deine Welten"}</h2></div><span class="mut vip-head-n">${NF(mine)} von ${NF(max)} belegt</span></div><div class="v2-wlist">${cardsHtml}${empty}${add}</div></section>`;
+    const empty = ownHtml ? "" : `<p class="mut v2-hint">Sobald der Server deine Welt meldet, steht hier ihr Status.</p>`;
+    // Eingeladene Welten stehen wie im Mockup in einem eigenen Block, damit "gehört mir" und
+    // "bin eingeladen" nicht in einer Liste zusammenfallen.
+    const invitedBlock = invitedHtml
+      ? `<section class="vip-block" id="v2-invited"><div class="vip-head"><div><p class="eyb">Eingeladen</p><h2 class="hub-h2">Welten von Freunden</h2></div></div><div class="v2-wlist">${invitedHtml}</div></section>`
+      : "";
+    return `<section class="vip-block" id="${admin ? "vip-admin-worlds" : "v2-worlds"}"><div class="vip-head v2-head-row"><div><p class="eyb">${admin ? "Verwaltung" : "Verwalten"}</p><h2 class="hub-h2">${admin ? "Alle VIP-Welten" : "Deine Welten"}</h2></div><span class="mut vip-head-n">${NF(mine)} von ${NF(max)} belegt</span></div><div class="v2-wlist">${ownHtml}${empty}${add}</div></section>${invitedBlock}`;
   };
   const ADMIN_PAGE = 12;
   const adminWorlds = (w) => {
@@ -245,6 +251,9 @@
       if (!card) return;
       const open = card.classList.toggle("is-open");
       btn.setAttribute("aria-expanded", open ? "true" : "false");
+      // Die Karte startet offen; die Beschriftung sagt, was der Knopf jetzt tut.
+      const lab = btn.querySelector(".v2-more-t");
+      if (lab) lab.textContent = open ? "Schließen" : "Verwalten";
       return;
     }
     const ren = btn.getAttribute("data-rename");
