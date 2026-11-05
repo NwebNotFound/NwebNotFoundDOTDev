@@ -38,7 +38,7 @@ try {
       });
       await page2.goto(`https://${host}${path}`,{waitUntil:'domcontentloaded'});
       await page2.waitForFunction(()=>document.querySelector('.konto-av')&&!document.querySelector('.konto-av').hidden);
-      assert.equal(await page2.locator('.konto-av').getAttribute('src'),'https://cdn.discordapp.com/embed/avatars/2.png','unlinked account keeps the https avatar on mc');
+      assert.equal(await page2.locator('.konto-av').getAttribute('src'),'/mc-head/MHF_Steve/64?v=5','unlinked account uses Steve on mc');
       await page2.close();
     } else {
       await page.waitForFunction(()=>document.querySelector('#umb img'));

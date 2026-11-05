@@ -256,7 +256,7 @@ const ACCT_JS = (loginBase) => `<script>(async()=>{const el=document.getElementB
 const httpsAvatar=u=>{try{const x=new URL(String(u||''));if(x.protocol!=='https:'||x.username||x.password)return '';return x.href}catch(e){return ''}};
 const onMc=/^mc\./.test(location.hostname);const fb=onMc?'/mc-head/MHF_Steve/64?v=5':'https://cdn.discordapp.com/embed/avatars/0.png';
 if(k){if(el)el.replaceChildren();
-if(d.user){const nm=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?d.user.mc_name:'';const av=k.querySelector('.konto-av');if(av){const head=nm&&onMc?'/mc-head/'+nm+'/64?v=5':'';av.onerror=function(){this.onerror=null;if(!String(this.src||'').endsWith(fb))this.src=fb};av.src=head||httpsAvatar(d.user.avatar)||fb;av.hidden=false}
+if(d.user){const nm=d.user.mc_name&&/^[A-Za-z0-9_]{1,16}$/.test(d.user.mc_name)?d.user.mc_name:'';const av=k.querySelector('.konto-av');if(av){const head=nm&&onMc?'/mc-head/'+nm+'/64?v=5':'';av.onerror=function(){this.onerror=null;if(!String(this.src||'').endsWith(fb))this.src=fb};av.src=onMc?(head||fb):(httpsAvatar(d.user.avatar)||fb);av.hidden=false}
 const out=k.querySelector('a.out');if(out)out.href='${loginBase}/auth/discord/logout?next='+nx;if(window.mcNavMark)window.mcNavMark()}
 else if(d.available){k.outerHTML='<a class="l" id="konto" href="${loginBase}/auth/discord/login?next='+nx+'">Mit Discord anmelden</a>'}
 else{k.outerHTML='<span class="l" id="konto">Login bald</span>'}}
@@ -501,7 +501,7 @@ const LBL={money:['Kontostand',v=>(+v).toLocaleString('de-DE')+' CP'],playtime:[
 (async()=>{const H=document.getElementById('ph'),B=document.getElementById('pb');
 const r=await fetch('/api/profile',{credentials:'include'});const d=await r.json().catch(()=>({}));
 if(!d.user){H.innerHTML='<h1 class="h-l">Dein Profil.</h1><p class="lead">Melde dich mit Discord an, um dein Profil zu sehen.</p><p style="margin-top:2rem"><a class="btn discord" href="${mc ? `https://${MAIN}` : ""}/auth/discord/login?next='+encodeURIComponent(location.href)+'">${DISCORD_SVG} Mit Discord anmelden</a></p>';return}
-const u=d.user;H.innerHTML='<img alt="" src="'+E(u.avatar)+'" width="112" height="112" style="width:112px;height:112px;border-radius:50%;margin:0 auto 1.2rem;box-shadow:0 10px 40px -10px var(--shadow)"><h1 class="h-l">'+E(u.name)+'</h1><p class="mut" style="margin:.4rem 0 0">@'+E(u.username)+(u.member_since?' · Mitglied seit '+E(fd(u.member_since)):'')+'</p>';
+const u=d.user;const mcName=d.minecraft&&d.minecraft.mc_name;const pic=${mc ? "(mcName&&/^[A-Za-z0-9_]{1,16}$/.test(mcName)?'/mc-head/'+mcName+'/64?v=5':'/mc-head/MHF_Steve/64?v=5')" : "u.avatar"};H.innerHTML='<img alt="" ${mc ? 'onerror="this.onerror=null;this.src=&quot;/mc-head/MHF_Steve/64?v=5&quot;"' : ''} src="'+E(pic)+'" width="112" height="112" style="width:112px;height:112px;border-radius:50%;margin:0 auto 1.2rem;box-shadow:0 10px 40px -10px var(--shadow)"><h1 class="h-l">'+E(u.name)+'</h1><p class="mut" style="margin:.4rem 0 0">@'+E(u.username)+(u.member_since?' · Mitglied seit '+E(fd(u.member_since)):'')+'</p>';
 let h='';const m=d.minecraft;
 if(m&&m.visible){const st=m.stats||{};const ks=Object.keys(st).filter(k=>k!=='inventory'&&k!=='pickup');
 const SK=['playtime','kills','deaths','blocks_mined'].concat(ks.filter(k=>!LBL[k]&&k!=='money'));const bal=st.money!=null&&st.money!=='';const id=encodeURIComponent(m.mc_uuid||m.mc_name);

@@ -38,6 +38,7 @@ try {
         hotRows: uniq([...document.querySelectorAll('.ivg.hot .ivs')].map(e => e.getBoundingClientRect().y)).length,
       };
     });
+    if (width === 375) assert.ok(d.slots[0].w >= 28, `375: slot at least 28px, got ${d.slots[0].w}`);
     assert.equal(d.slots.length, 41, `${width}: 41 slots`);
     assert.equal(d.main.length, 27); assert.equal(d.hot.length, 9); assert.equal(d.armor.length, 4);
     assert.ok(d.overflow <= 0, `${width}: no document overflow`);

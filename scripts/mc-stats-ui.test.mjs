@@ -9,7 +9,7 @@ import worker from '../src/worker.js';
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const fixture = { mined: {waxed_weathered_cut_copper_stairs: 2147483647, stone: 600, dirt: 42}, killed: {chicken: 91, 'minecraft:husk': 25, cow: 3} };
 async function openPage(browser, host, path, width = 390, data = fixture) {
-  const profile = {user:{name:'Fixture',username:'fixture',avatar:'',id:'1'},guestbook:[],minecraft:{visible:true,mc_name:'Fixture',mc_uuid:'fixture',stats:{},details:data}};
+  const profile = {user:{name:'Fixture',username:'fixture',avatar:'https://cdn.discordapp.com/embed/avatars/2.png',id:'1'},guestbook:[],minecraft:{visible:true,mc_name:'Fixture',mc_uuid:'fixture',stats:{kills:1,deaths:2,distance:3,blocks_mined:4,inventory:[{item:'diamond',count:64,slot:9}]},details:data}};
   const player = {name:'Fixture',stats:{},details:{all:{},extra:data},viewer:{logged_in:true}};
   const page = await browser.newPage({viewport:{width,height:900}, reducedMotion:'reduce'});
   const errors = [];
@@ -22,6 +22,7 @@ async function openPage(browser, host, path, width = 390, data = fixture) {
     }
     if (url.pathname === '/api/profile') return route.fulfill({json:profile});
     if (url.pathname === '/api/mc-players/Fixture') return route.fulfill({json:player});
+    if (url.pathname.startsWith('/mc-head/') || url.hostname === 'cdn.discordapp.com') return route.fulfill({contentType:'image/svg+xml', body:'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"/>'});
     if (url.pathname.startsWith('/mc-mob/')) {
       const response = await worker.fetch(new Request(url.href), {}, {});
       const location = response.headers.get('location');
@@ -126,3 +127,36 @@ for (const [host,path] of [['mc.nwebnotfound.dev','/profile'], ['nwebnotfound.de
     } finally { await browser.close(); }
   });
 }
+
+for (const host of ['mc.nwebnotfound.dev', 'nwebnotfound.dev']) test(`${host}: profile avatar respects the domain`, async () => {
+  const browser = await chromium.launch();
+  try {
+    const {page,errors} = await openPage(browser, host, '/profile');
+    const src = await page.locator('#ph > img').getAttribute('src');
+    if (host.startsWith('mc.')) assert.match(src, /^\/mc-head\/Fixture\//);
+    else assert.equal(src, 'https://cdn.discordapp.com/embed/avatars/2.png');
+    assert.deepEqual(errors, []);
+    await page.close();
+  } finally { await browser.close(); }
+});
+
+test('MC profile fits inventory and keeps phone tabs scrollable', async () => {
+  const browser = await chromium.launch();
+  try {
+    const {page,errors} = await openPage(browser, 'mc.nwebnotfound.dev', '/profile', 375);
+    await page.getByRole('tab',{name:'Inventar'}).click();
+    const d = await page.evaluate(() => ({slot:document.querySelector('.inv .ivs').getBoundingClientRect().width, overflow:document.documentElement.scrollWidth-innerWidth, columns:getComputedStyle(document.querySelector('.pf-kpi')).gridTemplateColumns.split(' ').length, tabs:getComputedStyle(document.querySelector('.pf-tl')).flexWrap, tabOverflow:getComputedStyle(document.querySelector('.pf-tl')).overflowX}));
+    assert.ok(d.slot >= 28, `slot width ${d.slot}`);
+    assert.equal(d.overflow,0); assert.equal(d.columns,2); assert.equal(d.tabs,'nowrap'); assert.equal(d.tabOverflow,'auto');
+    assert.deepEqual(errors,[]); await page.close();
+  } finally { await browser.close(); }
+});
+
+test('MC KPI grid has three columns on desktop', async () => {
+  const browser = await chromium.launch();
+  try {
+    const {page,errors} = await openPage(browser, 'mc.nwebnotfound.dev', '/profile', 1280);
+    const cols = await page.locator('.pf-kpi').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+    assert.equal(cols, 3); assert.deepEqual(errors,[]); await page.close();
+  } finally { await browser.close(); }
+});

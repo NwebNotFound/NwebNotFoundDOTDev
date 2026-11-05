@@ -24,7 +24,8 @@
 import { chromium } from "playwright";
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { webcrypto as C } from "node:crypto";
@@ -39,9 +40,10 @@ const SERVED = !args.includes("--no-serve");
 const SERVE = args.includes("--serve");
 const ONLY = opt("only", "all");
 const MC = opt("mc", "http://127.0.0.1:8791");
+const BROWSER_MC = `http://mc.nwebnotfound.dev:${new URL(MC).port || "8791"}`;
 const MOCK_DIR = path.resolve(opt("mockups", "/w/mockups"));
 const OUT = path.resolve(ROOT, opt("out", "docs/screens/v2/mc"));
-const TOK = "screens-ingest-token", SECRET = "screens-session-secret-0123456789abcdef";
+const TOK = "e2e-token", SECRET = "screens-session-secret-0123456789abcdef";
 const PORT = new URL(MC).port || "8791";
 const HOST = "mc.nwebnotfound.dev";
 const D1 = "100000000000000001";
@@ -72,6 +74,8 @@ const VIEWPORTS = [
   { w: 375, h: 812, tag: "375" },
 ];
 const STRESS = args.includes("--stress");
+const PAGE_FILTER = opt("pages", "").split(",").filter(Boolean);
+const QUICK = args.includes("--quick");
 
 // Item 2: pages whose formatting is worth pushing to the contract limits (16-char MC names, 48-char
 // shop names, nine-digit CP sums). Captured as stress-<slug>-<tag>.png next to the normal shots.
@@ -241,21 +245,15 @@ async function seed(session) {
 }
 
 async function startServer() {
-  const persist = path.join(ROOT, ".wrangler", "screens-mc");
-  await rm(persist, { recursive: true, force: true });
-  const dv = path.join(ROOT, ".dev.vars");
-  let hadDv = null;
-  if (fs.existsSync(dv)) { hadDv = fs.readFileSync(dv); }
-  fs.writeFileSync(dv, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\n`);
-  const restore = () => { try { if (hadDv) fs.writeFileSync(dv, hadDv); else fs.rmSync(dv, { force: true }); } catch { /* keep it */ } };
-  process.on("exit", restore);
+  const persist = await mkdtemp(path.join(os.tmpdir(), "mc-screens-"));
+  const restore = () => {};
   try {
     execSync(`npx wrangler d1 execute DB --local --persist-to "${persist}" --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
   } catch {
     console.warn("! schema.sql did not apply — the pages will show their error states");
   }
   execSync(`npx wrangler d1 execute DB --local --persist-to "${persist}" --command ${JSON.stringify(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('s-screens','${D1}','nils','Nils',datetime('now','+1 day'))`)}`, { cwd: ROOT, stdio: "ignore" });
-  serve(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", PORT, "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", persist]);
+  serve(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", PORT, "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", persist, "--var", `MC_INGEST_TOKEN:${TOK}`, "--var", `SESSION_SECRET:${SECRET}`, "--var", "DISCORD_CLIENT_ID:1", "--var", "DISCORD_CLIENT_SECRET:x"]);
   await reachable(`${MC}/`);
   return restore;
 }
@@ -277,12 +275,25 @@ const REPORT = path.join(OUT, "report.json");
 let prevReport = {};
 try { prevReport = JSON.parse(fs.readFileSync(REPORT, "utf8")); } catch { /* first run */ }
 
+async function routeMc(context) {
+  await context.route(`${BROWSER_MC}/**`, async route => {
+    const req = route.request();
+    const headers = Object.fromEntries(Object.entries(await req.allHeaders()).filter(([k]) => !k.startsWith(":") && !["host", "accept-encoding", "content-length"].includes(k)));
+    headers["x-nnf-test-host"] = HOST;
+    try {
+      const response = await fetch(req.url().replace(BROWSER_MC, MC), { method: req.method(), headers, body: req.postDataBuffer() || undefined, redirect: "manual" });
+      await route.fulfill({ status: response.status, headers: Object.fromEntries([...response.headers].filter(([k]) => !["content-encoding", "content-length", "transfer-encoding"].includes(k))), body: Buffer.from(await response.arrayBuffer()) });
+    } catch { await route.abort(); }
+  });
+}
+
 async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal } = {}) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1, reducedMotion: "no-preference", colorScheme: "dark" });
-  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
   // The artboards ask Google for their fonts; the offline run must not depend on that request, so
   // every non-file:// subresource is dropped and the injected local faces are the only ones used.
   if (blockExternal) await ctx.route("**/*", (route) => (route.request().url().startsWith("file://") ? route.continue() : route.abort()));
+  await routeMc(ctx);
   const page = await ctx.newPage();
   if (inject) await page.addInitScript(inject);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -327,9 +338,10 @@ async function styleProbe(browser, cookie) {
   const out = {};
   for (const motion of ["no-preference", "reduce"]) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: motion, colorScheme: "dark" });
-    if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+    if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
+    await routeMc(ctx);
     const page = await ctx.newPage();
-    await page.goto(`${MC}/`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${BROWSER_MC}/`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1200);
     out[motion] = await page.evaluate(() => {
       const cs = (sel, prop) => { const el = document.querySelector(sel); return el ? getComputedStyle(el)[prop] : null; };
@@ -412,10 +424,11 @@ async function seedStress(session) {
 async function stressChecks(browser, cookie) {
   const out = {};
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "no-preference", colorScheme: "dark" });
-  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
+  await routeMc(ctx);
   const page = await ctx.newPage();
   for (const [name, url] of [["player", `/spieler/${LONG}`], ["leaderboards", "/leaderboards"], ["shops", "/shops"], ["bestellungen", "/bestellungen"]]) {
-    await page.goto(`${MC}${url}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${BROWSER_MC}${url}`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1700);
     out[name] = await page.evaluate(() => {
       // "Ellipsized" is the goal for names; "spilled" would mean the box really overflows its row.
@@ -447,9 +460,10 @@ async function motionEvidence(browser, cookie) {
     return { stars: g(".l-stars"), clouds: g(".l-clouds"), hills: g(".l-hills"), mascot: g(".l-mascot"), glow: g(".pixbg") };
   });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "no-preference", colorScheme: "dark" });
-  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
+  await routeMc(ctx);
   const page = await ctx.newPage();
-  await page.goto(`${MC}/`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BROWSER_MC}/`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(2400);
   out.supportsScrollTimeline = await page.evaluate(() => CSS.supports("animation-timeline: scroll()"));
   out.viewTransition = await page.evaluate(() => {
@@ -498,8 +512,9 @@ async function motionEvidence(browser, cookie) {
   } catch (e) { out.transitionRunning = String(e).slice(0, 120); }
   await ctx.close();
   const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce", colorScheme: "dark" });
+  await routeMc(ctx2);
   const p2 = await ctx2.newPage();
-  await p2.goto(`${MC}/`, { waitUntil: "domcontentloaded" });
+  await p2.goto(`${BROWSER_MC}/`, { waitUntil: "domcontentloaded" });
   await p2.waitForTimeout(1600);
   out.reducedMotion = await read(p2);
   await ctx2.close();
@@ -532,7 +547,7 @@ async function main() {
     if (SERVE) await seedStress(session);
     for (const p of STRESS_PAGES) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
         probe.stress.push({ page: p.slug, ...r });
       }
     }
@@ -567,7 +582,7 @@ async function main() {
 
   if (mockup) {
     const inject = `(()=>{const s=document.createElement("style");s.textContent=${JSON.stringify(fontCss())};document.head.appendChild(s);document.addEventListener("DOMContentLoaded",()=>document.head.appendChild(s));})()`;
-    for (const p of PAGES) {
+    for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
       const src = path.join(MOCK_DIR, p.file);
       if (!fs.existsSync(src)) { console.warn(`! missing artboard ${src}`); continue; }
       for (const vp of VIEWPORTS) {
@@ -577,9 +592,9 @@ async function main() {
     }
   } else if (prevReport.mockups) probe.mockups = prevReport.mockups;
   if (impl) {
-    for (const p of PAGES) {
+    for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600 });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600 });
         probe.impl.push({ page: p.slug, ...r });
       }
     }
@@ -597,11 +612,11 @@ async function main() {
 
   // Stress pass (item 2): same pages, but with the longest allowed names and the biggest numbers the
   // contracts permit, so ellipsis/wrapping and grouped digits are checked instead of assumed.
-  if (impl || STRESS) {
+  if ((impl && !QUICK) || STRESS) {
     if (SERVE) await seedStress(session);
     for (const p of STRESS_PAGES) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
         probe.stress.push({ page: p.slug, ...r });
       }
     }
@@ -614,7 +629,7 @@ async function main() {
   }
 
   // Parallax + view transition evidence (items 3 + 4).
-  if (impl) probe.motion = await motionEvidence(browser, session.cookie);
+  if (impl && !QUICK) probe.motion = await motionEvidence(browser, session.cookie);
   else probe.motion = prevReport.motion || {};
 
   await browser.close();
