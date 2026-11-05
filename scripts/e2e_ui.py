@@ -417,7 +417,7 @@ with sync_playwright() as p:
         ctx.close()
         ctx = br.new_context(viewport={"width": w, "height": 900}); pg = ctx.new_page(); pg.route("**/*", route)
         pg.goto("https://" + H + "/vip", wait_until="domcontentloaded", timeout=45000); pg.locator("#vip .vip-ranks").wait_for(timeout=10000); vt = pg.inner_text("#vip")
-        ok("Mit Discord anmelden" in vt and "VIP und MVP" in vt and "VIP" in vt and "MVP" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 1, f"{w}px VIP anonym: Ränge und Login, kein Panel", vt[:240])
+        ok("Mit Discord anmelden" in vt and "Vorteile" in vt and "VIP" in vt and "MVP" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 1, f"{w}px VIP anonym: Ränge und Login, kein Panel", vt[:240])
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP anonym: kein horizontales Scrollen")
         pg.screenshot(path=f"{SH}/local-vip-anon-{w}.png", full_page=True)
         pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded", timeout=45000); pg.wait_for_timeout(400); t = pg.inner_text("body")
