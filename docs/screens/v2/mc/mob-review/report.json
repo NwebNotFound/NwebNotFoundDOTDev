@@ -1,0 +1,439 @@
+{
+  "mockups": [],
+  "impl": [
+    {
+      "page": "player",
+      "file": "docs\\screens\\v2\\mc\\mob-review\\neu-player-1280.png",
+      "w": 1280,
+      "h": 900,
+      "pageHeight": 2084,
+      "scrollWidth": 1280,
+      "mobIcons": [
+        {
+          "src": "/mc-mob/zombie",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/pig",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/husk",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/sheep",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/chicken",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/cow",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/skeleton",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/spider",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/sonstige",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/fall",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/lava",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/creeper",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/void",
+          "loaded": true
+        }
+      ],
+      "mobResponses": [
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/husk",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/pig",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/zombie",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/chicken",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/cow",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/sheep",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/creeper",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/skeleton",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/spider",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/void",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/sonstige",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/fall",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/lava",
+          "status": 302
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/bone.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/ender_eye.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/feather.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/lava_bucket.png",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "page": "player",
+      "file": "docs\\screens\\v2\\mc\\mob-review\\neu-player-390.png",
+      "w": 390,
+      "h": 844,
+      "pageHeight": 3210,
+      "scrollWidth": 390,
+      "mobIcons": [
+        {
+          "src": "/mc-mob/zombie",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/pig",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/husk",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/sheep",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/chicken",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/cow",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/skeleton",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/spider",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/sonstige",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/fall",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/lava",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/creeper",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/void",
+          "loaded": true
+        }
+      ],
+      "mobResponses": [
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/zombie",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/husk",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/pig",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/chicken",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/sheep",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/cow",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/skeleton",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/spider",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/sonstige",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/creeper",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/void",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/fall",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/lava",
+          "status": 302
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/bone.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/feather.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/ender_eye.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/lava_bucket.png",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "page": "player",
+      "file": "docs\\screens\\v2\\mc\\mob-review\\neu-player-375.png",
+      "w": 375,
+      "h": 812,
+      "pageHeight": 3285,
+      "scrollWidth": 375,
+      "mobIcons": [
+        {
+          "src": "/mc-mob/zombie",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/pig",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/husk",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/sheep",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/chicken",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/cow",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/skeleton",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/spider",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/sonstige",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/fall",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/lava",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/creeper",
+          "loaded": true
+        },
+        {
+          "src": "/mc-mob/void",
+          "loaded": true
+        }
+      ],
+      "mobResponses": [
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/pig",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/zombie",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/husk",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/cow",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/skeleton",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/chicken",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/sheep",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/creeper",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/spider",
+          "status": 200
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/void",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/sonstige",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/fall",
+          "status": 302
+        },
+        {
+          "url": "http://mc.nwebnotfound.dev:8794/mc-mob/lava",
+          "status": 302
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/feather.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/lava_bucket.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/ender_eye.png",
+          "status": 200
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.21.11/assets/minecraft/textures/item/bone.png",
+          "status": 200
+        }
+      ]
+    }
+  ],
+  "stress": [],
+  "style": {
+    "no-preference": {
+      "bodyFont": "SmBody, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+      "headingFont": "SmPixel, ui-monospace, monospace",
+      "cardRadius": "22px",
+      "cardBackground": "rgb(21, 33, 28)",
+      "quickLinkAnimation": "rise",
+      "buttonShadow": "rgb(47, 154, 75) 0px 3px 0px 0px, rgba(47, 154, 75, 0.8) 0px 10px 22px -10px",
+      "buttonHeight": 48,
+      "navRadius": "999px",
+      "navBlur": "blur(14px) saturate(1.4)",
+      "themeCss": true
+    },
+    "reduce": {
+      "bodyFont": "SmBody, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+      "headingFont": "SmPixel, ui-monospace, monospace",
+      "cardRadius": "22px",
+      "cardBackground": "rgb(21, 33, 28)",
+      "quickLinkAnimation": "none",
+      "buttonShadow": "rgb(47, 154, 75) 0px 3px 0px 0px, rgba(47, 154, 75, 0.8) 0px 10px 22px -10px",
+      "buttonHeight": 48,
+      "navRadius": "999px",
+      "navBlur": "blur(14px) saturate(1.4)",
+      "themeCss": true
+    },
+    "diff": {
+      "quickLinkAnimation": [
+        "rise",
+        "none"
+      ]
+    }
+  },
+  "stressChecks": {},
+  "motion": {},
+  "overflow390": [],
+  "overflow375": [],
+  "overflow390Stress": []
+}

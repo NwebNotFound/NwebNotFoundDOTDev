@@ -281,7 +281,18 @@ async function routeMc(context) {
     const headers = Object.fromEntries(Object.entries(await req.allHeaders()).filter(([k]) => !k.startsWith(":") && !["host", "accept-encoding", "content-length"].includes(k)));
     headers["x-nnf-test-host"] = HOST;
     try {
-      const response = await fetch(req.url().replace(BROWSER_MC, MC), { method: req.method(), headers, body: req.postDataBuffer() || undefined, redirect: "manual" });
+      let target = req.url().replace(BROWSER_MC, MC);
+      let response = await fetch(target, { method: req.method(), headers, body: req.postDataBuffer() || undefined, redirect: "manual" });
+      // Playwright routes only the first request in a redirect chain. Resolve local GET
+      // redirects here so /mc-mob heads and death icons stay on the fixture server.
+      for (let hop = 0; hop < 5 && req.method() === "GET" && [301, 302, 303, 307, 308].includes(response.status); hop++) {
+        const location = response.headers.get("location");
+        if (!location) break;
+        const next = new URL(location, target);
+        if (next.origin !== new URL(MC).origin) break;
+        target = next.href;
+        response = await fetch(target, { headers, redirect: "manual" });
+      }
       await route.fulfill({ status: response.status, headers: Object.fromEntries([...response.headers].filter(([k]) => !["content-encoding", "content-length", "transfer-encoding"].includes(k))), body: Buffer.from(await response.arrayBuffer()) });
     } catch { await route.abort(); }
   });
@@ -295,6 +306,12 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
   if (blockExternal) await ctx.route("**/*", (route) => (route.request().url().startsWith("file://") ? route.continue() : route.abort()));
   await routeMc(ctx);
   const page = await ctx.newPage();
+  const mobResponses = [];
+  page.on("response", response => {
+    let request = response.request();
+    while (request.redirectedFrom()) request = request.redirectedFrom();
+    if (new URL(request.url()).pathname.startsWith("/mc-mob/")) mobResponses.push({ url: response.url(), status: response.status() });
+  });
   if (inject) await page.addInitScript(inject);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForTimeout(wait || 1400);
@@ -322,6 +339,14 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     }, { timeout: 25_000 }).catch(() => {});
     await page.waitForTimeout(350);
   }
+  const mobImages = page.locator('img[src^="/mc-mob/"]');
+  for (const img of await mobImages.all()) {
+    await img.scrollIntoViewIfNeeded();
+    await img.evaluate(el => el.decode());
+  }
+  const mobIcons = await mobImages.evaluateAll(images => images.map(el => ({ src: el.getAttribute("src"), loaded: el.complete && el.naturalWidth > 0 })));
+  if (mobIcons.length && (mobResponses.filter(r => r.status === 200).length !== mobIcons.length || mobResponses.some(r => r.status >= 400))) throw new Error(`Mob icon requests failed: ${JSON.stringify(mobResponses)}`);
+  await page.evaluate(() => scrollTo(0, 0));
   await page.screenshot({ path: file, fullPage: true });
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -330,7 +355,7 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     return s ? (s.textContent || "").trim() : null;
   });
   await ctx.close();
-  return { file: path.relative(ROOT, file), w: vp.w, h: vp.h, pageHeight: height, scrollWidth: width, ...(status ? { status } : {}) };
+  return { file: path.relative(ROOT, file), w: vp.w, h: vp.h, pageHeight: height, scrollWidth: width, ...(mobIcons.length ? { mobIcons, mobResponses } : {}), ...(status ? { status } : {}) };
 }
 
 // Style probe: proves the v2 layer is actually applied and that reduced motion switches it off.
@@ -642,4 +667,4 @@ async function main() {
   }, null, 2));
 }
 
-main().catch((e) => { console.error(e); stopServers(); process.exit(1); });
+main().then(stopServers).catch((e) => { console.error(e); stopServers(); process.exit(1); });
