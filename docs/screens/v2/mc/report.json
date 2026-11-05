@@ -277,100 +277,13 @@
       "status": "Online · dev"
     },
     {
-      "page": "markt",
-      "file": "docs\\screens\\v2\\mc\\neu-markt-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 2881,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "markt",
-      "file": "docs\\screens\\v2\\mc\\neu-markt-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 3542,
-      "scrollWidth": 390
-    },
-    {
-      "page": "item",
-      "file": "docs\\screens\\v2\\mc\\neu-item-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 1803,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "item",
-      "file": "docs\\screens\\v2\\mc\\neu-item-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 1787,
-      "scrollWidth": 390
-    },
-    {
-      "page": "shops",
-      "file": "docs\\screens\\v2\\mc\\neu-shops-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 1104,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "shops",
-      "file": "docs\\screens\\v2\\mc\\neu-shops-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 1464,
-      "scrollWidth": 390
-    },
-    {
-      "page": "auktionen",
-      "file": "docs\\screens\\v2\\mc\\neu-auktionen-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 1016,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "auktionen",
-      "file": "docs\\screens\\v2\\mc\\neu-auktionen-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 1346,
-      "scrollWidth": 390
-    },
-    {
-      "page": "parkour",
-      "file": "docs\\screens\\v2\\mc\\neu-parkour-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 2058,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "parkour",
-      "file": "docs\\screens\\v2\\mc\\neu-parkour-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 2080,
-      "scrollWidth": 390
-    },
-    {
-      "page": "pvp",
-      "file": "docs\\screens\\v2\\mc\\neu-pvp-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 1067,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "pvp",
-      "file": "docs\\screens\\v2\\mc\\neu-pvp-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 1065,
-      "scrollWidth": 390
+      "page": "home",
+      "file": "docs\\screens\\v2\\mc\\neu-home-375.png",
+      "w": 375,
+      "h": 812,
+      "pageHeight": 4251,
+      "scrollWidth": 375,
+      "status": "Online · dev"
     },
     {
       "page": "spieler",
@@ -389,11 +302,19 @@
       "scrollWidth": 390
     },
     {
+      "page": "spieler",
+      "file": "docs\\screens\\v2\\mc\\neu-spieler-375.png",
+      "w": 375,
+      "h": 812,
+      "pageHeight": 822,
+      "scrollWidth": 375
+    },
+    {
       "page": "player",
       "file": "docs\\screens\\v2\\mc\\neu-player-1280.png",
       "w": 1280,
       "h": 900,
-      "pageHeight": 2057,
+      "pageHeight": 2116,
       "scrollWidth": 1280
     },
     {
@@ -401,31 +322,23 @@
       "file": "docs\\screens\\v2\\mc\\neu-player-390.png",
       "w": 390,
       "h": 844,
-      "pageHeight": 2968,
+      "pageHeight": 3196,
       "scrollWidth": 390
     },
     {
-      "page": "leaderboards",
-      "file": "docs\\screens\\v2\\mc\\neu-leaderboards-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 1493,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "leaderboards",
-      "file": "docs\\screens\\v2\\mc\\neu-leaderboards-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 1518,
-      "scrollWidth": 390
+      "page": "player",
+      "file": "docs\\screens\\v2\\mc\\neu-player-375.png",
+      "w": 375,
+      "h": 812,
+      "pageHeight": 3531,
+      "scrollWidth": 375
     },
     {
       "page": "changelog",
       "file": "docs\\screens\\v2\\mc\\neu-changelog-1280.png",
       "w": 1280,
       "h": 900,
-      "pageHeight": 1013,
+      "pageHeight": 1016,
       "scrollWidth": 1280
     },
     {
@@ -433,24 +346,16 @@
       "file": "docs\\screens\\v2\\mc\\neu-changelog-390.png",
       "w": 390,
       "h": 844,
-      "pageHeight": 1080,
+      "pageHeight": 1211,
       "scrollWidth": 390
     },
     {
-      "page": "feedback",
-      "file": "docs\\screens\\v2\\mc\\neu-feedback-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 1207,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "feedback",
-      "file": "docs\\screens\\v2\\mc\\neu-feedback-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 1261,
-      "scrollWidth": 390
+      "page": "changelog",
+      "file": "docs\\screens\\v2\\mc\\neu-changelog-375.png",
+      "w": 375,
+      "h": 812,
+      "pageHeight": 1257,
+      "scrollWidth": 375
     },
     {
       "page": "wiki",
@@ -469,6 +374,14 @@
       "scrollWidth": 390
     },
     {
+      "page": "wiki",
+      "file": "docs\\screens\\v2\\mc\\neu-wiki-375.png",
+      "w": 375,
+      "h": 812,
+      "pageHeight": 1933,
+      "scrollWidth": 375
+    },
+    {
       "page": "wiki-artikel",
       "file": "docs\\screens\\v2\\mc\\neu-wiki-artikel-1280.png",
       "w": 1280,
@@ -481,31 +394,23 @@
       "file": "docs\\screens\\v2\\mc\\neu-wiki-artikel-390.png",
       "w": 390,
       "h": 844,
-      "pageHeight": 2937,
+      "pageHeight": 2927,
       "scrollWidth": 390
     },
     {
-      "page": "vip",
-      "file": "docs\\screens\\v2\\mc\\neu-vip-1280.png",
-      "w": 1280,
-      "h": 900,
-      "pageHeight": 2406,
-      "scrollWidth": 1280
-    },
-    {
-      "page": "vip",
-      "file": "docs\\screens\\v2\\mc\\neu-vip-390.png",
-      "w": 390,
-      "h": 844,
-      "pageHeight": 3220,
-      "scrollWidth": 390
+      "page": "wiki-artikel",
+      "file": "docs\\screens\\v2\\mc\\neu-wiki-artikel-375.png",
+      "w": 375,
+      "h": 812,
+      "pageHeight": 3009,
+      "scrollWidth": 375
     },
     {
       "page": "account",
       "file": "docs\\screens\\v2\\mc\\neu-account-1280.png",
       "w": 1280,
       "h": 900,
-      "pageHeight": 3397,
+      "pageHeight": 1842,
       "scrollWidth": 1280
     },
     {
@@ -513,8 +418,16 @@
       "file": "docs\\screens\\v2\\mc\\neu-account-390.png",
       "w": 390,
       "h": 844,
-      "pageHeight": 5095,
-      "scrollWidth": 392
+      "pageHeight": 2413,
+      "scrollWidth": 390
+    },
+    {
+      "page": "account",
+      "file": "docs\\screens\\v2\\mc\\neu-account-375.png",
+      "w": 375,
+      "h": 812,
+      "pageHeight": 2398,
+      "scrollWidth": 375
     }
   ],
   "stress": [
@@ -736,11 +649,7 @@
       "glow": "none"
     }
   },
-  "overflow390": [
-    {
-      "page": "account",
-      "scrollWidth": 392
-    }
-  ],
+  "overflow390": [],
+  "overflow375": [],
   "overflow390Stress": []
 }

@@ -485,7 +485,7 @@ with sync_playwright() as p:
     kj = konto("javascript:alert(1)", None)
     ok(kj["xss"] == 0 and kj["src"].endswith(FB), "MC-Konto: javascript-URL fällt auf Steve zurück", kj)
     kg = konto("https://cdn.discordapp.com/embed/avatars/0.png", None)
-    ok(kg["src"].startswith("https://cdn.discordapp.com/") and kg["xss"] == 0, "MC-Konto: https-Avatar bleibt gesetzt", kg)
+    ok(kg["src"].endswith(FB) and kg["xss"] == 0, "MC-Konto: ohne MC-Verkn?pfung Steve", kg)
     kn = konto("javascript:alert(1)", "Nils")
     ok(kn["xss"] == 0 and "/mc-head/Nils/" in kn["src"], "MC-Konto: gültiger MC-Name schlägt den Avatar", kn)
     kctx.close()

@@ -570,7 +570,7 @@ html.mc .stat .k, html.mc .stats .card .k { color: var(--muted); }
 html.mc .stat .v, html.mc .stats .card .v { color: var(--ink); }
 
 /* ---- 3) profile tiles: the label may wrap to two lines, a value is NEVER cut off ---- */
-html.mc body .pf-kpi { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 0 0 16px; }
+html.mc body .pf-kpi { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; }
 html.mc body .pf-tile { align-items: flex-start; }
 html.mc body .pf-tile .k {
   white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25;
@@ -580,6 +580,11 @@ html.mc body .pf-tile .v { white-space: nowrap; overflow: visible; text-overflow
 html.mc body .pf-tile .s { white-space: normal; overflow: visible; text-overflow: clip; font-size: 0.75rem; }
 html.mc body .pf-meta { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 html.mc body .pf-meta dd { white-space: nowrap; overflow: visible; text-overflow: clip; }
+/* Paired player detail cards share a row; an odd last card uses the full row. */
+@media (min-width:760px) {
+  html.mc #det .dgr { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; }
+  html.mc #det .dgr > .dcard:last-child:nth-child(odd) { grid-column:1/-1; }
+}
 
 /* ---- 5) footer grass edge: spans the whole footer. The line is the first child of the shell's
         padded `<div class="wrap">`, so it is taken out of that flow and pinned to the footer box.
@@ -702,3 +707,12 @@ html.mc .vm span { white-space: nowrap; }
 html.mc .vm .sep { padding: 0 0.3em; color: var(--muted); }
 /* "Alle ›", "Zum Markt ›", "Anleitung ›": the chevron belongs to the word. */
 html.mc .nw { white-space: nowrap; }
+
+@media (max-width:560px) {
+  html.mc body .pf-meta { grid-template-columns:minmax(0,1fr); }
+  html.mc body .pf-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html.mc body .pf-tile .k { display:block; overflow:visible; }
+  html.mc body .pf-tl { display:flex; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity; }
+  html.mc body .pf-tl::-webkit-scrollbar { display:none; }
+  html.mc body .pf-tl button { flex:none; scroll-snap-align:start; }
+}

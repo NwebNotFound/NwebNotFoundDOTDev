@@ -24,7 +24,8 @@
 import { chromium } from "playwright";
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { webcrypto as C } from "node:crypto";
@@ -39,9 +40,10 @@ const SERVED = !args.includes("--no-serve");
 const SERVE = args.includes("--serve");
 const ONLY = opt("only", "all");
 const MC = opt("mc", "http://127.0.0.1:8791");
+const BROWSER_MC = `http://mc.nwebnotfound.dev:${new URL(MC).port || "8791"}`;
 const MOCK_DIR = path.resolve(opt("mockups", "/w/mockups"));
 const OUT = path.resolve(ROOT, opt("out", "docs/screens/v2/mc"));
-const TOK = "screens-ingest-token", SECRET = "screens-session-secret-0123456789abcdef";
+const TOK = "e2e-token", SECRET = "screens-session-secret-0123456789abcdef";
 const PORT = new URL(MC).port || "8791";
 const HOST = "mc.nwebnotfound.dev";
 const D1 = "100000000000000001";
@@ -69,8 +71,11 @@ const PAGES = [
 const VIEWPORTS = [
   { w: 1280, h: 900, tag: "1280" },
   { w: 390, h: 844, tag: "390" },
+  { w: 375, h: 812, tag: "375" },
 ];
 const STRESS = args.includes("--stress");
+const PAGE_FILTER = opt("pages", "").split(",").filter(Boolean);
+const QUICK = args.includes("--quick");
 
 // Item 2: pages whose formatting is worth pushing to the contract limits (16-char MC names, 48-char
 // shop names, nine-digit CP sums). Captured as stress-<slug>-<tag>.png next to the normal shots.
@@ -208,12 +213,16 @@ function fixture() {
       { id: "a3", seller_uuid: uuid(5), seller_name: "Tobsi", item: "dragon_egg", amount: 1, min_price: 500000, current_bid: null, bid_count: 0, ends_at: Date.now() + 20 * 3600000, status: "active", bids: [] },
     ],
     players_stats: Object.fromEntries(names.map((n, i) => [uuid(i), {
+      // A populated inventory for the linked account so /profile proves armour, storage, hotbar and
+      // offhand placement (an empty fixture cannot show the slot grid).
+      inventory: i === 0 ? [{ item: "diamond_helmet", slot: 39 }, { item: "iron_chestplate", slot: 38 }, { item: "iron_leggings", slot: 37 }, { item: "iron_boots", slot: 36 }, { item: "shield", slot: 40 }, { item: "diamond_sword", slot: 0 }, { item: "bread", count: 32, slot: 1 }, { item: "diamond", count: 64, slot: 9 }, { item: "oak_log", count: 48, slot: 17 }, { item: "cobblestone", count: 64, slot: 27 }] : undefined,
       money: 48200 - i * 5200, playtime: 486000 - i * 42000, kills: 480 - i * 50, deaths: 62 + i * 9, blocks_mined: 128000 - i * 12000,
       distance: 4200000 - i * 300000, online: i < 4,
       details: {
         mined: { stone: 38200 - i * 2000, deepslate: 12400 - i * 900, dirt: 9800, diamond_ore: 240 - i * 12, oak_log: 6400 },
         placed: { cobblestone: 8400, torch: 3200, oak_planks: 2100 },
-        killed: { zombie: 320 - i * 10, creeper: 180, skeleton: 96, enderman: 24 },
+        // Mob variety for the Mob-Kills list: heads that exist in /mc/heads plus German entity names.
+        killed: { zombie: 320, pig: 280, husk: 240, sheep: 180, chicken: 140, cow: 100, skeleton: 64, spider: 32 },
         crafted: { torch: 2600, stick: 1800, iron_pickaxe: 42 },
         deaths_by: { fall: 12, lava: 4, creeper: 3, void: 1 },
         distance_m: { walk: 3200000, sprint: 620000, fly: 180000, swim: 42000, boat: 33000, horse: 12000, elytra: 26000, minecart: 9000, climb: 78000, crouch: 22000 },
@@ -236,21 +245,15 @@ async function seed(session) {
 }
 
 async function startServer() {
-  const persist = path.join(ROOT, ".wrangler", "screens-mc");
-  await rm(persist, { recursive: true, force: true });
-  const dv = path.join(ROOT, ".dev.vars");
-  let hadDv = null;
-  if (fs.existsSync(dv)) { hadDv = fs.readFileSync(dv); }
-  fs.writeFileSync(dv, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\n`);
-  const restore = () => { try { if (hadDv) fs.writeFileSync(dv, hadDv); else fs.rmSync(dv, { force: true }); } catch { /* keep it */ } };
-  process.on("exit", restore);
+  const persist = await mkdtemp(path.join(os.tmpdir(), "mc-screens-"));
+  const restore = () => {};
   try {
     execSync(`npx wrangler d1 execute DB --local --persist-to "${persist}" --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
   } catch {
     console.warn("! schema.sql did not apply — the pages will show their error states");
   }
   execSync(`npx wrangler d1 execute DB --local --persist-to "${persist}" --command ${JSON.stringify(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('s-screens','${D1}','nils','Nils',datetime('now','+1 day'))`)}`, { cwd: ROOT, stdio: "ignore" });
-  serve(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", PORT, "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", persist]);
+  serve(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", PORT, "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", persist, "--var", `MC_INGEST_TOKEN:${TOK}`, "--var", `SESSION_SECRET:${SECRET}`, "--var", "DISCORD_CLIENT_ID:1", "--var", "DISCORD_CLIENT_SECRET:x"]);
   await reachable(`${MC}/`);
   return restore;
 }
@@ -272,13 +275,43 @@ const REPORT = path.join(OUT, "report.json");
 let prevReport = {};
 try { prevReport = JSON.parse(fs.readFileSync(REPORT, "utf8")); } catch { /* first run */ }
 
+async function routeMc(context) {
+  await context.route(`${BROWSER_MC}/**`, async route => {
+    const req = route.request();
+    const headers = Object.fromEntries(Object.entries(await req.allHeaders()).filter(([k]) => !k.startsWith(":") && !["host", "accept-encoding", "content-length"].includes(k)));
+    headers["x-nnf-test-host"] = HOST;
+    try {
+      let target = req.url().replace(BROWSER_MC, MC);
+      let response = await fetch(target, { method: req.method(), headers, body: req.postDataBuffer() || undefined, redirect: "manual" });
+      // Playwright routes only the first request in a redirect chain. Resolve local GET
+      // redirects here so /mc-mob heads and death icons stay on the fixture server.
+      for (let hop = 0; hop < 5 && req.method() === "GET" && [301, 302, 303, 307, 308].includes(response.status); hop++) {
+        const location = response.headers.get("location");
+        if (!location) break;
+        const next = new URL(location, target);
+        if (next.origin !== new URL(MC).origin) break;
+        target = next.href;
+        response = await fetch(target, { headers, redirect: "manual" });
+      }
+      await route.fulfill({ status: response.status, headers: Object.fromEntries([...response.headers].filter(([k]) => !["content-encoding", "content-length", "transfer-encoding"].includes(k))), body: Buffer.from(await response.arrayBuffer()) });
+    } catch { await route.abort(); }
+  });
+}
+
 async function capture(browser, url, file, vp, { cookie, inject, wait, blockExternal } = {}) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1, reducedMotion: "no-preference", colorScheme: "dark" });
-  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
   // The artboards ask Google for their fonts; the offline run must not depend on that request, so
   // every non-file:// subresource is dropped and the injected local faces are the only ones used.
   if (blockExternal) await ctx.route("**/*", (route) => (route.request().url().startsWith("file://") ? route.continue() : route.abort()));
+  await routeMc(ctx);
   const page = await ctx.newPage();
+  const mobResponses = [];
+  page.on("response", response => {
+    let request = response.request();
+    while (request.redirectedFrom()) request = request.redirectedFrom();
+    if (new URL(request.url()).pathname.startsWith("/mc-mob/")) mobResponses.push({ url: response.url(), status: response.status() });
+  });
   if (inject) await page.addInitScript(inject);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForTimeout(wait || 1400);
@@ -306,6 +339,36 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     }, { timeout: 25_000 }).catch(() => {});
     await page.waitForTimeout(350);
   }
+  const mobImages = page.locator('img[src^="/mc-mob/"]:visible');
+  for (const img of await mobImages.all()) {
+    await img.scrollIntoViewIfNeeded();
+    await img.evaluate(el => el.decode());
+  }
+  const mobIcons = await mobImages.evaluateAll(images => images.map(el => ({ src: el.getAttribute("src"), loaded: el.complete && el.naturalWidth > 0 })));
+  if (mobIcons.length && (mobResponses.filter(r => r.status === 200).length !== mobIcons.length || mobResponses.some(r => r.status >= 400))) throw new Error(`Mob icon requests failed: ${JSON.stringify(mobResponses)}`);
+  await page.evaluate(() => scrollTo(0, 0));
+  const layout = await page.evaluate(() => {
+    const box = el => { const r = el.getBoundingClientRect(); return { left:r.left, right:r.right, top:r.top, width:r.width, height:r.height }; };
+    const inventory = document.querySelector('#pb .inv');
+    const meta = document.querySelector('.pf-meta');
+    const cards = [...document.querySelectorAll('#det .dgr > .dcard')];
+    return {
+      ...(inventory ? { inventory: { card:box(inventory), slots:[...inventory.querySelectorAll('.ivs')].map(box) } } : {}),
+      ...(meta ? { meta:[...meta.children].map(box) } : {}),
+      ...(cards.length ? { stats:cards.map(el => ({ title:el.querySelector('h3').textContent, ...box(el) })) } : {}),
+    };
+  });
+  if (vp.w === 375 && layout.inventory) {
+    const { card, slots } = layout.inventory;
+    if (slots.some(s => s.width < 28 || s.left - card.left < 12 || card.right - s.right < 12)) throw new Error(`Inventory spacing failed: ${JSON.stringify(layout.inventory)}`);
+  }
+  if (vp.w <= 560 && layout.meta?.length && layout.meta.some(r => Math.abs(r.width - layout.meta[0].width) > 1)) throw new Error('Uneven mobile hero rows');
+  if (vp.w === 1280 && layout.stats?.length) {
+    for (let i = 0; i + 1 < layout.stats.length; i += 2) {
+      const a = layout.stats[i], b = layout.stats[i + 1];
+      if (Math.abs(a.top - b.top) > 1 || Math.abs(a.height - b.height) > 1) throw new Error('Unbalanced player stat row');
+    }
+  }
   await page.screenshot({ path: file, fullPage: true });
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -314,7 +377,7 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     return s ? (s.textContent || "").trim() : null;
   });
   await ctx.close();
-  return { file: path.relative(ROOT, file), w: vp.w, h: vp.h, pageHeight: height, scrollWidth: width, ...(status ? { status } : {}) };
+  return { file: path.relative(ROOT, file), w: vp.w, h: vp.h, pageHeight: height, scrollWidth: width, layout, ...(mobIcons.length ? { mobIcons, mobResponses } : {}), ...(status ? { status } : {}) };
 }
 
 // Style probe: proves the v2 layer is actually applied and that reduced motion switches it off.
@@ -322,9 +385,10 @@ async function styleProbe(browser, cookie) {
   const out = {};
   for (const motion of ["no-preference", "reduce"]) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: motion, colorScheme: "dark" });
-    if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+    if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
+    await routeMc(ctx);
     const page = await ctx.newPage();
-    await page.goto(`${MC}/`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${BROWSER_MC}/`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1200);
     out[motion] = await page.evaluate(() => {
       const cs = (sel, prop) => { const el = document.querySelector(sel); return el ? getComputedStyle(el)[prop] : null; };
@@ -407,10 +471,11 @@ async function seedStress(session) {
 async function stressChecks(browser, cookie) {
   const out = {};
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "no-preference", colorScheme: "dark" });
-  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
+  await routeMc(ctx);
   const page = await ctx.newPage();
   for (const [name, url] of [["player", `/spieler/${LONG}`], ["leaderboards", "/leaderboards"], ["shops", "/shops"], ["bestellungen", "/bestellungen"]]) {
-    await page.goto(`${MC}${url}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${BROWSER_MC}${url}`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1700);
     out[name] = await page.evaluate(() => {
       // "Ellipsized" is the goal for names; "spilled" would mean the box really overflows its row.
@@ -442,9 +507,10 @@ async function motionEvidence(browser, cookie) {
     return { stars: g(".l-stars"), clouds: g(".l-clouds"), hills: g(".l-hills"), mascot: g(".l-mascot"), glow: g(".pixbg") };
   });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "no-preference", colorScheme: "dark" });
-  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "127.0.0.1", path: "/" }]);
+  if (cookie) await ctx.addCookies([{ name: "nnf_session", value: decodeURIComponent(cookie.split("=")[1]), domain: "mc.nwebnotfound.dev", path: "/" }]);
+  await routeMc(ctx);
   const page = await ctx.newPage();
-  await page.goto(`${MC}/`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BROWSER_MC}/`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(2400);
   out.supportsScrollTimeline = await page.evaluate(() => CSS.supports("animation-timeline: scroll()"));
   out.viewTransition = await page.evaluate(() => {
@@ -493,8 +559,9 @@ async function motionEvidence(browser, cookie) {
   } catch (e) { out.transitionRunning = String(e).slice(0, 120); }
   await ctx.close();
   const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce", colorScheme: "dark" });
+  await routeMc(ctx2);
   const p2 = await ctx2.newPage();
-  await p2.goto(`${MC}/`, { waitUntil: "domcontentloaded" });
+  await p2.goto(`${BROWSER_MC}/`, { waitUntil: "domcontentloaded" });
   await p2.waitForTimeout(1600);
   out.reducedMotion = await read(p2);
   await ctx2.close();
@@ -527,7 +594,7 @@ async function main() {
     if (SERVE) await seedStress(session);
     for (const p of STRESS_PAGES) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
         probe.stress.push({ page: p.slug, ...r });
       }
     }
@@ -562,7 +629,7 @@ async function main() {
 
   if (mockup) {
     const inject = `(()=>{const s=document.createElement("style");s.textContent=${JSON.stringify(fontCss())};document.head.appendChild(s);document.addEventListener("DOMContentLoaded",()=>document.head.appendChild(s));})()`;
-    for (const p of PAGES) {
+    for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
       const src = path.join(MOCK_DIR, p.file);
       if (!fs.existsSync(src)) { console.warn(`! missing artboard ${src}`); continue; }
       for (const vp of VIEWPORTS) {
@@ -572,28 +639,31 @@ async function main() {
     }
   } else if (prevReport.mockups) probe.mockups = prevReport.mockups;
   if (impl) {
-    for (const p of PAGES) {
+    for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600 });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600 });
         probe.impl.push({ page: p.slug, ...r });
       }
     }
     probe.style = await styleProbe(browser, session.cookie);
     // Horizontal overflow at phone width is the classic regression of a new layout layer.
-    probe.overflow390 = probe.impl.filter((x) => x.w === 390 && x.scrollWidth > 390).map((x) => ({ page: x.page, scrollWidth: x.scrollWidth }));
+    const spill = (w) => probe.impl.filter((x) => x.w === w && x.scrollWidth > w).map((x) => ({ page: x.page, scrollWidth: x.scrollWidth }));
+    probe.overflow390 = spill(390);
+    probe.overflow375 = spill(375);
   } else {
     probe.impl = prevReport.impl || [];
     probe.style = prevReport.style || {};
     probe.overflow390 = prevReport.overflow390 || [];
+    probe.overflow375 = prevReport.overflow375 || [];
   }
 
   // Stress pass (item 2): same pages, but with the longest allowed names and the biggest numbers the
   // contracts permit, so ellipsis/wrapping and grouped digits are checked instead of assumed.
-  if (impl || STRESS) {
+  if ((impl && !QUICK) || STRESS) {
     if (SERVE) await seedStress(session);
     for (const p of STRESS_PAGES) {
       for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
+        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `stress-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: 1600 });
         probe.stress.push({ page: p.slug, ...r });
       }
     }
@@ -606,7 +676,7 @@ async function main() {
   }
 
   // Parallax + view transition evidence (items 3 + 4).
-  if (impl) probe.motion = await motionEvidence(browser, session.cookie);
+  if (impl && !QUICK) probe.motion = await motionEvidence(browser, session.cookie);
   else probe.motion = prevReport.motion || {};
 
   await browser.close();
@@ -614,9 +684,9 @@ async function main() {
   restore();
   console.log(JSON.stringify({
     mockups: probe.mockups.length, impl: probe.impl.length, stress: probe.stress.length,
-    style: probe.style, overflow390: probe.overflow390, overflow390Stress: probe.overflow390Stress,
+    style: probe.style, overflow390: probe.overflow390, overflow375: probe.overflow375, overflow390Stress: probe.overflow390Stress,
     stressChecks: probe.stressChecks, motion: probe.motion,
   }, null, 2));
 }
 
-main().catch((e) => { console.error(e); stopServers(); process.exit(1); });
+main().then(stopServers).catch((e) => { console.error(e); stopServers(); process.exit(1); });

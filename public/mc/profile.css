@@ -58,7 +58,7 @@ html:not(.mc) .pf-tl button{border-radius:99px;border:1px solid var(--line);box-
 .pf-meta .pf-on::before{content:"";width:7px;height:7px;background:#5fe36d;box-shadow:0 0 6px #5fe36d}
 .pf-meta dd:has(.pf-seen){white-space:normal;font-size:.85rem;line-height:1.35}
 /* Profil-Karten (/profile und /spieler): Titel + Untertitel, Listenzeilen, Parkour-Rang */
-/* .dcard x4: schlägt html.mc .g.pad/.card aus ds.css (0,3,1) unabhängig von der Ladereihenfolge */
+/* .dcard x4: schlÃ¤gt html.mc .g.pad/.card aus ds.css (0,3,1) unabhÃ¤ngig von der Ladereihenfolge */
 html .dcard.dcard.dcard.dcard{padding:var(--sp3)}
 @media (min-width:640px){html .dcard.dcard.dcard.dcard{padding:var(--sp4)}}
 .dcard h3{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;column-gap:var(--sp3);row-gap:var(--sp1);margin:0 0 var(--sp3);font-size:1.05rem;line-height:1.3}
@@ -72,7 +72,7 @@ html .dcard.dcard.dcard.dcard{padding:var(--sp3)}
 /* Helles Theme (Hauptdomain): dunkle Rangfarben auf hellem Badge, Kontrast >= 4.5:1 gegen #f1f1f3 */
 html:not(.mc) .pk-run .pk-rk{color:#4b5563;background:#f1f1f3;border-color:#d1d5db}
 html:not(.mc) .pk-run .pk-rk.p1{color:#7a5600;border-color:#c9a227}html:not(.mc) .pk-run .pk-rk.p2{color:#46505e;border-color:#9aa3ae}html:not(.mc) .pk-run .pk-rk.p3{color:#8a4510;border-color:#c98a55}
-/* Eine einzelne Top-Platzierung: keine Tabellenzeile, sondern eine Karte mit größerem Icon */
+/* Eine einzelne Top-Platzierung: keine Tabellenzeile, sondern eine Karte mit grÃ¶ÃŸerem Icon */
 .pk-card.pk-one .pk-run{margin-top:var(--sp1);padding:var(--sp3);gap:var(--sp4);background:rgba(0,0,0,.22);border:2px solid var(--line);border-radius:var(--r-sm,8px)}
 html.mc .pk-card.pk-one .pk-run{border-color:var(--mc-edge);box-shadow:var(--mc-inset-slot)}
 html:not(.mc) .pk-card.pk-one .pk-run{background:#f4f5f7;border:1px solid var(--line);border-radius:14px}
@@ -81,3 +81,36 @@ html:not(.mc) .pk-card.pk-one .pk-run{background:#f4f5f7;border:1px solid var(--
 .pk-card.pk-one .pk-tm{font-size:1.2rem}
 .pvp-arena .mini{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:560px){.pvp-arena .mini{grid-template-columns:1fr 1fr}.pk-card.pk-one .prow .n span{font-size:1rem}}
+
+html.mc .plc{flex-wrap:wrap}
+html.mc .plc .m3d-pop{position:relative;z-index:auto;flex:0 0 100%;width:auto;height:160px;overflow:hidden;opacity:0;transform:none;background:var(--surface-2);border:0;border-radius:var(--r-sm);box-shadow:var(--bevel);transition:opacity var(--mc-duration-fast,150ms) ease}
+html.mc .plc .m3d-pop.on{opacity:1}
+html.mc .plc .m3d-pop[hidden]{display:none!important}
+html.mc .plc .m3d-pop canvas{width:100%!important;height:100%!important;object-fit:contain}
+
+/* Personal inventory: one common slot unit for armour, storage, hotbar and offhand.
+   Real Minecraft pane shape at every width: armour as a single column on the left, the 9x3 storage in
+   the middle, the 9-slot hotbar below it (separated) and the offhand slot level with the hotbar.
+   On phones armour and offhand move below the storage to preserve slot size and padding. */
+html.mc #pb .inv{display:block;min-width:0}
+html.mc #pb .inv h3{margin:0 0 var(--sp2)}
+html.mc #pb .inv>p{margin-bottom:var(--sp3)}
+html.mc #pb .inv .iv-pane{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:var(--sp1);max-width:480px;margin:0 auto;align-items:start}
+html.mc #pb .inv .iv-arm,html.mc #pb .inv .iv-off,html.mc #pb .inv .ivg{display:grid;gap:var(--sp1);padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;max-width:none;min-width:0}
+html.mc #pb .inv .iv-arm{grid-column:1;grid-template-columns:minmax(0,1fr)}
+html.mc #pb .inv .iv-stack{grid-column:2/span 9;display:grid;gap:var(--sp2);min-width:0}
+html.mc #pb .inv .ivg{grid-template-columns:repeat(9,minmax(0,1fr))}
+html.mc #pb .inv .iv-off{grid-column:11;grid-template-columns:minmax(0,1fr);align-self:end;justify-self:stretch}
+html.mc #pb .inv .ivs{box-sizing:border-box;width:100%;height:auto;aspect-ratio:1;min-width:0}
+html.mc #pb .inv .ivs img{width:72%;height:72%;object-fit:contain;object-position:center}
+html.mc #pb .inv .ivs b{font-family:var(--f-px,monospace);color:#fff;text-shadow:1px 1px 2px #000;font-size:.7rem}
+
+@media(max-width:560px){
+ html.mc #pb{width:100%;padding-left:8px;padding-right:8px}
+ html.mc #pb .inv{padding-left:var(--sp3);padding-right:var(--sp3)}
+ html.mc #pb .inv .iv-pane{grid-template-columns:repeat(9,minmax(0,1fr))}
+ html.mc #pb .inv .iv-stack{grid-column:1/-1;grid-row:1}
+ html.mc #pb .inv .iv-arm{grid-column:1/span 4;grid-row:2;grid-template-columns:repeat(4,minmax(0,1fr))}
+ html.mc #pb .inv .iv-off{grid-column:9;grid-row:2}
+ html.mc #pb .inv .ivs b{font-size:.5rem;right:1px;bottom:0}
+}
