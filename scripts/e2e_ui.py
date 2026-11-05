@@ -246,8 +246,8 @@ with sync_playwright() as p:
         pg.route("**/api/mc-parkour", lambda r: r.fulfill(status=200, content_type="application/json", body='{"courses":{}}'))
         t = go("/parkour"); pg.locator("#pk-empty").wait_for(timeout=10000); ok("Noch keine Zeiten" in t or "Noch keine Zeiten" in pg.inner_text("body"), f"{w}px Parkour: Leerzustand")
         pg.screenshot(path=f"{SH}/local-parkour-leer-{w}.png", full_page=True); pg.unroute("**/api/mc-parkour")
-        go("/vip"); pg.locator("#vip-worlds").wait_for(timeout=10000); vt = pg.inner_text("#vip")
-        ok("Das Panel ist für die Ränge VIP, MVP und Admin." in vt and "bald verfügbar" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 0 and pg.locator("#vip a[href='/profile']").count() == 1, f"{w}px VIP ohne Rang: Übersicht, kein Panel", vt[:240])
+        go("/vip"); pg.locator("#vip .vip-ranks").wait_for(timeout=10000); vt = pg.inner_text("#vip")
+        ok("Das Panel ist für die Ränge VIP, MVP und Admin." in vt and "Vorteile" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 0 and pg.locator("#vip a[href='/profile']").count() == 1, f"{w}px VIP ohne Rang: Übersicht, kein Panel", vt[:240])
         ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator('.ng[data-g=konto] a[href="/vip"]').count() == 1 and pg.locator('.ng[data-g=community] a[href="/vip"]').count() == 0 and pg.locator('a[href="/vip"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=konto] .ngb[data-cur]').count() == 1, f"{w}px VIP: Konto-Menü aktiv, kein Formular")
         # Summer Theme v2: page headings use the self-hosted SmPixel (Pixelify Sans); Monocraft
         # left the MC surface with the redesign.
@@ -257,10 +257,10 @@ with sync_playwright() as p:
           const R = e => e.getBoundingClientRect();
           const cards = [...document.querySelectorAll('#vip .vip-card')];
           const inset = (root) => [...root.querySelectorAll('.slot')].map(s => { const a = R(root), b = R(s); return [b.left - a.left, b.top - a.top, a.right - b.right]; });
-          const soon = document.querySelector('#vip .vip-soon');
+          const soon = null;
           return { h: cards.map(c => R(c).height), tops: cards.map(c => R(c).top), bots: cards.map(c => R(c).bottom),
             inset: cards.flatMap(inset).concat(soon ? inset(soon) : []),
-            icons: cards.map(c => [...c.querySelectorAll('img')].map(i => (i.getAttribute('src')||'').split('/').pop())),
+            icons: cards.map(c => [...c.querySelectorAll('img')].filter(i => !i.closest('.v2-slots')).map(i => (i.getAttribute('src')||'').split('/').pop())),
             text: document.querySelector('#vip').innerText };
         }""")
         if w >= 800:
@@ -282,21 +282,26 @@ with sync_playwright() as p:
                 {"rank": "mvp", "label": "MVP", "icon": "nether_star", "color": "d", "yours": True, "perks": [{"id": "higher", "icon": "nether_star", "title": "Höherer Rang", "text": "ja"}]},
             ],
             "stats": {"money": 12, "playtime": 3660, "kills": 2, "deaths": 1, "blocks_mined": 40},
-            "worlds": {"placeholder": False, "slots": [
-                {"id": "aaaaaaaa-1111-4111-8111-111111111111", "label": "VIP-Welt 1", "online": True, "players": 2, "max": 8, "tps": 20},
-                {"id": "bbbbbbbb-2222-4222-8222-222222222222", "label": XSS, "online": False, "players": 0, "max": None, "tps": 18.2},
+            "worlds": {"placeholder": False, "mine": 1, "slots": [
+                {"id": "aaaaaaaa-1111-4111-8111-111111111111", "label": "VIP-Welt 1", "online": True, "players": 2, "max": 8, "tps": 20,
+                 "owner": True, "type": "normal", "visibility": "friends", "can_manage": True, "can_start": True, "settings": {"gamemode": "survival", "difficulty": "normal", "pvp": True, "keepInventory": False, "mobGriefing": True, "doDaylightCycle": True},
+                 "members": [{"name": "KaiDasEi", "role": "trusted"}]},
+                {"id": "bbbbbbbb-2222-4222-8222-222222222222", "label": XSS, "online": False, "players": 0, "max": None, "tps": 18.2,
+                 "owner": False, "invited": True, "role": "member", "owner_name": "Seller", "type": "flat", "visibility": "private",
+                 "can_manage": False, "can_start": False, "settings": {"gamemode": "survival", "difficulty": "normal", "pvp": True, "keepInventory": False, "mobGriefing": True, "doDaylightCycle": True}, "members": []},
             ]},
             "profile": "javascript:alert(1)",
         })))
-        go("/vip"); pg.locator(".vip-world").first.wait_for(timeout=10000); vh = pg.inner_html("#vip"); vx = pg.inner_text("#vip")
-        ok(pg.locator(".vip-card.is-you.is-mvp").count() == 1 and pg.locator(".vip-stat").count() == 5 and "12 CP" in vx and "1 Std 1 Min" in vx and "Zum Profil" in vx, f"{w}px VIP-Panel: Rang, Stats, Profil-Link", vx[:300])
+        go("/vip"); pg.locator(".v2-world").first.wait_for(timeout=10000); vh = pg.inner_html("#vip"); vx = pg.inner_text("#vip")
+        ok(pg.locator(".vip-card.is-you.is-mvp").count() == 1 and pg.locator(".v2-kpi").count() == 3 and "12 CP" in vx and "1 Std 1 Min" in vx and "Zum Profil" in vx, f"{w}px VIP-Panel: Rang, Stats, Profil-Link", vx[:300])
         ok(pg.locator('#vip a[href="/profile"]').count() == 1 and pg.locator('#vip a[href^="javascript:"]').count() == 0, f"{w}px VIP: Profil-Link fest, nicht aus der API")
         ok(XSS in vx and "&lt;img" in vh and pg.locator("#vip img[src='x']").count() == 0 and pg.locator("#vip script").count() == 0 and not pg.evaluate("window.vipx") and len(dlg) == vdlg0, f"{w}px VIP: Titel und Weltname escaped", vh[:240])
-        ok(pg.locator(".vip-world").count() == 2 and "online" in vx and "offline" in vx and "bald verfügbar" not in pg.inner_text("#vip-worlds"), f"{w}px VIP-Welten aus Daten, ohne Platzhalter")
+        ok(pg.locator(".v2-world").count() == 2 and "online" in vx and "offline" in vx and "bald verfügbar" not in pg.inner_text("#v2-worlds"), f"{w}px VIP-Welten aus Daten, ohne Platzhalter")
+        ok("Spieler-Kills" not in vx and "Tode" not in vx, f"{w}px VIP: Kills/Tode/Blöcke nicht im Panel", vx[:200])
         ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Panel: kein Overflow, keine Inline-Styles")
         pins = pg.evaluate("""() => { const R = e => e.getBoundingClientRect(); return [...document.querySelectorAll('#vip .g')].flatMap(card => [...card.querySelectorAll('.slot')].map(s => { const a = R(card), b = R(s); return [b.left-a.left, b.top-a.top, a.right-b.right]; })); }""")
         ok(pins and all(x >= 12 and y >= 12 and r >= 12 for x, y, r in pins), f"{w}px VIP-Panel: Slots in Karten, Welten und Stats eingerückt", pins[:6])
-        pg.locator(".vip-me").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-vip-panel-{w}.png", full_page=True); pg.unroute("**/api/mc-vip")
+        pg.locator(".v2-me").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-vip-panel-{w}.png", full_page=True); pg.unroute("**/api/mc-vip")
         WIDA, WIDB = "aaaaaaaa-1111-4111-8111-111111111111", "bbbbbbbb-2222-4222-8222-222222222222"
         pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps({
             "access": True, "reason": None, "note": "", "admin": True,
@@ -311,8 +316,8 @@ with sync_playwright() as p:
             ],
             "stats": {"money": 900, "playtime": 7200, "kills": 12, "deaths": 3, "blocks_mined": 2048},
             "worlds": {"placeholder": False, "slots": [
-                {"id": WIDA, "label": "Insel", "online": True, "players": 2, "max": 10, "tps": 20, "owner_name": "Nils", "owner": True, "visibility": "friends", "info": "Ruhige Insel"},
-                {"id": WIDB, "label": XSS, "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Seller", "owner": False, "visibility": "private", "info": ""},
+                {"id": WIDA, "label": "Insel", "online": True, "players": 2, "max": 10, "tps": 20, "owner_name": "Nils", "owner": True, "visibility": "friends", "info": "Ruhige Insel", "type": "normal", "can_manage": True, "can_start": True, "settings": {"gamemode": "survival", "difficulty": "normal", "pvp": True, "keepInventory": False, "mobGriefing": True, "doDaylightCycle": True}, "members": []},
+                {"id": WIDB, "label": XSS, "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Seller", "owner": False, "visibility": "private", "info": "", "type": "flat", "can_manage": True, "can_start": True, "settings": {"gamemode": "survival", "difficulty": "normal", "pvp": True, "keepInventory": False, "mobGriefing": True, "doDaylightCycle": True}, "members": []},
             ]},
             "admin_log": {"updated_at": "2026-11-01T20:00:00Z", "entries": [
                 {"at": "2026-11-01T19:30:00Z", "action": "start", "action_label": "Welt gestartet", "admin_name": XSS, "owner_name": "Gast", "world_id": WIDB, "detail": XSS},
@@ -323,30 +328,30 @@ with sync_playwright() as p:
         adlg0 = len(dlg)
         go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000); ah = pg.inner_html("#vip"); at = pg.inner_text("#vip")
         ok(pg.locator(".vip-admin-tag").count() == 1 and "Admin-Ansicht" in at and pg.locator(".vip-card.is-you.is-admin").count() == 1, f"{w}px VIP-Admin: Badge und eigene Karte", at[:200])
-        ok(pg.locator("#vip-admin-worlds .vip-world").count() == 2 and "Besitzer Seller" in at and "Deine Welt" in at and "Alle VIP-Welten" in at, f"{w}px VIP-Admin: alle Welten mit Besitzer", at[:240])
-        ok(pg.locator("#vip-admin-worlds button[data-act=start]").count() == 1 and pg.locator("#vip-admin-worlds button[data-act=visibility]").count() == 2 and pg.locator(f"#vip-admin-worlds button[data-act=visibility][data-vis=friends][data-id='{WIDB}']").count() == 1, f"{w}px VIP-Admin: Start und Sichtbarkeit je Welt")
+        ok(pg.locator("#vip-admin-worlds .v2-world").count() == 2 and "Besitzer Seller" in at and "Deine Welt" in at and "Alle VIP-Welten" in at, f"{w}px VIP-Admin: alle Welten mit Besitzer", at[:240])
+        ok(pg.locator("#vip-admin-worlds button[data-act=start]").count() == 1 and pg.locator("#vip-admin-worlds button[data-set=visibility]").count() == 4 and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-set=visibility][data-val=friends]").count() == 1, f"{w}px VIP-Admin: Start und Sichtbarkeit je Welt")
         ok(pg.locator("#vip-admin-log li").count() == 2 and pg.locator("#vip-admin-log li").first.inner_text().find("Welt gestartet") >= 0 and "Admin-Log" in at, f"{w}px VIP-Admin: Protokoll neueste zuerst", pg.locator("#vip-admin-log").inner_text()[:200])
         ok(XSS in at and "&lt;img" in ah and pg.locator("#vip img[src='x']").count() == 0 and pg.locator("#vip script").count() == 0 and not pg.evaluate("window.vipx") and len(dlg) == adlg0, f"{w}px VIP-Admin: Besitzer und Log escaped", ah[:240])
-        ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0 and pg.locator("#vip .vip-worlds").count() == 0, f"{w}px VIP-Admin: kein Overflow, keine Inline-Styles, kein VIP-Block für Adminwelt")
+        ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0 and pg.locator("#vip .v2-free").count() == 0, f"{w}px VIP-Admin: kein Overflow, keine Inline-Styles, kein VIP-Block für Adminwelt")
         pins = pg.evaluate("""() => { const R = e => e.getBoundingClientRect(); return [...document.querySelectorAll('#vip .g')].flatMap(card => [...card.querySelectorAll('.slot')].map(s => { const a = R(card), b = R(s); return [b.left-a.left, b.top-a.top, a.right-b.right]; })); }""")
         ok(pins and all(x >= 12 and y >= 12 and r >= 12 for x, y, r in pins), f"{w}px VIP-Admin: Slots in allen Karten eingerückt", pins[:6])
         pg.screenshot(path=f"{SH}/local-vip-admin-{w}.png", full_page=True)
         pg.route("**/api/mc-vip/worlds/**", lambda r: r.fulfill(status=202, content_type="application/json", body='{"ok":true,"request_id":"r1","op":"visibility","status":"pending"}'))
-        pg.click(f"#vip-admin-worlds button[data-act=visibility][data-id='{WIDB}']")
+        pg.click(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-set=visibility][data-val=friends]")
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('Sichtbarkeit')", timeout=10000)
         ok(pg.locator("#vip-say").inner_text().find("Sichtbarkeit geändert") >= 0 and pg.locator("#vip-say").get_attribute("role") == "status", f"{w}px VIP-Admin: Verwaltung meldet Erfolg ohne alert", pg.locator("#vip-say").inner_text())
         pg.unroute("**/api/mc-vip/worlds/**")
         pg.route("**/api/mc-vip/worlds/**", lambda r: r.fulfill(status=403, content_type="application/json", body='{"error":"not_owner","reason":"not_owner"}'))
-        pg.click(f"#vip-admin-worlds button[data-act=visibility][data-id='{WIDA}']")
+        pg.click(f"#vip-admin-worlds .v2-world[data-wid='{WIDA}'] button[data-set=visibility][data-val=private]")
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('nicht ändern')", timeout=10000)
         ok(len(dlg) == adlg0 and "Du darfst diese Welt nicht ändern." in pg.locator("#vip-say").inner_text(), f"{w}px VIP-Admin: Fehler als Meldung, kein Dialog", pg.locator("#vip-say").inner_text())
         pg.unroute("**/api/mc-vip/worlds/**"); pg.unroute("**/api/mc-vip")
         many = dict(MANYBASE, worlds={"placeholder": False, "slots": [{"id": "11111111-2222-4333-8444-%012d" % i, "label": "Welt %d" % i, "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Gast%d" % i, "owner": False, "visibility": "friends", "info": ""} for i in range(14)]})
         pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(many)))
         go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000); pg.wait_for_timeout(300)
-        ok(pg.locator("#vip-admin-worlds .vip-world:visible").count() == 12 and pg.locator("#vip-admin-worlds button[data-more]").count() == 1, f"{w}px VIP-Admin: 12 Welten, Rest hinter 'Mehr anzeigen'", pg.locator("#vip-admin-worlds .vip-world:visible").count())
+        ok(pg.locator("#vip-admin-worlds .v2-world:visible").count() == 12 and pg.locator("#vip-admin-worlds button[data-more]").count() == 1, f"{w}px VIP-Admin: 12 Welten, Rest hinter 'Mehr anzeigen'", pg.locator("#vip-admin-worlds .v2-world:visible").count())
         pg.click("#vip-admin-worlds button[data-more]"); pg.wait_for_timeout(200)
-        ok(pg.locator("#vip-admin-worlds .vip-world:visible").count() == 14 and pg.get_attribute("#vip-admin-worlds button[data-more]", "aria-expanded") == "true" and "Weniger anzeigen" in pg.inner_text("#vip-admin-worlds button[data-more]"), f"{w}px VIP-Admin: alle Welten nach Klick", pg.locator("#vip-admin-worlds .vip-world:visible").count())
+        ok(pg.locator("#vip-admin-worlds .v2-world:visible").count() == 14 and pg.get_attribute("#vip-admin-worlds button[data-more]", "aria-expanded") == "true" and "Weniger anzeigen" in pg.inner_text("#vip-admin-worlds button[data-more]"), f"{w}px VIP-Admin: alle Welten nach Klick", pg.locator("#vip-admin-worlds .v2-world:visible").count())
         ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Admin: viele Welten ohne Overflow/Inline-Styles")
         pg.unroute("**/api/mc-vip")
         now_s = int(time.time()); hour = 3600
@@ -418,8 +423,8 @@ with sync_playwright() as p:
         ok(not errs, f"{w}px keine Konsolen-/JS-Fehler", errs[:3])
         ctx.close()
         ctx = br.new_context(viewport={"width": w, "height": 900}); pg = ctx.new_page(); pg.route("**/*", route)
-        pg.goto("https://" + H + "/vip", wait_until="domcontentloaded", timeout=45000); pg.locator("#vip-worlds").wait_for(timeout=10000); vt = pg.inner_text("#vip")
-        ok("Mit Discord anmelden" in vt and "bald verfügbar" in vt and "VIP" in vt and "MVP" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 1, f"{w}px VIP anonym: Ränge und Login, kein Panel", vt[:240])
+        pg.goto("https://" + H + "/vip", wait_until="domcontentloaded", timeout=45000); pg.locator("#vip .vip-ranks").wait_for(timeout=10000); vt = pg.inner_text("#vip")
+        ok("Mit Discord anmelden" in vt and "Vorteile" in vt and "VIP" in vt and "MVP" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 1, f"{w}px VIP anonym: Ränge und Login, kein Panel", vt[:240])
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP anonym: kein horizontales Scrollen")
         pg.screenshot(path=f"{SH}/local-vip-anon-{w}.png", full_page=True)
         pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded", timeout=45000); pg.wait_for_timeout(400); t = pg.inner_text("body")

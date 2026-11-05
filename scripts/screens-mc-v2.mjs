@@ -71,6 +71,14 @@ const PAGES = [
   { slug: "wiki-menu-end", viewport: true, file: "McWiki.html", url: "/wiki", click: ".nbur", scroll: "(() => { const n = document.querySelector('.nl'); if (n) n.scrollTop = n.scrollHeight; })()" },
   { slug: "wiki-artikel", file: "McWiki.html", url: "/wiki/economy" },
   { slug: "vip", file: "McVip.html", url: "/vip" },
+  // Dieselbe Seite mit zugeklappter Verwaltung: zeigt, dass der Verwalten-Schalter schließt.
+  { slug: "vip-collapsed", file: "McVip.html", url: "/vip", click: 'button[data-manage]' },
+  // Eine Regel umgelegt: "Aenderungen speichern" ist dann aktiv.
+  { slug: "vip-save", file: "McVip.html", url: "/vip", click: '.v2-tgl' },
+  // Loeschbestaetigung mit getipptem Namen.
+  { slug: "vip-delete", file: "McVip.html", url: "/vip", click: 'button[data-del]' },
+  // Admin-Ansicht: alle Welten, dafuer wird der Rang des Kontos kurz auf admin gesetzt.
+  { slug: "vip-admin", file: "McVip.html", url: "/vip", admin: true },
   { slug: "account", file: "McAccount.html", url: "/profile" },
 ];
 const VIEWPORTS = [
@@ -193,6 +201,27 @@ function fixture() {
     },
     leaderboards_weekly: { money: lead((i) => 6200 / (i + 1), 6), playtime: lead((i) => 42000 / (i + 1), 7) },
     links: [{ discord_id: D1, mc_name: "Nils", mc_uuid: U1, has_role: true, verified: true }],
+    // VIP-Panel v2 (Phase 1B): eine eigene Welt des angemeldeten MVP (mit Regeln und Mitgliedern)
+    // und eine Welt eines Freundes, in die er eingeladen ist. Beides zusammen zeigt Kopfkarte,
+    // Verwaltung, Mitglieder, freien Platz und die Sektion "Welten von Freunden".
+    vip_worlds: [
+      {
+        id: "7f1e0000-0000-4000-8000-000000000010", owner_uuid: U1, owner_name: "Nils",
+        name: "Kirschtal", type: "normal", status: "running", visibility: "friends", slot: "vipworld-2",
+        player_limit: 10, players: 2, info: "Basis am Fluss",
+        invites: [{ uuid: uuid(1), name: "KaiDasEi", role: "trusted", added_at: Date.now() - 86400000 }, { uuid: uuid(3), name: "Mira", role: "member", added_at: Date.now() - 3600000 }],
+        settings: { gamemode: "survival", difficulty: "normal", pvp: true, keepInventory: true, mobGriefing: true, doDaylightCycle: true },
+        created_at: Date.now() - 2592000000, last_started_at: Date.now() - 1800000,
+      },
+      {
+        id: "7f1e0000-0000-4000-8000-000000000011", owner_uuid: uuid(1), owner_name: "KaiDasEi",
+        name: "Inselwelt", type: "flat", status: "stopped", visibility: "friends", slot: "vipworld-3",
+        player_limit: 6, players: 0,
+        invites: [{ uuid: U1, name: "Nils", role: "trusted", added_at: Date.now() - 7200000 }],
+        settings: { gamemode: "creative", difficulty: "easy", pvp: false, keepInventory: true, mobGriefing: false, doDaylightCycle: false },
+        created_at: Date.now() - 1296000000,
+      },
+    ],
     player_ranks: names.map((n, i) => ({ uuid: uuid(i), name: n, rank: i === 0 ? "mvp" : i === 1 ? "vip" : "default", color: i === 0 ? "&d" : i === 1 ? "&6" : "&7", weight: 10 - i })),
     pvp_stats: names.map((n, i) => ({ uuid: uuid(i), name: n, wins: 42 - i * 4, losses: 12 + i, draws: 1, matches: 55 - i * 3, winrate_pct: 76 - i * 6, favorite_kit: ["Sword", "Axe", "Bow"][i % 3] })),
     parkour: names.slice(0, 6).flatMap((n, i) => [
@@ -237,6 +266,18 @@ function fixture() {
   };
 }
 
+/** Nur fuer die Admin-Aufnahme: der Rang des Kontos kommt aus dem Ingest. */
+async function setRank(rank) {
+  const f = fixture();
+  f.player_ranks = f.player_ranks.map((r, i) => (i === 0 ? { ...r, rank } : r));
+  const res = await fetch(`${MC}/api/mc-ingest`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ingest-token": TOK, host: HOST },
+    body: JSON.stringify(f),
+  });
+  if (!res.ok) throw new Error(`rank ${rank}: ${res.status}`);
+}
+
 async function seed(session) {
   const res = await fetch(`${MC}/api/mc-ingest`, {
     method: "POST",
@@ -246,6 +287,14 @@ async function seed(session) {
   const txt = await res.text();
   if (!res.ok) throw new Error(`ingest ${res.status}: ${txt.slice(0, 400)}`);
   console.log("seed:", txt.slice(0, 300));
+  // VIP-Welten laufen nicht über den Ingest, sondern über den Sync des Vertrags (Token, sonst 401).
+  const vip = await fetch(`${MC}/api/mc-vip-worlds`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-ingest-token": TOK, host: HOST },
+    body: JSON.stringify({ vip_worlds: fixture().vip_worlds }),
+  });
+  console.log("seed vip:", (await vip.text()).slice(0, 200));
+  if (!vip.ok) throw new Error(`vip sync ${vip.status}`);
   session.cookie = await sessionCookie("s-screens");
 }
 
@@ -320,14 +369,18 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
   if (inject) await page.addInitScript(inject);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForTimeout(wait || 1400);
-  // Optionaler Klick vor dem Schuss (z. B. Burger-Drawer), damit auch eingeklappte Zustände
-  // prüfbar sind. Fehlt das Ziel, bleibt der Schuss unverändert.
+  // Der VIP-Kopf wird im Worker gerendert: der erste Treffer ist kalt und faellt sonst aus dem
+  // Wartefenster, sodass der Screenshot einen leeren Kopf zeigt.
+  const vipHead = page.locator("#vip .v2-head").first();
+  if (await vipHead.count()) await vipHead.evaluate((el) => el.decode().catch(() => {})).catch(() => {});
+  // Optionaler Klick vor dem Schuss (Burger-Drawer oder Verwaltungs-Karte), damit auch
+  // eingeklappte Zustaende pruefbar sind. Fehlt das Ziel, bleibt der Schuss unveraendert.
   if (click) {
     const target = page.locator(click).first();
-    if (await target.count()) { await target.click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(500); }
+    if (await target.count()) { await target.click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(600); }
   }
   // Optionales Scrollen nach dem Klick (z. B. ans Ende des Drawers), damit auch der untere
-  // Teil eines scrollenden Menüs im Bild ist.
+  // Teil eines scrollenden Menues im Bild ist.
   if (scroll) { await page.evaluate(scroll).catch(() => {}); await page.waitForTimeout(250); }
   // 3D models load lazily and asynchronously: give them a bounded moment so no tile is captured
   // mid-load (this is why the "Gerade online" row still looked empty on desktop while the phone
@@ -366,20 +419,38 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
     const inventory = document.querySelector('#pb .inv');
     const meta = document.querySelector('.pf-meta');
     const cards = [...document.querySelectorAll('#det .dgr > .dcard')];
-    // Nav-Drawer offen? Dann darf er nicht breiter als breit sein: mit ds.css (flex-wrap:wrap)
-    // und max-height liefen die Gruppen sonst in eine zweite Spalte, Wiki und Anmelden fehlten.
-    const drawer = document.querySelector(".nav.open .nl");
+      // VIP-Panel v2: Kopf und Texturen muessen wirklich geladen sein, sonst ist der Screenshot blind.
+      const vHead = document.querySelector('#vip .v2-head');
+      const vIcons = [...document.querySelectorAll('#vip .v2-toggles img, #vip .v2-types img, #vip .v2-slots img, #vip .vip-card .slot img')];
+      const vWorld = document.querySelector('#vip .v2-world');
+      // Trefferflaeche der Regler und Zustaende der Knoepfe als Zahlen im Report.
+      const vTgl = document.querySelector('#vip .v2-tgl');
+      const vSave = document.querySelector('#vip .v2-save .btn');
+      const vDanger = document.querySelector('#vip .v2-delconfirm .btn');
+      // Nav-Drawer offen? Dann darf er nicht breiter als breit sein: mit ds.css (flex-wrap:wrap)
+      // und max-height liefen die Gruppen sonst in eine zweite Spalte, Wiki und Anmelden fehlten.
+      const drawer = document.querySelector(".nav.open .nl");
     return {
       ...(inventory ? { inventory: { card:box(inventory), slots:[...inventory.querySelectorAll('.ivs')].map(box) } } : {}),
       ...(meta ? { meta:[...meta.children].map(box) } : {}),
       ...(cards.length ? { stats:cards.map(el => ({ title:el.querySelector('h3').textContent, ...box(el) })) } : {}),
-      ...(drawer ? { drawer: (() => {
-        const r = drawer.getBoundingClientRect();
-        return { scrollWidth: drawer.scrollWidth, clientWidth: drawer.clientWidth,
-          top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height),
-          room: Math.round(innerHeight - r.bottom),
-          groups: drawer.querySelectorAll(".ng").length, account: !!drawer.querySelector(".l"), items: drawer.children.length };
-      })() } : {}),
+        ...(vHead || vIcons.length || vWorld ? {
+          vip: {
+            head: vHead ? { src: vHead.getAttribute('src'), loaded: vHead.complete && vHead.naturalWidth > 0 } : null,
+            icons: vIcons.map(i => ({ src: i.getAttribute('src'), loaded: i.complete && i.naturalWidth > 0 })),
+            world: vWorld ? box(vWorld) : null,
+            toggle: vTgl ? { w: Math.round(box(vTgl).width), h: Math.round(box(vTgl).height) } : null,
+            save: vSave ? { disabled: vSave.disabled, bg: getComputedStyle(vSave).backgroundColor } : null,
+            danger: vDanger ? { bg: getComputedStyle(vDanger).backgroundColor, color: getComputedStyle(vDanger).color } : null,
+          },
+        } : {}),
+        ...(drawer ? { drawer: (() => {
+          const r = drawer.getBoundingClientRect();
+          return { scrollWidth: drawer.scrollWidth, clientWidth: drawer.clientWidth,
+            top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height),
+            room: Math.round(innerHeight - r.bottom),
+            groups: drawer.querySelectorAll(".ng").length, account: !!drawer.querySelector(".l"), items: drawer.children.length };
+        })() } : {}),
     };
   });
   if (layout.drawer && layout.drawer.scrollWidth > layout.drawer.clientWidth + 1) throw new Error(`Nav-Drawer scrollt seitwärts: ${JSON.stringify(layout.drawer)}`);
@@ -667,9 +738,14 @@ async function main() {
   } else if (prevReport.mockups) probe.mockups = prevReport.mockups;
   if (impl) {
     for (const p of PAGES.filter(p => !PAGE_FILTER.length || PAGE_FILTER.includes(p.slug))) {
-      for (const vp of VIEWPORTS) {
-        const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600, click: p.click, scroll: p.scroll, viewport: p.viewport });
-        probe.impl.push({ page: p.slug, ...r });
+      if (p.admin) await setRank("admin");
+      try {
+        for (const vp of VIEWPORTS) {
+          const r = await capture(browser, `${BROWSER_MC}${p.url}`, path.join(OUT, `neu-${p.slug}-${vp.tag}.png`), vp, { cookie: session.cookie, wait: p.slug === "home" ? 2600 : 1600, click: p.click, scroll: p.scroll, viewport: p.viewport });
+          probe.impl.push({ page: p.slug, ...r });
+        }
+      } finally {
+        if (p.admin) await setRank("mvp");
       }
     }
     probe.style = await styleProbe(browser, session.cookie);

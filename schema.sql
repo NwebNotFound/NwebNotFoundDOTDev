@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS mc_vip_commands (
   role TEXT,
   visibility TEXT,
   info TEXT,
+  world_type TEXT,
+  settings TEXT,
   source TEXT NOT NULL DEFAULT 'web',
   created_at INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
