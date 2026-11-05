@@ -346,6 +346,10 @@ async function capture(browser, url, file, vp, { cookie, inject, wait, blockExte
   if (inject) await page.addInitScript(inject);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForTimeout(wait || 1400);
+  // Der VIP-Kopf wird im Worker gerendert: der erste Treffer ist kalt und fällt sonst aus dem
+  // Wartefenster, sodass der Screenshot einen leeren Kopf zeigt.
+  const vipHead = page.locator("#vip .v2-head").first();
+  if (await vipHead.count()) await vipHead.evaluate((el) => el.decode().catch(() => {})).catch(() => {});
   // Panel v2: die Verwaltung ist zugeklappt, bis jemand sie öffnet. Der Screenshot der offenen
   // Karte braucht denselben Klick wie ein Besucher, sonst zeigt er nur die Kopfzeile.
   if (click) {

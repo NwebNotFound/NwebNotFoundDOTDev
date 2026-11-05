@@ -944,6 +944,11 @@ try {
     const seen0 = await req("/api/mc-vip", { cookie: c1 });
     const slot0 = seen0.j?.worlds?.slots?.[0];
     ok(slot0?.label === "Insel" && slot0?.online === true && slot0?.max === 10 && slot0?.players === 2 && slot0?.members?.some((m) => m.name === null && m.role === "member"), "VIP-Seite: online aus status running, max aus player_limit, name aus name", JSON.stringify(seen0.j?.worlds));
+    // Panel v2: ein siebter Regel-Schlüssel im Plugin darf die Welt nicht aus dem Panel werfen.
+    await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ settings: { gamemode: "creative", pvp: true, weather: "rain" } })] }, { token: TOK, origin: null, cookie: null });
+    const exSeen = await req("/api/mc-vip", { cookie: c1 });
+    const exSlot = exSeen.j?.worlds?.slots?.find((x) => x.id === WID);
+    ok(exSlot && exSlot.settings?.pvp === true && exSlot.settings?.gamemode === "creative" && !("weather" in (exSlot.settings || {})), "Sync: unbekannter Regel-Schlüssel wirft die Welt nicht raus", JSON.stringify(exSlot?.settings));
     const keep = await post("/api/mc-vip-worlds", { vip_admin_log: [CLOG({ action: "delete", detail: "" })] }, { token: TOK, origin: null, cookie: null });
     ok(keep.s === 200 && keep.j?.vip_worlds === null && JSON.parse(sqlRows("SELECT data FROM mc_blobs WHERE kind='vip_worlds'")[0].data).length === 1, "fehlender vip_worlds-Key lässt die Welten");
     ok(JSON.parse(sqlRows("SELECT data FROM mc_blobs WHERE kind='vip_admin_log'")[0].data)[0].action === "delete", "delete ist eine Vertrags-Aktion im Log");
@@ -1038,6 +1043,21 @@ try {
     ok(JSON.parse(sqlRows("SELECT data FROM mc_blobs WHERE kind='vip_worlds'")[0].data).length === 0 && JSON.parse(sqlRows("SELECT data FROM mc_blobs WHERE kind='vip_admin_log'")[0].data).length >= 1, "leeres vip_worlds leert Welten, Log bleibt");
     const seen = await req("/api/mc-vip", { cookie: c1 });
     ok(!JSON.stringify(seen.j?.worlds?.slots || []).includes(WID), "nach leerem Sync keine UUID-Slots aus vip_worlds", JSON.stringify(seen.j?.worlds || seen.j?.reason));
+    // Panel v2: create prüft laufende Aufträge mit, settings hat einen eigenen Eimer.
+    { await post("/api/mc-vip-worlds", { vip_worlds: [] }, { token: TOK, origin: null, cookie: null });
+      await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }] } });
+      const c1r = await post("/api/mc-vip/worlds", { request_id: "vip-create-1", name: "Kirschtal", type: "flat" }, { cookie: c1 });
+      ok(c1r.s === 202 && c1r.j?.op === "create", "create → 202", c1r.t);
+      const c2r = await post("/api/mc-vip/worlds", { request_id: "vip-create-2", name: "Kirschtal", type: "flat" }, { cookie: c1 });
+      ok(c2r.s === 409 && c2r.j?.reason === "name_taken", "zweites create mit gleichem Namen → 409 name_taken", c2r.t);
+      const c3r = await post("/api/mc-vip/worlds", { request_id: "vip-create-3", name: "Anders", type: "flat" }, { cookie: c1 });
+      ok(c3r.s === 409 && c3r.j?.reason === "no_free_slot", "zweites create zählt den laufenden Auftrag → 409 no_free_slot", c3r.t);
+      const pendCreate = sqlRows("SELECT COUNT(*) AS n FROM mc_vip_commands WHERE action = 'create' AND status = 'pending'")[0].n;
+      ok(pendCreate === 1, "nur ein create-Auftrag in der Queue", String(pendCreate));
+      await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD()] }, { token: TOK, origin: null, cookie: null });
+      const setOk = [];
+      for (let i = 0; i < 11; i++) setOk.push((await post(`/api/mc-vip/worlds/${WID}/settings`, { request_id: `vip-set-${i + 1}`, settings: { pvp: i % 2 === 0 } }, { cookie: c1 })).s);
+      ok(setOk.every((x) => x === 202), "11 Regel-Änderungen in einer Sitzung → 202, kein 429", JSON.stringify(setOk)); }
     sql("DELETE FROM mc_vip_commands"); sql("DELETE FROM mc_blobs WHERE kind IN ('vip_worlds','vip_admin_log')"); sql("DELETE FROM mc_player_ranks");
   }
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Rot', '$.team_color', '#FF5555', '$.team_color_code', '&c', '$.last_seen', '2026-10-31T23:05:00Z', '$.online', json('false')) WHERE mc_uuid = '${U1}'`);

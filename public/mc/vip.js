@@ -74,7 +74,7 @@
     return `<section class="v2-pane" aria-label="Einstellungen"><h3 class="v2-h3">Einstellungen</h3>${seg("Sichtbarkeit", "visibility", vis, [["friends", "Für Freunde"], ["private", "Privat"]])}<p class="mut v2-hint">Freunde aus deiner Freundesliste dürfen rein. Privat: nur eingeladene Spieler.</p>${seg("Spielmodus", "gamemode", st.gamemode, GM)}${seg("Schwierigkeit", "difficulty", st.difficulty, DIFF)}<ul class="v2-toggles">${TOGGLES.map(([k, icon, title, text]) => {
       const on = st[k] === true;
       return `<li>${slot(icon)}<span><b>${E(title)}</b><span class="mut">${E(text)}</span></span><button class="v2-tgl" type="button" role="switch" data-set="${k}" data-val="${on ? "false" : "true"}" aria-checked="${on}" aria-label="${E(title)}"></button></li>`;
-    }).join("")}</ul></section>`;
+    }).join("")}</ul><div class="v2-save"><button class="btn sm" type="button" data-save="${E(s.id)}" disabled>Änderungen speichern</button><span class="mut v2-hint">Regeln werden zusammen gesendet.</span></div></section>`;
   };
   const membersPane = (s) => {
     const list = (Array.isArray(s.members) ? s.members : []).filter((m) => NAME.test(m && m.name || ""));
@@ -191,6 +191,16 @@
     }
     return `<div class="vip-gate g v2-gate">${slot("player_head", true)}${msg}</div><h2 class="hub-h2">Vorteile</h2>${cards(d.catalog, d.limits)}${note(d.note)}`;
   };
+  // Ein Speichern statt sechs Aufträge: die Regeln einer Welt sammeln sich hier und gehen als
+  // ein Teil-Update raus (der 10-pro-Stunde-Eimer gilt für alles andere).
+  const dirty = new Map();
+  const markDirty = (id, key, val) => {
+    const d = { ...(dirty.get(id) || {}), [key]: val };
+    dirty.set(id, d);
+    const card = document.querySelector('.v2-world[data-wid="' + id + '"]');
+    const btn = card && card.querySelector("button[data-save]");
+    if (btn) { btn.disabled = false; btn.textContent = `Änderungen speichern (${Object.keys(d).length})`; }
+  };
   const rid = () => {
     try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch { /* Fallback unten */ }
     return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -260,6 +270,16 @@
       box.querySelectorAll('button[role="radio"]').forEach((b) => b.setAttribute("aria-checked", b === btn ? "true" : "false"));
       return;
     }
+    const save = btn.getAttribute("data-save");
+    if (save) {
+      const d = dirty.get(save);
+      if (!UUID.test(save) || !d || !Object.keys(d).length) return;
+      btn.disabled = true;
+      const outgoing = { ...d };
+      dirty.delete(save);
+      await run("/api/mc-vip/worlds/" + encodeURIComponent(save) + "/settings", { request_id: rid(), settings: outgoing }, "POST", "Einstellungen gespeichert. Der Server übernimmt sie gleich.");
+      return;
+    }
     const set = btn.getAttribute("data-set");
     if (set) {
       const card = btn.closest(".v2-world");
@@ -269,11 +289,18 @@
         const vis = btn.getAttribute("data-val") === "private" ? "private" : "friends";
         btn.disabled = true;
         await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/visibility", { request_id: rid(), visibility: vis }, "POST", "Sichtbarkeit geändert. Die Welt übernimmt es beim nächsten Abgleich.");
+        return;
+      }
+      // Regel lokal umschalten und merken; gesendet wird erst mit "Änderungen speichern".
+      if (btn.classList.contains("v2-tgl")) {
+        const on = btn.getAttribute("aria-checked") === "true";
+        btn.setAttribute("aria-checked", on ? "false" : "true");
+        btn.setAttribute("data-val", on ? "false" : "true");
+        markDirty(id, set, !on);
       } else {
-        const val = btn.getAttribute("data-val");
-        const v = val === "true" ? true : val === "false" ? false : val;
-        btn.disabled = true;
-        await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/settings", { request_id: rid(), settings: { [set]: v } }, "POST", "Einstellung gespeichert. Der Server übernimmt sie gleich.");
+        const group = btn.closest(".seg");
+        if (group) group.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
+        markDirty(id, set, btn.getAttribute("data-val"));
       }
       return;
     }

@@ -164,7 +164,11 @@ assert.deepEqual(cleanSettings({}), { settings: {} }, "leer wird vom Aufrufer ab
 assert.deepEqual(WORLD_DEFAULTS, { gamemode: "survival", difficulty: "normal", pvp: false, keepInventory: false, mobGriefing: true, doDaylightCycle: true });
 assert.equal(cleanWorlds([{ ...CW, settings: { pvp: true } }]).worlds[0].settings.pvp, true);
 assert.equal(cleanWorlds([{ ...CW, settings: { pvp: true } }]).worlds[0].settings.gamemode, undefined, "Sync speichert nur die gesendeten Regeln");
-assert.equal(cleanWorlds([{ ...CW, settings: { pvp: 1 } }]).worlds.length, 0, "ungültige settings: Welt raus statt Absturz");
+// Der Sync verwirft nur, was er nicht kennt; die Welt bleibt sichtbar (strenge Ablehnung nur im Browser-Pfad).
+assert.equal(cleanWorlds([{ ...CW, settings: { weather: "rain" } }]).worlds.length, 1, "unbekannter Schlüssel wirft die Welt nicht raus");
+assert.deepEqual(cleanWorlds([{ ...CW, settings: { weather: "rain", gamemode: "creative" } }]).worlds[0].settings, { gamemode: "creative" }, "nur die sechs Regeln bleiben");
+assert.equal(cleanWorlds([{ ...CW, settings: { pvp: 1 } }]).worlds.length, 1, "falscher Wert wirft die Welt nicht raus");
+assert.equal(cleanWorlds([{ ...CW, settings: { pvp: 1 } }]).worlds[0].settings.pvp, undefined, "falscher Wert fällt weg");
 assert.equal(cleanWorlds([{ ...CW }]).worlds[0].settings, null, "ohne settings bleibt null (Defaults im Panel)");
 
 console.log("vip-unit ok");

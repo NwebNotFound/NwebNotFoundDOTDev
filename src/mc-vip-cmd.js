@@ -15,6 +15,19 @@ const SETTINGS = {
   pvp: "bool", keepInventory: "bool", mobGriefing: "bool", doDaylightCycle: "bool",
 };
 export const DEFAULT_SETTINGS = { gamemode: "survival", difficulty: "normal", pvp: false, keepInventory: false, mobGriefing: true, doDaylightCycle: true };
+// Sync: unbekannte Schlüssel und falsche Werte fallen still weg, die Welt bleibt gelistet. Strenge
+// Ablehnung gilt nur für Browser-Eingaben (cleanSettings), nicht für den Plugin-Abgleich: ein
+// siebter Regel-Schlüssel im Plugin darf nicht alle Welten aus dem Panel werfen.
+function syncSettings(raw) {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!(k in SETTINGS)) continue;
+    if (SETTINGS[k] === "bool" ? typeof v !== "boolean" : !SETTINGS[k].includes(v)) continue;
+    out[k] = v;
+  }
+  return out;
+}
 // Teil-Update: fehlende Schlüssel bleiben gespeichert. Unbekannte Schlüssel und falsche Typen sind ein Fehler.
 export function cleanSettings(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { error: "settings muss ein Objekt sein" };
@@ -101,8 +114,7 @@ export function cleanWorlds(raw) {
     const invites = cleanInvites(w?.invites);
     if (invites == null) continue;
     // settings ist im Sync optional. Fehlt der Block, gelten die Vertrags-Defaults im Panel.
-    const settings = w?.settings == null ? null : cleanSettings(w.settings);
-    if (settings && settings.error) continue;
+    const settings = syncSettings(w?.settings);
     seen.add(id);
     const limit = num(w?.player_limit);
     const slot = typeof w?.slot === "string" && /^[A-Za-z0-9_-]{1,32}$/.test(w.slot) ? w.slot : null;
@@ -121,7 +133,7 @@ export function cleanWorlds(raw) {
       info: sanitizeInfo(w?.info),
       invites: invites.filter((i) => !(i.name && ownerName && i.name.toLowerCase() === ownerName.toLowerCase()) && i.uuid !== owner),
       addons,
-      settings: settings ? settings.settings : null,
+      settings,
       created_at: ms(w?.created_at),
       last_started_at: ms(w?.last_started_at),
     });
@@ -238,6 +250,14 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       const mine = (list || []).filter((w) => w.owner_uuid === a.uuid).length;
       if (mine >= worldLimit(a.rank)) return json({ error: "Kein freier Weltplatz", reason: "no_free_slot" }, 409);
       if ((list || []).some((w) => String(w.name || "").toLowerCase() === name.toLowerCase())) return json({ error: "Name schon vergeben", reason: "name_taken" }, 409);
+      // Die Syncliste hinkt dem Server nach: laufende create-Aufträge zählen für Platz und Namen mit,
+      // sonst legen zwei Klicks (oder zwei Tabs) zwei Welten an bzw. denselben Namen doppelt.
+      const [pMine, pName] = await Promise.all([
+        env.DB.prepare("SELECT COUNT(*) AS n FROM mc_vip_commands WHERE action = 'create' AND status = 'pending' AND discord_id = ?").bind(a.user.id).first(),
+        env.DB.prepare("SELECT 1 AS n FROM mc_vip_commands WHERE action = 'create' AND status = 'pending' AND lower(name) = lower(?) LIMIT 1").bind(name).first(),
+      ]);
+      if (pName) return json({ error: "Name schon vergeben", reason: "name_taken" }, 409);
+      if (mine + (pMine?.n || 0) >= worldLimit(a.rank)) return json({ error: "Kein freier Weltplatz", reason: "no_free_slot" }, 409);
     }
     if (action === "rename" && (list || []).some((w) => w.id !== id && String(w.name || "").toLowerCase() === name.toLowerCase())) return json({ error: "Name schon vergeben", reason: "name_taken" }, 409);
     if (action === "invite" || action === "uninvite" || action === "trust") {
@@ -274,10 +294,20 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
         const t = Math.min(perW?.n >= 3 ? perW.t : Infinity, perD?.n >= 6 ? perD.t : Infinity);
         return json({ error: "Zu viele Aktionen", retry_after_ms: Math.max(1, t + HOUR - now) }, 429);
       }
+    } else if (action === "settings") {
+      // Ein Speichern schickt bis zu sechs Regeln; ein Welt-Setup darf nicht am 10er-Eimer scheitern.
+      const [perD, perI] = await Promise.all([
+        env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE discord_id = ? AND action = 'settings' AND created_at > ?").bind(a.user.id, since).first(),
+        env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE (ip_hash = ?1 OR ip = ?2) AND action = 'settings' AND created_at > ?3").bind(ipHash, ip, since).first(),
+      ]);
+      if ((perD?.n || 0) >= 30 || (perI?.n || 0) >= 60) {
+        const t = Math.min(perD?.n >= 30 ? perD.t : Infinity, perI?.n >= 60 ? perI.t : Infinity);
+        return json({ error: "Zu viele Aktionen", retry_after_ms: Math.max(1, t + HOUR - now) }, 429);
+      }
     } else {
       const [perD, perI] = await Promise.all([
-        env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE discord_id = ? AND action != 'start' AND created_at > ?").bind(a.user.id, since).first(),
-        env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE (ip_hash = ?1 OR ip = ?2) AND action != 'start' AND created_at > ?3").bind(ipHash, ip, since).first(),
+        env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE discord_id = ? AND action != 'start' AND action != 'settings' AND created_at > ?").bind(a.user.id, since).first(),
+        env.DB.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS t FROM mc_vip_commands WHERE (ip_hash = ?1 OR ip = ?2) AND action != 'start' AND action != 'settings' AND created_at > ?3").bind(ipHash, ip, since).first(),
       ]);
       if ((perD?.n || 0) >= 10 || (perI?.n || 0) >= 20) {
         const t = Math.min(perD?.n >= 10 ? perD.t : Infinity, perI?.n >= 20 ? perI.t : Infinity);
