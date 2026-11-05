@@ -192,6 +192,13 @@ with sync_playwright() as p:
         ok(pg.locator('.ng[data-g=server] a[href="/changelog"]').count() == 1 and pg.locator('.ng[data-g=wiki] a[href="/wiki/befehle"]').count() == 1 and pg.locator('.ng[data-g=konto] a[href="/bestellungen"]').count() == 1 and pg.locator('.ng[data-g=konto] a[href="/vip"]').count() == 1, f"{w}px Nav: Server, Wiki, Konto")
         for path in ("/markt", "/wiki", "/wiki/befehle"): go(path); pg.screenshot(path=f"{SH}/local{path.replace('/','-')}-{w}.png", full_page=True)
         ok(pg.locator('.nl a[href="/wiki/befehle"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=wiki] .ngb[data-cur]').count() == 1 and pg.locator('.nl a[href="/wiki"][aria-current=page]').count() == 0, f"{w}px Nav: Wiki-Artikel markiert, nicht die Übersicht")
+        if w < 900:
+            # Wiki-Drawer: bei 375/390 liefen die Gruppen mit flex-wrap in eine zweite Spalte,
+            # Wiki und Konto waren nicht erreichbar (Designer-Audit fix-unified-nav).
+            pg.click(".nbur"); pg.wait_for_timeout(250)
+            dr = pg.evaluate("""() => { const n = document.querySelector('.nl'); const g = [...n.querySelectorAll('.ng')]; return { sw: n.scrollWidth, cw: n.clientWidth, groups: g.length, labels: g.map(x => (x.querySelector('.ngb') || {}).textContent.trim()), acc: !!n.querySelector('.ng[data-g=konto] .ngb') }; }""")
+            ok(dr["sw"] <= dr["cw"] + 1 and dr["groups"] == 6 and dr["acc"], f"{w}px Wiki-Drawer: kein Querscroll, alle Gruppen + Konto erreichbar", dr)
+            pg.keyboard.press("Escape")
         go("/parkour?course=test"); pg.locator(".pkr").first.wait_for(timeout=10000); t = pg.inner_text("body")
         ok(pg.locator(".pkg").count() == 1 and pg.locator(".pkr").count() == 10 and "00:39.000" in t, f"{w}px Parkour ?course=test: nur ein Board, Top 10, Zeit mm:ss.mmm", t[:300])
         ok(pg.locator(".pkr img[src^='/mc-head/']").count() == 10 and pg.locator(".pkh img[src*='/mc-icon/v2/']").count() == 1, f"{w}px Parkour: Köpfe + Item-Icon")
