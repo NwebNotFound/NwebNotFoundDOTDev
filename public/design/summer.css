@@ -1606,6 +1606,16 @@
   display: block;
   width: 100%;
 }
+/* The close parallax lifts the ground up to 64px; the soil continues below so no sky strip opens. */
+.sm-scene__ground-wrap::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 64px;
+  background: var(--sm-accent-dirt);
+}
 .sm-scene__mascot {
   position: absolute;
   left: 50%;
