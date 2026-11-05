@@ -1,5 +1,7 @@
 # AI-Panel (ai.nwebnotfound.dev)
 
+> **Retired (2026-11):** the panel is offline and `ai.nwebnotfound.dev` is detached; the code stays. To restore, re-add the `routes` custom_domain entry shown in `wrangler.jsonc` and deploy.
+
 Control panel for Nils' Hermes crew. One Cloudflare Worker, no dependencies, no build step.
 Chat with streamed thinking/tool events, streaming that survives a dropped connection,
 approve/steer/stop, persistent chat history in the Durable Object, bots + SOUL, per-bot model

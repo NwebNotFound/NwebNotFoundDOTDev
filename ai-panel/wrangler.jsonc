@@ -13,9 +13,7 @@
   },
   "workers_dev": false,
   "preview_urls": false,
-  "routes": [
-    { "pattern": "ai.nwebnotfound.dev", "custom_domain": true }
-  ],
+  // Retired: ai.nwebnotfound.dev is detached. To restore, re-add "routes": [{ "pattern": "ai.nwebnotfound.dev", "custom_domain": true }].
   "observability": {
     "enabled": true
   },
