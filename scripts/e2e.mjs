@@ -559,7 +559,7 @@ try {
     ok((await hub("/en")).s === 200 && /<html lang="en"/.test((await hub("/en")).t), "/en (ohne Schluss-Slash) → 200, englisch");
     for (const p of ["/de/guestbook", "/en/guestbook", "/en/portfolio", "/de/unbekannt"]) {
       const r = await hub(p), want = p.slice(3);
-      ok(r.s === 301 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}`, `${p} → 301 ${want} (Hub-fremde Route ohne Präfix)`, `${r.s} ${r.h.get("location")}`);
+      ok(r.s === 302 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}` && /no-store/.test(r.h.get("cache-control") || ""), `${p} → 302 no-store ${want} (Hub-fremde Route ohne Präfix, nie aus dem Cache)`, `${r.s} ${r.h.get("location")} ${r.h.get("cache-control")}`);
       ok((r.h.get("set-cookie") || "").includes(`nnf_lang=${p.slice(1, 3)}`), `${p} merkt sich die Sprache (DE/EN-Schalter bleibt auf der Seite)`, r.h.get("set-cookie"));
     }
     // Unified nav on the German-only pages: EN stays on the page and the nav follows the cookie.
@@ -573,14 +573,14 @@ try {
       ok(r.s === 200 && r.t.includes("/design/summer.css?v="), `Hub-Route ${p} → 200`, r.s);
     }
     // Rezensionen wurden am 04.11.2026 entfernt: die Route liefert die normale 404-Seite, die
-    // Sprachvarianten laufen über den üblichen 301 auf den präfixlosen Pfad.
+    // Sprachvarianten laufen über den üblichen 302 (no-store) auf den präfixlosen Pfad.
     {
       const gone = await hub("/reviews");
       const goneDe = await hub("/de/reviews");
       const goneEn = await hub("/en/reviews");
       ok(gone.s === 404 && gone.t.includes("Fehler 404") && !gone.t.includes("sm-root"), "/reviews → normale 404-Seite", gone.s);
-      ok(goneDe.s === 301 && (goneDe.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/de/reviews → 301 auf /reviews", goneDe.s);
-      ok(goneEn.s === 301 && (goneEn.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/en/reviews → 301 auf /reviews", goneEn.s);
+      ok(goneDe.s === 302 && (goneDe.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/de/reviews → 302 auf /reviews", goneDe.s);
+      ok(goneEn.s === 302 && (goneEn.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/en/reviews → 302 auf /reviews", goneEn.s);
       ok(!gone.t.includes("Rezensionen") && !(await hub("/")).t.includes("Rezensionen") && !(await hub("/about")).t.includes("Rezensionen"), "nirgends mehr ein Rezensionen-Link");
     }
     const soon = await hub("/en/music");

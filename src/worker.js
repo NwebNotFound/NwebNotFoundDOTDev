@@ -1057,8 +1057,9 @@ export default {
     // (301), damit z. B. /en/guestbook nicht in einem 404 endet.
     const pre = splitLang(p);
     // The redirect also remembers the language, so the DE/EN switch of the German-only pages stays on
-    // the same page and the nav there follows the choice.
-    if (pre.lang && !hubPageExists(pre.path)) return new Response(null, { status: 301, headers: { location: `https://${MAIN}${pre.path}`, "set-cookie": langCookie(pre.lang) } });
+    // the same page and the nav there follows the choice. 302 + no-store: a cached 301 would skip the
+    // Worker on the next switch and never set the cookie again.
+    if (pre.lang && !hubPageExists(pre.path)) return new Response(null, { status: 302, headers: { location: `https://${MAIN}${pre.path}`, "set-cookie": langCookie(pre.lang), "cache-control": "no-store" } });
     if (hubPageExists(pre.path)) {
       const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
       const page = hubPage(pre.path, lang, { query: url.searchParams });

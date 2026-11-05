@@ -2,8 +2,8 @@
    /design/unav.js, mockup: mockups/fix-unified-nav). Only existing tokens: --sm-* on the hub, the
    portfolio palette (--fg, --card, …) on the German-only pages, theme-v2 tokens on mc.*.
    --u-* are local aliases only. */
-.u-main{--u-glass:var(--sm-glass,var(--navbg));--u-s1:var(--sm-surface,var(--card));--u-s2:var(--sm-surface-2,var(--panel2));--u-fg:var(--sm-foreground,var(--fg));--u-mut:var(--sm-muted-foreground,var(--mut));--u-line:var(--sm-border,var(--line));--u-edge:var(--sm-border-strong,var(--edge));--u-px:var(--sm-font-pixel,var(--px-font));--u-acc:var(--sm-primary,var(--acc));--u-acc-ink:var(--sm-primary-foreground,var(--accfg));--u-acc-edge:var(--sm-primary-deep,var(--sunedge));--u-shadow:var(--sm-shadow-1,var(--sh1));--u-down:var(--sm-danger,#d64545)}
-html.mc .u-mc{--u-glass:var(--glass);--u-s1:var(--surface);--u-s2:var(--surface-2);--u-fg:var(--ink);--u-mut:var(--muted);--u-line:var(--line);--u-edge:var(--line-strong);--u-px:var(--f-px);--u-acc:var(--act);--u-acc-ink:var(--act-ink);--u-acc-edge:var(--act-edge);--u-shadow:var(--shadow);--u-down:var(--down)}
+.u-main{--u-glass:var(--sm-glass,var(--navbg));--u-s1:var(--sm-surface,var(--card));--u-s2:var(--sm-surface-2,var(--panel2));--u-fg:var(--sm-foreground,var(--fg));--u-mut:var(--sm-muted-foreground,var(--mut));--u-line:var(--sm-border,var(--line));--u-edge:var(--sm-border-strong,var(--edge));--u-px:var(--sm-font-pixel,var(--px-font));--u-acc:var(--sm-primary,var(--acc));--u-acc-ink:var(--sm-primary-foreground,var(--accfg));--u-acc-edge:var(--sm-primary-deep,var(--sunedge));--u-shadow:var(--sm-shadow-1,var(--sh1));--u-down:var(--sm-danger,var(--ds-danger,var(--fg)));--u-lift:var(--sm-shadow-2,var(--sh2))}
+html.mc .u-mc{--u-glass:var(--glass);--u-s1:var(--surface);--u-s2:var(--surface-2);--u-fg:var(--ink);--u-mut:var(--muted);--u-line:var(--line);--u-edge:var(--line-strong);--u-px:var(--f-px);--u-acc:var(--act);--u-acc-ink:var(--act-ink);--u-acc-edge:var(--act-edge);--u-shadow:var(--shadow);--u-down:var(--down);--u-lift:var(--shadow-lift)}
 
 .u-nav{position:sticky;top:0;z-index:50;padding:calc(16px + env(safe-area-inset-top)) 0 8px;background:transparent}
 .u-nav *{box-sizing:border-box}
@@ -27,7 +27,7 @@ html.mc .u-mc{--u-glass:var(--glass);--u-s1:var(--surface);--u-s2:var(--surface-
 .u-seg{display:inline-flex;gap:2px;padding:4px;border-radius:999px;background:var(--u-s2);box-shadow:inset 0 0 0 1px var(--u-line)}
 .u-seg a{display:inline-grid;place-items:center;min-width:40px;min-height:36px;padding:0 10px;border-radius:999px;font-size:13px;font-weight:900;color:var(--u-mut)!important;text-decoration:none!important}
 .u-seg a:hover{color:var(--u-fg)!important}
-.u-seg a[aria-current="true"]{background:var(--u-s1);color:var(--u-fg)!important;box-shadow:0 1px 2px rgba(0,0,0,.1),0 2px 0 var(--u-edge)}
+.u-seg a[aria-current="true"]{background:var(--u-s1);color:var(--u-fg)!important;box-shadow:0 2px 0 var(--u-edge)}
 .u-ib{display:inline-grid;place-items:center;width:44px;height:44px;flex:none;padding:0;border:0;border-radius:999px;background:var(--u-s2);color:var(--u-fg);box-shadow:inset 0 0 0 1px var(--u-line);cursor:pointer;transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
 .u-theme:hover{transform:rotate(-12deg) scale(1.06)}
 .u-ib svg{width:22px;height:22px;shape-rendering:crispEdges}
@@ -49,7 +49,7 @@ html.mc .u-mc{--u-glass:var(--glass);--u-s1:var(--surface);--u-s2:var(--surface-
 .u-login{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;background:var(--u-acc);color:var(--u-acc-ink)!important;font-size:14px;font-weight:800;text-decoration:none!important;white-space:nowrap;box-shadow:0 3px 0 var(--u-acc-edge)}
 .u-login svg{width:20px;height:16px;flex:none}
 .u-login[aria-disabled="true"]{background:var(--u-s2);color:var(--u-mut)!important;box-shadow:inset 0 0 0 1px var(--u-line)}
-.u-menu,.u-drop{display:none;position:absolute;top:calc(100% + 10px);z-index:60;min-width:220px;max-height:min(70vh,440px);overflow:auto;padding:6px;gap:2px;border-radius:18px;background:var(--u-s1);box-shadow:inset 0 0 0 1px var(--u-line),0 24px 48px -16px rgba(0,0,0,.6);text-align:left}
+.u-menu,.u-drop{display:none;position:absolute;top:calc(100% + 10px);z-index:60;min-width:220px;max-height:min(70vh,440px);overflow:auto;padding:6px;gap:2px;border-radius:18px;background:var(--u-s1);box-shadow:inset 0 0 0 1px var(--u-line),var(--u-lift);text-align:left}
 .u-menu{right:0}
 .u-drop{left:0}
 .u-group{position:relative}
@@ -79,7 +79,7 @@ html.mc .u-mc :is(.u-menu a,.u-drop a,.u-me__links a):is(:hover,:focus-visible){
   .u-acct{padding:0 6px;background:var(--u-s2);box-shadow:inset 0 0 0 1px var(--u-line)}
   .u-login{padding:0 12px}
   .u-burger{display:inline-grid}
-  .u-panel{display:none;position:absolute;top:calc(100% + 8px);left:0;right:0;flex-direction:column;padding:8px;border-radius:24px;background:var(--u-s1);box-shadow:inset 0 0 0 1px var(--u-line),0 24px 48px -16px rgba(0,0,0,.6);max-height:calc(100dvh - 96px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+  .u-panel{display:none;position:absolute;top:calc(100% + 8px);left:0;right:0;flex-direction:column;padding:8px;border-radius:24px;background:var(--u-s1);box-shadow:inset 0 0 0 1px var(--u-line),var(--u-lift);max-height:calc(100dvh - 96px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
   .u-open .u-panel{display:flex;animation:u-in .35s cubic-bezier(.2,.8,.2,1) both}
   .u-nav__nav{display:block;flex:none}
   .u-links{flex-direction:column;flex-wrap:nowrap;align-items:stretch}
