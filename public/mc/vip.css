@@ -80,7 +80,7 @@ html.mc .v2-toast{display:flex;align-items:center;gap:.5rem;margin:0 0 .4rem;pad
 html.mc .v2-toast.is-on{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
 html.mc .v2-world{padding:0;overflow:hidden;position:relative;transition:box-shadow .25s,transform .25s cubic-bezier(.34,1.56,.64,1)}
 html.mc .v2-world.is-on{box-shadow:var(--shadow-lift)}
-html.mc .v2-world.is-on::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 2px rgba(95,214,122,.5);pointer-events:none}
+html.mc .v2-world.is-on::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--c-acc) 50%, transparent);pointer-events:none}
 html.mc .v2-wlist{display:grid;gap:.8rem}
 html.mc .v2-wh{display:grid;grid-template-columns:56px minmax(0,1fr);gap:.4rem .9rem;align-items:center;padding:1rem 1.1rem}
 html.mc .v2-wt{min-width:0}
