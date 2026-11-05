@@ -240,7 +240,7 @@ with sync_playwright() as p:
         t = go("/parkour"); pg.locator("#pk-empty").wait_for(timeout=10000); ok("Noch keine Zeiten" in t or "Noch keine Zeiten" in pg.inner_text("body"), f"{w}px Parkour: Leerzustand")
         pg.screenshot(path=f"{SH}/local-parkour-leer-{w}.png", full_page=True); pg.unroute("**/api/mc-parkour")
         go("/vip"); pg.locator("#vip .vip-ranks").wait_for(timeout=10000); vt = pg.inner_text("#vip")
-        ok("Das Panel ist für die Ränge VIP, MVP und Admin." in vt and "VIP und MVP" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 0 and pg.locator("#vip a[href='/profile']").count() == 1, f"{w}px VIP ohne Rang: Übersicht, kein Panel", vt[:240])
+        ok("Das Panel ist für die Ränge VIP, MVP und Admin." in vt and "Vorteile" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 0 and pg.locator("#vip a[href='/profile']").count() == 1, f"{w}px VIP ohne Rang: Übersicht, kein Panel", vt[:240])
         ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator('.ng[data-g=konto] a[href="/vip"]').count() == 1 and pg.locator('.ng[data-g=community] a[href="/vip"]').count() == 0 and pg.locator('a[href="/vip"][aria-current=page]').count() == 1 and pg.locator('.ng[data-g=konto] .ngb[data-cur]').count() == 1, f"{w}px VIP: Konto-Menü aktiv, kein Formular")
         # Summer Theme v2: page headings use the self-hosted SmPixel (Pixelify Sans); Monocraft
         # left the MC surface with the redesign.
@@ -342,9 +342,9 @@ with sync_playwright() as p:
         many = dict(MANYBASE, worlds={"placeholder": False, "slots": [{"id": "11111111-2222-4333-8444-%012d" % i, "label": "Welt %d" % i, "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Gast%d" % i, "owner": False, "visibility": "friends", "info": ""} for i in range(14)]})
         pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(many)))
         go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000); pg.wait_for_timeout(300)
-        ok(pg.locator("#vip-admin-worlds .vip-world:visible").count() == 12 and pg.locator("#vip-admin-worlds button[data-more]").count() == 1, f"{w}px VIP-Admin: 12 Welten, Rest hinter 'Mehr anzeigen'", pg.locator("#vip-admin-worlds .vip-world:visible").count())
+        ok(pg.locator("#vip-admin-worlds .v2-world:visible").count() == 12 and pg.locator("#vip-admin-worlds button[data-more]").count() == 1, f"{w}px VIP-Admin: 12 Welten, Rest hinter 'Mehr anzeigen'", pg.locator("#vip-admin-worlds .v2-world:visible").count())
         pg.click("#vip-admin-worlds button[data-more]"); pg.wait_for_timeout(200)
-        ok(pg.locator("#vip-admin-worlds .vip-world:visible").count() == 14 and pg.get_attribute("#vip-admin-worlds button[data-more]", "aria-expanded") == "true" and "Weniger anzeigen" in pg.inner_text("#vip-admin-worlds button[data-more]"), f"{w}px VIP-Admin: alle Welten nach Klick", pg.locator("#vip-admin-worlds .vip-world:visible").count())
+        ok(pg.locator("#vip-admin-worlds .v2-world:visible").count() == 14 and pg.get_attribute("#vip-admin-worlds button[data-more]", "aria-expanded") == "true" and "Weniger anzeigen" in pg.inner_text("#vip-admin-worlds button[data-more]"), f"{w}px VIP-Admin: alle Welten nach Klick", pg.locator("#vip-admin-worlds .v2-world:visible").count())
         ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Admin: viele Welten ohne Overflow/Inline-Styles")
         pg.unroute("**/api/mc-vip")
         now_s = int(time.time()); hour = 3600
