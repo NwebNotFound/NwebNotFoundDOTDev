@@ -170,8 +170,15 @@ function handleLogout(req, env, url) {
 
 /** Sign out everywhere: bump the store marker so every issued cookie stops validating. */
 async function handleLogoutAll(env) {
-  // revokeAll clears every cached marker for the user before it writes the fresh one.
-  const before = await store.revokeAll(env);
+  // revokeAll clears every cached marker for the user before it writes the fresh one. If the
+  // marker cannot be persisted the sign-out did not happen: say so instead of answering ok.
+  let before;
+  try {
+    before = await store.revokeAll(env);
+  } catch (err) {
+    if (err instanceof store.RevocationUnavailableError) return json({ error: "revoke_failed" }, 503);
+    throw err;
+  }
   const headers = new Headers(SECURITY_HEADERS);
   headers.set("content-type", "application/json; charset=utf-8");
   headers.set("cache-control", "no-store");
@@ -820,8 +827,9 @@ export async function route(request, env, ctx) {
     // else here (which bots exist, whether the store is bound, the session version) is
     // internal detail and only goes to a signed-in user.
     if (method !== "GET") return json({ error: "method_not_allowed" }, 405);
-    const revokedNow = await store.revokedBefore(env);
-    const who = await auth.currentUser(env, request, { revokedBefore: revokedNow });
+    // An unreadable revocation marker means "treat as signed out" here, never "nothing revoked".
+    const revokedNow = await store.revokedBefore(env).catch(() => null);
+    const who = revokedNow === null ? null : await auth.currentUser(env, request, { revokedBefore: revokedNow });
     if (!who) return json({ ok: true });
     // The panel's own view plus the origin proxy's: a red "tunnel/gateway" dot here is what the
     // UI shows when things are down, instead of a generic "Load failed" in the chat.
@@ -849,7 +857,14 @@ export async function route(request, env, ctx) {
   }
 
   // ---- authenticated API ----
-  const revoked = await store.revokedBefore(env);
+  let revoked;
+  try {
+    revoked = await store.revokedBefore(env);
+  } catch (err) {
+    // Fail closed: without the marker a revoked (possibly stolen) cookie cannot be told apart.
+    if (err instanceof store.RevocationUnavailableError) return json({ error: "store_unavailable" }, 503);
+    throw err;
+  }
   const user = await auth.currentUser(env, request, { revokedBefore: revoked });
   if (!user) return json({ error: "unauthorized" }, 401);
   ctx.user = user;

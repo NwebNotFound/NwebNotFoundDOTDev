@@ -289,6 +289,66 @@ test("logout invalidates the cached revocation marker right away", async () => {
   }
 });
 
+test("a store outage fails closed: 503 for the API, logout-all is not reported as ok", async () => {
+  resetCache();
+  const broken = {
+    ...env,
+    PANEL_STORE: {
+      idFromName: (n) => n,
+      get: () => ({
+        fetch: async () => {
+          throw new Error("store down");
+        },
+      }),
+    },
+  };
+  try {
+    const me = await call("/api/me", { e: broken });
+    assert.equal(me.status, 503, "a cookie is not accepted while revocation is unknown");
+    assert.equal((await body(me)).error, "store_unavailable");
+
+    const health = await call("/api/health", { e: broken });
+    assert.deepEqual(await body(health), { ok: true }, "health treats the caller as signed out");
+
+    // Without a binding (local dev) the in-memory marker is authoritative and the API works.
+    const okStore = { ...broken, PANEL_STORE: undefined };
+    assert.equal((await call("/api/me", { e: okStore })).status, 200);
+  } finally {
+    resetCache();
+  }
+});
+
+test("logout-all answers 503 when the marker cannot be written", async () => {
+  resetCache();
+  let writes = 0;
+  const storage = new Map();
+  const flaky = {
+    ...env,
+    PANEL_STORE: {
+      idFromName: (n) => n,
+      get: () => ({
+        fetch: async (url, init) => {
+          if (init?.method === "POST") {
+            writes++;
+            throw new Error("write failed");
+          }
+          if (String(url).endsWith("/revoked")) return Response.json({ before: storage.get("r") || 0 });
+          return Response.json({ ok: true, entries: [] });
+        },
+      }),
+    },
+  };
+  try {
+    const out = await call("/api/logout-all", { method: "POST", e: flaky });
+    assert.equal(out.status, 503);
+    assert.equal((await body(out)).error, "revoke_failed");
+    assert.equal(out.headers.get("set-cookie"), null, "nothing claims the sign-out happened");
+    assert.ok(writes >= 1);
+  } finally {
+    resetCache();
+  }
+});
+
 test("me returns the user, csrf token and bots", async () => {
   const data = await body(await call("/api/me"));
   assert.equal(data.user.id, ALLOWED);

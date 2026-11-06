@@ -1695,10 +1695,17 @@ async function logout() {
 async function logoutAll() {
   const ok = await confirmAction("Überall abmelden", "Beendet alle Panel-Sitzungen auf allen Geräten.", "Abmelden");
   if (!ok) return;
+  // Only report success when the server confirmed the revocation; a failed write must not look
+  // like "signed out everywhere" while other sessions keep working.
+  let res = null;
   try {
-    await fetch("/api/logout-all", { method: "POST", headers: { "x-csrf-token": state.csrf } });
+    res = await fetch("/api/logout-all", { method: "POST", headers: { "x-csrf-token": state.csrf } });
   } catch {
-    /* ignore */
+    res = null;
+  }
+  if (!res || !res.ok) {
+    toast("Überall abmelden fehlgeschlagen – Sitzungen sind noch aktiv. Bitte erneut versuchen.", true);
+    return;
   }
   showLogin();
 
