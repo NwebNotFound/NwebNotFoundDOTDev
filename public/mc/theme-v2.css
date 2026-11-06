@@ -156,7 +156,8 @@ html.mc .chip, html.mc .pill, html.mc .tag, html.mc .soon, html.mc .wip, html.mc
 html.mc .pill { font-size: 0.85rem; font-weight: 700; padding: 0.35rem 0.8rem; }
 html.mc .tag { border-radius: 999px; }
 html.mc .chip .dot, html.mc .tag .dot { width: 7px; height: 7px; border-radius: 2px; background: var(--sun); }
-html.mc .chip-live .dot { background: #2fbf71; animation: ping 2s ease-out infinite; }
+html.mc .chip-live .dot { position: relative; background: #2fbf71; animation: none; box-shadow: none; }
+html.mc .chip-live .dot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(47, 191, 113, 0.55); opacity: 0; pointer-events: none; animation: ping 2s ease-out infinite; }
 html.mc .chip.t-new, html.mc .tag.ts { color: var(--up); } html.mc .chip.t-fix, html.mc .tag.tr { color: var(--down); }
 html.mc .chip.t-chg, html.mc .tag.tw { color: var(--sun); } html.mc .tag.tb { color: var(--ramune); }
 html.mc .soon { color: var(--act); } html.mc .wip { color: var(--ramune); }
@@ -306,7 +307,10 @@ html.mc .onl a.g b { font-size: 0.75rem; font-weight: 800; }
 html.mc .onl a.g canvas { display: block; }
 html.mc .status { font-size: clamp(1.1rem, 3vw, 1.5rem); font-weight: 800; }
 html.mc .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--muted); }
-html.mc .dot.on { background: #2fbf71; animation: ping 2s ease-out infinite; }
+html.mc .dot.on { position: relative; background: #2fbf71; animation: none; box-shadow: none; } /* also overrides the old inline box-shadow pulse in worker.js MC_CSS */
+/* Live ping as a composited ring (transform + opacity) on ::after; the box-shadow animation forced a
+   style recalc and a layout every frame. 10px dot + 8px spread each side -> scale 2.6. */
+html.mc .dot.on::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(47, 191, 113, 0.55); opacity: 0; pointer-events: none; animation: ping 2s ease-out infinite; }
 html.mc .dot.off { background: var(--down); }
 html.mc .avatar.bob, html.mc .head.bob, html.mc .bob { animation: bob 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
 html.mc .podium .p:nth-child(2) .avatar, html.mc .pod .p1 img { animation: bob 3.2s ease-in-out infinite; }
@@ -341,7 +345,7 @@ html.mc footer a:hover { background: var(--surface-2); text-decoration: none; }
 @keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg) scale(1.06); } 60% { transform: rotate(6deg) scale(1.06); } }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes pop-spin { from { transform: rotate(-120deg) scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(47, 191, 113, 0.55); } 80%, 100% { box-shadow: 0 0 0 8px rgba(47, 191, 113, 0); } }
+@keyframes ping { 0% { transform: scale(1); opacity: 1; } 80%, 100% { transform: scale(2.6); opacity: 0; } }
 html.mc .rise { animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 html.mc .drift { animation: drift 22s ease-in-out infinite alternate; }
 html.mc .drift-slow { animation: drift 34s ease-in-out infinite alternate-reverse; }
@@ -362,6 +366,8 @@ html.mc .tl-item:nth-child(4) { animation-delay: 0.18s; }
 html.mc .icon-btn { width: 44px; height: 44px; display: inline-grid; place-items: center; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--ink); box-shadow: var(--bevel); cursor: pointer; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
 html.mc .icon-btn:hover { transform: rotate(-12deg) scale(1.06); }
 
+/* Off-screen hero (parallax.js): decorative loops pause, scroll-driven .ly layers keep going. */
+html.mc .hscene.is-off *:not(.ly), html.mc .hscene.is-off *::after { animation-play-state: paused; }
 /* prefers-reduced-motion: every v2 animation off (theme.css `.still` rule, page-wide). */
 @media (prefers-reduced-motion: reduce) {
   html.mc *, html.mc *::before, html.mc *::after { animation: none !important; transition-duration: 0s !important; }

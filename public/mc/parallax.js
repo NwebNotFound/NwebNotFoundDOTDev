@@ -78,6 +78,8 @@
   if ("IntersectionObserver" in window) {
     new IntersectionObserver((entries) => {
       visible = entries.some((x) => x.isIntersecting);
+      // Off screen the decorative loops pause too (theme-v2.css .hscene.is-off), not only this loop.
+      scene.classList.toggle("is-off", !visible);
       if (visible) { start(); schedule(); } else stop();
     }, { rootMargin: "120px" }).observe(scene);
   } else visible = true;

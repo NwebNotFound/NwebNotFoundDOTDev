@@ -206,11 +206,17 @@ const REVEAL_JS = `<script>(()=>{const els=document.querySelectorAll('.reveal');
 
 const DISCORD_SVG = `<svg width="18" height="14" viewBox="0 0 71 55" fill="currentColor" aria-hidden="true"><path d="M60.1 4.9A58.5 58.5 0 0045.4.4a40 40 0 00-1.9 3.8 54 54 0 00-16.2 0A40 40 0 0025.4.4 58.4 58.4 0 0010.7 4.9C1.4 18.7-1.1 32.2.1 45.5a59 59 0 0018 9.1 43 43 0 003.8-6.2 38 38 0 01-6-2.9l1.5-1.1a42 42 0 0036 0l1.5 1.1a38 38 0 01-6 2.9 43 43 0 003.8 6.2 58.7 58.7 0 0018-9.1c1.5-15.4-2.5-28.8-10.6-40.6zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2z"/></svg>`;
 
+// The four faces every page renders with (SmPixel = Pixelify Sans, SmBody = Nunito, 400 + 700).
+// Preloaded so the swap happens before first paint instead of shifting the nav and hero (CLS).
+// The MC shell used to preload Monocraft, which no page uses since theme v2 (two wasted downloads).
+const FONT_PRELOAD = ["pixelify-sans-latin-400", "pixelify-sans-latin-700", "nunito-latin-400", "nunito-latin-700"]
+  .map((f) => `<link rel="preload" href="/design/fonts/${f}.woff2" as="font" type="font/woff2" crossorigin>`).join("");
+
 function shell({ title, desc, css, nav, body, head = "", footer, themeColor }) {
   return `<!doctype html><html lang="de"${css === MC_CSS ? ' class="mc"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${themeColor}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
-<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/bundle/mc.css?v=${AV}"><link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><script src="/mc/item-names-de.js?v=${AV}"></script>${UNAV_JS}` : UNAV_HEAD}${head}</head><body>
+${css === MC_CSS ? FONT_PRELOAD : ""}<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/bundle/mc.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>${UNAV_JS}` : UNAV_HEAD}${head}</head><body>
 ${nav}
 <main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}</body></html>`;
 }
@@ -263,13 +269,15 @@ const PORTFOLIO = portfolio({ title: "Projekte · Nils Weberruß", desc: "Inform
 </div></section>` });
 
 const GUEST = portfolio({ title: "Gästebuch · NwebNotFound", desc: "Hinterlass eine Nachricht.", nav: pNav("guestbook", "/guestbook"),
-  head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: `
+  body: `
 <section class="ph center"><div class="wrap"><p class="pk reveal">Gästebuch</p><h1 class="h1x reveal d1">Sag Hallo!</h1><p class="lead reveal d2">Lass einen Gruß da. Zum Schreiben meldest du dich mit Discord an.</p></div></section>
 <section class="gb"><div class="wrap gbwrap">
 <div class="card form reveal" id="compose"><p class="mut" style="margin:0">Lade…</p></div>
 <div class="card form reveal d1" id="entries"><div id="list" class="mut">Lade Einträge…</div></div>
 </div></section>
 <script>
+// Turnstile loads only once the signed-in form is on screen (explicit render, never twice).
+const tsLoad=()=>window.__tsP||(window.__tsP=new Promise((res,rej)=>{if(window.turnstile)return res();const s=document.createElement('script');s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';s.async=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)}));
 const e=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=t=>{try{return new Date(t.replace(' ','T')+'Z').toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'})}catch(_){return t}};
 async function load(){const d=await(await fetch('/api/guestbook')).json();const L=document.getElementById('list');
@@ -277,7 +285,7 @@ L.innerHTML=d.entries.length?d.entries.map(x=>'<div class="entry"><div class="av
 function compose(d){const C=document.getElementById('compose');const nx=encodeURIComponent(location.href);
 if(!d.user){C.innerHTML=d.available?'<h3 style="margin-bottom:.5rem">Eintrag schreiben</h3><p class="mut">Melde dich mit Discord an, dann erscheinen dein Name und dein Avatar beim Eintrag.</p><p style="margin-top:1.2rem"><a class="btn discord" href="/auth/discord/login?next='+nx+'">${DISCORD_SVG} Mit Discord anmelden</a></p>':'<h3 style="margin-bottom:.5rem">Eintrag schreiben</h3><p class="mut">Neue Einträge gehen bald per Discord-Login. Der Login ist gleich fertig eingerichtet.</p><p style="margin-top:1.2rem"><button class="btn discord" disabled>${DISCORD_SVG} Discord-Login <span class="hide-s">bald</span></button></p>';return;}
 C.innerHTML='<form id="f"><div style="display:flex;align-items:center;gap:.7rem;margin-bottom:1rem"><img alt="" src="'+e(d.user.avatar)+'" width="36" height="36" style="border-radius:50%"><b>'+e(d.user.name)+'</b></div><label for="m" class="mut" style="font-size:.85rem">Nachricht (max. 500 Zeichen)</label><textarea id="m" name="message" maxlength="500" rows="4" required></textarea><div class="cf-turnstile" data-sitekey="${SITEKEY}" data-theme="auto" style="margin-bottom:1rem"></div><button class="btn">Eintragen</button> <span id="st" class="mut" style="margin-left:.6rem"></span></form>';
-window.turnstile&&turnstile.render&&C.querySelector('.cf-turnstile')&&!C.querySelector('iframe')&&setTimeout(()=>{try{if(!C.querySelector('iframe'))turnstile.render(C.querySelector('.cf-turnstile'))}catch(_){}},50);
+tsLoad().then(()=>{try{if(C.querySelector('.cf-turnstile')&&!C.querySelector('iframe'))turnstile.render(C.querySelector('.cf-turnstile'))}catch(_){}}).catch(()=>{});
 document.getElementById('f').onsubmit=async ev=>{ev.preventDefault();const st=document.getElementById('st');st.textContent='Sende…';const fd=new FormData(ev.target);
 const r=await fetch('/api/guestbook',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({message:fd.get('message'),token:fd.get('cf-turnstile-response')})});const j=await r.json().catch(()=>({}));
 st.textContent=r.ok?'Danke!':(j.error||'Fehler');if(r.ok)ev.target.reset();window.turnstile&&turnstile.reset();load();};}

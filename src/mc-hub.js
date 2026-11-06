@@ -138,7 +138,6 @@ export const marketItemBody = (item) => `
 <p style="margin:0 0 1rem"><a href="/markt">‹ Markt</a></p><div id="ihd" data-item="${item}"><h1 class="hub-h">…</h1></div></div></section>
 <section class="sec" style="padding-top:.6rem"><div class="hub-wrap" id="iroot"><div class="g pad mut">Lade…</div></div></section>
 <section class="sec" style="padding-top:0"><div class="hub-wrap"><div class="g pad" id="bbuy" data-item="${item}" data-sitekey="${TS_SITEKEY}" hidden></div></div></section>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/item.js?v=${AV}" defer></script><script src="/mc/bankbuy.js?v=${AV}" defer></script>`;
 
 /* ---------- Wiki ---------- */

@@ -3,7 +3,10 @@
 (()=>{if(window.MC3D)return;
 const OK=(()=>{try{const c=document.createElement('canvas');return !!(c.getContext('webgl2')||c.getContext('webgl'))}catch(_){return false}})();
 const STATIC=()=>matchMedia('(max-width:640px),(hover:none),(prefers-reduced-motion:reduce)').matches;
-const NAME=/^[A-Za-z0-9_]{1,16}$/;const MAX_LIVE=6;let live=0,lib=null;const VS=[];
+const NAME=/^[A-Za-z0-9_]{1,16}$/;const MAX_LIVE=6;
+// Live viewers draw at most 30 fps: the idle and walk animations are slow, and every viewer is its
+// own WebGL loop (up to six on a page), so this halves the GPU/main-thread work per viewer.
+const FRAME_MS=33;const cap=v=>{const draw=v.draw.bind(v);let last=0;v.draw=function(){const now=performance.now();if(now-last<FRAME_MS){this.animationID=requestAnimationFrame(()=>this.draw());return}last=now;draw()};return v};let live=0,lib=null;const VS=[];
 const gc=()=>{for(let i=VS.length-1;i>=0;i--)if(!VS[i][0].isConnected){try{VS[i][1].dispose()}catch(_){}VS.splice(i,1);live--}};
 const load=()=>lib||(lib=new Promise((res,rej)=>{if(window.skinview3d)return res();const s=document.createElement('script');s.src='/vendor/skinview3d-3.4.2.min.js';s.async=true;s.onload=res;s.onerror=rej;document.head.appendChild(s)}));
 const skin=n=>'/mc-skin/'+encodeURIComponent(n)+'?v=3';
@@ -24,7 +27,7 @@ const io=new IntersectionObserver(es=>{shown=!!es[0]&&es[0].isIntersecting;if(!s
 function stop(){removeEventListener('pointermove',mv);removeEventListener('pointerleave',leave);document.removeEventListener('visibilitychange',onVis);try{io.disconnect()}catch(_){}}
 if(fine){addEventListener('pointermove',mv,{passive:true});addEventListener('pointerleave',leave)}
 document.addEventListener('visibilitychange',onVis);io.observe(el);kick()}
-function live3d(el,n,w,h,rot){const cv=document.createElement('canvas');const v=new skinview3d.SkinViewer({canvas:cv,width:w,height:h,zoom:.86,fov:40});
+function live3d(el,n,w,h,rot){const cv=document.createElement('canvas');const v=cap(new skinview3d.SkinViewer({canvas:cv,width:w,height:h,zoom:.86,fov:40}));
 v.controls.enableZoom=false;v.controls.enablePan=false;v.globalLight.intensity=2.6;v.cameraLight.intensity=.7;v.playerObject.rotation.y=rot;
 return v.loadSkin(skin(n)).then(()=>{v.animation=new skinview3d.IdleAnimation();v.animation.speed=.6;if(!el.isConnected){v.dispose();live--;return}el.appendChild(cv);el.classList.add('ready');VS.push([el,v]);look(v,el);
 new IntersectionObserver(e=>{v.renderPaused=!e[0].isIntersecting}).observe(el);new ResizeObserver(()=>{if(el.clientWidth&&el.clientHeight)v.setSize(el.clientWidth,el.clientHeight)}).observe(el);return v})}
@@ -43,7 +46,7 @@ window.MC3D={
  hover(root,sel){if(!OK||STATIC())return;const pop=document.createElement('div');pop.className='m3d-pop';pop.hidden=true;pop.setAttribute('aria-hidden','true');let v=null,tm,generation=0,queue=Promise.resolve();
   const hide=()=>{generation++;pop.hidden=true;pop.classList.remove('on');if(v)v.renderPaused=true};
   const show=a=>{const n=a.dataset.player;if(!NAME.test(n))return;const current=++generation;pop.hidden=true;pop.classList.remove('on');
-   queue=queue.catch(()=>{}).then(async()=>{if(current!==generation||!a.isConnected)return;await load();if(!v){const cv=document.createElement('canvas');v=new skinview3d.SkinViewer({canvas:cv,width:160,height:160,zoom:.86,fov:40});v.controls.enableZoom=false;v.controls.enablePan=false;v.controls.enableRotate=false;v.globalLight.intensity=2.6;v.cameraLight.intensity=.7;v.animation=new skinview3d.WalkingAnimation();v.animation.speed=.7;v.playerObject.rotation.y=-.5;pop.appendChild(cv)}await v.loadSkin(skin(n));if(current!==generation||!a.isConnected){v.renderPaused=true;return}a.appendChild(pop);pop.hidden=false;v.renderPaused=false;pop.classList.add('on')}).catch(()=>{if(current===generation)hide()})};
+   queue=queue.catch(()=>{}).then(async()=>{if(current!==generation||!a.isConnected)return;await load();if(!v){const cv=document.createElement('canvas');v=cap(new skinview3d.SkinViewer({canvas:cv,width:160,height:160,zoom:.86,fov:40}));v.controls.enableZoom=false;v.controls.enablePan=false;v.controls.enableRotate=false;v.globalLight.intensity=2.6;v.cameraLight.intensity=.7;v.animation=new skinview3d.WalkingAnimation();v.animation.speed=.7;v.playerObject.rotation.y=-.5;pop.appendChild(cv)}await v.loadSkin(skin(n));if(current!==generation||!a.isConnected){v.renderPaused=true;return}a.appendChild(pop);pop.hidden=false;v.renderPaused=false;pop.classList.add('on')}).catch(()=>{if(current===generation)hide()})};
   root.addEventListener('pointerover',e=>{const a=e.target.closest(sel);if(!a||e.pointerType!=='mouse')return;clearTimeout(tm);tm=setTimeout(()=>show(a),120)});
   root.addEventListener('pointerout',e=>{const a=e.target.closest(sel);if(!a||(e.relatedTarget&&a.contains(e.relatedTarget)))return;clearTimeout(tm);hide()});
   addEventListener('scroll',hide,{passive:true})}
