@@ -33,6 +33,9 @@ function sectionDate(title) {
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === iso ? { iso, label: match[0] } : null;
 }
 
+// A heading that is just the date would repeat the date chip of its group; only real headings are rendered.
+const dateOnly = (title) => !!sectionDate(title) && !/[A-Za-zÄÖÜäöüß]/.test(title);
+
 // Explicit update types take precedence. Topic labels use only words in the entry itself;
 // unknown text stays neutral instead of claiming a change is new or fixed.
 function entryCategory(text) {
@@ -90,7 +93,7 @@ export const changelogBody = (md = CHANGELOG_MD) => {
     if (!group) groups.push(group = { date, sections: [] });
     group.sections.push(section);
   }
-  const list = groups.length ? `<div class="cl-timeline">${groups.map((group) => `<article class="g clg"${group.date ? ` data-date="${group.date.iso}"` : ""}>${group.date ? `<time class="chip cl-date" datetime="${group.date.iso}">${esc(group.date.label)}</time>` : ""}${group.sections.map((s) => `${s.title ? `<h2 class="clh">${inline(s.title)}</h2>` : `<h2 class="clh">Neu auf dem Server</h2>`}<ul class="cll">${s.items.map(renderEntry).join("")}</ul>`).join("")}</article>`).join("")}</div>`
+  const list = groups.length ? `<div class="cl-timeline">${groups.map((group) => `<article class="g clg"${group.date ? ` data-date="${group.date.iso}"` : ""}>${group.date ? `<time class="chip cl-date" datetime="${group.date.iso}">${esc(group.date.label)}</time>` : ""}${group.sections.map((s) => `${s.title == null ? `<h2 class="clh">Neu auf dem Server</h2>` : dateOnly(s.title) ? "" : `<h2 class="clh">${inline(s.title)}</h2>`}<ul class="cll">${s.items.map(renderEntry).join("")}</ul>`).join("")}</article>`).join("")}</div>`
     : `<div class="g empty-st" id="cl-empty"><h2 class="hub-h2">Noch keine Einträge</h2><p class="mut">Sobald es Neuigkeiten gibt, stehen sie hier.</p></div>`;
   return `<link rel="stylesheet" href="/mc/changelog.css?v=${AV}"><section class="hero cl-hero"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Server-News</p><h1 class="hub-h">Changelog.</h1><p class="sub">Was sich auf dem Server geändert hat.</p></div></section>
 <section class="sec cl-sec"><div class="hub-wrap cl-wrap" id="changelog">${list}<p class="mut cl-src">Stand: mc-stack@${esc(CHANGELOG_SRC.sha.slice(0, 7))}</p></div></section>`;

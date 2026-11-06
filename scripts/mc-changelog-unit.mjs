@@ -50,6 +50,20 @@ test("the bundled player entries carry their real dates and keep topic icons, wi
   assert.ok(html.includes("Stack für Stack"));
 });
 
+test("a date-only section heading is not repeated next to the date chip", () => {
+  const md = `## Für Spieler
+### 06.11.2026
+- **Neue Navigation** – Eine Leiste für alles.
+### 05.11.2026 – Release
+- **Backup** – Läuft im Betrieb.
+`;
+  const html = changelogBody(md);
+  assert.equal((html.match(/06\.11\.2026/g) || []).length, 1);
+  assert.doesNotMatch(html, /<h2 class="clh">06\.11\.2026<\/h2>/);
+  // A dated heading with words still renders as the section heading, next to the chip.
+  assert.match(html, /<h2 class="clh">05\.11\.2026 – Release<\/h2>/);
+});
+
 test("latestEntries gives date, title and subline for the start page", () => {
   const md = `## Für Spieler
 ### 06.11.2026
