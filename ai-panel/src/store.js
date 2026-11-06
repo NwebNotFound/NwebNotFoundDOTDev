@@ -11,6 +11,7 @@
 
 import * as rl from "./ratelimit.js";
 import * as log from "./log.js";
+import { redactText } from "./redact.js";
 
 const LOG_MAX = 200;
 const RUN_MAX = 200;
@@ -472,8 +473,10 @@ export async function messageAppend(env, row) {
     conversation_id: String(row.conversation_id || ""),
     role: String(row.role || "assistant").slice(0, 20),
     kind: String(row.kind || "message").slice(0, 20),
-    content: String(row.content ?? "").slice(0, MESSAGE_CONTENT_MAX),
-    tool: row.tool ? String(row.tool).slice(0, 80) : null,
+    // Every transcript row is served back to the browser on each load, so it is stored redacted
+    // (tool output, run answers, the delta fallback): one choke point instead of every caller.
+    content: redactText(String(row.content ?? "")).slice(0, MESSAGE_CONTENT_MAX),
+    tool: row.tool ? redactText(String(row.tool)).slice(0, 80) : null,
     ok: typeof row.ok === "boolean" ? row.ok : null,
     run_id: row.run_id ? String(row.run_id) : null,
     ts: Number(row.ts) || Date.now(),

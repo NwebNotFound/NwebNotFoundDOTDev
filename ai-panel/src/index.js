@@ -10,7 +10,7 @@ import * as auth from "./auth.js";
 import * as up from "./upstream.js";
 import * as store from "./store.js";
 import { teeSseFrames } from "./sse-tap.js";
-import { clampInt, redactValue, sessionKind } from "./redact.js";
+import { clampInt, redactText, redactValue, sessionKind } from "./redact.js";
 import * as crewRoutes from "./crew-routes.js";
 
 export { PanelStore } from "./store.js";
@@ -71,14 +71,15 @@ function upstreamProblem(where, status, data) {
   let detail = data;
   if (data && typeof data === "object") detail = data.error ?? data.detail ?? data.message ?? data;
   const text = typeof detail === "string" ? detail : JSON.stringify(detail ?? null);
-  console.error(JSON.stringify({ ai_panel_upstream: { where, status, detail: String(text).slice(0, 300) } }));
+  // Redact before truncating: upstream error text can quote the request or a tool's output.
+  console.error(JSON.stringify({ ai_panel_upstream: { where, status, detail: redactText(String(text)).slice(0, 300) } }));
 }
 
 function upstreamFailure(err) {
   let status = err instanceof up.UpstreamError ? err.status : 502;
   // Never forward an upstream 401/403: the browser would treat it as its own session expiring.
   if (status === 401 || status === 403 || !status) status = 502;
-  console.error(JSON.stringify({ ai_panel_upstream: { where: "transport", status, detail: String(err?.message || err).slice(0, 300) } }));
+  console.error(JSON.stringify({ ai_panel_upstream: { where: "transport", status, detail: redactText(String(err?.message || err)).slice(0, 300) } }));
   return json({ error: status === 503 ? "upstream_not_configured" : "upstream_unreachable" }, status);
 }
 
@@ -95,7 +96,7 @@ function usageError(res, where) {
   if (!code) return null;
   if (USAGE_ERRORS[code]) return USAGE_ERRORS[code];
   console.error(
-    JSON.stringify({ ai_panel_upstream: { where, status: Number(res?.status) || 0, detail: String(code).slice(0, 300) } }),
+    JSON.stringify({ ai_panel_upstream: { where, status: Number(res?.status) || 0, detail: redactText(String(code)).slice(0, 300) } }),
   );
   return GENERIC_UPSTREAM_ERROR;
 }
@@ -328,7 +329,7 @@ async function getJobs(env, bot) {
     upstreamProblem("jobs_list", status, data);
     return json({ error: "jobs_unavailable" }, 502);
   }
-  return json({ bot, jobs: Array.isArray(data?.jobs) ? data.jobs : [] });
+  return json({ bot, jobs: Array.isArray(data?.jobs) ? redactValue(data.jobs) : [] });
 }
 
 async function createJob(env, bot, body) {
@@ -696,7 +697,7 @@ async function runAction(env, bot, runId, action, body) {
     run_id: runId,
     status: action === "approval" ? `approval:${payload.choice}` : action === "stop" ? "stopped" : "steered",
   });
-  return json({ ok: true, action, result: data });
+  return json({ ok: true, action, result: redactValue(data) });
 }
 
 async function quickChat(env, bot, body) {
@@ -1074,14 +1075,14 @@ export async function route(request, env, ctx) {
           run_id: runId,
           status: state,
           error: TERMINAL_RUN_STATES.has(state) && state !== "completed" && state !== "finished" && state !== "success"
-            ? String(data?.error || data?.detail || state).slice(0, 200)
+            ? redactText(String(data?.error || data?.detail || state)).slice(0, 200)
             : null,
         });
       }
       const pending = pendingControl(data);
       if (TERMINAL_RUN_STATES.has(state)) {
         const conversationId = await conversationForRun(env, bot, runId);
-        const out = typeof data?.output === "string" ? data.output.trim() : "";
+        const out = typeof data?.output === "string" ? redactText(data.output.trim()) : "";
         if (conversationId && out) {
           await store.messageAppend(env, {
             conversation_id: conversationId,
@@ -1092,7 +1093,7 @@ export async function route(request, env, ctx) {
           });
         }
       }
-      return json({ ...(data ?? {}), pending: pending.request_id ? pending : null });
+      return json({ ...redactValue(data ?? {}), pending: pending.request_id ? pending : null });
     }
     if (action === "events") {
       if (method !== "GET") return json({ error: "method_not_allowed" }, 405);
@@ -1119,7 +1120,7 @@ export async function handle(request, env) {
     if (err instanceof up.UpstreamError) {
       res = upstreamFailure(err);
     } else {
-      console.error("ai-panel error", err && err.stack ? err.stack : String(err));
+      console.error("ai-panel error", redactText(err && err.stack ? err.stack : String(err)));
       res = json({ error: "internal_error" }, 500);
     }
   }

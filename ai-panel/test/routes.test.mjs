@@ -511,11 +511,11 @@ test("chat history: send, reload, and the transcript is still there", async () =
   const early = await body(await call(`/api/bots/cloudflare/conversations/${conversation_id}/messages`));
   assert.deepEqual(early.messages.map((m) => [m.role, m.content]), [["user", "Was ist der Status?"]]);
 
-  // The stream tap records tool row and final answer while the bytes go through untouched.
+  // The stream tap records tool row and final answer while the frames go through (redacted).
   const events = await call(`/api/bots/cloudflare/runs/${run_id}/events`);
   assert.equal(events.status, 200);
   const streamed = await events.text();
-  assert.match(streamed, /run\.completed/, "the client still sees the raw stream");
+  assert.match(streamed, /run\.completed/, "the client still sees the stream");
   assert.doesNotMatch(streamed, /: ping/, "the tap does not inject frames itself");
 
   // "Reload": a fresh list call finds the thread and its full transcript.
@@ -632,6 +632,38 @@ test("chat history survives a dropped stream through the poll fallback", async (
     assert.equal(last.content, "per Poll fertig", "the poll persisted the answer server-side");
   } finally {
     mock.state.streamDrops = false;
+  }
+});
+
+test("secrets in run streams, run polls, transcripts and jobs are redacted", async () => {
+  const key = "sk-proj-AbCdEf0123456789AbCdEf0123456789";
+  mock.state.runOutput = `cat .env\nOPENAI_API_KEY=${key}`;
+  mock.state.jobs.push({ id: "job_secret", name: "leak", schedule: "0 * * * *", prompt: `use ${key}` });
+  try {
+    const started = await body(await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "cat .env" } }));
+    const streamed = await (await call(`/api/bots/cloudflare/runs/${started.run_id}/events`)).text();
+    assert.match(streamed, /run\.completed/);
+    assert.ok(!streamed.includes(key), "the SSE frames reach the browser redacted");
+
+    const transcript = await body(
+      await call(`/api/bots/cloudflare/conversations/${started.conversation_id}/messages`),
+    );
+    assert.ok(transcript.messages.length > 1);
+    assert.ok(!JSON.stringify(transcript).includes(key), "the stored transcript is redacted");
+
+    mock.state.runs.set(started.run_id, { status: "completed", output: `token: ${key}` });
+    const polled = await call(`/api/bots/cloudflare/runs/${started.run_id}`);
+    assert.ok(!(await polled.text()).includes(key), "the run GET is redacted");
+    const again = await body(
+      await call(`/api/bots/cloudflare/conversations/${started.conversation_id}/messages`),
+    );
+    assert.ok(!JSON.stringify(again).includes(key), "the poll-persisted answer is redacted");
+
+    const jobs = await call("/api/bots/cloudflare/jobs");
+    assert.ok(!(await jobs.text()).includes(key), "the job list is redacted");
+  } finally {
+    mock.state.runOutput = undefined;
+    mock.state.jobs = mock.state.jobs.filter((j) => j.id !== "job_secret");
   }
 });
 

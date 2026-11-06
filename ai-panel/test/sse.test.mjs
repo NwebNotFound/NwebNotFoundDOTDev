@@ -93,3 +93,33 @@ test("an event stream passes through with SSE headers", async () => {
   assert.equal(res.headers.get("x-accel-buffering"), "no");
   assert.match(await res.text(), /run\.completed/);
 });
+
+test("the logged upstream failure detail is redacted", async () => {
+  const key = "ghp_0123456789abcdefghijABCDEFGHIJ012345";
+  const logged = [];
+  const originalError = console.error;
+  console.error = (...args) => logged.push(args.join(" "));
+  try {
+    await pipeSse(new Response(`rejected header Authorization: Bearer ${key}`, { status: 500 }));
+  } finally {
+    console.error = originalError;
+  }
+  assert.ok(logged.length > 0);
+  assert.ok(!logged.join("\n").includes(key), logged.join("\n"));
+});
+
+test("pipeSse redacts secrets inside event frames", async () => {
+  const key = "sk-proj-AbCdEf0123456789AbCdEf0123456789";
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(enc.encode(`data: {"choices":[{"delta":{"content":"KEY=${key}"}}]}\n\n`));
+      controller.close();
+    },
+  });
+  const res = await pipeSse(new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }), {
+    pingMs: 1_000,
+  });
+  const text = await res.text();
+  assert.match(text, /choices/);
+  assert.ok(!text.includes(key), text);
+});

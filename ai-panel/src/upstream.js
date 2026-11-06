@@ -2,6 +2,9 @@
 // origin-proxy, which verifies the shared secret and injects the real Hermes key.
 // Nothing in this module ever puts a key in a response body.
 
+import { redactText } from "./redact.js";
+import { redactSseStream } from "./sse-tap.js";
+
 const JSON_TIMEOUT_MS = 25_000;
 
 const BOT_NAME = /^[a-z0-9][a-z0-9_-]{0,31}$/;
@@ -226,7 +229,7 @@ export async function pipeSse(res, { pingMs } = {}) {
   const type = res.headers.get("content-type") || "";
   if (!res.ok && !type.includes("event-stream")) {
     // Detail stays in the Worker log; the browser only learns that the upstream failed.
-    const detail = (await res.text().catch(() => "")).slice(0, 500);
+    const detail = redactText(await res.text().catch(() => "")).slice(0, 500);
     console.error(JSON.stringify({ ai_panel_upstream: { status: res.status, detail } }));
     return new Response(JSON.stringify({ error: "upstream_error" }), {
       status: 502,
@@ -239,7 +242,9 @@ export async function pipeSse(res, { pingMs } = {}) {
       headers: sseHeaders(),
     });
   }
-  return new Response(sseBody(res.body, { pingMs }), {
+  // Re-serialised frame by frame with secrets redacted: tool output and model text are upstream
+  // text the panel did not author.
+  return new Response(sseBody(redactSseStream(res.body), { pingMs }), {
     status: res.ok ? 200 : res.status,
     headers: sseHeaders({ "x-upstream-status": String(res.status) }),
   });
@@ -268,7 +273,7 @@ async function openrouter(env, path) {
     // only ever receives the generic code, which the router may translate.
     console.error(
       JSON.stringify({
-        ai_panel_upstream: { where: "openrouter", path, status: 502, detail: String(err?.message || err).slice(0, 300) },
+        ai_panel_upstream: { where: "openrouter", path, status: 502, detail: redactText(String(err?.message || err)).slice(0, 300) },
       }),
     );
     return { status: 502, data: null, error: "upstream_error" };

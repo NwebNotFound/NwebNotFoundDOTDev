@@ -1,10 +1,11 @@
 // The transcript tap: every JSON `data:` payload of the stream reaches the recorder, whatever the
-// framing, while the bytes themselves pass through unchanged.
+// framing, and the browser gets the same frames re-serialised with secrets redacted.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { teeSseFrames } from "../src/sse-tap.js";
+import { redactSseStream, teeSseFrames } from "../src/sse-tap.js";
+import { MASK } from "../src/redact.js";
 
 const enc = new TextEncoder();
 
@@ -61,7 +62,9 @@ test("an oversized frame is dropped and the tap resyncs at the next boundary", a
     { maxBuffer: 256 },
   );
   assert.deepEqual(frames, [{ event: "a" }, { event: "b" }]);
-  assert.ok(text.includes("x".repeat(200)), "the stream itself is not truncated");
+  assert.ok(!text.includes("x".repeat(200)), "an unredactable giant is not forwarded raw");
+  assert.match(text, /^: frame dropped/m);
+  assert.match(text, /"event":"b"/);
 });
 
 test("a throwing recorder does not break the stream", async () => {
@@ -69,4 +72,30 @@ test("a throwing recorder does not break the stream", async () => {
     throw new Error("boom");
   });
   assert.match(await new Response(out).text(), /"a":2/);
+});
+
+test("secrets in a frame are redacted in the stream and in what the recorder sees", async () => {
+  const key = "sk-proj-AbCdEf0123456789AbCdEf0123456789";
+  const { frames, text } = await tap([
+    `data: {"event":"tool.completed","output":"OPENAI_API_KEY=${key}","args":{"password":"hunter2"}}\n\n`,
+    `event: message\ndata: plain ${key}\n\n`,
+    ": ping\n\n",
+  ]);
+  assert.ok(!text.includes(key), text);
+  assert.ok(!text.includes("hunter2"), text);
+  assert.match(text, /^: ping$/m, "comment frames survive");
+  assert.match(text, /^event: message$/m);
+  assert.equal(frames.length, 1);
+  assert.ok(frames[0].output.includes(MASK));
+  assert.equal(frames[0].args.password, MASK);
+  assert.equal(JSON.stringify(frames).includes(key), false);
+});
+
+test("redactSseStream redacts without a recorder and keeps [DONE]", async () => {
+  const out = redactSseStream(
+    streamOf(['data: {"choices":[{"delta":{"content":"ghp_0123456789abcdefghijABCDEFGHIJ012345"}}]}\n\n', "data: [DONE]\n\n"]),
+  );
+  const text = await new Response(out).text();
+  assert.doesNotMatch(text, /ghp_/);
+  assert.match(text, /data: \[DONE\]/);
 });
