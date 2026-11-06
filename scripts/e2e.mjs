@@ -12,6 +12,9 @@ import "./content-unit.mjs";
 import "./markdown-unit.mjs";
 import "./feed-unit.mjs";
 import "./epub-unit.mjs";
+import "./worker-robust-unit.mjs";
+import "./dos-unit.mjs";
+import "./queue-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { hubPage } from "../src/hub.js";
@@ -59,6 +62,7 @@ fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
 fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\nPRICE_RESET_AT=${RESET}\n`);
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
+{ let okS = true; try { execSync(`bash scripts/schema-check.sh --local --persist-to ${PERSIST}`, { cwd: ROOT, stdio: "ignore" }); } catch { okS = false; } ok(okS, "schema.sql erfüllt scripts/schema-check.sh (deploy.sh-Vorabprüfung)"); }
 const wd = spawn(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", ...NPX.opts });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
 // Writing fixtures (phase 3a/3b): the committed src/generated/{content,feeds}.js carry Nils' real
@@ -308,7 +312,8 @@ try {
   ok((await req("/api/mc-ingest", { method: "POST", token: TOK, body: { links: [{ discord_id: D9, mc_name: "Buyer", mc_uuid: U9, has_role: true, verified: true }] } })).s === 200, "Link für Käufer");
   const pend0 = (await req("/api/mc-shop-orders/pending", { token: TOK })).j.items;
   ok(pend0.every((x) => x.type === "shop"), "pending (alt, ohne ?types) liefert nur type=shop", JSON.stringify(pend0.map((x) => x.type)));
-  const BB = (body, o = {}) => req("/api/mc-shop-order", { method: "POST", body: { type: "bank_buy", ...body }, cookie: c9, origin: O, ip: "10.0.0.33", ...o });
+  const BB = (body, o = {}) => req("/api/mc-shop-order", { method: "POST", body: { type: "bank_buy", turnstile: "XXXX.DUMMY.TOKEN.XXXX", ...body }, cookie: c9, origin: O, ip: "10.0.0.33", ...o });
+  ok((await BB({ item: "diamond", amount: 1, turnstile: undefined })).s === 403, "bank_buy Website ohne Turnstile-Token → 403");
   ok((await BB({ item: "diamond", amount: 1 }, { cookie: undefined })).s === 401, "bank_buy ohne Login → 401");
   ok((await BB({ item: "diamond", amount: 1 }, { origin: "https://evil.example" })).s === 403, "bank_buy fremde Origin → 403");
   ok((await BB({ item: "diamond", amount: 0 })).s === 400, "bank_buy Menge 0 → 400");
@@ -737,7 +742,8 @@ try {
     ok((await mob("phantom")) === "/mc-icon/v2/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/v2/feather" && (await mob("..%2Fx")) === "/mc-icon/v2/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
     const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
   }
-  { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy-report-only") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && !r.headers.get("content-security-policy"), "CSP Report-Only gesetzt (nicht erzwingend)", c); }
+  { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && /form-action 'self' https:\/\/nwebnotfound\.dev (https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+) /.test(c) && !r.headers.get("content-security-policy-report-only"), "CSP wird erzwungen (inkl. form-action für den Logout-POST)", c);
+    ok(r.headers.get("strict-transport-security") === "max-age=31536000; includeSubDomains", "HSTS gesetzt", r.headers.get("strict-transport-security")); }
   console.log("E) economy_daily");
   { const ED = (rows) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { economy_daily: rows } });
     const e0 = await req("/api/mc-economy"); ok(e0.s === 200 && Array.isArray(e0.j?.days) && e0.j.days.length === 0, "Economy-API leer → days []", e0.t);
@@ -896,6 +902,17 @@ try {
       const vipLoc = (loc) => { try { const u = new URL(loc); return u.pathname === "/vip" && (u.hostname === "mc.nwebnotfound.dev" || u.hostname === "127.0.0.1") && !loc.includes("evil"); } catch { return false; } };
       ok(vipLoc(rel) && vipLoc(abs), "relativer und absoluter next auf /vip ist erlaubt", JSON.stringify({ rel, abs }));
       ok((await bye("https://nwebnotfound.dev.evil.com/vip")) === "https://nwebnotfound.dev/", "Host muss nwebnotfound.dev oder Subdomain davon sein"); }
+    { // Logout nur per POST mit eigener Origin (CSRF, #83)
+      sql(`INSERT INTO sessions (id, discord_id, username, expires_at) VALUES ('slo', '100000000000000001', 'Nils', datetime('now', '+1 day'))`);
+      const ck = await cookieFor("slo"), has = () => sqlRows("SELECT id FROM sessions WHERE id = 'slo'").length === 1, NX = "?next=" + encodeURIComponent("https://mc.nwebnotfound.dev/vip");
+      const g = await req("/auth/discord/logout" + NX, { cookie: ck, testHost: "nwebnotfound.dev" });
+      ok(g.s === 200 && /<form method="post" action="\/auth\/discord\/logout\?next=/.test(g.t) && has(), "GET-Logout meldet nicht ab, zeigt POST-Formular", g.s);
+      const ev = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://evil.example", testHost: "nwebnotfound.dev" });
+      const no = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, testHost: "nwebnotfound.dev" });
+      ok(ev.s === 403 && no.s === 403 && has(), "POST-Logout mit fremder/ohne Origin → 403, Session bleibt", ev.s + "/" + no.s);
+      const po = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://mc.nwebnotfound.dev", testHost: "nwebnotfound.dev" });
+      ok(po.s === 303 && /^(https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+)\/vip$/.test(po.h.get("location") || "") && /nnf_session=;.*Max-Age=0/.test(po.h.get("set-cookie") || "") && !has(), "POST-Logout von mc. → 303, Cookie gelöscht, Session weg", po.s + " " + po.h.get("location"));
+      const pg = await req("/", { cookie: ck }); ok(pg.t.includes("closest('a[href*=\"/auth/discord/logout\"]')") && pg.t.includes("f.method='post'"), "Konto-Menü: Abmelden-Link sendet POST-Formular"); }
   }
   // Ingest: null bleibt NULL (nicht 0), online pro Spieler wird gespeichert (Dict- und View-Form)
   { const nm = sqlRows(`SELECT mc_name FROM mc_links WHERE mc_uuid = '${U1}'`)[0]?.mc_name, bak = sqlRows(`SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0];

@@ -1,7 +1,7 @@
 // Feedback (Bug/Idee/Sonstiges): nur eingeloggte Discord-User mit verifiziertem MC-Account + Server-Rolle.
 // Schutz: Turnstile, Origin-Check, 3 Einreichungen/Tag pro Discord-Account. Keine IP-Speicherung.
 // Admin: GET/PATCH mit "Authorization: Bearer <FEEDBACK_ADMIN_TOKEN>" (nur aus env, wird nie ausgegeben).
-const TEST_SECRET = "1x0000000000000000000000000000000AA";
+import { verifyTurnstile } from "./turnstile.js";
 const TYPES = ["bug", "idea", "other"], STATUS = ["open", "in_progress", "done", "rejected"], DAY = 864e5, LIMIT = 3;
 const clip = (v, n) => String(v ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, n);
 const iso = (t) => (t ? new Date(t).toISOString() : null);
@@ -37,11 +37,8 @@ export function makeFeedback({ json, getUser, safeEq, MAIN, MCD }) {
     if (text.length < 10) return json({ error: "Text: 10–2000 Zeichen" }, 400);
     if ((await used(env, w.user.id)) >= LIMIT) return json({ error: "Limit erreicht: 3 Einreichungen pro Tag" }, 429); // Vorabprüfung spart Captcha-Call; verbindlich ist das atomare INSERT unten
     if (!env.TURNSTILE_SECRET) return json({ error: "Captcha nicht konfiguriert" }, 503);
-    const fd = new FormData(); fd.append("secret", env.TURNSTILE_SECRET); fd.append("response", String(b?.token || ""));
-    let v = {}; try { v = await (await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: fd })).json(); } catch {}
-    // Hostname muss unsere Seite sein (Cloudflares öffentlicher Test-Secret liefert immer "example.com" – nur für lokale Tests)
-    const hostOk = v.hostname === MAIN || v.hostname === MCD || (env.TURNSTILE_SECRET === TEST_SECRET && v.hostname === "example.com");
-    if (v.success !== true || !hostOk) return json({ error: "Captcha fehlgeschlagen" }, 403);
+    // success + Hostname unserer Seite (siehe src/turnstile.js)
+    if (!(await verifyTurnstile(env, b?.token, { hosts: [MAIN, MCD] }))) return json({ error: "Captcha fehlgeschlagen" }, 403);
     const now = Date.now();
     // Atomar: nur einfügen, solange < LIMIT in den letzten 24 h (kein Race bei parallelen Submits)
     const r = await env.DB.prepare("INSERT INTO feedback (discord_id, mc_uuid, mc_name, category, text, location, status, created_at) SELECT ?, ?, ?, ?, ?, ?, 'open', ? WHERE (SELECT COUNT(*) FROM feedback WHERE discord_id = ? AND created_at > ?) < ?").bind(w.user.id, w.link.mc_uuid, w.link.mc_name, category, text, location, now, w.user.id, now - DAY, LIMIT).run();

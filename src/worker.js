@@ -4,7 +4,7 @@ import { cleanRanks, rankStatements } from "./mc-ranks.js";
 import { cleanPvp, pvpStatements, pvpApi, pvpPlayerApi, pvpBody } from "./mc-pvp.js";
 import { vipApi, vipBody } from "./mc-vip.js";
 import { makeVip } from "./mc-vip-cmd.js";
-import { resolveIcon, TEX_BASE } from "./mc-icon.js";
+import { resolveIcon, TEX_BASE, ICON_ID_RE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { headResponse, skinResponse, validSkinUrl } from "./mc-head.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
@@ -18,6 +18,9 @@ import { hubPage, hubPageExists } from "./hub.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie } from "./i18n/index.js";
+import { safeDecode } from "./safe-decode.js";
+import { verifyTurnstile } from "./turnstile.js";
+import { purge } from "./purge.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -252,7 +255,8 @@ const REVEAL_JS = `<script>(()=>{const els=document.querySelectorAll('.reveal');
 
 // Account: auf MC füllt das die Gruppe „Mein Konto“ (eine Leiste). Auf dem Portfolio bleibt der Chip.
 // Kein Aufruf von /api/mc-vip. Rang und Welten bleiben auf der VIP-Seite.
-const ACCT_JS = (loginBase) => `<script>(async()=>{const el=document.getElementById('acct');const k=document.getElementById('konto');if(!el&&!k)return;try{const d=await(await fetch('/api/me',{credentials:'include'})).json();const nx=encodeURIComponent(location.href);
+// Abmelden-Links (Konto-Menü) schicken ein POST-Formular statt eines GET (CSRF-Schutz, siehe auth()).
+const ACCT_JS = (loginBase) => `<script>document.addEventListener('click',e=>{const a=e.target&&e.target.closest&&e.target.closest('a[href*="/auth/discord/logout"]');if(!a||e.defaultPrevented||e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();const f=document.createElement('form');f.method='post';f.action=a.href;f.hidden=true;document.body.append(f);f.submit()});(async()=>{const el=document.getElementById('acct');const k=document.getElementById('konto');if(!el&&!k)return;try{const d=await(await fetch('/api/me',{credentials:'include'})).json();const nx=encodeURIComponent(location.href);
 const httpsAvatar=u=>{try{const x=new URL(String(u||''));if(x.protocol!=='https:'||x.username||x.password)return '';return x.href}catch(e){return ''}};
 const onMc=/^mc\./.test(location.hostname);const fb=onMc?'/mc-head/MHF_Steve/64?v=5':'https://cdn.discordapp.com/embed/avatars/0.png';
 if(k){if(el)el.replaceChildren();
@@ -588,7 +592,9 @@ async function hmac(secret, data) { const k = await crypto.subtle.importKey("raw
 function safeEq(a, b) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
 async function sign(env, v) { return `${v}.${await hmac(env.SESSION_SECRET, v)}`; }
 async function unsign(env, s) { if (!s || !env.SESSION_SECRET) return null; const i = s.lastIndexOf("."); if (i < 1) return null; const v = s.slice(0, i); return safeEq(s.slice(i + 1), await hmac(env.SESSION_SECRET, v)) ? v : null; }
-const cookies = (req) => Object.fromEntries((req.headers.get("cookie") || "").split(/;\s*/).filter(Boolean).map(c => { const i = c.indexOf("="); return [c.slice(0, i), decodeURIComponent(c.slice(i + 1))]; }));
+// Kaputte Cookies (ohne "=" oder mit ungültiger %-Folge, z. B. von einer Nachbar-Subdomain gesetzt) werden
+// übersprungen statt die ganze Anfrage mit einem URIError abzubrechen.
+const cookies = (req) => { const o = {}; for (const c of (req.headers.get("cookie") || "").split(/;\s*/)) { const i = c.indexOf("="); if (i < 1) continue; const k = c.slice(0, i), v = safeDecode(c.slice(i + 1)); if (v != null && !(k in o)) o[k] = v; } return o; };
 const sessCookie = (v, maxAge) => `${COOKIE}=${encodeURIComponent(v)}; Domain=.${MAIN}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
 const hostOk = (h) => { const host = String(h || "").toLowerCase(); if (host === MAIN || host === MCD) return true; if (!host.endsWith("." + MAIN)) return false; const rest = host.slice(0, -(MAIN.length + 1)); return rest.length > 0 && /^[a-z0-9.-]+$/.test(rest) && !rest.startsWith(".") && !rest.endsWith(".") && !rest.includes(".."); };
 // next: relativer Pfad oder https auf nwebnotfound.dev / *.nwebnotfound.dev. Sonst Startseite. /vip bleibt auf der MC-Subdomain.
@@ -645,15 +651,41 @@ async function auth(p, req, env, url) {
     h.append("set-cookie", clear); h.append("set-cookie", sessCookie(await sign(env, sid), SESSION_DAYS * 86400));
     return new Response(null, { status: 302, headers: h });
   }
+  // Logout ändert Zustand → nur per POST mit passender Origin (sonst könnte jede fremde Seite per Link
+  // oder Redirect abmelden: SameSite=Lax schickt die Cookie bei Top-Level-GETs mit). Ein GET (alter
+  // Link, Lesezeichen, ohne JS) zeigt nur eine Bestätigungsseite mit POST-Formular.
   if (p === "/auth/discord/logout") {
+    if (req.method === "POST") {
+      const o = req.headers.get("origin");
+      if (o !== `https://${MAIN}` && o !== `https://${MCD}`) return html(portfolio({ title: "Abmelden fehlgeschlagen", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Abmelden nicht möglich.</h1><p class="lead">Die Anfrage kam nicht von dieser Seite.</p><p style="margin-top:2rem"><a class="btn" href="https://${MAIN}/">Zur Startseite</a></p></div></section>` }), 403);
+      const user = await getUser(req, env);
+      if (user) await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(user.sid).run();
+      return new Response(null, { status: 303, headers: { location: next, "cache-control": "no-store", "set-cookie": sessCookie("", 0) } });
+    }
+    if (req.method !== "GET" && req.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { allow: "GET, POST" } });
     const user = await getUser(req, env);
-    if (user) await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(user.sid).run();
-    return redirect(next, { "set-cookie": sessCookie("", 0) });
+    if (!user) return redirect(next);
+    return html(portfolio({ title: "Abmelden", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Abmelden?</h1><p class="lead">Du bist als ${esc(user.name)} angemeldet.</p><form method="post" action="/auth/discord/logout?next=${encodeURIComponent(next)}" style="margin-top:2rem"><button class="btn" type="submit">Abmelden</button> <a class="btn sec" href="${esc(next)}">Abbrechen</a></form></div></section>` }), 200, { "cache-control": "no-store" });
   }
   return null;
 }
 
 /* ---------- MC-Ingest (Push von PC-Nils) ---------- */
+// mc_snapshot: servers und leaderboards kommen in getrennten Pushes. Nur den gesendeten Teil in SQL
+// ersetzen (json_set), statt die ganze Zeile in JS zu lesen, zu ändern und zurückzuschreiben: zwei
+// parallele Pushes überschreiben sich sonst gegenseitig mit dem alten Stand des jeweils anderen Teils.
+// Für den nicht gesendeten Teil wird ein fehlender Zeitstempel (Altdaten) aus dem bisherigen
+// updated_at nachgetragen, bevor updated_at weiterspringt. undefined = Teil nicht gesendet.
+export function snapshotStatement(env, servers, leaderboards, now) {
+  const parts = [["servers", servers], ["leaderboards", leaderboards]];
+  const fresh = {}; for (const [k, v] of parts) if (v !== undefined) { fresh[k] = v; fresh[k + "_at"] = now; }
+  const sets = [], args = [JSON.stringify(fresh), now];
+  for (const [k, v] of parts) {
+    if (v !== undefined) { sets.push(`'$.${k}', json(?${args.length + 1}), '$.${k}_at', ?2`); args.push(JSON.stringify(v)); }
+    else sets.push(`'$.${k}_at', COALESCE(json_extract(mc_snapshot.data, '$.${k}_at'), CASE WHEN json_type(mc_snapshot.data, '$.${k}') IS NOT NULL THEN mc_snapshot.updated_at END)`);
+  }
+  return env.DB.prepare(`INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?1, ?2) ON CONFLICT(id) DO UPDATE SET data = json_set(json(mc_snapshot.data), ${sets.join(", ")}), updated_at = excluded.updated_at`).bind(...args);
+}
 // Craft-Views direkt annehmen (v_leaderboards, v_player_stats_ext, v_market_history) → interne Formen
 const pk = (o, ...k) => { for (const x of k) if (o?.[x] != null && o[x] !== "") return o[x]; return null; };
 const UUIDX = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
@@ -826,14 +858,7 @@ async function mcIngest(req, env) {
   const { links, players_stats, details, leaderboards_weekly, ...data } = cleanIngest(b), now = Date.now();
   const st = [], market = cleanMarket(b?.market), market_history = cleanHistory(b?.market_history);
   if (b?.servers || b?.leaderboards) {
-    // Teile unabhängig mergen: jeder Teil mit eigenem Zeitstempel
-    const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
-    const cur = row ? JSON.parse(row.data) : {};
-    if (cur.servers && !cur.servers_at) cur.servers_at = row.updated_at;
-    if (cur.leaderboards && !cur.leaderboards_at) cur.leaderboards_at = row.updated_at;
-    if (b.servers) { cur.servers = data.servers; cur.servers_at = now; }
-    if (b.leaderboards) { cur.leaderboards = data.leaderboards; cur.leaderboards_at = now; }
-    st.push(env.DB.prepare("INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(JSON.stringify(cur), now));
+    st.push(snapshotStatement(env, b.servers ? data.servers ?? null : undefined, b.leaderboards ? data.leaderboards ?? null : undefined, now));
   }
   if (links) {
     if (b.links_full === true) st.push(env.DB.prepare("DELETE FROM mc_links"));
@@ -991,9 +1016,14 @@ async function mcMarketItem(env, raw) {
 }
 
 /* ---------- Helfer ---------- */
-// CSP erst nur als Report-Only (Verstöße landen in der Browser-Konsole, kein report-uri → keine IP-Logs). Inline-Skripte/-Styles sind noch nötig.
-const CSP_RO = "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mc-heads.net https://cdn.jsdelivr.net https://cdn.discordapp.com; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://discord.com; object-src 'none'";
-const SEC_HEADERS = { "content-security-policy-report-only": CSP_RO, "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
+// CSP wird erzwungen (vorher Report-Only). Geprüft: alle Seiten beider Hosts, ein- und ausgeloggt,
+// ohne Verstoß gegen diese Liste. Inline-Skripte/-Styles und Inline-Handler (onerror=…) sind noch
+// nötig, daher 'unsafe-inline' (Nonces wären ein größerer Umbau). Kein report-uri → keine IP-Logs.
+// form-action: Logout ist ein POST an die Hauptdomain, auch von mc. aus, und leitet auf beide Hosts weiter.
+const CSP = `default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mc-heads.net https://cdn.jsdelivr.net https://cdn.discordapp.com; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://${MAIN} https://${MCD} https://discord.com; object-src 'none'`;
+// HSTS: .dev steht ohnehin auf der HSTS-Preload-Liste; der Header deckt zusätzlich Clients ohne diese Liste ab.
+const HSTS = "max-age=31536000; includeSubDomains";
+const SEC_HEADERS = { "content-security-policy": CSP, "strict-transport-security": HSTS, "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
 const json = (o, s = 200, extra = {}) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
 // Feeds (phase 3b): prebuilt at build time (src/generated/feeds.js), served with a validator so a
 // reader that already has the current version gets a 304. Short cache, no tracking parameters.
@@ -1047,9 +1077,7 @@ async function guestbookApi(req, env) {
     let b; try { b = await req.json(); } catch { return json({ error: "Ungültige Anfrage" }, 400); }
     const message = String(b.message || "").trim();
     if (!message || message.length > 500) return json({ error: "Nachricht 1–500 Zeichen" }, 400);
-    const fd = new FormData(); fd.append("secret", env.TURNSTILE_SECRET); fd.append("response", String(b.token || "")); fd.append("remoteip", req.headers.get("CF-Connecting-IP") || "");
-    const v = await (await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: fd })).json();
-    if (!v.success) return json({ error: "Captcha fehlgeschlagen" }, 403);
+    if (!(await verifyTurnstile(env, b?.token, { ip: req.headers.get("CF-Connecting-IP") || "", hosts: [MAIN, MCD] }))) return json({ error: "Captcha fehlgeschlagen" }, 403);
     const row = await env.DB.prepare("SELECT avatar FROM sessions WHERE id = ?").bind(user.sid).first();
     await env.DB.prepare("INSERT INTO entries (name, message, discord_id, avatar) VALUES (?, ?, ?, ?)").bind(user.name.slice(0, 50), message, user.id, row?.avatar || null).run();
     return json({ ok: true }, 201);
@@ -1065,8 +1093,18 @@ async function me(req, env) {
   return json({ available: authReady(env), user: u ? { id: u.id, name: u.name, username: u.username, avatar: u.avatar, mc_name: l?.mc_name || null } : null }, 200, cors);
 }
 
-export default {
-  async fetch(req, env, ctx) {
+// Letztes Netz: jeder ungefangene Fehler im Routing wird geloggt und als sauberes 500 beantwortet
+// (statt Cloudflare-Fehler 1101). Keine Fehlerdetails an den Client.
+async function handle(req, env, ctx) {
+  try { return await route(req, env, ctx); }
+  catch (e) {
+    console.error("unhandled error", req.method, new URL(req.url).pathname, e && e.stack || e);
+    let api = false; try { api = new URL(req.url).pathname.startsWith("/api/"); } catch {}
+    return api ? json({ error: "Interner Fehler" }, 500) : new Response("Interner Fehler", { status: 500, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+  }
+}
+
+async function route(req, env, ctx) {
     const url = new URL(req.url);
     const hostH = req.headers.get("host")?.replace(/:\d+$/, "") || "";
     const allowTestHost = env.MC_INGEST_TOKEN === "e2e-token";
@@ -1085,19 +1123,19 @@ export default {
     if (p === "/api/mc-data") return mcData(env);
     if (p === "/api/profile") return profileApi(req, env);
     if (p === "/api/mc-players") return json({ players: await playersApi(env, url) });
-    if (p.startsWith("/api/mc-players/")) { const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, decodeURIComponent(p.slice(16)), u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
+    if (p.startsWith("/api/mc-players/")) { const n = safeDecode(p.slice(16)); if (n == null) return json({ error: "Spieler nicht gefunden" }, 404); const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, n, u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
     if (p === "/api/mc-leaderboards") return mcLeaderboards(env);
     if (p === "/api/mc-parkour") return json(await parkourApi(env), 200, { "cache-control": "public, max-age=30" });
     if (p === "/api/mc-pvp") return json(await pvpApi(env), 200, { "cache-control": "public, max-age=30" });
     if (p === "/api/mc-vip") { if (req.method !== "GET") return json({ error: "Method not allowed" }, 405); const u = await getUser(req, env).catch(() => null); return json(await vipApi(env, u), 200, { "cache-control": "private, no-store" }); }
-    if (p.startsWith("/api/mc-pvp/")) { const o = await pvpPlayerApi(env, decodeURIComponent(p.slice(12))); return o ? json(o, 200, { "cache-control": "public, max-age=30" }) : json({ error: "keine PvP-Daten" }, 404); }
+    if (p.startsWith("/api/mc-pvp/")) { const n = safeDecode(p.slice(12)); if (n == null) return json({ error: "keine PvP-Daten" }, 404); const o = await pvpPlayerApi(env, n); return o ? json(o, 200, { "cache-control": "public, max-age=30" }) : json({ error: "keine PvP-Daten" }, 404); }
     if (p === "/api/mc-economy") return json(await economyApi(env), 200, { "cache-control": "public, max-age=60" });
     if (p === "/api/mc-market") return mcMarket(env);
-    if (p.startsWith("/api/mc-market/")) return mcMarketItem(env, decodeURIComponent(p.slice(15)));
+    if (p.startsWith("/api/mc-market/")) { const it = safeDecode(p.slice(15)); return it == null ? json({ error: "invalid item" }, 400) : mcMarketItem(env, it); }
     if (p.startsWith("/mc-head/")) return headResponse(req, p, ctx, env);
     if (p.startsWith("/mc-skin/")) return skinResponse(req, p, ctx, env);
-    if (p.startsWith("/mc-mob/")) return new Response(null, { status: 302, headers: { location: mobIcon(decodeURIComponent(p.slice(8)).replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } });
-    if (p.startsWith("/mc-icon/")) { const q = p.slice(9).replace(/^v2\//, ""); let dq; try { dq = decodeURIComponent(q); } catch { return new Response("Not found", { status: 404 }); } const r = resolveIcon(dq.replace(/\.png$/, "")); return r ? new Response(null, { status: 302, headers: { location: /^(https:|\/)/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=86400" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${dq.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
+    if (p.startsWith("/mc-mob/")) { const k = safeDecode(p.slice(8)); if (k == null) return new Response("Not found", { status: 404 }); return new Response(null, { status: 302, headers: { location: mobIcon(k.replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } }); }
+    if (p.startsWith("/mc-icon/")) { const dq = safeDecode(p.slice(9).replace(/^v2\//, "")), id = dq == null ? "" : dq.toLowerCase().replace(/\.png$/, "").replace(/^minecraft:/, ""); if (!ICON_ID_RE.test(id)) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=3600" } }); const r = resolveIcon(id); return r ? new Response(null, { status: 302, headers: { location: /^(https:|\/)/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=86400" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${id.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
     if (p.startsWith("/auth/")) {
       if (isMc) { url.hostname = MAIN; return redirect(url.toString()); }
       const r = await auth(p, req, env, url); if (r) return r;
@@ -1113,19 +1151,19 @@ export default {
       if (p === "/bestellungen" || p === "/abholungen") return html(mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));
       if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
       if (p === "/spieler") return html(mcPage("Spieler · NwebNotFound MC", "Spieler suchen: Skin, öffentliche Stats und Profil", playersBody()));
-      if (p.startsWith("/spieler/")) { const n = decodeURIComponent(p.slice(9)); if (!/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
+      if (p.startsWith("/spieler/")) { const n = safeDecode(p.slice(9)); if (n == null || !/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
       if (p === "/markt" && url.searchParams.has("item")) {
         const raw = String(url.searchParams.get("item") || "").trim(), it = cleanItem(raw);
         const known = it ? await env.DB.prepare("SELECT 1 FROM mc_market WHERE item = ?").bind(it).first().catch(() => null) : null;
         return redirect(known ? `/markt/${encodeURIComponent(it)}` : `/markt?q=${encodeURIComponent(raw.replace(/^minecraft:/i, "").replace(/_/g, " ").slice(0, 48))}`);
       }
       if (p === "/shops") return html(mcPage("Shops · NwebNotFound MC", "Spielershops: Angebote, Preise, Lager und Orte", shopsBody()));
-      if (p.startsWith("/shops/")) { const id = decodeURIComponent(p.slice(7)); if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Shop · NwebNotFound MC", "Spielershop", shopBody(id))); }
+      if (p.startsWith("/shops/")) { const id = safeDecode(p.slice(7)); if (id == null || !/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Shop · NwebNotFound MC", "Spielershop", shopBody(id))); }
       if (p === "/bestenlisten" || p === "/bestenliste") return Response.redirect(`https://${MCD}/leaderboards`, 301);
       if (p === "/auktionen") return html(mcPage("Auktionen · NwebNotFound MC", "Live-Auktionen vom Server", auctionsBody()));
-      if (p.startsWith("/auktionen/")) { const id = decodeURIComponent(p.slice(11)); if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Auktion · NwebNotFound MC", "Auktion mit Gebotsverlauf", auctionBody(id))); }
+      if (p.startsWith("/auktionen/")) { const id = safeDecode(p.slice(11)); if (id == null || !/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Auktion · NwebNotFound MC", "Auktion mit Gebotsverlauf", auctionBody(id))); }
       if (p === "/markt") return html(mcPage("Markt · NwebNotFound MC", "Preise, Gewinner und Verlierer im Server-Shop", marketBody()));
-      if (p.startsWith("/markt/")) { const it = cleanItem(decodeURIComponent(p.slice(7))); if (!it) return notFound(true); return html(mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
+      if (p.startsWith("/markt/")) { const raw = safeDecode(p.slice(7)), it = raw == null ? null : cleanItem(raw); if (!it) return notFound(true); return html(mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
       if (p === "/wiki") return html(mcPage("Wiki · NwebNotFound MC", "Anleitungen, Regeln und FAQ zum Minecraft-Server", wikiIndexBody(MC_HOST)));
       if (p.startsWith("/wiki/")) { const a = WIKI.find((x) => x.slug === p.slice(6)); if (!a) return notFound(true); return html(mcPage(a.title + " · Wiki · NwebNotFound MC", a.sum, wikiArticleBody(a, MC_HOST))); }
       return assetOrNotFound(req, env, true);
@@ -1154,5 +1192,12 @@ export default {
     if (p === "/profile") return html(PROFILE_MAIN());
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
     return assetOrNotFound(req, env, false);
+}
+
+export default {
+  fetch: (req, env, ctx) => handle(req, env, ctx),
+  async scheduled(event, env, ctx) {
+    try { console.log("purge", JSON.stringify(await purge(env))); }
+    catch (e) { console.error("purge failed", e && e.stack || e); throw e; }
   },
 };

@@ -3,6 +3,7 @@
 // expired setzt nur mc-stack, frühestens 600000 ms nach created_at.
 import { normU, WORLD_LIMITS, worldLimit } from "./mc-vip.js";
 import { hashIp } from "./ip-hash.js";
+import { safeDecode } from "./safe-decode.js";
 
 // Vom Browser erlaubte ops (Pfad → action).
 export const ACTIONS = ["create", "rename", "start", "stop", "settings", "set_visibility", "invite", "uninvite", "trust", "delete"];
@@ -252,6 +253,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       if ((list || []).some((w) => String(w.name || "").toLowerCase() === name.toLowerCase())) return json({ error: "Name schon vergeben", reason: "name_taken" }, 409);
       // Die Syncliste hinkt dem Server nach: laufende create-Aufträge zählen für Platz und Namen mit,
       // sonst legen zwei Klicks (oder zwei Tabs) zwei Welten an bzw. denselben Namen doppelt.
+      // (Vorabprüfung für eine klare Fehlermeldung; verbindlich ist die gleiche Bedingung im INSERT unten.)
       const [pMine, pName] = await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS n FROM mc_vip_commands WHERE action = 'create' AND status = 'pending' AND discord_id = ?").bind(a.user.id).first(),
         env.DB.prepare("SELECT 1 AS n FROM mc_vip_commands WHERE action = 'create' AND status = 'pending' AND lower(name) = lower(?) LIMIT 1").bind(name).first(),
@@ -273,16 +275,22 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     const spec = { action, world_id: id, name, role, visibility };
     const rid = body?.request_id != null ? String(body.request_id) : crypto.randomUUID();
     if (!RID.test(rid)) return json({ error: "request_id ungültig (1-64 Zeichen [A-Za-z0-9_-])" }, 400);
-    const ex = await env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, info, world_type, settings, status FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
-    if (ex) {
+    const existing = () => env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, info, world_type, settings, status FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
+    const dup = (ex) => {
       const same = ex.action === spec.action && (ex.world_id || "") === spec.world_id && (ex.name || null) === name && (ex.role || null) === role && (ex.visibility || null) === visibility
         && (ex.world_type || null) === worldType && (ex.settings || null) === (settings ? JSON.stringify(settings) : null);
       if (!same) return json({ error: "request_id schon benutzt" }, 409);
       return json({ ok: true, duplicate: true, request_id: rid, op: ex.action, status: ex.status }, 200);
-    }
+    };
+    const ex = await existing();
+    if (ex) return dup(ex);
     const ip = req.headers.get("CF-Connecting-IP") || "";
     const ipHash = await hashIp(env, ip);
     const now = Date.now(), since = now - HOUR;
+    // Rate-Limits und "busy": erst als Vorabprüfung (mit retry_after_ms), dann verbindlich als
+    // Bedingung im INSERT selbst. Sonst laufen parallele Anfragen alle durch die Zählung, bevor die
+    // erste Zeile steht (zwei creates bekommen denselben freien Platz, start läuft doppelt usw.).
+    const limits = async () => {
     if (action === "start") {
       const busy = await env.DB.prepare("SELECT 1 AS n FROM mc_vip_commands WHERE world_id = ? AND status = 'pending' LIMIT 1").bind(id).first();
       if (busy) return json({ error: "Auftrag läuft schon", reason: "busy" }, 409);
@@ -314,8 +322,37 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
         return json({ error: "Zu viele Aktionen", retry_after_ms: Math.max(1, t + HOUR - now) }, 429);
       }
     }
+    return null;
+    };
+    const pre = await limits(); if (pre) return pre;
+    // Gleiche Bedingungen wie limits() und die create-Prüfung oben, als ein Statement. ?4 world_id,
+    // ?8 discord_id, ?9 name, ?16 ip_hash (NULL trifft nie), ?17 Zeitfenster, ?18 freie Plätze.
+    const cnt = (w) => `(SELECT COUNT(*) FROM mc_vip_commands WHERE ${w} AND created_at > ?17)`;
+    const guard = action === "start"
+      ? `NOT EXISTS (SELECT 1 FROM mc_vip_commands WHERE world_id = ?4 AND status = 'pending') AND ${cnt("world_id = ?4 AND action = 'start'")} < 3 AND ${cnt("discord_id = ?8 AND action = 'start'")} < 6`
+      : action === "settings"
+        ? `${cnt("discord_id = ?8 AND action = 'settings'")} < 30 AND ${cnt("ip_hash = ?16 AND action = 'settings'")} < 60`
+        : `${cnt("discord_id = ?8 AND action != 'start' AND action != 'settings'")} < 10 AND ${cnt("ip_hash = ?16 AND action != 'start' AND action != 'settings'")} < 20`
+          + (create ? ` AND NOT EXISTS (SELECT 1 FROM mc_vip_commands WHERE action = 'create' AND status = 'pending' AND lower(name) = lower(?9)) AND (SELECT COUNT(*) FROM mc_vip_commands WHERE action = 'create' AND status = 'pending' AND discord_id = ?8) < ?18` : "");
+    const free = create ? worldLimit(a.rank) - (list || []).filter((w) => w.owner_uuid === a.uuid).length : 0;
     const rowId = crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, world_type, settings, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web', ?, 'pending', NULL, ?)").bind(rowId, rid, action, id, a.uuid, a.name, create ? a.uuid : world.owner_uuid, a.user.id, name, role, visibility, info, worldType, settings ? JSON.stringify(settings) : null, now, ipHash).run();
+    // OR IGNORE: zwei parallele Submits mit derselben request_id sehen oben beide keine Zeile; der
+    // zweite INSERT verletzt dann UNIQUE (discord_id, request_id). Statt 500 → erneut lesen → duplicate.
+    const ins = await env.DB.prepare(`INSERT OR IGNORE INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, world_type, settings, source, created_at, status, ip, ip_hash) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 'web', ?15, 'pending', NULL, ?16 WHERE ${guard}`)
+      .bind(rowId, rid, action, id, a.uuid, a.name, create ? a.uuid : world.owner_uuid, a.user.id, name, role, visibility, info, worldType, settings ? JSON.stringify(settings) : null, now, ipHash, since, ...(create ? [free] : [])).run();
+    if (!ins.meta?.changes) {
+      // Nichts eingefügt: gleiche request_id parallel (→ duplicate) oder ein Limit hat gegriffen.
+      const ex2 = await existing(); if (ex2) return dup(ex2);
+      if (create) {
+        const [pMine, pName] = await Promise.all([
+          env.DB.prepare("SELECT COUNT(*) AS n FROM mc_vip_commands WHERE action = 'create' AND status = 'pending' AND discord_id = ?").bind(a.user.id).first(),
+          env.DB.prepare("SELECT 1 AS n FROM mc_vip_commands WHERE action = 'create' AND status = 'pending' AND lower(name) = lower(?) LIMIT 1").bind(name).first(),
+        ]);
+        if (pName) return json({ error: "Name schon vergeben", reason: "name_taken" }, 409);
+        if ((pMine?.n || 0) >= free) return json({ error: "Kein freier Weltplatz", reason: "no_free_slot" }, 409);
+      }
+      return (await limits()) || json({ error: "Zu viele Aktionen", retry_after_ms: 60000 }, 429);
+    }
     return json({ ok: true, request_id: rid, op: action, status: "pending" }, 202);
   }
 
@@ -383,15 +420,16 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       if (p === "/api/mc-vip/worlds") return mutate(req, env, "", "create", await bodyOf(req));
       const m = p.match(/^\/api\/mc-vip\/worlds\/([^/]+)\/(start|stop|rename|settings|delete|visibility|members)(?:\/([^/]+))?(?:\/(trust))?$/);
       if (!m) return null;
-      const worldId = decodeURIComponent(m[1]);
-      const body = m[2] === "members" && req.method === "DELETE" ? { name: decodeURIComponent(m[3] || "") } : await bodyOf(req);
+      const worldId = safeDecode(m[1]), member = safeDecode(m[3] || "");
+      if (worldId == null || member == null) return json({ error: "not found" }, 404);
+      const body = m[2] === "members" && req.method === "DELETE" ? { name: member } : await bodyOf(req);
       if (m[2] === "start") return mutate(req, env, worldId, "start", body);
       if (m[2] === "stop") return mutate(req, env, worldId, "stop", body);
       if (m[2] === "rename") return mutate(req, env, worldId, "rename", body);
       if (m[2] === "settings") return mutate(req, env, worldId, "settings", body);
       if (m[2] === "delete") return mutate(req, env, worldId, "delete", body);
       if (m[2] === "visibility") return mutate(req, env, worldId, "set_visibility", body);
-      if (m[2] === "members" && m[4] === "trust") return mutate(req, env, worldId, "trust", { ...body, name: decodeURIComponent(m[3] || "") });
+      if (m[2] === "members" && m[4] === "trust") return mutate(req, env, worldId, "trust", { ...body, name: member });
       if (m[2] === "members" && req.method === "DELETE") return mutate(req, env, worldId, "uninvite", body);
       if (m[2] === "members") return mutate(req, env, worldId, "invite", body);
       return null;

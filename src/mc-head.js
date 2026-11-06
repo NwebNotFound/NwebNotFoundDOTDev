@@ -125,7 +125,7 @@ const CC = (real) => "public, max-age=" + (real ? 21600 : 600);
 // Fall über /mc-icon/v2/player_head → mc-heads.net, also über das Netz: ohne Verbindung zu den
 // Skin-Quellen blieb das <img> kaputt, jeder Avatar (auch der eines verknüpften Namens) fiel auf
 // MHF_Steve zurück. Jetzt antwortet /mc-head/<name> immer mit einem echten PNG.
-async function localHeadAsset(env, req) {
+async function localHeadAsset(env, req, maxAge = 600) {
   try {
     if (!env?.ASSETS) return null;
     const url = new URL("/mc/heads/steve.png", req.url).toString();
@@ -136,12 +136,26 @@ async function localHeadAsset(env, req) {
     return new Response(b, {
       status: 200,
       headers: {
-        "content-type": "image/png", "cache-control": "public, max-age=600",
+        "content-type": "image/png", "cache-control": "public, max-age=" + maxAge,
         "x-skin-source": "asset:steve", "x-content-type-options": "nosniff",
       },
     });
   } catch { return null; }
 }
+// Schutz gegen Verstärkung: jeder neue Name kostet bis zu ~14 Upstream-Abrufe (Mojang, minotar,
+// mc-heads, je mit Retry) plus PNG-Dekodierung. Cache-Fehlgriffe werden deshalb pro IP gedrosselt
+// (pro Isolate, Speicher begrenzt). Über dem Limit gibt es den lokalen Steve, ohne Upstream.
+// Echte Spieler sind davon kaum betroffen: Treffer im Edge-Cache zählen nicht mit.
+export const MISS_LIMIT = { perMin: 120 };
+const misses = new Map(), MISS_MAX = 5000;
+export function missAllowed(req, now = Date.now()) {
+  const ip = req?.headers?.get?.("cf-connecting-ip");
+  if (!ip) return true; // nur intern/Tests: in Produktion setzt Cloudflare den Header immer
+  let e = misses.get(ip);
+  if (!e || now - e.t >= 60000) { if (!e && misses.size >= MISS_MAX) misses.clear(); e = { t: now, n: 0 }; misses.set(ip, e); }
+  return ++e.n <= MISS_LIMIT.perMin;
+}
+const putCache = async (cache, key, res, ctx) => { if (!cache) return; try { const p = cache.put(key, res.clone()).catch(() => {}); ctx?.waitUntil ? ctx.waitUntil(p) : await p; } catch {} };
 export async function renderHead(name, size, fetcher = fetch, env = null) {
   const k = await resolveSkin(name, env, fetcher); if (!k) return null;
   return { png: await encodePng(size, size, faceRgba(k.s, size)), fallback: !k.real, src: k.src };
@@ -153,15 +167,21 @@ export async function headResponse(req, path, ctx, env = null, fetcher = fetch) 
   const key = new Request(new URL("/mc-head/v5/" + m[1].toLowerCase() + "/" + size, req.url).toString());
   const cache = typeof caches !== "undefined" ? caches.default : null;
   const hit = cache && (await cache.match(key)); if (hit) return hit;
+  if (!missAllowed(req)) {
+    const local = await localHeadAsset(env, req, 60);
+    return local || new Response(null, { status: 302, headers: { location: "/mc-icon/v2/player_head", "cache-control": "public, max-age=60" } });
+  }
   const r = await renderHead(m[1], size, fetcher, env);
   if (!r) {
-    // Ohne erreichbare Skin-Quelle: eigener Default-Kopf statt Weiterleitung ins Netz.
+    // Ohne erreichbare Skin-Quelle: eigener Default-Kopf statt Weiterleitung ins Netz. Auch dieses
+    // Negativ-Ergebnis wird (10 min) gecacht, sonst kostet derselbe unbekannte Name bei jedem Aufruf
+    // wieder die ganze Upstream-Kette.
     const local = await localHeadAsset(env, req);
-    if (local) return local;
+    if (local) { await putCache(cache, key, local, ctx); return local; }
     return new Response(null, { status: 302, headers: { location: "/mc-icon/v2/player_head", "cache-control": "public, max-age=300" } });
   }
   const res = new Response(r.png, { headers: { "content-type": "image/png", "cache-control": CC(!r.fallback), "x-skin-source": r.src, "x-content-type-options": "nosniff" } });
-  if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
+  await putCache(cache, key, res, ctx);
   return res;
 }
 // Roh-Skin same-origin für skinview3d (CSP: img/connect nur 'self'). Nur validierte PNGs (siehe skinOk), Fallback Steve.
@@ -171,9 +191,10 @@ export async function skinResponse(req, path, ctx, env = null, fetcher = fetch) 
   const key = new Request(new URL("/mc-skin/v3/" + m[1].toLowerCase(), req.url).toString());
   const cache = typeof caches !== "undefined" ? caches.default : null;
   const hit = cache && (await cache.match(key)); if (hit) return hit;
+  if (!missAllowed(req)) return new Response("Too many requests", { status: 429, headers: { "retry-after": "60", "cache-control": "no-store" } });
   const k = await resolveSkin(m[1], env, fetcher);
-  if (!k) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } });
+  if (!k) { const nf = new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } }); await putCache(cache, key, nf, ctx); return nf; } // Negativ-Cache
   const res = new Response(k.b, { headers: { "content-type": "image/png", "cache-control": CC(k.real), "x-skin-source": k.src, "x-content-type-options": "nosniff" } });
-  if (cache) { const p = cache.put(key, res.clone()); ctx?.waitUntil ? ctx.waitUntil(p) : await p; }
+  await putCache(cache, key, res, ctx);
   return res;
 }
