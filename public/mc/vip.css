@@ -79,6 +79,9 @@ html.mc .v2-pips i.on{background:var(--grass);box-shadow:0 2px 0 var(--act-edge)
 html.mc .v2-toast{display:flex;align-items:center;gap:.5rem;margin:0 0 .4rem;padding:.55rem .85rem;border-radius:999px;width:max-content;max-width:100%;background:var(--c-acc-bg);color:var(--ink);box-shadow:inset 0 0 0 1px var(--ring)}
 /* Erst die Meldung selbst darf animieren: eine Dauer-Animation mit fill both machte den leeren Toast sichtbar. */
 html.mc .v2-toast.is-on{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+/* The feedback pill stays in view while a lower card is used: fixed to the bottom of the viewport (auto margins centre it). */
+html.mc .vip-say.v2-toast{position:fixed;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom));margin:0 auto;z-index:60;max-width:min(92vw,560px);pointer-events:none;box-shadow:inset 0 0 0 1px var(--ring),var(--shadow)}
+html.mc .vip-say.v2-toast:not(.is-on){display:none}
 html.mc .v2-world{padding:0;overflow:hidden;position:relative;transition:box-shadow .25s,transform .25s cubic-bezier(.34,1.56,.64,1)}
 html.mc .v2-world.is-on{box-shadow:var(--shadow-lift)}
 html.mc .v2-world.is-on::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--c-acc) 50%, transparent);pointer-events:none}

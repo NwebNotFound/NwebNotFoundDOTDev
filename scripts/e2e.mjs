@@ -544,9 +544,9 @@ try {
     ok(home.t.includes('href="https://github.com/NwebNotFound" target="_blank" rel="noopener noreferrer"') && home.t.includes('href="https://x.com/NwebNotFound" target="_blank" rel="noopener noreferrer"'), "Footer: GitHub und X als normale Links mit rel=noopener noreferrer");
     ok(extUrls(home.t).length === 0, "keine fremden Requests (kein CDN, kein Tracker, keine externen Schriften)", extUrls(home.t).slice(0, 3).join(" "));
     { const nav = home.t.slice(home.t.indexOf("<header"), home.t.indexOf("</header>"));
-      ok(!nav.includes(">Musik<") && home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche: nicht in der Navigation (Nils 05.11.), 'bald' auf den Kacheln"); }
+      ok(!nav.includes(">Musik<") && home.t.includes("h2-st is-soon") && home.t.includes(">bald<"), "noch leere Bereiche: nicht in der Navigation (Nils 05.11.), 'bald' auf den Projektkarten"); }
     const en = await hub("/", { headers: { "accept-language": "en-GB,en;q=0.9" } });
-    ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("Welcome to my corner"), "Accept-Language en → englische Oberfläche");
+    ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("What I&#39;m building"), "Accept-Language en → englische Oberfläche");
     ok(en.t.includes('href="/de"') && en.t.includes('href="/en"') && en.t.includes('aria-current="true"'), "Sprachumschalter verlinkt beide Sprachen und markiert die aktuelle");
     const bare = await hub("/");
     ok(/<html lang="de"/.test(bare.t), "ohne Accept-Language → Deutsch als Standard");
@@ -1079,11 +1079,40 @@ try {
       ok(ar.s === 202 && ar.j?.op === "rename", "Admin: eigene Welt umbenennen → 202", ar.t);
       const ad = await post(`/api/mc-vip/worlds/${WID}/delete`, { request_id: "vip-admin-delete", confirm: "Insel" }, { cookie: c1 });
       ok(ad.s === 202 && ad.j?.op === "delete", "Admin: eigene Welt löschen → 202", ad.t);
+      // Real website → pending path (review #96/#168): the exact 202 shape the panel follows, the
+      // typed delete name as confirm, and the link as it is at dispatch.
+      ok(ad.j?.status === "pending" && typeof ad.j?.request_id === "string" && ad.j.request_id === "vip-admin-delete", "Echte 202-Antwort: request_id + status pending", ad.t);
+      const dup = await post(`/api/mc-vip/worlds/${WID}/delete`, { request_id: "vip-admin-delete", confirm: "Insel" }, { cookie: c1 });
+      ok(dup.s === 200 && dup.j?.duplicate === true && dup.j?.status === "pending", "Delete-Wiederholung mit gleichem Namen → duplicate statt 409", dup.t);
+      const pq = (await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || [];
+      const pDel = pq.find((x) => x.request_id === "vip-admin-delete"), pRen = pq.find((x) => x.request_id === "vip-admin-rename");
+      ok(pDel?.confirm === "Insel" && pDel?.name === null && pDel?.world_id === WID, "Pending: delete trägt den eingetippten Namen als confirm", JSON.stringify(pDel));
+      ok(pDel?.linked === true && pDel?.actor_uuid === U1 && pRen?.linked === true, "Pending: linked=true bei gültiger Verknüpfung", JSON.stringify(pDel));
+      sql(`UPDATE mc_links SET verified = 0 WHERE discord_id = '${D1}'`);
+      ok(((await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || []).find((x) => x.request_id === "vip-admin-delete")?.linked === false, "Pending: nach Entknüpfen linked=false (Prüfung beim Abholen)");
+      sql(`UPDATE mc_links SET verified = 1, has_role = 0 WHERE discord_id = '${D1}'`);
+      ok(((await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || []).find((x) => x.request_id === "vip-admin-delete")?.linked === false, "Pending: ohne Discord-Rolle linked=false");
+      const keepUuid = sqlRows(`SELECT mc_uuid FROM mc_links WHERE discord_id = '${D1}'`)[0].mc_uuid;
+      sql(`UPDATE mc_links SET has_role = 1, mc_uuid = '${U2}' WHERE discord_id = '${D1}'`);
+      ok(((await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || []).find((x) => x.request_id === "vip-admin-delete")?.linked === false, "Pending: neu auf anderen Account verknüpft → linked=false");
+      sql(`UPDATE mc_links SET mc_uuid = '${keepUuid}' WHERE discord_id = '${D1}'`);
+      ok(((await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || []).find((x) => x.request_id === "vip-admin-delete")?.linked === true, "Pending: zurückverknüpft → linked=true");
       sql("DELETE FROM mc_vip_commands WHERE request_id IN ('vip-admin-create','vip-admin-rename','vip-admin-delete')");
       await post("/api/mc-vip-worlds", { vip_worlds: [] }, { token: TOK, origin: null, cookie: null });
       await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }] } });
       const c1r = await post("/api/mc-vip/worlds", { request_id: "vip-create-1", name: "Kirschtal", type: "flat" }, { cookie: c1 });
       ok(c1r.s === 202 && c1r.j?.op === "create", "create → 202", c1r.t);
+      { // Status of an own command: pending until the ack, then the server's real outcome.
+        const st0 = await req("/api/mc-vip/requests/vip-create-1", { cookie: c1 });
+        ok(st0.s === 200 && st0.j?.status === "pending" && st0.j?.op === "create", "Auftragsstatus: pending vor dem Ack", st0.t);
+        ok((await req("/api/mc-vip/requests/vip-create-1", { cookie: c2 })).s === 404, "Auftragsstatus: fremder Auftrag → 404");
+        ok((await req("/api/mc-vip/requests/vip-create-1")).s === 401, "Auftragsstatus: ohne Session → 401");
+        ok((await req("/api/mc-vip/requests/bad%20id", { cookie: c1 })).s === 400, "Auftragsstatus: ungültige request_id → 400");
+        await req("/api/mc-vip-commands/ack", { method: "POST", token: TOK, body: { acks: [{ request_id: "vip-create-1", discord_id: D1, status: "denied", reason: "not_linked" }] } });
+        const st1 = await req("/api/mc-vip/requests/vip-create-1", { cookie: c1 });
+        ok(st1.j?.status === "denied" && st1.j?.reason === "not_linked", "Auftragsstatus: denied/not_linked nach dem Ack", st1.t);
+        sql("UPDATE mc_vip_commands SET status = 'pending', reason = NULL, acked_at = NULL WHERE request_id = 'vip-create-1'");
+      }
       const c2r = await post("/api/mc-vip/worlds", { request_id: "vip-create-2", name: "Kirschtal", type: "flat" }, { cookie: c1 });
       ok(c2r.s === 409 && c2r.j?.reason === "name_taken", "zweites create mit gleichem Namen → 409 name_taken", c2r.t);
       const c3r = await post("/api/mc-vip/worlds", { request_id: "vip-create-3", name: "Anders", type: "flat" }, { cookie: c1 });
