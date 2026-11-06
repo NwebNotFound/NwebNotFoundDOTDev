@@ -84,7 +84,7 @@
     }).join("");
     return `<section class="v2-pane" aria-label="Mitglieder"><h3 class="v2-h3">Mitglieder <span class="mut v2-count">${NF(list.length)} / 12</span></h3><ul class="v2-members">${rows || '<li class="v2-empty"><span class="mut">Noch niemand eingeladen.</span></li>'}</ul><form class="v2-invite" data-id="${E(s.id)}"><div class="field"><label for="inv-${E(s.id)}">Spieler einladen</label><input id="inv-${E(s.id)}" name="name" placeholder="Minecraft-Name" autocomplete="off" maxlength="16" pattern="[A-Za-z0-9_]{1,16}" required></div><button class="btn" type="submit">Einladen</button></form><p class="mut v2-hint">Vertraut = darf die Welt starten. Verwalten, einladen und löschen kannst nur du.</p></section>`;
   };
-  const renameForm = (s) => `<form class="v2-rename" id="rn-${E(s.id)}" data-id="${E(s.id)}" hidden><div class="field"><label for="rn-in-${E(s.id)}">Neuer Name</label><input id="rn-in-${E(s.id)}" name="name" value="${E(s.label)}" maxlength="24" minlength="3" pattern="[A-Za-z0-9_-]{3,24}" autocomplete="off" required></div><button class="btn sm" type="submit">Umbenennen</button></form>`;
+  const renameForm = (s) => `<form class="v2-rename" id="rn-${E(s.id)}" data-id="${E(s.id)}" hidden><div class="field"><label for="rn-in-${E(s.id)}">Neuer Name</label><input id="rn-in-${E(s.id)}" name="name" value="${E(s.label)}" maxlength="24" minlength="3" pattern="[A-Za-z0-9_\\-]{3,24}" autocomplete="off" required></div><button class="btn sm" type="submit">Umbenennen</button></form>`;
   const deleteForm = (s) => `<form class="v2-delconfirm" id="dc-${E(s.id)}" data-id="${E(s.id)}" data-name="${E(s.label)}" hidden><div class="field"><label for="dc-in-${E(s.id)}">Zum Löschen <b>${E(s.label)}</b> eintippen</label><input id="dc-in-${E(s.id)}" name="confirm" autocomplete="off" placeholder="${E(s.label)}" maxlength="24" required></div><button class="btn danger" type="submit">Endgültig löschen</button><p class="mut v2-hint">Löschen lässt sich nicht rückgängig machen. Die Welt und ihre Einstellungen sind danach weg.</p></form>`;
   // Eine Weltkarte. Verwalten nur für Owner/Admin; trusted und Mitglieder sehen Starten.
   const world = (s, opts = {}) => {
@@ -111,7 +111,7 @@
     const body = manage ? `<div class="v2-wbody" id="wb-${E(s.id)}">${settingsPane(s)}${membersPane(s)}</div><footer class="v2-wfoot"><span class="mut v2-hint">Änderungen laufen über den Server, meist in ein paar Sekunden.</span><button class="btn sm ghost v2-danger" type="button" data-del="${E(s.id)}" aria-controls="dc-${E(s.id)}" aria-expanded="false">Welt löschen…</button></footer>${deleteForm(s)}` : "";
     return `<article class="g v2-world${online ? " is-on" : ""}${manage ? " is-open" : " v2-guest"}${opts.extra ? " is-extra" : ""}" data-wid="${E(s.id)}"><header class="v2-wh">${slot(typ.icon, true)}<div class="v2-wt"><b class="v2-wname">${E(s.label) || "VIP-Welt"}${manage && uuid ? `<button class="v2-icbtn" type="button" data-rename="${E(s.id)}" aria-label="Umbenennen" aria-controls="rn-${E(s.id)}" aria-expanded="false">${ico("name_tag", 16)}</button>` : ""}</b><p class="mut v2-wmeta">${meta.join(" · ")}</p>${info}${manage && uuid ? renameForm(s) : ""}</div><div class="v2-wacts">${acts.join("")}</div></header>${body}</article>`;
   };
-  const createCard = () => `<article class="v2-free"><span class="slot big v2-plus" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 5 5"><rect x="2" y="0" width="1" height="5" fill="currentColor"/><rect x="0" y="2" width="5" height="1" fill="currentColor"/></svg></span><div class="v2-free-in"><b>Freier Platz</b><p class="mut">Leg deine nächste Welt an. Name 3–24 Zeichen, nur Buchstaben, Zahlen, - und _.</p><form class="v2-create"><div class="field"><label for="v2-nm">Name</label><input id="v2-nm" name="name" placeholder="z. B. Kirschtal" autocomplete="off" maxlength="24" minlength="3" pattern="[A-Za-z0-9_-]{3,24}" required></div><div class="field"><span class="v2-flab">Art</span><div class="v2-types" role="radiogroup" aria-label="Weltart">${Object.entries(TYPE).map(([k, v], i) => `<button type="button" role="radio" data-type="${k}" aria-checked="${i === 0}">${ico(v.icon, 28)}${v.label}</button>`).join("")}</div></div><button class="btn" type="submit">Welt anlegen <span class="arrow">›</span></button></form></div></article>`;
+  const createCard = () => `<article class="v2-free"><span class="slot big v2-plus" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 5 5"><rect x="2" y="0" width="1" height="5" fill="currentColor"/><rect x="0" y="2" width="5" height="1" fill="currentColor"/></svg></span><div class="v2-free-in"><b>Freier Platz</b><p class="mut">Leg deine nächste Welt an. Name 3–24 Zeichen, nur Buchstaben, Zahlen, - und _.</p><form class="v2-create"><div class="field"><label for="v2-nm">Name</label><input id="v2-nm" name="name" placeholder="z. B. Kirschtal" autocomplete="off" maxlength="24" minlength="3" pattern="[A-Za-z0-9_\\-]{3,24}" required></div><div class="field"><span class="v2-flab">Art</span><div class="v2-types" role="radiogroup" aria-label="Weltart">${Object.entries(TYPE).map(([k, v], i) => `<button type="button" role="radio" data-type="${k}" aria-checked="${i === 0}">${ico(v.icon, 28)}${v.label}</button>`).join("")}</div></div><button class="btn" type="submit">Welt anlegen <span class="arrow">›</span></button></form></div></article>`;
   const full = (max) => `<div class="v2-full g">${pips(max, max)}<p><b>Dein Platz ist belegt.</b> <span class="mut">${max === 1 ? "VIP hat eine Welt." : "Du hast alle " + NF(max) + " Welten."} Für eine neue Welt lösche erst eine alte.</span></p></div>`;
   const ownSection = (w, max, admin) => {
     const all = w && Array.isArray(w.slots) ? w.slots : [];
@@ -227,6 +227,29 @@
     busy: "Für diese Welt läuft schon ein Auftrag.", not_linked: "Dein Minecraft-Account ist nicht verknüpft.",
     member_not_found: "Dieser Spieler ist nicht eingeladen.", "schon eingeladen": "Dieser Spieler ist schon eingeladen.",
     "nicht eingeladen": "Dieser Spieler ist nicht eingeladen.", "höchstens 12 Mitglieder": "Höchstens 12 Mitglieder.",
+    host_unavailable: "Der Server war nicht erreichbar. Versuch es gleich noch einmal.",
+    invalid_player: "Dein Minecraft-Account ist nicht verknüpft.",
+  };
+  // A 202 only means "queued". The success text comes once mc-stack acks the command as done;
+  // denied/failed/expired show the server's reason (live test 06.11.: a not_linked create had
+  // been shown as "Welt angelegt").
+  const POLL_MS = 2500, POLL_MAX = 36;
+  const follow = async (rid, okMsg) => {
+    say("Auftrag an den Server gesendet. Warte auf seine Antwort …", false);
+    for (let i = 0; i < POLL_MAX; i++) {
+      await new Promise((res) => setTimeout(res, POLL_MS));
+      let r;
+      try {
+        const x = await fetch("/api/mc-vip/requests/" + encodeURIComponent(rid), { credentials: "include", cache: "no-store" });
+        r = { status: x.status, j: await x.json().catch(() => ({})) };
+      } catch { continue; }
+      if (r.status !== 200 || !r.j || r.j.status === "pending") continue;
+      await load();
+      if (r.j.status === "done") return say(okMsg || "Erledigt.", false);
+      const why = r.j.reason || "";
+      return say(ERR[why] || (r.j.status === "expired" ? "Der Server hat den Auftrag nicht rechtzeitig ausgeführt." : "Der Server hat den Auftrag abgelehnt" + (why ? " (" + String(why).slice(0, 40) + ")." : ".")), true);
+    }
+    say("Der Server hat noch nicht geantwortet. Der Auftrag bleibt in der Warteschlange; der Stand erscheint nach dem nächsten Abgleich.", false);
   };
   const send = async (path, body, method) => {
     try {
@@ -238,7 +261,8 @@
     const r = await send(path, body, method);
     if (r.ok) {
       await load();
-      say(okMsg || "Auftrag an den Server gesendet.", false);
+      if (r.j && r.j.status === "pending" && typeof r.j.request_id === "string") await follow(r.j.request_id, okMsg);
+      else say(okMsg || "Auftrag an den Server gesendet.", false);
     } else if (r.status === 429) {
       say("Zu viele Aktionen in der letzten Stunde. Bitte später erneut versuchen.", true);
     } else {
@@ -365,7 +389,7 @@
       const type = chosen && chosen.getAttribute("data-type") || "normal";
       const btn = f.querySelector('button[type="submit"]');
       if (btn) btn.disabled = true;
-      await run("/api/mc-vip/worlds", { request_id: rid(), name: nm, type }, "POST", "Welt angelegt. Der Server erstellt sie jetzt.");
+      await run("/api/mc-vip/worlds", { request_id: rid(), name: nm, type }, "POST", "Welt angelegt.");
       return;
     }
     if (f.matches(".v2-invite")) {
@@ -402,7 +426,7 @@
       if (!want || confirm !== want) { say("Zum Löschen den Weltnamen exakt eintippen.", true); return; }
       const btn = f.querySelector('button[type="submit"]');
       if (btn) btn.disabled = true;
-      await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/delete", { request_id: rid(), confirm }, "POST", "Löschauftrag an den Server gesendet. Die Welt verschwindet nach dem Abgleich.");
+      await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/delete", { request_id: rid(), confirm }, "POST", "Welt gelöscht. Sie verschwindet nach dem nächsten Abgleich aus der Liste.");
     }
   });
   const load = async () => {

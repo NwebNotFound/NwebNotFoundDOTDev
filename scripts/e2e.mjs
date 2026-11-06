@@ -1084,6 +1084,17 @@ try {
       await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }] } });
       const c1r = await post("/api/mc-vip/worlds", { request_id: "vip-create-1", name: "Kirschtal", type: "flat" }, { cookie: c1 });
       ok(c1r.s === 202 && c1r.j?.op === "create", "create → 202", c1r.t);
+      { // Status of an own command: pending until the ack, then the server's real outcome.
+        const st0 = await req("/api/mc-vip/requests/vip-create-1", { cookie: c1 });
+        ok(st0.s === 200 && st0.j?.status === "pending" && st0.j?.op === "create", "Auftragsstatus: pending vor dem Ack", st0.t);
+        ok((await req("/api/mc-vip/requests/vip-create-1", { cookie: c2 })).s === 404, "Auftragsstatus: fremder Auftrag → 404");
+        ok((await req("/api/mc-vip/requests/vip-create-1")).s === 401, "Auftragsstatus: ohne Session → 401");
+        ok((await req("/api/mc-vip/requests/bad%20id", { cookie: c1 })).s === 400, "Auftragsstatus: ungültige request_id → 400");
+        await req("/api/mc-vip-commands/ack", { method: "POST", token: TOK, body: { acks: [{ request_id: "vip-create-1", discord_id: D1, status: "denied", reason: "not_linked" }] } });
+        const st1 = await req("/api/mc-vip/requests/vip-create-1", { cookie: c1 });
+        ok(st1.j?.status === "denied" && st1.j?.reason === "not_linked", "Auftragsstatus: denied/not_linked nach dem Ack", st1.t);
+        sql("UPDATE mc_vip_commands SET status = 'pending', reason = NULL, acked_at = NULL WHERE request_id = 'vip-create-1'");
+      }
       const c2r = await post("/api/mc-vip/worlds", { request_id: "vip-create-2", name: "Kirschtal", type: "flat" }, { cookie: c1 });
       ok(c2r.s === 409 && c2r.j?.reason === "name_taken", "zweites create mit gleichem Namen → 409 name_taken", c2r.t);
       const c3r = await post("/api/mc-vip/worlds", { request_id: "vip-create-3", name: "Anders", type: "flat" }, { cookie: c1 });

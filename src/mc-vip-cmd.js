@@ -381,8 +381,22 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     return json({ ok: true, vip_worlds: worldsC ? worldsC.worlds.length : null, vip_admin_log: logC ? logC.log.length : null });
   }
 
+  // The panel's answer after a 202: the server's real outcome of one own command (read-only, the
+  // caller's discord_id only). pending until mc-stack acks; then done, denied, failed or expired.
+  async function requestStatus(req, env, rid) {
+    if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
+    if (!RID.test(rid)) return json({ error: "request_id ungültig" }, 400);
+    const u = await getUser(req, env).catch(() => null);
+    if (!u) return json({ error: "Bitte mit Discord anmelden", reason: "login" }, 401);
+    const row = await env.DB.prepare("SELECT action, status, reason FROM mc_vip_commands WHERE request_id = ? AND discord_id = ? LIMIT 1").bind(rid, String(u.id)).first().catch(() => null);
+    if (!row) return json({ error: "Auftrag nicht gefunden" }, 404);
+    return json({ request_id: rid, op: row.action, status: row.status, reason: row.reason || "" }, 200, { "cache-control": "no-store" });
+  }
+
   return {
     async route(p, req, env, url) {
+      const rq = p.match(/^\/api\/mc-vip\/requests\/([^/]+)$/);
+      if (rq) return requestStatus(req, env, decodeURIComponent(rq[1]));
       if (p === "/api/mc-vip-commands/pending") return pending(req, env, url);
       if (p === "/api/mc-vip-commands/ack") return ack(req, env);
       if (p === "/api/mc-vip-worlds") return sync(req, env);
