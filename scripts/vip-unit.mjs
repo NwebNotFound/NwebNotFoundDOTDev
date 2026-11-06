@@ -85,6 +85,12 @@ const CW = {
 };
 const CL = { at: 1793504000000, admin_uuid: "cccccccc-0000-4000-8000-0000000000cc", admin_name: "Nils", owner_uuid: "1b2c3d4e-0000-4000-8000-000000000001", owner_name: "Ada", world_id: "7f1e0000-0000-4000-8000-000000000010", action: "set_visibility", detail: "private" };
 assert.equal(cleanWorlds({ id: "nope" }).error.includes("Array"), true);
+{ // Sync-Grenze laut Vertrag 500 (vorher 30): 31 Welten kommen vollständig an, 501 werden abgelehnt.
+  const many = (n) => Array.from({ length: n }, (_, i) => ({ ...CW, id: `11111111-2222-4333-8444-${String(i).padStart(12, "0")}` }));
+  assert.equal(cleanWorlds(many(31)).worlds.length, 31, "31 Welten vollständig");
+  assert.equal(cleanWorlds(many(500)).worlds.length, 500, "500 Welten vollständig");
+  assert.equal(cleanWorlds(many(501)).error, "höchstens 500 Welten", "501 abgelehnt statt gekürzt");
+}
 assert.equal(cleanWorlds([{ ...CW, visibility: "public" }]).worlds.length, 0, "visibility public raus");
 const cw = cleanWorlds([CW]).worlds[0];
 assert.equal(cw.name, "Insel");
