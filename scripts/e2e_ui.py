@@ -375,8 +375,8 @@ with sync_playwright() as p:
         long_ = dict(MANYBASE, worlds={"placeholder": False, "slots": [{"id": "22222222-3333-4444-8555-000000000001", "label": "abcdefghijklmnopqrstuvwx", "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Gast", "owner": False, "visibility": "friends", "info": "", "type": "flat", "can_manage": True, "can_start": True}]})
         pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(long_)))
         go("/vip"); pg.locator("#vip-admin-worlds .v2-world").first.wait_for(timeout=10000)
-        geo = pg.evaluate("() => { const c = document.querySelector('#vip-admin-worlds .v2-world').getBoundingClientRect(); const b = document.querySelector('#vip-admin-worlds .v2-wname [data-rename]'); if (!b) return null; const r = b.getBoundingClientRect(); return [r.width, r.left - c.left, c.right - r.right]; }")
-        ok(geo and geo[0] >= 24 and geo[1] >= 0 and geo[2] >= 0, f"{w}px VIP: Umbenennen-Button bleibt bei 24 Zeichen sichtbar", geo)
+        geo = pg.evaluate("() => { const c = document.querySelector('#vip-admin-worlds .v2-world').getBoundingClientRect(); const b = document.querySelector('#vip-admin-worlds .v2-wname [data-rename]'); if (!b) return null; const r = b.getBoundingClientRect(); return [r.width, r.left - c.left, c.right - r.right, c.width]; }")
+        ok(geo and geo[0] >= 24 and geo[1] >= 0 and geo[2] >= 0 and geo[3] >= min(w - 32, 288), f"{w}px VIP: Umbenennen-Button sichtbar, Weltkarte nie schmal (24 Zeichen)", geo)
         pg.unroute("**/api/mc-vip")
         now_s = int(time.time()); hour = 3600
         def bucket(back):

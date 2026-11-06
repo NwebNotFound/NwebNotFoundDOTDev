@@ -38,7 +38,7 @@ html.mc .vip-say.is-bad{color:var(--c-red)}
 html.mc .vip-ranks.is-three{grid-template-columns:minmax(0,1fr)}
 @media(min-width:1040px){html.mc .vip-ranks.is-three{grid-template-columns:repeat(3,minmax(0,1fr))}}
 html.mc .vip-aworlds{display:grid;gap:var(--s3);grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))}
-html.mc .vip-aworlds .v2-world{min-width:0}
+html.mc .v2-world{min-width:min(100%,18rem)}
 html.mc .vip-aworlds .v2-world.is-open{grid-column:1/-1}
 html.mc .v2-world.is-extra{display:none}
 html.mc .vip-aworlds.is-open .v2-world.is-extra{display:block}
