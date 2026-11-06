@@ -37,7 +37,8 @@ html.mc .vip-say.is-on{opacity:1}
 html.mc .vip-say.is-bad{color:var(--c-red)}
 html.mc .vip-ranks.is-three{grid-template-columns:minmax(0,1fr)}
 @media(min-width:1040px){html.mc .vip-ranks.is-three{grid-template-columns:repeat(3,minmax(0,1fr))}}
-html.mc .vip-aworlds{display:grid;gap:var(--s3);grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))}
+html.mc .vip-aworlds{display:grid;gap:var(--s3);grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))}
+html.mc .v2-world{min-width:min(100%,18rem)}
 html.mc .vip-aworlds .v2-world.is-open{grid-column:1/-1}
 html.mc .v2-world.is-extra{display:none}
 html.mc .vip-aworlds.is-open .v2-world.is-extra{display:block}
@@ -87,8 +88,11 @@ html.mc .v2-world.is-on::after{content:"";position:absolute;inset:0;border-radiu
 html.mc .v2-wlist{display:grid;gap:.8rem}
 html.mc .v2-wh{display:grid;grid-template-columns:56px minmax(0,1fr);gap:.4rem .9rem;align-items:center;padding:1rem 1.1rem}
 html.mc .v2-wt{min-width:0}
-html.mc .v2-wname{display:flex;align-items:center;gap:.35rem;font-family:var(--f-px);font-size:1.15rem;overflow-wrap:anywhere}
-html.mc .v2-wmeta{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:.3rem 0 0;font-size:.85rem;font-weight:700}
+html.mc .v2-wname{display:flex;align-items:center;gap:.35rem;min-width:0;font-family:var(--f-px);font-size:1.15rem;line-height:1.3}
+/* Only the name shrinks and ends in an ellipsis; the rename button next to it stays visible. */
+html.mc .v2-wn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.mc .v2-wname>.v2-icbtn{flex:none}
+html.mc .v2-wmeta{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;margin:.3rem 0 0;font-size:.85rem;font-weight:700;line-height:1.4;overflow-wrap:normal;word-break:normal}
 html.mc .v2-wacts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 html.mc .v2-wacts .btn{flex:1 1 auto}
 @media(min-width:800px){
@@ -169,7 +173,7 @@ html.mc .v2-types button[aria-checked="true"]{box-shadow:inset 0 0 0 2px var(--a
 html.mc .v2-trust{color:var(--up);font-family:var(--f-body)}
 html.mc .v2-slots{display:flex;gap:.35rem;margin:-.3rem 0 1rem}
 html.mc .v2-slots .slot{width:40px;height:40px;display:inline-grid;place-items:center;border-radius:10px;background:var(--surface-2);box-shadow:var(--bevel)}
-html.mc .v2-slots .slot img{animation:bob 3.2s ease-in-out infinite}
+html.mc .v2-slots .slot img{display:block;width:32px;height:32px;object-fit:contain;image-rendering:pixelated}
 html.mc .v2-slots .slot:nth-child(2) img{animation-delay:.25s}
 html.mc .v2-slots .slot:nth-child(3) img{animation-delay:.5s}
 html.mc .vip-card.is-vip{background:linear-gradient(160deg,rgba(255,212,94,.14),var(--surface) 55%)}

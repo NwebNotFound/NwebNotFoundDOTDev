@@ -663,7 +663,7 @@ ${hreflangTags}
 ${feedTags}
 <link rel="preload" href="/design/fonts/pixelify-sans-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/design/fonts/nunito-latin-400.woff2" as="font" type="font/woff2" crossorigin>
-<script src="/design/summer-theme.js?v=${AV}"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${UNAV_HEAD}${printScript}${parallaxScript}${readerScript}${homeAssets}
+<script src="/design/summer-theme.js?v=${AV}"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${UNAV_HEAD}${printScript}${parallaxScript}${readerScript}${homeAssets}${o.head || ""}
 </head><body class="sm-shell">
 ${progressBar}
 <a class="sm-skip-link" href="#main">${esc(t("skip"))}</a>
@@ -863,6 +863,12 @@ export function hubPage(bare, lang, opts = {}) {
   if (!meta) return null;
   const body = bare === "/" ? homeBody(t, lang) : bare === "/about" ? aboutBody(t, lang) : soonBody(t, lang, bare);
   return document_({ lang, bare, t, title: t(meta[0]), desc: t(meta[1]), body, home: bare === "/" });
+}
+
+/** A hub-shell page with a caller-made body (the private /profile): same header, footer and tokens. */
+export function sitePage({ lang = "de", bare, title, desc, body, head = "" }) {
+  const t = makeT(lang);
+  return document_({ lang, bare, t, title, desc, body, head, hreflangs: [], canonicalTo: `https://${SITE}${bare}` });
 }
 
 export const hubPageExists = (bare) => Object.prototype.hasOwnProperty.call(META, bare) || writingRoute(bare) !== null;

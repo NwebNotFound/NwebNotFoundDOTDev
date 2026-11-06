@@ -80,7 +80,7 @@ try {
   console.log("0) Parkour leer");
   { const g = fs.readFileSync(ROOT + "src/generated/changelog.js", "utf8"); ok(g.includes("Für Spieler") && !/## Admin|creepy_ro|PR #\d|v_economy_daily|--profile/.test(g), "Gebündelter Changelog enthält nur den Spieler-Teil"); }
   { const r = await req("/changelog"); ok(r.s === 200 && r.t.includes("Changelog.") && r.t.includes("Stack für Stack") && r.t.includes("/mc/changelog.css"), "GET /changelog → 200 mit Spieler-Einträgen", r.t.slice(0, 200));
-    ok(!r.t.includes("creepy_ro") && !r.t.includes("PR #28") && !r.t.includes("Admin"), "Changelog zeigt keinen Admin-Teil");
+    ok(!r.t.includes("creepy_ro") && !r.t.includes("PR #28") && !r.t.includes("Website PR #23") && !/<h[1-4][^>]*>\s*Admin\s*</.test(r.t), "Changelog zeigt keinen Admin-Teil (das Wort Admin im Spielertext ist erlaubt: Rang)");
     const body = r.t.slice(r.t.indexOf('id="changelog"')); ok(!/<script|<style| style=/.test(body.slice(0, body.indexOf("</section>"))), "Changelog-Inhalt ohne Inline-Script/-Style");
     { const m = await req("/changelog", { testHost: "nwebnotfound.dev" }); ok(!m.t.includes("Stack für Stack"), "Changelog nicht auf der persönlichen Seite", String(m.s)); } }
   { const r = await req("/api/mc-parkour"); ok(r.s === 200 && r.j && Object.keys(r.j.courses).length === 0, "Parkour-API leer → courses {}", r.t); const pg = await req("/parkour"); ok(pg.s === 200 && pg.t.includes("/api/mc-parkour") && pg.t.includes("Noch keine Zeiten"), "GET /parkour leer → 200 mit Leerzustand"); }
@@ -227,7 +227,37 @@ try {
   const mm = inventorySlotMap(mixed);
   ok(mm[0]?.item === "bread" && mm[1]?.item === "diamond" && mm[9]?.item === "oak_log", "Gemischtes Inventar: slotted zuerst, Rest in freie Slots", JSON.stringify(mm));
   const mainProf = await req("/profile", { cookie: c1, testHost: "nwebnotfound.dev" });
-  ok(mainProf.s === 200 && mainProf.t.includes("/mc/inventory.js") && mainProf.t.includes("#pb .mch") && !/ds\.css\?v=/.test(mainProf.t), "Hauptdomain-Profil: inline CSS + Inventar-Skript");
+  ok(mainProf.s === 200 && mainProf.t.includes("p3-tagcard") && mainProf.t.includes("/design/profile.css?v=") && mainProf.t.includes('content="noindex"') && /private/.test(mainProf.h.get("cache-control") || ""), "Hauptdomain-Profil (privat): Namensschild, noindex, private no-store");
+  ok(!/inventory\.js|pbal|Kontostand|Inventar/.test(mainProf.t) && mainProf.t.includes("https://mc.nwebnotfound.dev/profile"), "Hauptdomain-Profil: keine Minecraft-Stats/Inventar, nur Textlink zum MC-Profil");
+  ok(!mainProf.t.includes("bearbeiten") && !/seit \d+\. \w+ \d{4} da/.test(mainProf.t), "Profil: kein totes bearbeiten-Link, kein Sitzungsdatum als Mitglied-seit");
+  { const anon = await req("/profile", { testHost: "nwebnotfound.dev" }); ok(anon.s === 302 && (anon.h.get("location") || "").startsWith("/auth/discord/login?next=") && !anon.t.includes("p3-tagcard"), "Profil ohne Login: Weiterleitung zum Discord-Login, kein Inhalt"); }
+  { const noOrigin = await req("/api/profile/delete", { method: "POST", cookie: c2, testHost: "nwebnotfound.dev", body: {} }); const anonDel = await req("/api/profile/delete", { method: "POST", testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
+    ok(noOrigin.s === 403 && anonDel.s === 401, "Profil löschen: ohne Origin 403, ohne Login 401"); }
+  { const DD = "999000111222333444"; sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('sdel','${DD}','deleter','Deleter',datetime('now','+1 day'))`); sql(`INSERT INTO entries (name, message, discord_id) VALUES ('Deleter','zum-loeschen-e2e','${DD}')`);
+    const cd = await cookieFor("sdel"); const pg = await req("/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
+    ok(pg.s === 200 && pg.t.includes("zum-loeschen-e2e") && pg.t.includes("1 Gruß"), "Profil zeigt eigenen Gästebucheintrag und Zähler");
+    const noConfirm = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
+    const stillThere = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
+    ok(noConfirm.s === 400 && stillThere.j?.user?.id === DD, "Profil löschen: ohne ausdrückliche Bestätigung 400, nichts gelöscht");
+    const del = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { confirm: "delete" } });
+    const after = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const me2 = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
+    ok(del.s === 200 && !JSON.stringify(after.j).includes("zum-loeschen-e2e") && me2.j?.user === null, "Profil löschen: Einträge und Sitzung entfernt"); }
+  // Isolation: A can neither delete nor view B's data, even when B's id is supplied in body or query.
+  { const DA = "999000111222333555", DB_ = "999000111222333666"; const TOK_B = "b-privat-e2e", TOK_A = "a-privat-e2e";
+    sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('siA','${DA}','usera','User A',datetime('now','+1 day')),('siB','${DB_}','userb','User B',datetime('now','+1 day'))`);
+    sql(`INSERT INTO entries (name, message, discord_id) VALUES ('User A','${TOK_A}','${DA}'),('User B','${TOK_B}','${DB_}')`);
+    const cA = await cookieFor("siA"), cB = await cookieFor("siB");
+    const viewA = await req("/api/profile?discord_id=" + DB_, { cookie: cA, testHost: "nwebnotfound.dev" });
+    ok(viewA.j?.user?.id === DA && JSON.stringify(viewA.j).includes(TOK_A) && !JSON.stringify(viewA.j).includes(TOK_B) && !JSON.stringify(viewA.j).includes(DB_), "ansehen (/api/profile): nur die Daten des Sitzungsinhabers, ?discord_id wird ignoriert");
+    const pageA = await req("/profile?discord_id=" + DB_, { cookie: cA, testHost: "nwebnotfound.dev" });
+    ok(pageA.s === 200 && pageA.t.includes(TOK_A) && !pageA.t.includes(TOK_B), "Profilseite: nur eigene Einträge");
+    const delA = await req("/api/profile/delete?discord_id=" + DB_, { method: "POST", cookie: cA, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { confirm: "delete", discord_id: DB_, id: DB_, target: DB_, user: DB_ } });
+    const gbAfter = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const viewB = await req("/api/profile", { cookie: cB, testHost: "nwebnotfound.dev" });
+    const pageB = await req("/profile?discord_id=" + DA, { cookie: cB, testHost: "nwebnotfound.dev" });
+    const aGone = await req("/api/profile", { cookie: cA, testHost: "nwebnotfound.dev" });
+    const db = sqlRows(`SELECT (SELECT COUNT(*) FROM sessions WHERE id='siA') AS sa, (SELECT COUNT(*) FROM sessions WHERE id='siB') AS sb, (SELECT COUNT(*) FROM entries WHERE discord_id='${DA}') AS ea, (SELECT COUNT(*) FROM entries WHERE discord_id='${DB_}') AS eb, (SELECT COUNT(*) FROM entries WHERE message='${TOK_B}') AS ebm`)[0];
+    ok(delA.s === 200 && db.sa === 0 && db.ea === 0 && aGone.j?.user === null, "Benutzer A löscht nur sich selbst: eigene Sitzung + Einträge sind weg, untergeschobene Ziel-ID wird ignoriert");
+    ok(!JSON.stringify(gbAfter.j).includes(TOK_A) && JSON.stringify(gbAfter.j).includes(TOK_B) && db.sb === 1 && db.eb === 1 && db.ebm === 1 && viewB.j?.user?.id === DB_ && pageB.s === 200 && pageB.t.includes(TOK_B), "Benutzer B bleibt erreichbar: Eintrag, Sitzung und Profil unverändert"); }
   ok((await req("/mc/inventory.js", { testHost: "nwebnotfound.dev" })).s === 200 && (await req("/mc/inventory.js")).s === 200, "/mc/inventory.js auf Haupt- und MC-Host");
   ok(!JSON.stringify((await req("/api/mc-players/Nils")).j).includes("diamond_sword"), "Inventar/Abholfach nicht öffentlich");
   const mine = (await req("/api/mc-auctions/a1", { cookie: c1 })).j; ok(mine.mine[0]?.status === "accepted" && mine.viewer.can_bid === true, "Auktionsseite zeigt eigenes Gebot 'accepted'");

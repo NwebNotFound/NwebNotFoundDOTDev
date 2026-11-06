@@ -232,6 +232,10 @@ html.mc .tabs, html.mc .seg, html.mc .kind {
   background: var(--surface-2); box-shadow: var(--bevel); max-width: 100%;
 }
 html.mc .tabs { display: inline-flex; overflow-x: auto; scrollbar-width: none; }
+/* Wiki list: let it fit instead of showing a scrollbar; menus/drawers scroll without a visible bar. */
+html.mc .wside { max-height: none; overflow: visible; }
+html.mc .u-menu, html.mc .u-drop, html.mc .u-panel { scrollbar-width: none; }
+html.mc .u-menu::-webkit-scrollbar, html.mc .u-drop::-webkit-scrollbar, html.mc .u-panel::-webkit-scrollbar { display: none; }
 html.mc .tabs::-webkit-scrollbar, html.mc .seg::-webkit-scrollbar { display: none; }
 html.mc .tabs button, html.mc .seg button, html.mc .kind button {
   min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent;
