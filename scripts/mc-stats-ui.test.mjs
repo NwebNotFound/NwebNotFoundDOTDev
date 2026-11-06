@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import worker from '../src/worker.js';
+import { bundleCss } from './fixtures/bundle-asset.mjs';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const fixture = { mined: {waxed_weathered_cut_copper_stairs: 2147483647, stone: 600, dirt: 42}, killed: {chicken: 91, 'minecraft:husk': 25, cow: 3} };
@@ -20,6 +21,7 @@ async function openPage(browser, host, path, width = 390, data = fixture) {
       const response = await worker.fetch(new Request(url.href), {}, {});
       return route.fulfill({status:response.status, contentType:'text/html', body:await response.text()});
     }
+    if (url.pathname === '/bundle/mc.css') return route.fulfill({contentType:'text/css', body:await bundleCss(publicDir, url.href)});
     if (url.pathname === '/api/profile') return route.fulfill({json:profile});
     if (url.pathname === '/api/mc-players/Fixture') return route.fulfill({json:player});
     if (url.pathname.startsWith('/mc-head/') || url.hostname === 'cdn.discordapp.com') return route.fulfill({contentType:'image/svg+xml', body:'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"/>'});

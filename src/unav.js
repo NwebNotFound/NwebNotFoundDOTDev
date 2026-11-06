@@ -16,7 +16,7 @@ const BURGER = `<svg class="u-bi u-bi--open" viewBox="0 0 12 12" aria-hidden="tr
 export const CAT = `<svg class="px" width="28" height="28" viewBox="0 0 16 16" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="2" y="1" width="3" height="3" fill="currentColor"/><rect x="11" y="1" width="3" height="3" fill="currentColor"/><rect x="1" y="3" width="14" height="11" fill="currentColor"/><rect x="2" y="4" width="12" height="9" fill="var(--sm-cream, var(--cream, #fff7e6))"/><rect x="5" y="7" width="2" height="2" fill="#1f2a44"/><rect x="9" y="7" width="2" height="2" fill="#1f2a44"/><rect x="7" y="10" width="2" height="1" fill="#1f2a44"/></svg>`;
 const SUN = `<svg class="px" width="22" height="22" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><rect x="4" y="4" width="4" height="4" fill="#e2a52a"/><rect x="3" y="5" width="6" height="2" fill="#ffd45e"/><rect x="5" y="3" width="2" height="6" fill="#ffd45e"/></svg>`;
 const MOON = `<svg class="px" width="22" height="22" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><rect x="4" y="1" width="4" height="1" fill="#ffd45e"/><rect x="2" y="2" width="3" height="1" fill="#ffd45e"/><rect x="1" y="3" width="3" height="6" fill="#ffd45e"/><rect x="2" y="9" width="3" height="1" fill="#ffd45e"/><rect x="4" y="10" width="4" height="1" fill="#ffd45e"/></svg>`;
-const icon = (id) => `<img alt="" width="22" height="22" src="/mc-icon/v2/${id}">`;
+const icon = (id) => `<img alt="" width="22" height="22" loading="lazy" decoding="async" src="/mc-icon/v2/${id}">`;
 
 // All labels come from the hub dictionary (src/i18n); mc.* is German only.
 const labels = (lang) => {
@@ -24,7 +24,8 @@ const labels = (lang) => {
   return { t, nav: t("nav.label"), lang: t("lang.label"), open: t("nav.menu_open"), close: t("nav.menu_close"), login: t("acct.login"), logout: t("acct.logout"), soon: t("acct.soon"), account: t("acct.label"), profile: t("acct.profile"), orders: t("acct.orders"), day: t("theme.day"), night: t("theme.night"), toDay: t("theme.switch_to_day"), toNight: t("theme.switch_to_night") };
 };
 
-export const UNAV_HEAD = `<link rel="stylesheet" href="/design/unav.css?v=${AV}"><script src="/design/unav.js?v=${AV}" defer></script>`;
+export const UNAV_JS = `<script src="/design/unav.js?v=${AV}" defer></script>`;
+export const UNAV_HEAD = `<link rel="stylesheet" href="/design/unav.css?v=${AV}">${UNAV_JS}`;
 
 function themeToggle(l) {
   return `<button class="u-ib u-theme" type="button" data-summer-theme-toggle aria-pressed="false" aria-label="${esc(l.toNight)}" data-label-day="${esc(l.day)}" data-label-night="${esc(l.night)}" data-aria-day="${esc(l.toDay)}" data-aria-night="${esc(l.toNight)}"><span class="u-ti u-ti--sun">${SUN}</span><span class="u-ti u-ti--moon">${MOON}</span><span class="u-vh" data-sm-theme-label>${esc(l.night)}</span></button>`;

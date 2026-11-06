@@ -36,11 +36,11 @@
   ];
   const slot = (id, big) => {
     const i = ICON.test(id) ? id : "paper";
-    return `<span class="slot${big ? " big" : ""}"><img alt="" width="${big ? 40 : 28}" height="${big ? 40 : 28}" src="/mc-icon/v2/${i}"></span>`;
+    return `<span class="slot${big ? " big" : ""}"><img loading="lazy" alt="" width="${big ? 40 : 28}" height="${big ? 40 : 28}" src="/mc-icon/v2/${i}"></span>`;
   };
   const ico = (id, size) => {
     const i = ICON.test(id) ? id : "paper";
-    return `<img alt="" width="${size}" height="${size}" src="/mc-icon/v2/${i}">`;
+    return `<img loading="lazy" alt="" width="${size}" height="${size}" src="/mc-icon/v2/${i}">`;
   };
   const head = (name, size, cls) => NAME.test(name || "")
     ? `<img${cls ? ` class="${cls}"` : ""} alt="" width="${size}" height="${size}" src="/mc-head/${encodeURIComponent(name)}/${size}">`
@@ -169,7 +169,7 @@
     const p = d.player || {};
     const admin = d.admin === true;
     const name = NAME.test(p.name || "") ? p.name : "";
-    const headImg = name ? `<span class="v2-headwrap"><img class="v2-head" alt="" width="64" height="64" src="/mc-head/${encodeURIComponent(name)}/64?v=5"></span>` : `<span class="v2-headwrap">${slot("player_head", true)}</span>`;
+    const headImg = name ? `<span class="v2-headwrap"><img loading="lazy" class="v2-head" alt="" width="64" height="64" src="/mc-head/${encodeURIComponent(name)}/64?v=5"></span>` : `<span class="v2-headwrap">${slot("player_head", true)}</span>`;
     const st = d.stats || {};
     const max = d.limits && Number.isFinite(+d.limits.mine) && +d.limits.mine > 0 ? Math.floor(+d.limits.mine) : 3;
     const ownList = d.worlds && Array.isArray(d.worlds.slots) ? d.worlds.slots.filter((s) => s && s.owner === true) : [];

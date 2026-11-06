@@ -49,7 +49,7 @@ function entryCategory(text) {
 
 function renderEntry(text) {
   const category = entryCategory(text);
-  return `<li data-category="${category.id}"><span class="slot cl-icon"><img class="mi" alt="" width="20" height="20" src="/mc-icon/v2/${category.icon}"></span><span class="cl-entry"><span class="chip ${category.chip}">${category.label}</span><span class="cl-copy">${inline(text)}</span></span></li>`;
+  return `<li data-category="${category.id}"><span class="slot cl-icon"><img loading="lazy" class="mi" alt="" width="20" height="20" src="/mc-icon/v2/${category.icon}"></span><span class="cl-entry"><span class="chip ${category.chip}">${category.label}</span><span class="cl-copy">${inline(text)}</span></span></li>`;
 }
 
 export const changelogBody = (md = CHANGELOG_MD) => {

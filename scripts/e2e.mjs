@@ -265,7 +265,7 @@ try {
   console.log("6d) Feedback");
   const fb = (body, o = {}) => req("/api/feedback", { method: "POST", body, cookie: c1, origin: O, ...o });
   const good = { category: "bug", text: "Beschreibung mit genug Text c0de", location: "Spawn", token: "XXXX.DUMMY.TOKEN.XXXX" };
-  for (const h of [HOST, "nwebnotfound.dev"]) { const pg = await req("/feedback", { testHost: h }); ok(pg.s === 200 && pg.t.includes("/api/feedback") && pg.t.includes("challenges.cloudflare.com/turnstile") && /mc\/ds\.css|ds\.css\?v=/.test(pg.t), "GET /feedback auf " + h + " → 200 (MC-Design)", pg.s); }
+  for (const h of [HOST, "nwebnotfound.dev"]) { const pg = await req("/feedback", { testHost: h }); ok(pg.s === 200 && pg.t.includes("/api/feedback") && pg.t.includes("challenges.cloudflare.com/turnstile") && /\/bundle\/mc\.css\?v=/.test(pg.t), "GET /feedback auf " + h + " → 200 (MC-Design)", pg.s); }
   ok((await req("/feedback", { testHost: "nwebnotfound.dev" })).t.includes('href="https://mc.nwebnotfound.dev/markt"'), "Hauptdomain: MC-Navigation absolut");
   // Login-Gate
   ok((await req("/api/feedback")).j.logged_in === false, "Login-Gate: GET ohne Login → logged_in false (Seite zeigt Login-Button)");
@@ -481,7 +481,7 @@ try {
     const api = (await req("/api/mc-parkour")).j, L = api.courses.test;
     ok(L.length === 10 && L.every((x, i) => x.rank === i + 1 && (i === 0 || L[i - 1].time_ms <= x.time_ms)) && L[0].mc_name === "Nils" && L[0].time_ms === 39000, "Top 10 aufsteigend sortiert, max 10", JSON.stringify(L.map((x) => x.time_ms)));
     ok(api.courses.nether_run?.length === 1 && api.courses.nether_run[0].mc_uuid === PU(2), "Zweiter Kurs separat");
-    const pg = await req("/parkour"); ok(pg.s === 200 && /ds\.css\?v=/.test(pg.t) && pg.t.includes('href="/parkour"'), "GET /parkour → 200, im MC-Nav");
+    const pg = await req("/parkour"); ok(pg.s === 200 && /\/bundle\/mc\.css\?v=/.test(pg.t) && pg.t.includes('href="/parkour"'), "GET /parkour → 200, im MC-Nav");
     ok(api.course_names?.test === "Test" && L[0].course_name === "Test" && api.course_icons?.test === "paper" && L[0].course_icon === "paper", "Ohne course_name/icon → Fallback hübsche Kurs-ID + paper", JSON.stringify(api.course_names));
     r = await ing([e0({ course: "cave_rush", mc_uuid: PU(3), mc_name: "Cave", time_ms: 30000, course_name: "  Cave\u0000  Rush  " }), e0({ course: "kurs1", mc_uuid: PU(4), time_ms: 31000, course_name: "<img src=x onerror=alert(1)>" }), e0({ course: "lang", mc_uuid: PU(5), time_ms: 32000, course_name: "x".repeat(60) }), e0({ course: "leer", mc_uuid: PU(6), time_ms: 33000, course_name: "   " }), e0({ course: "zahl", mc_uuid: PU(7), time_ms: 34000, course_name: 5 })]);
     ok(r.j.parkour === 5 && r.j.parkour_rejected === 0 && r.j.parkour_course_names === 3, "course_name optional, ungültig → Zeit zählt trotzdem", r.t);
@@ -528,7 +528,7 @@ try {
     { const m = await req("/parkour", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes("/api/mc-parkour")), "/parkour nur auf mc-Domain", m.s); }
   }
   console.log("7) Seiten");
-  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle", "/parkour", "/vip"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
+  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle", "/parkour", "/vip"]) { const x = await req(p); ok(x.s === 200 && /\/bundle\/mc\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
   console.log("7b) Hub: Shell, Sprache, Weiterleitungen");
@@ -538,7 +538,7 @@ try {
       .filter((u) => !/^https:\/\/(github\.com\/NwebNotFound|x\.com\/NwebNotFound|mc\.nwebnotfound\.dev|nwebnotfound\.dev)(\/|$)/.test(u));
     const home = await hub("/", { headers: { "accept-language": "de-DE,de;q=0.9,en;q=0.8" } });
     ok(home.s === 200 && /<html lang="de" class="sm-root">/.test(home.t), "GET / → 200, <html lang=de> aus Accept-Language", home.s);
-    ok(home.t.includes("/design/summer.css?v=") && home.t.includes('src="/design/summer-theme.js"') && home.t.indexOf("summer-theme.js") < home.t.indexOf("summer.css?v="), "Hub lädt das Phase-1-Theme (Themeskript vor dem Stylesheet)");
+    ok(home.t.includes("/design/summer.css?v=") && home.t.includes('src="/design/summer-theme.js?v=') && home.t.indexOf("summer-theme.js") < home.t.indexOf("summer.css?v="), "Hub lädt das Phase-1-Theme (Themeskript vor dem Stylesheet)");
     ok(home.t.includes('class="sm-skip-link"') && home.t.includes('<main id="main">') && home.t.includes('<footer class="sm-footer"'), "Skip-Link und Landmarks vorhanden");
     ok(home.t.includes('hreflang="de"') && home.t.includes('hreflang="en"') && home.t.includes('hreflang="x-default"'), "hreflang de/en/x-default gesetzt");
     ok(home.t.includes('href="https://github.com/NwebNotFound" target="_blank" rel="noopener noreferrer"') && home.t.includes('href="https://x.com/NwebNotFound" target="_blank" rel="noopener noreferrer"'), "Footer: GitHub und X als normale Links mit rel=noopener noreferrer");
@@ -699,7 +699,7 @@ try {
     const chapter = await hub("/writing/test-fixture-chapter-2");
     ok(chapter.t.includes('href="/downloads/story-test-fixture-chapter-2.epub"') && chapter.t.includes("EPUB herunterladen"), "Kapitel: EPUB-Download-Button", chapter.s);
     ok(chapter.t.includes('href="/downloads/series-test-fixture-serie.epub"'), "Kapitel: Serien-EPUB verlinkt");
-    ok(chapter.t.includes("data-sm-print") && chapter.t.includes('<script src="/design/summer-print.js" defer></script>'), "Kapitel: Druck-Button mit externem Skript");
+    ok(chapter.t.includes("data-sm-print") && /<script src="\/design\/summer-print\.js\?v=[0-9a-f]+" defer><\/script>/.test(chapter.t), "Kapitel: Druck-Button mit externem Skript");
     ok(chapter.t.includes("© Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
     ok(!/onclick=/.test(chapter.t) && !/<script(?![^>]*\ssrc=)/i.test(chapter.t), "Kapitel: kein Inline-Handler, kein Inline-Skript");
     const blog = await hub("/writing/test-fixture-hello");
@@ -744,6 +744,21 @@ try {
     ok((await mob("creeper")) === "/mc/heads/creeper.png" && (await mob("minecraft:zombie")) === "/mc/heads/zombie.png", "Mob-Icon: Creeper/Zombie → eigener Kopf");
     ok((await mob("phantom")) === "/mc-icon/v2/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/v2/feather" && (await mob("..%2Fx")) === "/mc-icon/v2/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
     const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
+  }
+  { // Performance: one bundled stylesheet on mc., immutable only for the current version, HTML revalidated.
+    const { AV } = await import("../src/asset-version.js");
+    const page = await fetch(BASE + "/wiki", { headers: { host: HOST } }); const html = await page.text();
+    ok(html.includes(`/bundle/mc.css?v=${AV}`) && !/\/mc\/(ds|theme-v2)\.css|\/design\/(minecraft|unav)\.css/.test(html), "mc.: ein CSS-Bundle statt minecraft/ds/theme-v2/unav");
+    ok(!/immutable/.test(page.headers.get("cache-control") || ""), "mc.: HTML bleibt revalidiert", page.headers.get("cache-control"));
+    const b = await fetch(BASE + `/bundle/mc.css?v=${AV}`, { headers: { host: HOST } }); const css = await b.text();
+    const parts = ["public/design/minecraft.css", "public/mc/ds.css", "public/mc/theme-v2.css", "public/design/unav.css"].map((f) => fs.readFileSync(ROOT + f, "utf8").replaceAll("\r\n", "\n"));
+    const all = css.replaceAll("\r\n", "\n");
+    let at = 0; const inOrder = parts.every((x) => { const i = all.indexOf(x, at); if (i < 0) return false; at = i + x.length; return true; });
+    ok(b.status === 200 && /text\/css/.test(b.headers.get("content-type") || "") && inOrder, "Bundle: alle vier Teile vollständig, in Kaskaden-Reihenfolge");
+    ok(/immutable/.test(b.headers.get("cache-control") || ""), "Bundle mit aktueller Version: immutable", b.headers.get("cache-control"));
+    ok(!/immutable/.test((await fetch(BASE + "/bundle/mc.css?v=alt", { headers: { host: HOST } })).headers.get("cache-control") || ""), "Bundle mit fremder Version: nicht immutable");
+    ok(/immutable/.test((await fetch(BASE + `/mc/common.js?v=${AV}`, { headers: { host: HOST } })).headers.get("cache-control") || ""), "versioniertes JS: immutable");
+    ok(/loading="lazy"/.test(html.match(/<img[^>]*\/mc-icon\/v2\/grass_block[^>]*>/)?.[0] || ""), "Nav-Icons laden lazy");
   }
   { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy-report-only") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && !r.headers.get("content-security-policy"), "CSP Report-Only gesetzt (nicht erzwingend)", c); }
   console.log("E) economy_daily");
