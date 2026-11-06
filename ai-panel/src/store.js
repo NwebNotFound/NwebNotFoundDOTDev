@@ -11,6 +11,7 @@
 
 import * as rl from "./ratelimit.js";
 import * as log from "./log.js";
+import { redactText } from "./redact.js";
 
 const LOG_MAX = 200;
 const RUN_MAX = 200;
@@ -321,6 +322,11 @@ export async function rateTake(env, bucket, id) {
   }
 }
 
+/** A request-log row for Workers Logs only, never the durable ring (sampled noise). */
+export function logLocal(entry) {
+  return log.record(entry);
+}
+
 /** Append a request-log row. Always also goes to Workers Logs. */
 export async function logAppend(env, entry) {
   const row = log.record(entry);
@@ -472,8 +478,10 @@ export async function messageAppend(env, row) {
     conversation_id: String(row.conversation_id || ""),
     role: String(row.role || "assistant").slice(0, 20),
     kind: String(row.kind || "message").slice(0, 20),
-    content: String(row.content ?? "").slice(0, MESSAGE_CONTENT_MAX),
-    tool: row.tool ? String(row.tool).slice(0, 80) : null,
+    // Every transcript row is served back to the browser on each load, so it is stored redacted
+    // (tool output, run answers, the delta fallback): one choke point instead of every caller.
+    content: redactText(String(row.content ?? "")).slice(0, MESSAGE_CONTENT_MAX),
+    tool: row.tool ? redactText(String(row.tool)).slice(0, 80) : null,
     ok: typeof row.ok === "boolean" ? row.ok : null,
     run_id: row.run_id ? String(row.run_id) : null,
     ts: Number(row.ts) || Date.now(),
@@ -569,9 +577,21 @@ export function resetConversations() {
 
 const revokedCache = new Map(); // marker key → { value, expires }
 const REVOKED_KEY = "revoked";
+// The last marker this isolate saw, kept without a TTL. It is the fallback when the store cannot
+// be read: an old value is still a valid lower bound, whereas 0 would revive every session.
+let lastKnownRevoked = null;
+
+/** The store could not tell whether sessions are revoked; callers must fail closed. */
+export class RevocationUnavailableError extends Error {
+  constructor(message = "revocation_unavailable") {
+    super(message);
+    this.name = "RevocationUnavailableError";
+  }
+}
 
 function rememberRevoked(value) {
   revokedCache.set(REVOKED_KEY, { value, expires: Date.now() + REVOKED_CACHE_TTL_MS });
+  lastKnownRevoked = Math.max(lastKnownRevoked ?? 0, value);
   return value;
 }
 
@@ -579,48 +599,59 @@ function rememberRevoked(value) {
  * Drop the cached revocation marker now instead of waiting for the TTL. A plain logout clears
  * this isolate's entry; `all: true` ("sign out everywhere") clears every entry, so no cached
  * pre-logout value survives anywhere in this isolate. Other isolates are covered by the TTL.
+ * The TTL-less last-known fallback is kept: it only ever moves forward.
  */
 export function invalidateRevokedCache({ all = false } = {}) {
   if (all) revokedCache.clear();
   else revokedCache.delete(REVOKED_KEY);
 }
 
-/** Epoch seconds; sessions issued at or before this are dead. Cached briefly. */
+/**
+ * Epoch seconds; sessions issued at or before this are dead. Cached briefly.
+ * Fails closed: if the store errors and this isolate has never seen a marker, it throws
+ * `RevocationUnavailableError` instead of answering 0 ("nothing revoked").
+ * Without a store binding (local dev, tests) the in-memory marker is authoritative.
+ */
 export async function revokedBefore(env) {
   const cached = revokedCache.get(REVOKED_KEY);
   if (cached && cached.expires > Date.now()) return cached.value;
   const s = stub(env);
-  if (!s) return 0;
+  if (!s) return lastKnownRevoked ?? 0;
   try {
     const res = await s.fetch("https://panel-store/revoked");
     if (!res.ok) throw new Error(`store ${res.status}`);
     const data = await res.json();
-    const value = Number(data.before) || 0;
-    revokedCache.set(REVOKED_KEY, { value, expires: Date.now() + REVOKED_CACHE_TTL_MS });
-    return value;
+    return rememberRevoked(Number(data.before) || 0);
   } catch {
-    return cached ? cached.value : 0;
+    if (lastKnownRevoked !== null) return lastKnownRevoked;
+    throw new RevocationUnavailableError();
   }
 }
 
-/** Invalidate every session issued so far. Returns the new marker. */
+/**
+ * Invalidate every session issued so far. Returns the new marker. Throws
+ * `RevocationUnavailableError` when the marker could not be persisted, so the caller does not
+ * report a sign-out that only happened in this isolate's memory.
+ */
 export async function revokeAll(env) {
   const before = Math.floor(Date.now() / 1000);
   // Sign out everywhere: every cached entry goes first, then only the fresh marker is put back.
   invalidateRevokedCache({ all: true });
   const s = stub(env);
   if (!s) return rememberRevoked(before);
+  let data;
   try {
     const res = await s.fetch("https://panel-store/revoked", { method: "POST", body: JSON.stringify({ before }) });
     if (!res.ok) throw new Error(`store ${res.status}`);
-    const data = await res.json();
-    return rememberRevoked(Number(data.before) || before);
+    data = await res.json();
   } catch {
-    return rememberRevoked(before);
+    throw new RevocationUnavailableError("revoke_failed");
   }
+  return rememberRevoked(Number(data.before) || before);
 }
 
 /** Test seam: forget every cached revocation marker. */
 export function resetCache() {
   revokedCache.clear();
+  lastKnownRevoked = null;
 }

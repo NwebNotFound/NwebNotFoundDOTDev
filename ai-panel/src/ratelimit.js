@@ -9,7 +9,19 @@ export const LIMITS = {
   chat: { max: 20, window: 60 },
   api: { max: 120, window: 60 },
   auth: { max: 10, window: 60 },
+  // Per client IP, in memory, before the session check: caps what one source can make the
+  // Worker do (revocation lookups, DO writes) whether or not it is signed in.
+  ip: { max: 300, window: 60 },
+  // Failed authentications per client IP. Once over, the IP gets 429 before any auth work.
+  unauth: { max: 30, window: 60 },
 };
+
+/** True when `id` has already used up `bucketName` in the current window (does not count). */
+export function exhausted(bucketName, id, now = Date.now()) {
+  const limit = LIMITS[bucketName] || LIMITS.api;
+  const entry = buckets.get(`${bucketName}:${id}`);
+  return Boolean(entry && entry.reset > now && entry.count >= limit.max);
+}
 
 export function take(bucketName, id, now = Date.now()) {
   const limit = LIMITS[bucketName] || LIMITS.api;
