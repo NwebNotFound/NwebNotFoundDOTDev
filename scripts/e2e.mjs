@@ -1053,6 +1053,17 @@ try {
     ok(!JSON.stringify(seen.j?.worlds?.slots || []).includes(WID), "nach leerem Sync keine UUID-Slots aus vip_worlds", JSON.stringify(seen.j?.worlds || seen.j?.reason));
     // Panel v2: create prüft laufende Aufträge mit, settings hat einen eigenen Eimer.
     { await post("/api/mc-vip-worlds", { vip_worlds: [] }, { token: TOK, origin: null, cookie: null });
+      // Admin (Nils, 06.11.): eigene Welten anlegen und verwalten wie VIP/MVP (Admin = 3 Plätze).
+      await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }] } });
+      const ac = await post("/api/mc-vip/worlds", { request_id: "vip-admin-create", name: "AdminWelt", type: "normal" }, { cookie: c1 });
+      ok(ac.s === 202 && ac.j?.op === "create", "Admin: eigene Welt anlegen → 202", ac.t);
+      await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ status: "stopped", slot: null, players: 0 })] }, { token: TOK, origin: null, cookie: null });
+      const ar = await post(`/api/mc-vip/worlds/${WID}/rename`, { request_id: "vip-admin-rename", name: "AdminNeu" }, { cookie: c1 });
+      ok(ar.s === 202 && ar.j?.op === "rename", "Admin: eigene Welt umbenennen → 202", ar.t);
+      const ad = await post(`/api/mc-vip/worlds/${WID}/delete`, { request_id: "vip-admin-delete", confirm: "Insel" }, { cookie: c1 });
+      ok(ad.s === 202 && ad.j?.op === "delete", "Admin: eigene Welt löschen → 202", ad.t);
+      sql("DELETE FROM mc_vip_commands WHERE request_id IN ('vip-admin-create','vip-admin-rename','vip-admin-delete')");
+      await post("/api/mc-vip-worlds", { vip_worlds: [] }, { token: TOK, origin: null, cookie: null });
       await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }] } });
       const c1r = await post("/api/mc-vip/worlds", { request_id: "vip-create-1", name: "Kirschtal", type: "flat" }, { cookie: c1 });
       ok(c1r.s === 202 && c1r.j?.op === "create", "create → 202", c1r.t);

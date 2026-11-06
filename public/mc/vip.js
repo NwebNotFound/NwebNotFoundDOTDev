@@ -180,7 +180,14 @@
     const rk = ["vip", "mvp", "admin"].includes(p.rank) ? p.rank : "";
     const headCard = `<div class="g v2-me is-${rk}">${headImg}<div class="v2-me-id"><p class="eyb">Dein Rang ${abadge}</p><h2 class="hub-h2">${E(name || "Spieler")} ${badge(p.rank, p.color)}</h2><p class="vip-acts"><a class="btn sm" href="/profile">Zum Profil</a>${pub}</p></div><div class="v2-kpis"><div class="v2-kpi"><span class="k">Guthaben</span><b class="v tnum">${bal}</b></div><div class="v2-kpi"><span class="k">Spielzeit</span><b class="v tnum">${st.playtime == null ? "–" : up(st.playtime)}</b></div><div class="v2-kpi is-worlds"><span class="k">Deine Welten</span><b class="v tnum">${NF(mine)} / ${NF(max)}</b>${pips(mine, max)}</div></div></div>`;
     const ranks = `<section class="vip-block" id="vip-ranks"><div class="vip-head"><div><p class="eyb">Ränge</p><h2 class="hub-h2">VIP und MVP</h2></div><p class="mut vip-head-note">Beide Ränge kosten nichts. Nils vergibt sie von Hand an enge Freunde.</p></div>${cards(d.catalog, d.limits)}${note(d.note)}</section>`;
-    const worlds = admin ? adminWorlds(d.worlds) + adminLog(d.admin_log) : ownSection(d.worlds, max, false);
+    // Admin (Nils, 06.11.): own worlds with the free-slot card on top, as for VIP/MVP; the all-worlds
+    // view below keeps the other players' worlds (no card twice, ids stay unique).
+    // An admin who is also invited/trusted in someone else's world gets that world only once, in the
+    // all-worlds view (full admin controls): no "Eingeladen" copy, so the rn-/inv-/dc- ids stay unique.
+    const slotsOf = d.worlds && Array.isArray(d.worlds.slots) ? d.worlds.slots : [];
+    const others = d.worlds ? { ...d.worlds, slots: slotsOf.filter((s) => !(s && s.owner === true)) } : d.worlds;
+    const mineOnly = d.worlds ? { ...d.worlds, slots: slotsOf.filter((s) => s && s.owner === true) } : d.worlds;
+    const worlds = admin ? ownSection(mineOnly, max, false) + adminWorlds(others) + adminLog(d.admin_log) : ownSection(d.worlds, max, false);
     return `${headCard}<p class="vip-say v2-toast" id="vip-say" role="status" aria-live="polite"></p>${worlds}${ranks}`;
   };
   const gate = (d) => {
