@@ -4,7 +4,8 @@
 // Läuft allein und wird von scripts/e2e.mjs importiert. Ohne node:sqlite (Node < 22.5) übersprungen.
 import assert from "node:assert/strict";
 import { makeD1, sqliteAvailable } from "./d1-sqlite.mjs";
-import { snapshotStatement } from "../src/worker.js";
+import worker, { snapshotStatement } from "../src/worker.js";
+import { purge, IP_RETENTION_MS } from "../src/purge.js";
 import { makeTrade } from "../src/mc-trade.js";
 import { makeVip } from "../src/mc-vip-cmd.js";
 
@@ -138,6 +139,32 @@ else {
     const a1 = await hashIp({ SESSION_SECRET: "s1" }, "203.0.113.1"), a2 = await hashIp({ SESSION_SECRET: "s2" }, "203.0.113.1");
     assert.ok(/^[0-9a-f]{64}$/.test(a1) && a1 !== a2, "Ersatz-Pepper aus SESSION_SECRET");
     assert.notEqual(a1, await hashIp({ IP_HASH_PEPPER: "s1" }, "203.0.113.1"), "Ersatz ist nicht SESSION_SECRET selbst");
+  }
+  // ---- #85: Ack löscht Alt-Klartext-ip; stündlicher Purge löscht IP-Daten nach 2 h und alte Sessions ----
+  {
+    const env = { ...(await fresh()), MC_INGEST_TOKEN: "tok" }, DB = env.DB, now = Date.now(), old = now - IP_RETENTION_MS - 1000;
+    const ins = (t, id, created, ip, ih) => t === "b"
+      ? DB.prepare("INSERT INTO mc_bids_pending (id, auction_id, bidder_uuid, amount, source, created_at, status, ip, ip_hash) VALUES (?, 'a1', ?, 1, 'web', ?, 'pending', ?, ?)").bind(id, U1, created, ip, ih).run()
+      : t === "o" ? DB.prepare("INSERT INTO mc_shop_orders_pending (id, item, qty, buyer_uuid, source, created_at, status, ip, ip_hash) VALUES (?, 'diamond', 1, ?, 'web', ?, 'pending', ?, ?)").bind(id, U1, created, ip, ih).run()
+        : DB.prepare("INSERT INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, created_at, ip, ip_hash) VALUES (?, ?, 'start', ?, ?, 'Nils', ?, ?, ?, ?, ?)").bind(id, id, U1, U1, U1, DID, created, ip, ih).run();
+    await ins("b", "b-old", old, "198.51.100.1", null); await ins("b", "b-new", now, null, "h1");
+    await ins("o", "o-old", old, null, "h2"); await ins("o", "o-new", now, "198.51.100.2", "h3");
+    await ins("v", "v-old", old, "198.51.100.3", "h4"); await ins("v", "v-new", now, null, "h5");
+    // Ack: Klartext-ip weg, ip_hash bleibt (zählt im 1-h-Fenster)
+    const ackReq = new Request("https://x/api/mc-shop-orders/ack", { method: "POST", headers: { "x-ingest-token": "tok", "content-type": "application/json" }, body: JSON.stringify({ acks: [{ id: "o-new", status: "accepted" }] }) });
+    assert.equal((await (await trade.route("/api/mc-shop-orders/ack", ackReq, env, U("/api/mc-shop-orders/ack"))).json()).updated, 1);
+    const on = await DB.prepare("SELECT ip, ip_hash FROM mc_shop_orders_pending WHERE id = 'o-new'").first();
+    assert.equal(on.ip, null, "Ack löscht Klartext-ip"); assert.equal(on.ip_hash, "h3", "ip_hash bleibt bis zum Purge");
+    await DB.prepare("INSERT INTO sessions (id, discord_id, username, expires_at) VALUES ('s-old', '1', 'a', datetime('now', '-1 day')), ('s-new', '2', 'b', datetime('now', '+1 day'))").run();
+    const r = await purge(env, now);
+    assert.deepEqual(r, { bids: 1, orders: 1, vip: 1, sessions: 1 }, JSON.stringify(r));
+    for (const [t, id] of [["mc_bids_pending", "b-old"], ["mc_shop_orders_pending", "o-old"], ["mc_vip_commands", "v-old"]]) {
+      const x = await DB.prepare(`SELECT ip, ip_hash FROM ${t} WHERE id = ?`).bind(id).first(); assert.ok(x.ip == null && x.ip_hash == null, "alte IP-Daten gelöscht: " + id);
+    }
+    assert.equal((await DB.prepare("SELECT ip_hash FROM mc_bids_pending WHERE id = 'b-new'").first()).ip_hash, "h1", "frische Zeilen behalten ip_hash");
+    assert.deepEqual((await DB.prepare("SELECT id FROM sessions").all()).results.map((x) => x.id), ["s-new"], "abgelaufene Session gelöscht");
+    assert.equal(typeof worker.scheduled, "function", "Worker hat einen scheduled-Handler");
+    await worker.scheduled({}, env, { waitUntil() {} });
   }
   console.log("queue-unit: alle Tests grün");
 }

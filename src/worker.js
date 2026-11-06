@@ -20,6 +20,7 @@ import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie } from "./i18n/index.js";
 import { safeDecode } from "./safe-decode.js";
 import { verifyTurnstile } from "./turnstile.js";
+import { purge } from "./purge.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -1178,4 +1179,8 @@ async function route(req, env, ctx) {
 
 export default {
   fetch: (req, env, ctx) => handle(req, env, ctx),
+  async scheduled(event, env, ctx) {
+    try { console.log("purge", JSON.stringify(await purge(env))); }
+    catch (e) { console.error("purge failed", e && e.stack || e); throw e; }
+  },
 };

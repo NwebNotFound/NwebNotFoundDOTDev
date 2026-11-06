@@ -218,13 +218,16 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const { results } = await env.DB.prepare(`SELECT ${cols} FROM ${table} WHERE status = 'pending'${tw} AND created_at > ? ORDER BY created_at ASC LIMIT ?`).bind(...types, since, limit).all();
     return json({ now: Date.now(), items: results.map((x) => ({ ...x, request_id: x.id, idem_key: x.id, order_type: x.type, ...(x.type === "bank_buy" ? { amount: x.qty, mc_uuid: x.buyer_uuid } : {}) })) });
   };
+  // Ack löscht die Alt-Klartext-ip sofort. ip_hash bleibt bis zum stündlichen Purge (worker.js purge(),
+  // nach 2 h) stehen: er zählt im 1-h-Fenster des Pro-IP-Limits. Würde er schon beim Ack gelöscht,
+  // zählten nur noch offene Aufträge – der Server bestätigt meist in Sekunden, das Limit wäre wirkungslos.
   const ack = (table) => async (req, env) => {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
     if (!tokenOk(req, env)) return json({ error: "unauthorized" }, 401);
     let b; try { b = await req.json(); } catch { return json({ error: "invalid json" }, 400); }
     const acks = (Array.isArray(b?.acks) ? b.acks : []).slice(0, 200).filter((x) => typeof x?.id === "string" && ACK_OK.includes(x.status));
     const now = Date.now();
-    const res = acks.length ? await env.DB.batch(acks.map((x) => env.DB.prepare(`UPDATE ${table} SET status = ?, reason = ?, acked_at = ? WHERE id = ? AND status != ? AND (status = 'pending' OR (? = 0 AND status NOT IN ('rejected','failed','refunded','collected','picked_up','delivered','cancelled')))`).bind(x.status, clip(x.reason, 120) || null, now, x.id, x.status, x.status === "accepted" || x.status === "rejected" ? 1 : 0))) : [];
+    const res = acks.length ? await env.DB.batch(acks.map((x) => env.DB.prepare(`UPDATE ${table} SET status = ?, reason = ?, acked_at = ?, ip = NULL WHERE id = ? AND status != ? AND (status = 'pending' OR (? = 0 AND status NOT IN ('rejected','failed','refunded','collected','picked_up','delivered','cancelled')))`).bind(x.status, clip(x.reason, 120) || null, now, x.id, x.status, x.status === "accepted" || x.status === "rejected" ? 1 : 0))) : [];
     return json({ ok: true, updated: res.reduce((s, r) => s + (r.meta?.changes || 0), 0) });
   };
   const BID_COLS = "id, auction_id, bidder_uuid, bidder_name, amount, source, created_at", ORD_COLS = "id, listing_id, shop_id, item, qty, buyer_uuid, buyer_uuid AS uuid, buyer_name, unit_price, unit_price AS max_unit_price_cent, source, created_at, type";

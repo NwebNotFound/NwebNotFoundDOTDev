@@ -62,6 +62,7 @@ fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
 fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\nPRICE_RESET_AT=${RESET}\n`);
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
+{ let okS = true; try { execSync(`bash scripts/schema-check.sh --local --persist-to ${PERSIST}`, { cwd: ROOT, stdio: "ignore" }); } catch { okS = false; } ok(okS, "schema.sql erfüllt scripts/schema-check.sh (deploy.sh-Vorabprüfung)"); }
 const wd = spawn(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", ...NPX.opts });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
 // Writing fixtures (phase 3a/3b): the committed src/generated/{content,feeds}.js carry Nils' real
