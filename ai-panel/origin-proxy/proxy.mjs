@@ -12,6 +12,10 @@
 //   /gw/p/<bot>/…      → Authorization: Bearer ***   (API_SERVER_KEY from profiles/<bot>/.env)
 //   /gw/… (no profile) → Authorization: Bearer ***   (API_SERVER_KEY of this .env)
 //
+// Only the routes the Worker (ai-panel/src) actually calls are served, each with its method
+// (see ROUTES below); everything else is refused before a credential is attached. Paths must be
+// canonical: no "%", no "//", no "." segments, nothing outside [A-Za-z0-9/_.-].
+//
 // Two routes are special-cased instead of proxied as-is (see "Crew routes" below):
 //   GET /gw/p/<bot>/api/sessions
 //   GET /gw/p/<bot>/api/sessions/<id>/messages
@@ -206,9 +210,9 @@ const PROFILE = /^\/p\/([a-z0-9][a-z0-9_-]{0,31})(?=\/|$)/;
 //   GET /gw/p/<bot>/api/sessions/<id>/messages   one session's transcript, paged
 //
 // These two are the only routes that rewrite the body instead of piping it: they clamp paging
-// to a hard maximum and redact credential-shaped text before it leaves the host. Everything
-// else (/v1/runs, /api/jobs, …) still streams through untouched, which is what the chat and
-// the cron editor need.
+// to a hard maximum and redact credential-shaped text before it leaves the host. The other
+// allowlisted routes (/v1/runs, /api/jobs, …) stream through untouched, which is what the chat
+// and the cron editor need; the Worker redacts what it forwards to the browser.
 //
 // The allowlist is the same one every other /gw/p/<bot>/ route uses: a profile whose gateway
 // key resolves. A bot without a key is a 404 here too, so a typo cannot read another bot's
@@ -379,6 +383,53 @@ async function handleCrew(req, res, url, route) {
   console.log(`${req.method} ${url.pathname} 200 ${page.length}/(${total ?? "?"}) (crew ${route.kind})`);
 }
 
+// ---------------------------------------------------------------------------------------
+// Allowlist — exactly what ai-panel/src calls, nothing else
+// ---------------------------------------------------------------------------------------
+//
+// The shared secret alone must not unlock every gateway and dashboard API with the injected
+// credentials. Keep this in step with the up.call/up.stream calls in ai-panel/src: a route the
+// Worker does not use has no business being reachable through the tunnel.
+
+const B = "[a-z0-9][a-z0-9_-]{0,31}"; // profile name, as PROFILE
+const I = "[A-Za-z0-9_-]{1,64}"; // job / run / session id, as the Worker's ID check
+const r = (src) => new RegExp(`^${src}$`);
+
+export const ROUTES = [
+  // gateway, per profile
+  { methods: ["GET", "POST"], re: r(`/gw/p/${B}/api/jobs`) },
+  { methods: ["PATCH", "DELETE"], re: r(`/gw/p/${B}/api/jobs/${I}`) },
+  { methods: ["POST"], re: r(`/gw/p/${B}/api/jobs/${I}/(?:pause|resume|run)`) },
+  { methods: ["GET"], re: r(`/gw/p/${B}/api/sessions`) },
+  { methods: ["GET"], re: r(`/gw/p/${B}/api/sessions/${I}/messages`) },
+  { methods: ["POST"], re: r(`/gw/p/${B}/v1/runs`) },
+  { methods: ["GET"], re: r(`/gw/p/${B}/v1/runs/${I}`) },
+  { methods: ["GET"], re: r(`/gw/p/${B}/v1/runs/${I}/events`) },
+  { methods: ["POST"], re: r(`/gw/p/${B}/v1/runs/${I}/(?:approval|steer|stop)`) },
+  { methods: ["POST"], re: r(`/gw/p/${B}/v1/chat/completions`) },
+  // dashboard
+  { methods: ["GET", "POST"], re: r("/dash/api/profiles") },
+  { methods: ["GET", "PUT"], re: r(`/dash/api/profiles/${B}/soul`) },
+  { methods: ["GET"], re: r("/dash/api/model/options") },
+  { methods: ["POST"], re: r("/dash/api/model/set") },
+];
+
+/** Raw request path (before WHATWG normalisation) is canonical: nothing that decodes or folds. */
+export function canonicalPath(rawPath) {
+  const p = String(rawPath || "");
+  if (!p.startsWith("/") || p.includes("//") || p.includes("%")) return false;
+  if (!/^[A-Za-z0-9/_.-]+$/.test(p)) return false;
+  return !p.split("/").some((seg) => seg === "." || seg === "..");
+}
+
+/** "ok", "method" (path known, method not), or "unknown". */
+export function allowRoute(method, pathname) {
+  const hits = ROUTES.filter((route) => route.re.test(pathname));
+  if (!hits.length) return { verdict: "unknown", allow: [] };
+  const allow = [...new Set(hits.flatMap((route) => route.methods))];
+  return { verdict: allow.includes(String(method || "").toUpperCase()) ? "ok" : "method", allow };
+}
+
 function upstreamFor(pathname) {
   if (pathname.startsWith("/gw/")) {
     const rest = pathname.slice(3);
@@ -403,6 +454,27 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/health") {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     res.end(JSON.stringify(await healthPayload()));
+    return;
+  }
+
+  // Canonical paths only, checked on the raw request line: `new URL` keeps "%73" and "//" as they
+  // are and folds "..", so a non-canonical spelling could otherwise dodge the route checks below.
+  const rawPath = String(req.url || "").split("?")[0];
+  if (!canonicalPath(rawPath) || rawPath !== url.pathname) {
+    res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ error: "non_canonical_path" }));
+    console.warn(`${req.method} 400 (non-canonical path)`);
+    return;
+  }
+
+  // Method + path allowlist: only what the Worker calls gets a credential.
+  const allowed = allowRoute(req.method, url.pathname);
+  if (allowed.verdict !== "ok") {
+    const status = allowed.verdict === "method" ? 405 : 404;
+    const extra = status === 405 ? { allow: allowed.allow.join(", ") } : {};
+    res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", ...extra });
+    res.end(JSON.stringify({ error: status === 405 ? "method_not_allowed" : "not_found" }));
+    console.warn(`${req.method} ${url.pathname} ${status} (not on the allowlist)`);
     return;
   }
 
