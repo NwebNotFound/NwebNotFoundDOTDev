@@ -5,7 +5,11 @@ import { CHANGELOG_MD, CHANGELOG_SRC } from "./generated/changelog.js";
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 // → [{ title, items: [] }] für die Unterabschnitte (###) des Spieler-Teils; Einträge ohne ### landen in einem Block ohne Titel.
-export function playerSections(md = CHANGELOG_MD) {
+// Optional English text at the end of an entry: an HTML comment `<!-- en: **Title** – subline -->`. The German
+// text stays the source of truth; `stripEn` hides the comment everywhere else (e.g. the /changelog page).
+const EN_RE = /\s*<!--\s*en:\s*([\s\S]*?)\s*-->\s*$/;
+const stripEn = (raw) => raw.replace(EN_RE, "");
+const rawSections = (md = CHANGELOG_MD) => {
   const lines = md.split(/\r?\n/); let on = false; const out = []; let cur = null;
   for (const l of lines) {
     const h2 = /^##\s+(.+?)\s*$/.exec(l);
@@ -15,6 +19,9 @@ export function playerSections(md = CHANGELOG_MD) {
     const li = /^\s*[-*]\s+(.+?)\s*$/.exec(l); if (li) { if (!cur) out.push(cur = { title: null, items: [] }); cur.items.push(li[1]); }
   }
   return out.filter((s) => s.items.length);
+};
+export function playerSections(md = CHANGELOG_MD) {
+  return rawSections(md).map((sec) => ({ ...sec, items: sec.items.map(stripEn) }));
 }
 // Group sections with an explicitly stated date; never infer a date for undated source entries.
 function sectionDate(title) {
@@ -54,12 +61,14 @@ function renderEntry(text) {
 
 /** Latest player-facing entries for the start page: [{ date: "06.11." | "", title, sub, text }], newest first.
  *  An entry is "Title sentence. Optional second sentence as subline." under a dated `### dd.mm.yyyy` heading. */
-export function latestEntries(limit = 4, md = CHANGELOG_MD) {
+export function latestEntries(limit = 4, md = CHANGELOG_MD, lang = "de") {
   const out = [];
-  for (const section of playerSections(md)) {
+  for (const section of rawSections(md)) {
     const d = sectionDate(section.title);
     const date = d ? `${d.iso.slice(8, 10)}.${d.iso.slice(5, 7)}.` : "";
-    for (const raw of section.items) {
+    for (const item of section.items) {
+      const enM = EN_RE.exec(item);
+      const raw = lang === "en" && enM ? enM[1] : stripEn(item);
       const plain = (x) => x.replace(/^\s*(?:\*\*)?\[[^\]]+\](?:\*\*)?\s*/, "").replace(/[`*]/g, "").trim();
       // "**Title** – subline" (preferred), else the first sentence is the title and the rest the subline.
       const bold = /^\s*\*\*(.+?)\*\*\s*[–—-]\s*(\S.*)$/s.exec(raw);

@@ -151,6 +151,7 @@ for (const lang of LANGS) {
   ok(tileCount === 6 && tileCount % 3 === 0, `sechs gleich große Projektkarten, Raster ohne Lücke (${tileCount})`);
   ok(["Zuletzt", "Latest"].some((x) => hubPage("/", "de").includes(x)) && hubPage("/", "de").includes("data-gb-latest") && hubPage("/", "de").includes("h2-log"), "Zuletzt (Changelog) and the guestbook teaser are on the start page");
   ok(/<li><span class="h2-when">\d\d\.\d\d\.<\/span><span class="h2-lic">[\s\S]*?<b>[^<]+<\/b><small>[^<]+<\/small>/.test(hubPage("/", "de")), "Zuletzt shows date, title and subline per entry");
+  ok(hubPage("/", "en").includes("Real player heads on the website") && !/<li><span class="h2-when">[^<]*<\/span><span class="h2-lic">[\s\S]*?<b>Echte Spielerköpfe/.test(hubPage("/", "en")), "the English start page shows the English changelog entries (German as fallback)");
   // Und die Chips auf /about zählen dieselben Bereiche.
   const aboutChips = (hubPage("/about", "de").match(/sm-badge sm-badge--(ramune|sakura|lavender|peach|sun)/g) || []).length;
   ok(aboutChips >= 3 && !hubPage("/about", "de").includes("Rezensionen"), "die Bereichs-Chips auf /about passen zur Navigation");

@@ -66,6 +66,18 @@ test("latestEntries gives date, title and subline for the start page", () => {
   assert.equal(latestEntries(2, md).length, 2);
 });
 
+test("English title and subline come from the en: comment, fall back to German, and never show on the page", () => {
+  const md = `## Für Spieler
+### 06.11.2026
+- **Neue Navigation** – Eine Leiste für alles. <!-- en: **New navigation** – One bar for everything. -->
+- **Nur Deutsch** – Kein englischer Text.
+`;
+  assert.deepEqual(latestEntries(2, md, "en").map((e) => [e.title, e.sub]), [["New navigation", "One bar for everything."], ["Nur Deutsch", "Kein englischer Text."]]);
+  assert.deepEqual(latestEntries(1, md, "de").map((e) => [e.title, e.sub]), [["Neue Navigation", "Eine Leiste für alles."]]);
+  assert.ok(!changelogBody(md).includes("New navigation") && !changelogBody(md).includes("en:") && !changelogBody(md).includes("&lt;!--"));
+  assert.deepEqual(playerSections(md)[0].items[0], "**Neue Navigation** – Eine Leiste für alles.");
+});
+
 test("a new player section without a heading does not inherit an earlier date", () => {
   const md = `## Für Spieler
 ### 2026-10-03
