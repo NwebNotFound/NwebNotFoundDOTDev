@@ -5,7 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { createServer } from "node:http";
+import http, { createServer } from "node:http";
 import { once } from "node:events";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -103,10 +103,10 @@ test("a wrong secret is refused", async () => {
 });
 
 test("each bot gets its own gateway key, chosen from the /p/<bot>/ prefix", async () => {
-  const cf = await get("/gw/p/cloudflare/v1/runs", { "content-type": "application/json" });
+  const cf = await get("/gw/p/cloudflare/v1/runs/run_1");
   assert.equal(cf.status, 200);
   const cfData = await cf.json();
-  assert.equal(cfData.path, "/p/cloudflare/v1/runs");
+  assert.equal(cfData.path, "/p/cloudflare/v1/runs/run_1");
   assert.equal(cfData.auth, `Bearer ${KEYS.cloudflare}`);
 
   const mc = await get("/gw/p/minecraft/api/jobs");
@@ -121,7 +121,7 @@ test("each bot gets its own gateway key, chosen from the /p/<bot>/ prefix", asyn
 
 test("a profile without a configured key is a 404 and is never proxied", async () => {
   const before = seen.length;
-  const res = await get("/gw/p/unknownbot/v1/runs", { "content-type": "application/json" });
+  const res = await get("/gw/p/unknownbot/v1/runs/run_1");
   assert.equal(res.status, 404);
   assert.equal((await res.json()).error, "unknown_bot");
   assert.equal(seen.length, before, "no upstream request for an unknown bot");
@@ -138,7 +138,7 @@ test("dashboard routes get the dashboard session token and the dashboard host", 
 });
 
 test("a client cannot smuggle its own credentials through", async () => {
-  const res = await get("/gw/p/cloudflare/v1/runs", {
+  const res = await get("/gw/p/cloudflare/v1/runs/run_1", {
     authorization: "Bearer attacker-key",
     "x-hermes-session-token": "attacker-token",
   });
@@ -187,7 +187,7 @@ test("an unreachable upstream is a generic 502 without internals", async () => {
         }
       });
     });
-    const res = await fetch(`http://127.0.0.1:${listenPort}/gw/p/cloudflare/v1/runs`, {
+    const res = await fetch(`http://127.0.0.1:${listenPort}/gw/p/cloudflare/v1/runs/run_1`, {
       headers: { "x-hermes-panel-secret": SECRET },
     });
     assert.equal(res.status, 502);
@@ -326,32 +326,105 @@ test("gateway keys are resolved from the profile env files, cached, and never lo
       return { status: res.status, body: await res.json() };
     };
 
-    const alpha = await call("/gw/p/alpha/v1/runs");
+    const alpha = await call("/gw/p/alpha/v1/runs/run_1");
     assert.equal(alpha.status, 200);
     assert.equal(alpha.body.auth, "Bearer key-for-alpha", "quotes, export and comments are handled");
 
-    const fallback = await call("/gw/p/default/v1/runs");
+    const fallback = await call("/gw/p/default/v1/runs/run_1");
     assert.equal(fallback.body.auth, "Bearer key-from-default-env", "default reads the Hermes home .env");
 
-    const noKey = await call("/gw/p/beta/v1/runs");
+    const noKey = await call("/gw/p/beta/v1/runs/run_1");
     assert.equal(noKey.status, 404);
     assert.equal(noKey.body.error, "unknown_bot", "a profile without a key stays a 404");
 
-    const badName = await call("/gw/p/Bad..Name/v1/runs");
+    const badName = await call("/gw/p/Bad..Name/v1/runs/run_1");
     assert.equal(badName.status, 404, "an invalid bot name is not a profile route");
-    assert.equal(badName.body.error, "unknown_bot");
+    assert.equal(badName.body.error, "not_found");
 
+    // The Worker never calls a /gw/ route without a profile, so API_SERVER_KEY is never attached.
     const plain = await call("/gw/health");
-    assert.equal(plain.body.auth, "Bearer key-from-process-env", "/gw/ without a profile keeps using API_SERVER_KEY");
+    assert.equal(plain.status, 404, "/gw/ without a profile is not on the allowlist");
+    assert.equal(plain.body.auth, undefined);
 
     // Rotation is picked up within the cache window, not on every request.
     writeFileSync(path.join(home, "profiles", "alpha", ".env"), "API_SERVER_KEY=key-for-alpha-rotated\n");
-    const cached = await call("/gw/p/alpha/v1/runs");
+    const cached = await call("/gw/p/alpha/v1/runs/run_1");
     assert.equal(cached.body.auth, "Bearer key-for-alpha", "the key is cached for ~30 s");
 
     assert.match(log, /gateway keys resolved from profile \.env: default, alpha, beta/, "startup log lists discovered bots");
     assert.doesNotMatch(log, /key-for-alpha|key-from-default-env|key-from-process-env/, "no key value is ever logged");
   } finally {
     proc.kill();
+  }
+});
+
+// ---- allowlist (#74) ----------------------------------------------------------------------
+
+const send = (p, method = "GET") =>
+  fetch(`${proxyUrl}${p}`, { method, headers: { "x-hermes-panel-secret": SECRET, "content-type": "application/json" }, body: method === "GET" ? undefined : "{}" });
+
+test("only the routes the Worker calls are proxied, each with its own methods", async () => {
+  const allowed = [
+    ["GET", "/gw/p/cloudflare/api/jobs?include_disabled=true"],
+    ["POST", "/gw/p/cloudflare/api/jobs"],
+    ["PATCH", "/gw/p/cloudflare/api/jobs/job_1"],
+    ["DELETE", "/gw/p/cloudflare/api/jobs/job_1"],
+    ["POST", "/gw/p/cloudflare/api/jobs/job_1/pause"],
+    ["POST", "/gw/p/cloudflare/v1/runs"],
+    ["GET", "/gw/p/cloudflare/v1/runs/run_1"],
+    ["POST", "/gw/p/cloudflare/v1/runs/run_1/steer"],
+    ["POST", "/gw/p/cloudflare/v1/chat/completions"],
+    ["GET", "/dash/api/profiles"],
+    ["PUT", "/dash/api/profiles/cloudflare/soul"],
+    ["GET", "/dash/api/model/options?profile=cloudflare"],
+    ["POST", "/dash/api/model/set?profile=cloudflare"],
+  ];
+  for (const [method, p] of allowed) {
+    const res = await send(p, method);
+    assert.equal(res.status, 200, `${method} ${p}`);
+  }
+
+  const refused = [
+    ["DELETE", "/dash/api/profiles/cloudflare", 404],
+    ["POST", "/dash/api/profiles/cloudflare/model", 404],
+    ["GET", "/dash/api/config", 404],
+    ["GET", "/gw/v1/runs", 404],
+    ["POST", "/gw/v1/runs", 404],
+    ["GET", "/gw/p/cloudflare/v1/runs", 405],
+    ["DELETE", "/gw/p/cloudflare/v1/runs/run_1", 405],
+    ["POST", "/dash/api/model/options", 405],
+    ["GET", "/gw/p/cloudflare/v1/models", 404],
+  ];
+  for (const [method, p, status] of refused) {
+    const before = seen.length;
+    const res = await send(p, method);
+    assert.equal(res.status, status, `${method} ${p}`);
+    assert.equal(seen.length, before, `${method} ${p} never reached Hermes`);
+  }
+});
+
+test("non-canonical paths are refused before routing", async () => {
+  for (const p of [
+    "/gw/p/cloudflare/api/%73essions/run_aaa111/messages",
+    "/gw/p/cloudflare//api/sessions",
+    "/gw/p/cloudflare/api/jobs/../sessions",
+    "/gw/p/cloudflare/api/./jobs",
+    "/dash/api/profiles/cloud~flare/soul",
+  ]) {
+    const before = seen.length;
+    const res = await new Promise((resolve, reject) => {
+      // node:http keeps the raw request target; fetch would normalise "..".
+      const u = new URL(proxyUrl);
+      const req = http.request({ host: u.hostname, port: u.port, path: p, headers: { "x-hermes-panel-secret": SECRET } }, (r) => {
+        let body = "";
+        r.on("data", (c) => (body += c));
+        r.on("end", () => resolve({ status: r.statusCode, body }));
+      });
+      req.on("error", reject);
+      req.end();
+    });
+    assert.equal(res.status, 400, p);
+    assert.match(res.body, /non_canonical_path/);
+    assert.equal(seen.length, before, `${p} never reached Hermes`);
   }
 });
