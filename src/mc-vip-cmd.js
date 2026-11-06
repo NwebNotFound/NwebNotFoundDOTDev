@@ -3,6 +3,7 @@
 // expired setzt nur mc-stack, frühestens 600000 ms nach created_at.
 import { normU, WORLD_LIMITS, worldLimit } from "./mc-vip.js";
 import { hashIp } from "./ip-hash.js";
+import { safeDecode } from "./safe-decode.js";
 
 // Vom Browser erlaubte ops (Pfad → action).
 export const ACTIONS = ["create", "rename", "start", "stop", "settings", "set_visibility", "invite", "uninvite", "trust", "delete"];
@@ -383,15 +384,16 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       if (p === "/api/mc-vip/worlds") return mutate(req, env, "", "create", await bodyOf(req));
       const m = p.match(/^\/api\/mc-vip\/worlds\/([^/]+)\/(start|stop|rename|settings|delete|visibility|members)(?:\/([^/]+))?(?:\/(trust))?$/);
       if (!m) return null;
-      const worldId = decodeURIComponent(m[1]);
-      const body = m[2] === "members" && req.method === "DELETE" ? { name: decodeURIComponent(m[3] || "") } : await bodyOf(req);
+      const worldId = safeDecode(m[1]), member = safeDecode(m[3] || "");
+      if (worldId == null || member == null) return json({ error: "not found" }, 404);
+      const body = m[2] === "members" && req.method === "DELETE" ? { name: member } : await bodyOf(req);
       if (m[2] === "start") return mutate(req, env, worldId, "start", body);
       if (m[2] === "stop") return mutate(req, env, worldId, "stop", body);
       if (m[2] === "rename") return mutate(req, env, worldId, "rename", body);
       if (m[2] === "settings") return mutate(req, env, worldId, "settings", body);
       if (m[2] === "delete") return mutate(req, env, worldId, "delete", body);
       if (m[2] === "visibility") return mutate(req, env, worldId, "set_visibility", body);
-      if (m[2] === "members" && m[4] === "trust") return mutate(req, env, worldId, "trust", { ...body, name: decodeURIComponent(m[3] || "") });
+      if (m[2] === "members" && m[4] === "trust") return mutate(req, env, worldId, "trust", { ...body, name: member });
       if (m[2] === "members" && req.method === "DELETE") return mutate(req, env, worldId, "uninvite", body);
       if (m[2] === "members") return mutate(req, env, worldId, "invite", body);
       return null;

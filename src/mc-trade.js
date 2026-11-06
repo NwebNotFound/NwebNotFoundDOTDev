@@ -1,5 +1,6 @@
 // Spielershops + Auktionshaus + Warteschlangen (Website ist NICHT autoritativ fürs Geld; alle Beträge in Cent)
 import { hashIp } from "./ip-hash.js";
+import { safeDecode } from "./safe-decode.js";
 const ID_RE = /^[A-Za-z0-9_.:-]{1,64}$/, ITEM_RE = /^[a-z0-9_]{1,48}$/, NAME_RE = /^[A-Za-z0-9_]{1,16}$/;
 const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 const normU = (x) => String(x).toLowerCase().replace(/-/g, "").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
@@ -237,12 +238,12 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
       if (p === "/api/mc-shop-orders/pending") return pending("mc_shop_orders_pending", ORD_COLS, true)(req, env, url);
       if (p === "/api/mc-shop-orders/ack") return ack("mc_shop_orders_pending")(req, env);
       if (p === "/api/mc-auctions") return auctions(req, env);
-      if (p.startsWith("/api/mc-auctions/")) return auction(req, env, decodeURIComponent(p.slice(17)));
+      if (p.startsWith("/api/mc-auctions/")) { const id = safeDecode(p.slice(17)); return id == null ? json({ error: "not found" }, 404) : auction(req, env, id); }
       if (p === "/api/mc-abholungen" || p === "/api/mc-bestellungen") return pickups(req, env);
       if (p === "/api/mc-bank-buy") return bankBuy(req, env);
       if (p === "/api/mc-orders/hide") return hideOrder(req, env);
       if (p === "/api/mc-shops") return shops(req, env);
-      if (p.startsWith("/api/mc-shops/")) return shop(req, env, decodeURIComponent(p.slice(14)));
+      if (p.startsWith("/api/mc-shops/")) { const id = safeDecode(p.slice(14)); return id == null ? json({ error: "not found" }, 404) : shop(req, env, id); }
       return null;
     },
   };

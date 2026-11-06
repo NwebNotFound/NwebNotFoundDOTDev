@@ -18,6 +18,7 @@ import { hubPage, hubPageExists } from "./hub.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie } from "./i18n/index.js";
+import { safeDecode } from "./safe-decode.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -588,7 +589,9 @@ async function hmac(secret, data) { const k = await crypto.subtle.importKey("raw
 function safeEq(a, b) { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; }
 async function sign(env, v) { return `${v}.${await hmac(env.SESSION_SECRET, v)}`; }
 async function unsign(env, s) { if (!s || !env.SESSION_SECRET) return null; const i = s.lastIndexOf("."); if (i < 1) return null; const v = s.slice(0, i); return safeEq(s.slice(i + 1), await hmac(env.SESSION_SECRET, v)) ? v : null; }
-const cookies = (req) => Object.fromEntries((req.headers.get("cookie") || "").split(/;\s*/).filter(Boolean).map(c => { const i = c.indexOf("="); return [c.slice(0, i), decodeURIComponent(c.slice(i + 1))]; }));
+// Kaputte Cookies (ohne "=" oder mit ungültiger %-Folge, z. B. von einer Nachbar-Subdomain gesetzt) werden
+// übersprungen statt die ganze Anfrage mit einem URIError abzubrechen.
+const cookies = (req) => { const o = {}; for (const c of (req.headers.get("cookie") || "").split(/;\s*/)) { const i = c.indexOf("="); if (i < 1) continue; const k = c.slice(0, i), v = safeDecode(c.slice(i + 1)); if (v != null && !(k in o)) o[k] = v; } return o; };
 const sessCookie = (v, maxAge) => `${COOKIE}=${encodeURIComponent(v)}; Domain=.${MAIN}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
 const hostOk = (h) => { const host = String(h || "").toLowerCase(); if (host === MAIN || host === MCD) return true; if (!host.endsWith("." + MAIN)) return false; const rest = host.slice(0, -(MAIN.length + 1)); return rest.length > 0 && /^[a-z0-9.-]+$/.test(rest) && !rest.startsWith(".") && !rest.endsWith(".") && !rest.includes(".."); };
 // next: relativer Pfad oder https auf nwebnotfound.dev / *.nwebnotfound.dev. Sonst Startseite. /vip bleibt auf der MC-Subdomain.
@@ -1065,8 +1068,18 @@ async function me(req, env) {
   return json({ available: authReady(env), user: u ? { id: u.id, name: u.name, username: u.username, avatar: u.avatar, mc_name: l?.mc_name || null } : null }, 200, cors);
 }
 
-export default {
-  async fetch(req, env, ctx) {
+// Letztes Netz: jeder ungefangene Fehler im Routing wird geloggt und als sauberes 500 beantwortet
+// (statt Cloudflare-Fehler 1101). Keine Fehlerdetails an den Client.
+async function handle(req, env, ctx) {
+  try { return await route(req, env, ctx); }
+  catch (e) {
+    console.error("unhandled error", req.method, new URL(req.url).pathname, e && e.stack || e);
+    let api = false; try { api = new URL(req.url).pathname.startsWith("/api/"); } catch {}
+    return api ? json({ error: "Interner Fehler" }, 500) : new Response("Interner Fehler", { status: 500, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+  }
+}
+
+async function route(req, env, ctx) {
     const url = new URL(req.url);
     const hostH = req.headers.get("host")?.replace(/:\d+$/, "") || "";
     const allowTestHost = env.MC_INGEST_TOKEN === "e2e-token";
@@ -1085,18 +1098,18 @@ export default {
     if (p === "/api/mc-data") return mcData(env);
     if (p === "/api/profile") return profileApi(req, env);
     if (p === "/api/mc-players") return json({ players: await playersApi(env, url) });
-    if (p.startsWith("/api/mc-players/")) { const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, decodeURIComponent(p.slice(16)), u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
+    if (p.startsWith("/api/mc-players/")) { const n = safeDecode(p.slice(16)); if (n == null) return json({ error: "Spieler nicht gefunden" }, 404); const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, n, u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
     if (p === "/api/mc-leaderboards") return mcLeaderboards(env);
     if (p === "/api/mc-parkour") return json(await parkourApi(env), 200, { "cache-control": "public, max-age=30" });
     if (p === "/api/mc-pvp") return json(await pvpApi(env), 200, { "cache-control": "public, max-age=30" });
     if (p === "/api/mc-vip") { if (req.method !== "GET") return json({ error: "Method not allowed" }, 405); const u = await getUser(req, env).catch(() => null); return json(await vipApi(env, u), 200, { "cache-control": "private, no-store" }); }
-    if (p.startsWith("/api/mc-pvp/")) { const o = await pvpPlayerApi(env, decodeURIComponent(p.slice(12))); return o ? json(o, 200, { "cache-control": "public, max-age=30" }) : json({ error: "keine PvP-Daten" }, 404); }
+    if (p.startsWith("/api/mc-pvp/")) { const n = safeDecode(p.slice(12)); if (n == null) return json({ error: "keine PvP-Daten" }, 404); const o = await pvpPlayerApi(env, n); return o ? json(o, 200, { "cache-control": "public, max-age=30" }) : json({ error: "keine PvP-Daten" }, 404); }
     if (p === "/api/mc-economy") return json(await economyApi(env), 200, { "cache-control": "public, max-age=60" });
     if (p === "/api/mc-market") return mcMarket(env);
-    if (p.startsWith("/api/mc-market/")) return mcMarketItem(env, decodeURIComponent(p.slice(15)));
+    if (p.startsWith("/api/mc-market/")) { const it = safeDecode(p.slice(15)); return it == null ? json({ error: "invalid item" }, 400) : mcMarketItem(env, it); }
     if (p.startsWith("/mc-head/")) return headResponse(req, p, ctx, env);
     if (p.startsWith("/mc-skin/")) return skinResponse(req, p, ctx, env);
-    if (p.startsWith("/mc-mob/")) return new Response(null, { status: 302, headers: { location: mobIcon(decodeURIComponent(p.slice(8)).replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } });
+    if (p.startsWith("/mc-mob/")) { const k = safeDecode(p.slice(8)); if (k == null) return new Response("Not found", { status: 404 }); return new Response(null, { status: 302, headers: { location: mobIcon(k.replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } }); }
     if (p.startsWith("/mc-icon/")) { const q = p.slice(9).replace(/^v2\//, ""); let dq; try { dq = decodeURIComponent(q); } catch { return new Response("Not found", { status: 404 }); } const r = resolveIcon(dq.replace(/\.png$/, "")); return r ? new Response(null, { status: 302, headers: { location: /^(https:|\/)/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=86400" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${dq.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
     if (p.startsWith("/auth/")) {
       if (isMc) { url.hostname = MAIN; return redirect(url.toString()); }
@@ -1113,19 +1126,19 @@ export default {
       if (p === "/bestellungen" || p === "/abholungen") return html(mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));
       if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", loginBase: `https://${MAIN}`, head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
       if (p === "/spieler") return html(mcPage("Spieler · NwebNotFound MC", "Spieler suchen: Skin, öffentliche Stats und Profil", playersBody()));
-      if (p.startsWith("/spieler/")) { const n = decodeURIComponent(p.slice(9)); if (!/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
+      if (p.startsWith("/spieler/")) { const n = safeDecode(p.slice(9)); if (n == null || !/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
       if (p === "/markt" && url.searchParams.has("item")) {
         const raw = String(url.searchParams.get("item") || "").trim(), it = cleanItem(raw);
         const known = it ? await env.DB.prepare("SELECT 1 FROM mc_market WHERE item = ?").bind(it).first().catch(() => null) : null;
         return redirect(known ? `/markt/${encodeURIComponent(it)}` : `/markt?q=${encodeURIComponent(raw.replace(/^minecraft:/i, "").replace(/_/g, " ").slice(0, 48))}`);
       }
       if (p === "/shops") return html(mcPage("Shops · NwebNotFound MC", "Spielershops: Angebote, Preise, Lager und Orte", shopsBody()));
-      if (p.startsWith("/shops/")) { const id = decodeURIComponent(p.slice(7)); if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Shop · NwebNotFound MC", "Spielershop", shopBody(id))); }
+      if (p.startsWith("/shops/")) { const id = safeDecode(p.slice(7)); if (id == null || !/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Shop · NwebNotFound MC", "Spielershop", shopBody(id))); }
       if (p === "/bestenlisten" || p === "/bestenliste") return Response.redirect(`https://${MCD}/leaderboards`, 301);
       if (p === "/auktionen") return html(mcPage("Auktionen · NwebNotFound MC", "Live-Auktionen vom Server", auctionsBody()));
-      if (p.startsWith("/auktionen/")) { const id = decodeURIComponent(p.slice(11)); if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Auktion · NwebNotFound MC", "Auktion mit Gebotsverlauf", auctionBody(id))); }
+      if (p.startsWith("/auktionen/")) { const id = safeDecode(p.slice(11)); if (id == null || !/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Auktion · NwebNotFound MC", "Auktion mit Gebotsverlauf", auctionBody(id))); }
       if (p === "/markt") return html(mcPage("Markt · NwebNotFound MC", "Preise, Gewinner und Verlierer im Server-Shop", marketBody()));
-      if (p.startsWith("/markt/")) { const it = cleanItem(decodeURIComponent(p.slice(7))); if (!it) return notFound(true); return html(mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
+      if (p.startsWith("/markt/")) { const raw = safeDecode(p.slice(7)), it = raw == null ? null : cleanItem(raw); if (!it) return notFound(true); return html(mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
       if (p === "/wiki") return html(mcPage("Wiki · NwebNotFound MC", "Anleitungen, Regeln und FAQ zum Minecraft-Server", wikiIndexBody(MC_HOST)));
       if (p.startsWith("/wiki/")) { const a = WIKI.find((x) => x.slug === p.slice(6)); if (!a) return notFound(true); return html(mcPage(a.title + " · Wiki · NwebNotFound MC", a.sum, wikiArticleBody(a, MC_HOST))); }
       return assetOrNotFound(req, env, true);
@@ -1154,5 +1167,8 @@ export default {
     if (p === "/profile") return html(PROFILE_MAIN());
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
     return assetOrNotFound(req, env, false);
-  },
+}
+
+export default {
+  fetch: (req, env, ctx) => handle(req, env, ctx),
 };

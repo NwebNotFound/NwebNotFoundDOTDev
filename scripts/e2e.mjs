@@ -12,6 +12,7 @@ import "./content-unit.mjs";
 import "./markdown-unit.mjs";
 import "./feed-unit.mjs";
 import "./epub-unit.mjs";
+import "./worker-robust-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { hubPage } from "../src/hub.js";
