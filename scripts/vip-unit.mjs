@@ -90,6 +90,11 @@ assert.equal(cleanWorlds({ id: "nope" }).error.includes("Array"), true);
   assert.equal(cleanWorlds(many(31)).worlds.length, 31, "31 Welten vollständig");
   assert.equal(cleanWorlds(many(500)).worlds.length, 500, "500 Welten vollständig");
   assert.equal(cleanWorlds(many(501)).error, "höchstens 500 Welten", "501 abgelehnt statt gekürzt");
+  // D1: ein Wert darf höchstens 2 MB groß sein. Schlimmster Fall: 500 Welten, je 12 Mitglieder, volle Texte.
+  const inv = Array.from({ length: 12 }, (_, i) => ({ uuid: `22222222-2222-4222-8222-${String(i).padStart(12, "0")}`, name: "Player_Name_" + i, role: "trusted", added_at: 1793503000000 }));
+  const worst = cleanWorlds(many(500).map((w) => ({ ...w, name: "W".repeat(24), info: "x".repeat(120), owner_name: "NwebNotFound", slot: "vipworld-12", invites: inv, addons: ["keep-inventory", "peaceful", "pvp"] })));
+  assert.equal(worst.worlds.length, 500);
+  assert.ok(JSON.stringify(worst.worlds).length < 2_000_000 * 0.75, "500 Welten bleiben mit Reserve unter der D1-Grenze von 2 MB");
 }
 assert.equal(cleanWorlds([{ ...CW, visibility: "public" }]).worlds.length, 0, "visibility public raus");
 const cw = cleanWorlds([CW]).worlds[0];
