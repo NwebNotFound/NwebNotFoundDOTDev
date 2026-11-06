@@ -159,9 +159,19 @@
     }).join("");
     return `${head}<ul class="vip-log">${rows}</ul></section>`;
   };
+  // The feedback pill lives on <body>, not inside the panel: <main> carries a transform (page rise
+  // animation), which would turn "position:fixed" into "fixed to main" and push it below the fold.
+  const sayNode = () => {
+    let n = document.getElementById("vip-say");
+    if (!n) {
+      n = document.createElement("p");
+      n.id = "vip-say"; n.className = "vip-say v2-toast"; n.setAttribute("role", "status"); n.setAttribute("aria-live", "polite");
+      document.body.appendChild(n);
+    }
+    return n;
+  };
   const say = (msg, bad) => {
-    const n = document.getElementById("vip-say");
-    if (!n) return;
+    const n = sayNode();
     n.textContent = msg || "";
     n.className = "vip-say v2-toast" + (msg ? " is-on" : "") + (bad ? " is-bad" : "");
   };
@@ -188,7 +198,7 @@
     const others = d.worlds ? { ...d.worlds, slots: slotsOf.filter((s) => !(s && s.owner === true)) } : d.worlds;
     const mineOnly = d.worlds ? { ...d.worlds, slots: slotsOf.filter((s) => s && s.owner === true) } : d.worlds;
     const worlds = admin ? ownSection(mineOnly, max, false) + adminWorlds(others) + adminLog(d.admin_log) : ownSection(d.worlds, max, false);
-    return `${headCard}<p class="vip-say v2-toast" id="vip-say" role="status" aria-live="polite"></p>${worlds}${ranks}`;
+    return `${headCard}${worlds}${ranks}`;
   };
   const gate = (d) => {
     const raw = location.pathname + location.search + location.hash;
@@ -436,6 +446,7 @@
     let d;
     try { d = await get("/api/mc-vip"); } catch { d = { access: false, reason: "error", catalog: [], note: "" }; }
     T.innerHTML = d && d.access ? panel(d) : gate(d || {});
+    if (d && d.access) sayNode();
   };
   load();
 })();
