@@ -322,6 +322,11 @@ export async function rateTake(env, bucket, id) {
   }
 }
 
+/** A request-log row for Workers Logs only, never the durable ring (sampled noise). */
+export function logLocal(entry) {
+  return log.record(entry);
+}
+
 /** Append a request-log row. Always also goes to Workers Logs. */
 export async function logAppend(env, entry) {
   const row = log.record(entry);

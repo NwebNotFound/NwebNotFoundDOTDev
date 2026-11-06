@@ -866,3 +866,96 @@ test("logout-all revokes every issued session", async () => {
   assert.equal(after.status, 401, "the old cookie no longer authenticates");
   resetCache();
 });
+
+// ---- abuse limits (#80) -----------------------------------------------------------------
+
+function storeEnv() {
+  const map = new Map();
+  const storage = {
+    async get(k) {
+      return map.get(k);
+    },
+    async put(k, v) {
+      map.set(k, v);
+    },
+    async delete(k) {
+      map.delete(k);
+    },
+    async list({ prefix = "" } = {}) {
+      return new Map([...map].filter(([k]) => k.startsWith(prefix)));
+    },
+  };
+  const doStore = new PanelStore({ storage }, {});
+  return {
+    map,
+    env: {
+      ...env,
+      PANEL_STORE: { idFromName: (n) => n, get: () => ({ fetch: (url, init) => doStore.fetch(new Request(url, init)) }) },
+    },
+  };
+}
+
+test("unauthenticated requests are rate-limited per IP and stay out of the audit ring", async () => {
+  resetCache();
+  const { map, env: e } = storeEnv();
+  const anon = (ip) => handle(new Request(`${HOST}/api/x`, { headers: { "cf-connecting-ip": ip } }), e);
+  try {
+    const statuses = [];
+    for (let i = 0; i < 40; i++) statuses.push((await anon("203.0.113.7")).status);
+    assert.equal(statuses[0], 401);
+    assert.ok(statuses.includes(429), "the flood is cut off before the auth check");
+    assert.equal(statuses.filter((s) => s === 401).length, 30, "at most the unauth budget reaches auth");
+    const ring = map.get("log") || [];
+    assert.equal(ring.filter((r) => r.status === 401 || r.status === 429).length, 0, "no 401/429 row in the durable log");
+    assert.equal((await anon("198.51.100.9")).status, 401, "another IP is not affected");
+  } finally {
+    resetCache();
+  }
+});
+
+test("/auth/callback is rate-limited per IP", async () => {
+  const statuses = [];
+  for (let i = 0; i < 12; i++) {
+    const res = await handle(
+      new Request(`${HOST}/auth/callback?code=abc&state=zzz`, { headers: { "cf-connecting-ip": "192.0.2.44" } }),
+      env,
+    );
+    statuses.push(res.status);
+  }
+  assert.equal(statuses[0], 302, "a bad state is a redirect to the denied page");
+  assert.equal(statuses.at(-1), 429);
+});
+
+test("input size limits are consistent across routes", async () => {
+  const big = (n) => "x".repeat(n);
+  const cases = [
+    ["/api/bots/minecraft/jobs/job_1", "PATCH", { prompt: big(5001) }],
+    ["/api/bots/minecraft/jobs/job_1", "PATCH", { name: big(201) }],
+    ["/api/bots/minecraft/jobs", "POST", { name: big(201), schedule: "0 * * * *" }],
+    ["/api/bots", "POST", { name: "sizecheck", soul: big(200_001) }],
+    ["/api/bots", "POST", { name: "sizecheck", description: big(2001) }],
+    ["/api/bots/cloudflare/runs/run_abc/steer", "POST", { input: big(20_001) }],
+    ["/api/bots/cloudflare/quick", "POST", { messages: Array.from({ length: 51 }, () => ({ role: "user", content: "hi" })) }],
+    ["/api/bots/cloudflare/quick", "POST", { messages: [{ role: "user", content: big(20_001) }] }],
+  ];
+  for (const [path, method, payload] of cases) {
+    const res = await call(path, { method, body: payload });
+    assert.equal(res.status, 413, `${method} ${path} ${Object.keys(payload)}`);
+  }
+  assert.ok(!mock.state.profiles.some((p) => p.name === "sizecheck"), "nothing oversized was forwarded");
+});
+
+test("a body over 256 KB is refused before it is read", async () => {
+  const declared = await handle(
+    new Request(`${HOST}/api/bots/cloudflare/runs`, {
+      method: "POST",
+      headers: { "content-length": String(300 * 1024), "content-type": "application/json", "cf-connecting-ip": "192.0.2.80" },
+      body: "{}",
+    }),
+    env,
+  );
+  assert.equal(declared.status, 413);
+
+  const undeclared = await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "x".repeat(300 * 1024) } });
+  assert.equal(undeclared.status, 400, "an oversized body without the header is not parsed");
+});
