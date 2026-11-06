@@ -352,7 +352,7 @@
       const id = btn.getAttribute("data-id") || "";
       if (!UUID.test(id)) return;
       btn.disabled = true;
-      await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/" + act, { request_id: rid() }, "POST", act === "start" ? "Startauftrag an den Server gesendet. Der Status aktualisiert sich, sobald die Welt läuft." : "Stopauftrag an den Server gesendet.");
+      await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/" + act, { request_id: rid() }, "POST", act === "start" ? "Welt gestartet." : "Welt gestoppt.");
       return;
     }
     if (act === "trust") {

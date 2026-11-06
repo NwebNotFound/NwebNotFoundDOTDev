@@ -348,11 +348,18 @@ with sync_playwright() as p:
         pg.click(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-set=visibility][data-val=friends]")
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('Sichtbarkeit')", timeout=10000)
         ok(pg.locator("#vip-say").inner_text().find("Sichtbarkeit geändert") >= 0 and pg.locator("#vip-say").get_attribute("role") == "status", f"{w}px VIP-Admin: Verwaltung meldet Erfolg ohne alert", pg.locator("#vip-say").inner_text())
+        INVIEW = "() => { const r = document.querySelector('#vip-say').getBoundingClientRect(); return r.width > 0 && r.top >= 0 && r.bottom <= innerHeight; }"
+        ok(pg.evaluate(INVIEW) and pg.evaluate("() => document.querySelector('#vip-say').classList.contains('is-on')"), f"{w}px VIP: Rückmeldung (erledigt) von einer unteren Karte im Sichtfeld")
+        # done start: completion wording, distinct from the queued text
+        pg.click(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-act=start]")
+        pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('Welt gestartet')", timeout=10000)
+        ok("gesendet" not in pg.locator("#vip-say").inner_text() and pg.evaluate(INVIEW), f"{w}px VIP: erledigter Start nennt Abschluss, nicht 'gesendet'", pg.locator("#vip-say").inner_text())
         pg.unroute("**/api/mc-vip/worlds/**")
         pg.route("**/api/mc-vip/worlds/**", lambda r: r.fulfill(status=403, content_type="application/json", body='{"error":"not_owner","reason":"not_owner"}'))
         pg.click(f"#v2-worlds .v2-world[data-wid='{WIDA}'] button[data-set=visibility][data-val=private]")
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('nicht ändern')", timeout=10000)
         ok(len(dlg) == adlg0 and "Du darfst diese Welt nicht ändern." in pg.locator("#vip-say").inner_text(), f"{w}px VIP-Admin: Fehler als Meldung, kein Dialog", pg.locator("#vip-say").inner_text())
+        ok(pg.evaluate(INVIEW) and pg.evaluate("() => document.querySelector('#vip-say').classList.contains('is-bad')"), f"{w}px VIP: Ablehnung im Sichtfeld")
         pg.unroute("**/api/mc-vip/worlds/**"); pg.unroute("**/api/mc-vip/requests/**")
         # Live test 06.11.: a create that mc-stack acked denied/not_linked was shown as "Welt angelegt".
         # Success only after the ack done; otherwise the server's reason. The name pattern compiles
