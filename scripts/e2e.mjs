@@ -775,6 +775,21 @@ try {
     ok((await mob("phantom")) === "/mc-icon/v2/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/v2/feather" && (await mob("..%2Fx")) === "/mc-icon/v2/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
     const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
   }
+  { // Runtime performance (roadmap C2): no main-thread animations, fonts preloaded, Turnstile on demand.
+    const css = ["public/design/summer.css", "public/mc/theme-v2.css", "public/mc/ds.css", "public/design/unav.css", "public/mc/profile.css"].map((f) => fs.readFileSync(ROOT + f, "utf8")).join(" ");
+    const kf = [...css.matchAll(/@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g)];
+    const slow = kf.filter((m) => [...m[2].matchAll(/([a-z-]+)\s*:/g)].some((p) => !["transform", "opacity"].includes(p[1]))).map((m) => m[1]);
+    ok(kf.length > 20 && slow.length === 0, "Keyframes animieren nur transform/opacity (kein box-shadow etc. pro Frame)", slow.join(","));
+    const gb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev" } }).then((r) => r.text());
+    ok(!/<script[^>]+turnstile\/v0\/api\.js/.test(gb) && /render=explicit/.test(gb), "Gästebuch: Turnstile erst beim Formular (kein api.js im Kopf)");
+    const mi = await fetch(BASE + "/markt/diamond", { headers: { host: HOST } }).then((r) => r.text());
+    ok(!/<script[^>]+turnstile\/v0\/api\.js/.test(mi), "Markt-Item: kein Turnstile-Skript beim Laden");
+    const FONTS = ["pixelify-sans-latin-400", "pixelify-sans-latin-700", "nunito-latin-400", "nunito-latin-700"];
+    for (const [h, path] of [[HOST, "/wiki"], [HOST, "/"], [HOST, "/vip"]]) {
+      const t = await fetch(BASE + path, { headers: { "x-nnf-test-host": h } }).then((r) => r.text());
+      ok(FONTS.every((f) => t.includes(`href="/design/fonts/${f}.woff2" as="font"`)) && !/Monocraft[^"]*\.woff2" as="font"/.test(t), `${h}${path}: die vier genutzten Schriften vorgeladen, kein ungenutztes Monocraft`);
+    }
+  }
   { // Performance: one bundled stylesheet on mc., immutable only for the current version, HTML revalidated.
     const { AV } = await import("../src/asset-version.js");
     const page = await fetch(BASE + "/wiki", { headers: { host: HOST } }); const html = await page.text();
@@ -1157,6 +1172,8 @@ try {
   }
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Rot', '$.team_color', '#FF5555', '$.team_color_code', '&c', '$.last_seen', '2026-10-31T23:05:00Z', '$.online', json('false')) WHERE mc_uuid = '${U1}'`);
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Grün', '$.team_color', 'red;x', '$.team_color_hex', '#55ff55', '$.online', 1) WHERE mc_uuid = '${U2}'`);
+  try { execSync(`python3 scripts/player3d-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ 3D-Viewer: Pause/Fortsetzen fehlgeschlagen"); }
+  try { execSync(`python3 scripts/turnstile-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Turnstile-Challenge-Ablauf fehlgeschlagen"); }
   try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
 
 } catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }

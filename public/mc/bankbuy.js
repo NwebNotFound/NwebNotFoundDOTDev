@@ -10,7 +10,9 @@ B.innerHTML=head+'<p class="mut" style="margin:.4rem 0 0;font-size:.9rem">Aktuel
 +'<form class="bbuy" id="bbf"><label>Menge<input type="number" id="bba" min="1" max="2304" value="1" inputmode="numeric" required></label><label>Summe ca.<output id="bbt" class="tnum" style="min-height:44px;display:flex;align-items:center;color:var(--c-fg)">'+CP(x.buy_price)+'</output></label><button class="btn go" id="bbb">Kaufen</button></form>'
 +'<div class="cf-turnstile" data-sitekey="'+E(B.dataset.sitekey)+'" data-theme="dark" data-size="flexible" style="margin-top:.6rem"></div><p class="mut" id="bbm" role="status" style="font-size:.9rem;margin:.6rem 0 0"></p>';
 const A=document.getElementById('bba'),T=document.getElementById('bbt'),M=document.getElementById('bbm'),F=document.getElementById('bbf');
-const tsr=()=>{try{window.turnstile&&turnstile.render&&!B.querySelector('.cf-turnstile iframe')&&turnstile.render(B.querySelector('.cf-turnstile'))}catch(_){}};setTimeout(tsr,400);
+// Turnstile is loaded here, only when the buy form is shown (was a script tag on every item page).
+const tsLoad=()=>window.__tsP||(window.__tsP=new Promise((res,rej)=>{if(window.turnstile)return res();const s=document.createElement('script');s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';s.async=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)}));
+const tsr=()=>{try{!B.querySelector('.cf-turnstile iframe')&&turnstile.render(B.querySelector('.cf-turnstile'))}catch(_){}};tsLoad().then(tsr).catch(()=>{});
 A.oninput=()=>{T.textContent=CP((+A.value||0)*x.buy_price)};
 let RID=crypto.randomUUID();F.onsubmit=async e=>{e.preventDefault();const amount=Math.floor(+A.value);if(!(amount>=1&&amount<=2304)){M.textContent='Menge 1 bis 2304';M.className='dn';return}
 const btn=document.getElementById('bbb');btn.disabled=true;const tk=(B.querySelector('[name="cf-turnstile-response"]')||{}).value;
