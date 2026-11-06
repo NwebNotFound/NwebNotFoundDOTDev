@@ -33,20 +33,20 @@ const SERIES = CONTENT.series || [];
 
 // Hub routes. The first entry is the new start page; `/portfolio` is the previous start page and
 // keeps its own (German) portfolio shell in src/worker.js.
-export const HUB_PAGES = ["/", "/about", "/music", "/writing"];
-const SOON = { "/music": "music", "/writing": "writing" };
+export const HUB_PAGES = ["/", "/about", "/music", "/writing", "/blog", "/pixelwand"];
+const SOON = { "/music": "music", "/writing": "writing", "/blog": "blog", "/pixelwand": "pixelwand" };
 
 // Sections that only enter the nav once they have content (Nils, 05.11.: hide Musik/Texte until
 // their pages exist). `/writing` is ready as soon as one text is published; `/music` has no source yet.
-const LATER = [
-  { path: "/music", key: "nav.music", ready: () => false },
-  { path: "/writing", key: "nav.writing", ready: () => publishedWriting(WRITING).length > 0 },
-];
+// Sections with a page but maybe no content yet: in the nav they are "bald" until ready (nav v2).
+export const navReady = () => ({ music: false, blog: false, writing: publishedWriting(WRITING).length > 0 });
 
 const META = {
   "/": ["meta.home.title", "meta.home.desc"],
   "/about": ["meta.about.title", "meta.about.desc"],
   "/music": ["meta.music.title", "meta.music.desc"],
+  "/blog": ["meta.blog.title", "meta.blog.desc"],
+  "/pixelwand": ["meta.pixelwand.title", "meta.pixelwand.desc"],
 };
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -613,8 +613,7 @@ function readingSizeControl(t) {
 /** The shared bar of both sites (src/unav.js) with the hub's links, language and theme. */
 function hubNav(lang, bare, t, extra) {
   const cur = bare === "/" ? "start" : bare.split("/")[1];
-  const items = mainItems(lang, cur, (p) => href(p, lang));
-  for (const s of LATER) if (s.ready()) items.push({ href: href(s.path, lang), label: t(s.key), cur: bare === s.path || bare.startsWith(s.path + "/") });
+  const items = mainItems(lang, cur, (p) => href(p, lang), navReady());
   return mainNav({ lang, items, langHrefs: { de: href(bare, "de"), en: href(bare, "en") }, brandHref: href("/", lang), extra });
 }
 

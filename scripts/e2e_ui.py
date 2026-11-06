@@ -198,6 +198,13 @@ with sync_playwright() as p:
             pg.click(".u-burger"); pg.wait_for_timeout(250)
             dr = pg.evaluate("""() => { const n = document.querySelector('.u-panel'); const g = [...n.querySelectorAll('.u-group')]; const r = n.getBoundingClientRect(); return { sw: n.scrollWidth, cw: n.clientWidth, groups: g.length, labels: g.map(x => x.querySelector('.u-gbtn').textContent.trim()), acc: !!n.querySelector('.u-me__links a.u-out'), bottom: innerHeight - r.bottom, page: document.documentElement.scrollWidth - innerWidth }; }""")
             ok(dr["sw"] <= dr["cw"] + 1 and dr["groups"] == 5 and dr["acc"] and dr["bottom"] >= 8 and dr["page"] <= 0, f"{w}px Wiki-Drawer: kein Querscroll, alle Gruppen + Konto erreichbar, endet vor der Bildschirmkante", dr)
+            if pg.locator(".u-panel .u-drow").count():  # the mc drawer has no language/theme rows
+                th = pg.evaluate("""() => { const n = document.querySelector('.u-panel'); const hit = el => { const r = el.getBoundingClientRect(), x = r.left + r.width / 2, c = r.top + r.height / 2; return [c - 21, c + 21].every(y => { const e = document.elementFromPoint(x, y); return e === el || el.contains(e); }); }; const A = [...n.querySelectorAll('.u-drow .u-seg a')], T = n.querySelector('.u-drow .u-theme'); return { seg: A.length, segOk: A.every(hit), themeOk: hit(T), themeH: Math.round(T.getBoundingClientRect().height), page: document.documentElement.scrollWidth - innerWidth }; }""")
+                ok(th["seg"] == 2 and th["segOk"] and th["themeOk"] and th["themeH"] >= 44 and th["page"] <= 0, f"{w}px Drawer: DE/EN + Theme-Schalter haben 44px Touch-Fläche, kein Überlauf", th)
+            if pg.locator(".u-me__who").count():
+                me = pg.evaluate("""() => { const n = document.querySelector('.u-panel'); const hit = el => { const r = el.getBoundingClientRect(), x = r.left + r.width / 2, c = r.top + r.height / 2; return [c - 21, c + 21].every(y => { const e = document.elementFromPoint(x, y); return e === el || el.contains(e); }); }; return { who: hit(n.querySelector('.u-me__who')), out: hit(n.querySelector('.u-me__links a.u-out')) }; }""")
+                ok(me["who"] and me["out"], f"{w}px Drawer: Profil + Abmelden haben 44px Touch-Fläche", me)
+            if pg.locator(".u-panel .u-drow").count(): pg.focus(".u-drow .u-theme"); pg.keyboard.press("Tab"); ok(pg.evaluate("!!document.activeElement.closest('.u-panel')"), f"{w}px Drawer: Tastatur erreicht die Schalter")
             y0 = pg.evaluate("document.querySelector('.u-nav').getBoundingClientRect().top"); pg.mouse.wheel(0, 400); pg.wait_for_timeout(150)
             ok(abs(pg.evaluate("document.querySelector('.u-nav').getBoundingClientRect().top") - y0) < 1, f"{w}px Drawer offen: Kopfleiste bleibt sticky (#69)")
             pg.keyboard.press("Escape")
@@ -211,7 +218,8 @@ with sync_playwright() as p:
             ok(pg.evaluate("document.activeElement.closest('.u-panel') !== null"), f"{w}px Nav mobil: Fokus springt in den Drawer")
             for _ in range(40): pg.keyboard.press("Tab")
             ok(pg.evaluate("!!document.activeElement.closest('.u-nav')"), f"{w}px Nav mobil: Tab bleibt im Drawer")
-            pg.keyboard.press("Escape"); ok(not pg.locator(".u-panel").is_visible() and pg.evaluate("document.activeElement.classList.contains('u-burger')"), f"{w}px Nav mobil: Escape schließt, Fokus zurück auf dem Menüknopf")
+            # nav v2: the drawer fades out (opacity), visibility switches after 0.35 s
+            pg.keyboard.press("Escape"); pg.wait_for_timeout(450); ok(not pg.locator(".u-panel").is_visible() and pg.evaluate("document.activeElement.classList.contains('u-burger')"), f"{w}px Nav mobil: Escape schließt, Fokus zurück auf dem Menüknopf")
         else:
             pg.focus(".u-group[data-g=wirtschaft] .u-gbtn"); pg.keyboard.press("Enter"); pg.keyboard.press("ArrowDown")
             ok(pg.evaluate("document.activeElement.getAttribute('href')") == "/markt", f"{w}px Nav: Tastatur öffnet Dropdown")
@@ -220,6 +228,16 @@ with sync_playwright() as p:
             ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "true" and pg.locator('.u-group[data-g=community] a[href="/spieler"]').count() == 1, f"{w}px Nav: Klick öffnet Community")
             pg.locator(".u-group[data-g=community] .u-gbtn").dispatch_event("click")
             ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "false", f"{w}px Nav: zweiter Klick schließt")
+            # real mouse: hover opens, the click that follows keeps it open, a second click closes it (intentional close)
+            gb = ".u-group[data-g=community] .u-gbtn"; pg.mouse.move(5, 400); pg.wait_for_timeout(250)
+            bx = pg.locator(gb).bounding_box(); cx, cy = bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2
+            pg.mouse.move(cx, cy); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "true", f"{w}px Nav: Hover öffnet Community")
+            pg.mouse.down(); pg.mouse.up(); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "true", f"{w}px Nav: echter Klick nach Hover lässt das Menü offen")
+            pg.mouse.down(); pg.mouse.up(); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "false", f"{w}px Nav: zweiter echter Klick schließt absichtlich")
+            pg.mouse.move(5, 400); pg.wait_for_timeout(300)
+            pg.mouse.move(cx, cy); pg.wait_for_timeout(120); pg.focus(gb); pg.keyboard.press("Enter"); pg.wait_for_timeout(120)
+            ok(pg.get_attribute(gb, "aria-expanded") == "false", f"{w}px Nav: Enter nach Hover schaltet um (Tastatur unverändert)")
+            pg.mouse.move(5, 400); pg.wait_for_timeout(300); pg.keyboard.press("Escape")
             # Wiki has the longest dropdown: with space it must show every link (no 440px clip),
             # on a short viewport it scrolls while the scrollbar stays hidden (Nils' request).
             pg.locator(".u-group[data-g=wiki] .u-gbtn").dispatch_event("click")
