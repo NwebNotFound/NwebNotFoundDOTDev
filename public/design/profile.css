@@ -21,6 +21,7 @@
 .p3-tabs a{flex:none;position:relative;display:inline-flex;align-items:center;min-height:44px;font:800 15px var(--sm-font-body);color:var(--sm-muted-foreground)!important;text-decoration:none!important}
 .p3-tabs a[aria-current=page]{color:var(--sm-foreground)!important}
 .p3-tabs a[aria-current=page]::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:4px;background:repeating-linear-gradient(90deg,var(--sm-accent-sun) 0 6px,transparent 6px 8px)}
+@media(max-width:430px){.p3-tabs{gap:15px}}
 .p3-grid{display:grid;gap:34px 40px;grid-template-columns:minmax(0,1fr)}
 @media(min-width:900px){.p3-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}}
 .p3-h{display:flex;align-items:baseline;gap:10px;margin:0 0 14px;font:700 22px var(--sm-font-pixel)}

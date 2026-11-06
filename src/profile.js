@@ -35,7 +35,7 @@ ${line ? `<p class="p3-line">${line}</p>` : ""}
 <a class="p3-mc" href="https://mc.nwebnotfound.dev/profile" target="_blank" rel="noopener noreferrer"><img alt="" src="/mc-icon/v2/grass_block" width="20" height="20"> Dein Minecraft-Profil liegt auf mc.nwebnotfound.dev <span class="h2-arrow" aria-hidden="true">&#8250;</span></a>
 </div>
 </section>
-<nav class="p3-tabs" aria-label="Profil" data-p3-tabs><a href="#uebersicht" aria-current="page">Übersicht</a><a href="#lesen">Lesen</a><a href="#erfolge">Erfolge</a><a href="#gaestebuch">Gästebuch</a><a href="#einstellungen">Einstellungen</a></nav>
+<nav class="p3-tabs" aria-label="Profil" data-p3-tabs><a href="#uebersicht" aria-current="page">Übersicht</a><a href="#lesen">Lesen</a><a href="#erfolge">Erfolge</a><a href="#gaestebuch">Gästebuch</a><a href="#einstellungen">Konto</a></nav>
 <div class="p3-grid">
 <section class="p3-book" id="lesen">
 <h2 class="p3-h">Weiterlesen</h2>
