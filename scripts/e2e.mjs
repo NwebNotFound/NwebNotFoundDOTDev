@@ -742,7 +742,8 @@ try {
     ok((await mob("phantom")) === "/mc-icon/v2/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/v2/feather" && (await mob("..%2Fx")) === "/mc-icon/v2/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
     const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
   }
-  { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy-report-only") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && !r.headers.get("content-security-policy"), "CSP Report-Only gesetzt (nicht erzwingend)", c); }
+  { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && /form-action 'self' https:\/\/nwebnotfound\.dev (https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+) /.test(c) && !r.headers.get("content-security-policy-report-only"), "CSP wird erzwungen (inkl. form-action für den Logout-POST)", c);
+    ok(r.headers.get("strict-transport-security") === "max-age=31536000; includeSubDomains", "HSTS gesetzt", r.headers.get("strict-transport-security")); }
   console.log("E) economy_daily");
   { const ED = (rows) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { economy_daily: rows } });
     const e0 = await req("/api/mc-economy"); ok(e0.s === 200 && Array.isArray(e0.j?.days) && e0.j.days.length === 0, "Economy-API leer → days []", e0.t);
@@ -901,6 +902,17 @@ try {
       const vipLoc = (loc) => { try { const u = new URL(loc); return u.pathname === "/vip" && (u.hostname === "mc.nwebnotfound.dev" || u.hostname === "127.0.0.1") && !loc.includes("evil"); } catch { return false; } };
       ok(vipLoc(rel) && vipLoc(abs), "relativer und absoluter next auf /vip ist erlaubt", JSON.stringify({ rel, abs }));
       ok((await bye("https://nwebnotfound.dev.evil.com/vip")) === "https://nwebnotfound.dev/", "Host muss nwebnotfound.dev oder Subdomain davon sein"); }
+    { // Logout nur per POST mit eigener Origin (CSRF, #83)
+      sql(`INSERT INTO sessions (id, discord_id, username, expires_at) VALUES ('slo', '100000000000000001', 'Nils', datetime('now', '+1 day'))`);
+      const ck = await cookieFor("slo"), has = () => sqlRows("SELECT id FROM sessions WHERE id = 'slo'").length === 1, NX = "?next=" + encodeURIComponent("https://mc.nwebnotfound.dev/vip");
+      const g = await req("/auth/discord/logout" + NX, { cookie: ck, testHost: "nwebnotfound.dev" });
+      ok(g.s === 200 && /<form method="post" action="\/auth\/discord\/logout\?next=/.test(g.t) && has(), "GET-Logout meldet nicht ab, zeigt POST-Formular", g.s);
+      const ev = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://evil.example", testHost: "nwebnotfound.dev" });
+      const no = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, testHost: "nwebnotfound.dev" });
+      ok(ev.s === 403 && no.s === 403 && has(), "POST-Logout mit fremder/ohne Origin → 403, Session bleibt", ev.s + "/" + no.s);
+      const po = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://mc.nwebnotfound.dev", testHost: "nwebnotfound.dev" });
+      ok(po.s === 303 && /^(https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+)\/vip$/.test(po.h.get("location") || "") && /nnf_session=;.*Max-Age=0/.test(po.h.get("set-cookie") || "") && !has(), "POST-Logout von mc. → 303, Cookie gelöscht, Session weg", po.s + " " + po.h.get("location"));
+      const pg = await req("/", { cookie: ck }); ok(pg.t.includes("closest('a[href*=\"/auth/discord/logout\"]')") && pg.t.includes("f.method='post'"), "Konto-Menü: Abmelden-Link sendet POST-Formular"); }
   }
   // Ingest: null bleibt NULL (nicht 0), online pro Spieler wird gespeichert (Dict- und View-Form)
   { const nm = sqlRows(`SELECT mc_name FROM mc_links WHERE mc_uuid = '${U1}'`)[0]?.mc_name, bak = sqlRows(`SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0];

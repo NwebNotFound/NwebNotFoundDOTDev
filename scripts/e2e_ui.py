@@ -177,7 +177,7 @@ with sync_playwright() as p:
         ok(pg.locator('.ng[data-g=wirtschaft] .ngb[data-cur]').count() == 1 and pg.locator('a[href="/markt"][aria-current=page]').count() == 1, f"{w}px Nav: /markt/diamond markiert Markt")
         ok(pg.evaluate("document.documentElement.scrollWidth<=innerWidth+1"), f"{w}px Item-Seite mit Bank-Kauf: kein Overflow")
         t0 = pg.inner_text("#bbt"); pg.fill("#bba", "2"); ok(pg.inner_text("#bbt") != t0, f"{w}px Bank-Kauf: Summe live", pg.inner_text("#bbt"))
-        pg.click("#bbb"); pg.wait_for_function("document.getElementById('bbm').textContent.length>0", timeout=10000)
+        pg.click("#bbb"); pg.wait_for_function("() => document.getElementById('bbm').textContent.length>0", timeout=10000)
         ok("gesendet" in pg.inner_text("#bbm") or "Zu viele" in pg.inner_text("#bbm"), f"{w}px Bank-Kauf: Absenden", pg.inner_text("#bbm"))
         pg.locator("#bbuy").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/ux-bankkauf-{w}.png")
         go("/markt/elytra"); pg.wait_for_timeout(600); ok("nicht kaufbar" in pg.inner_text("#bbuy"), f"{w}px Bank-Kauf: gesperrtes Item ohne Formular")

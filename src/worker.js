@@ -255,7 +255,8 @@ const REVEAL_JS = `<script>(()=>{const els=document.querySelectorAll('.reveal');
 
 // Account: auf MC füllt das die Gruppe „Mein Konto“ (eine Leiste). Auf dem Portfolio bleibt der Chip.
 // Kein Aufruf von /api/mc-vip. Rang und Welten bleiben auf der VIP-Seite.
-const ACCT_JS = (loginBase) => `<script>(async()=>{const el=document.getElementById('acct');const k=document.getElementById('konto');if(!el&&!k)return;try{const d=await(await fetch('/api/me',{credentials:'include'})).json();const nx=encodeURIComponent(location.href);
+// Abmelden-Links (Konto-Menü) schicken ein POST-Formular statt eines GET (CSRF-Schutz, siehe auth()).
+const ACCT_JS = (loginBase) => `<script>document.addEventListener('click',e=>{const a=e.target&&e.target.closest&&e.target.closest('a[href*="/auth/discord/logout"]');if(!a||e.defaultPrevented||e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();const f=document.createElement('form');f.method='post';f.action=a.href;f.hidden=true;document.body.append(f);f.submit()});(async()=>{const el=document.getElementById('acct');const k=document.getElementById('konto');if(!el&&!k)return;try{const d=await(await fetch('/api/me',{credentials:'include'})).json();const nx=encodeURIComponent(location.href);
 const httpsAvatar=u=>{try{const x=new URL(String(u||''));if(x.protocol!=='https:'||x.username||x.password)return '';return x.href}catch(e){return ''}};
 const onMc=/^mc\./.test(location.hostname);const fb=onMc?'/mc-head/MHF_Steve/64?v=5':'https://cdn.discordapp.com/embed/avatars/0.png';
 if(k){if(el)el.replaceChildren();
@@ -650,10 +651,21 @@ async function auth(p, req, env, url) {
     h.append("set-cookie", clear); h.append("set-cookie", sessCookie(await sign(env, sid), SESSION_DAYS * 86400));
     return new Response(null, { status: 302, headers: h });
   }
+  // Logout ändert Zustand → nur per POST mit passender Origin (sonst könnte jede fremde Seite per Link
+  // oder Redirect abmelden: SameSite=Lax schickt die Cookie bei Top-Level-GETs mit). Ein GET (alter
+  // Link, Lesezeichen, ohne JS) zeigt nur eine Bestätigungsseite mit POST-Formular.
   if (p === "/auth/discord/logout") {
+    if (req.method === "POST") {
+      const o = req.headers.get("origin");
+      if (o !== `https://${MAIN}` && o !== `https://${MCD}`) return html(portfolio({ title: "Abmelden fehlgeschlagen", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Abmelden nicht möglich.</h1><p class="lead">Die Anfrage kam nicht von dieser Seite.</p><p style="margin-top:2rem"><a class="btn" href="https://${MAIN}/">Zur Startseite</a></p></div></section>` }), 403);
+      const user = await getUser(req, env);
+      if (user) await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(user.sid).run();
+      return new Response(null, { status: 303, headers: { location: next, "cache-control": "no-store", "set-cookie": sessCookie("", 0) } });
+    }
+    if (req.method !== "GET" && req.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { allow: "GET, POST" } });
     const user = await getUser(req, env);
-    if (user) await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(user.sid).run();
-    return redirect(next, { "set-cookie": sessCookie("", 0) });
+    if (!user) return redirect(next);
+    return html(portfolio({ title: "Abmelden", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Abmelden?</h1><p class="lead">Du bist als ${esc(user.name)} angemeldet.</p><form method="post" action="/auth/discord/logout?next=${encodeURIComponent(next)}" style="margin-top:2rem"><button class="btn" type="submit">Abmelden</button> <a class="btn sec" href="${esc(next)}">Abbrechen</a></form></div></section>` }), 200, { "cache-control": "no-store" });
   }
   return null;
 }
@@ -1004,9 +1016,14 @@ async function mcMarketItem(env, raw) {
 }
 
 /* ---------- Helfer ---------- */
-// CSP erst nur als Report-Only (Verstöße landen in der Browser-Konsole, kein report-uri → keine IP-Logs). Inline-Skripte/-Styles sind noch nötig.
-const CSP_RO = "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mc-heads.net https://cdn.jsdelivr.net https://cdn.discordapp.com; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://discord.com; object-src 'none'";
-const SEC_HEADERS = { "content-security-policy-report-only": CSP_RO, "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
+// CSP wird erzwungen (vorher Report-Only). Geprüft: alle Seiten beider Hosts, ein- und ausgeloggt,
+// ohne Verstoß gegen diese Liste. Inline-Skripte/-Styles und Inline-Handler (onerror=…) sind noch
+// nötig, daher 'unsafe-inline' (Nonces wären ein größerer Umbau). Kein report-uri → keine IP-Logs.
+// form-action: Logout ist ein POST an die Hauptdomain, auch von mc. aus, und leitet auf beide Hosts weiter.
+const CSP = `default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mc-heads.net https://cdn.jsdelivr.net https://cdn.discordapp.com; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://${MAIN} https://${MCD} https://discord.com; object-src 'none'`;
+// HSTS: .dev steht ohnehin auf der HSTS-Preload-Liste; der Header deckt zusätzlich Clients ohne diese Liste ab.
+const HSTS = "max-age=31536000; includeSubDomains";
+const SEC_HEADERS = { "content-security-policy": CSP, "strict-transport-security": HSTS, "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "x-frame-options": "SAMEORIGIN", "permissions-policy": "camera=(), microphone=(), geolocation=()" };
 const json = (o, s = 200, extra = {}) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
 // Feeds (phase 3b): prebuilt at build time (src/generated/feeds.js), served with a validator so a
 // reader that already has the current version gets a 304. Short cache, no tracking parameters.
