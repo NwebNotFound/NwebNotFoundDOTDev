@@ -1062,7 +1062,20 @@
   background: var(--sm-accent-sun);
 }
 .sm-badge--live .sm-badge__dot {
+  position: relative;
   background: #2fbf71;
+}
+/* The live ping is a ring on ::after that grows and fades (transform + opacity, composited). The
+   former box-shadow animation repainted and restyled every frame on the main thread. Same 8px
+   spread (7px dot -> scale 23/7), same colour and timing. */
+.sm-badge--live .sm-badge__dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(47, 191, 113, 0.55);
+  opacity: 0; /* only visible while animating: reduced motion shows the plain dot, as before */
+  pointer-events: none;
   animation: sm-ping 2s ease-out infinite;
 }
 .sm-badge--sun,
@@ -2232,14 +2245,14 @@
     transform: translateY(-8px) rotate(-1.5deg);
   }
 }
+/* .sm-scene__shadow is an inline span, so the former scaleX never applied (no visible change);
+   it only kept the animation off the compositor. Opacity alone looks the same and is composited. */
 @keyframes sm-shadow-pulse {
   0%,
   100% {
-    transform: scaleX(1);
     opacity: 0.25;
   }
   50% {
-    transform: scaleX(0.8);
     opacity: 0.15;
   }
 }
@@ -2306,11 +2319,13 @@
 }
 @keyframes sm-ping {
   0% {
-    box-shadow: 0 0 0 0 rgba(47, 191, 113, 0.55);
+    transform: scale(1);
+    opacity: 1;
   }
   80%,
   100% {
-    box-shadow: 0 0 0 8px rgba(47, 191, 113, 0);
+    transform: scale(3.3);
+    opacity: 0;
   }
 }
 @keyframes sm-tilt {
@@ -2333,6 +2348,12 @@
   55% {
     transform: rotate(6deg);
   }
+}
+
+/* Off-screen hero (summer-parallax.js): decorative loops pause, scroll-driven layers keep going. */
+[data-sm-parallax].is-off *:not(.sm-parallax),
+[data-sm-parallax].is-off *::after {
+  animation-play-state: paused;
 }
 
 @media (prefers-reduced-motion: reduce) {

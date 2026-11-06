@@ -25,6 +25,15 @@
   var scenes = document.querySelectorAll("[data-sm-parallax]");
   if (!scenes.length) return;
 
+  /* Decorative loops (bob, drift, twinkle, shadow) pause while the scene is off screen: the class
+     sets animation-play-state, the scroll-driven parallax layers keep running (summer.css). */
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      for (var k = 0; k < entries.length; k++) entries[k].target.classList.toggle("is-off", !entries[k].isIntersecting);
+    }, { rootMargin: "120px" });
+    for (var s = 0; s < scenes.length; s++) io.observe(scenes[s]);
+  }
+
   var running = false;
   var handlers = [];
 
