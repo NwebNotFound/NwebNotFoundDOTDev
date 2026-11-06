@@ -51,8 +51,14 @@ OPENROUTER_API_KEY=...
 ```
 
 `node scripts/dev-server.mjs` runs the same handler under plain Node and serves `public/`;
-open `/__dev/login` to mint a session without Discord. It is a dev-only route and does not
-exist in the Worker.
+open the `/__dev/login?token=…` URL it prints at startup to mint a session without Discord
+(the token is random per start). It is a dev-only route and does not exist in the Worker. The
+dev server only answers `Host: 127.0.0.1:<port>` / `localhost:<port>`, so a DNS-rebound page
+cannot reach it.
+
+`.dev.vars` must **never** contain the production `SESSION_SECRET` or `HERMES_PANEL_SECRET`:
+a cookie minted by the dev server would then be valid in production, and a dev mistake would
+reach the real proxy. Use separate dev values.
 
 ## Credentials, and where they live
 
