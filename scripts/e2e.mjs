@@ -253,7 +253,11 @@ try {
     ok(pageA.s === 200 && pageA.t.includes(TOK_A) && !pageA.t.includes(TOK_B), "Profilseite: nur eigene Einträge");
     const delA = await req("/api/profile/delete?discord_id=" + DB_, { method: "POST", cookie: cA, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { confirm: "delete", discord_id: DB_, id: DB_, target: DB_, user: DB_ } });
     const gbAfter = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const viewB = await req("/api/profile", { cookie: cB, testHost: "nwebnotfound.dev" });
-    ok(delA.s === 200 && !JSON.stringify(gbAfter.j).includes(TOK_A) && JSON.stringify(gbAfter.j).includes(TOK_B) && viewB.j?.user?.id === DB_, "Benutzer A löscht nur sich selbst: Einträge und Sitzung von B bleiben, auch mit untergeschobener Ziel-ID"); }
+    const pageB = await req("/profile?discord_id=" + DA, { cookie: cB, testHost: "nwebnotfound.dev" });
+    const aGone = await req("/api/profile", { cookie: cA, testHost: "nwebnotfound.dev" });
+    const db = sqlRows(`SELECT (SELECT COUNT(*) FROM sessions WHERE id='siA') AS sa, (SELECT COUNT(*) FROM sessions WHERE id='siB') AS sb, (SELECT COUNT(*) FROM entries WHERE discord_id='${DA}') AS ea, (SELECT COUNT(*) FROM entries WHERE discord_id='${DB_}') AS eb, (SELECT COUNT(*) FROM entries WHERE message='${TOK_B}') AS ebm`)[0];
+    ok(delA.s === 200 && db.sa === 0 && db.ea === 0 && aGone.j?.user === null, "Benutzer A löscht nur sich selbst: eigene Sitzung + Einträge sind weg, untergeschobene Ziel-ID wird ignoriert");
+    ok(!JSON.stringify(gbAfter.j).includes(TOK_A) && JSON.stringify(gbAfter.j).includes(TOK_B) && db.sb === 1 && db.eb === 1 && db.ebm === 1 && viewB.j?.user?.id === DB_ && pageB.s === 200 && pageB.t.includes(TOK_B), "Benutzer B bleibt erreichbar: Eintrag, Sitzung und Profil unverändert"); }
   ok((await req("/mc/inventory.js", { testHost: "nwebnotfound.dev" })).s === 200 && (await req("/mc/inventory.js")).s === 200, "/mc/inventory.js auf Haupt- und MC-Host");
   ok(!JSON.stringify((await req("/api/mc-players/Nils")).j).includes("diamond_sword"), "Inventar/Abholfach nicht öffentlich");
   const mine = (await req("/api/mc-auctions/a1", { cookie: c1 })).j; ok(mine.mine[0]?.status === "accepted" && mine.viewer.can_bid === true, "Auktionsseite zeigt eigenes Gebot 'accepted'");
