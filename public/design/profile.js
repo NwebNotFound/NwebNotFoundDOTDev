@@ -15,7 +15,7 @@
   btn.addEventListener("click", function () {
     if (!window.confirm("Gästebuch-Einträge und Anmeldung wirklich löschen? Das lässt sich nicht rückgängig machen.")) return;
     btn.disabled = true;
-    fetch("/api/profile/delete", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: "{}" })
+    fetch("/api/profile/delete", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: "delete" }) })
       .then(function (r) { if (!r.ok) throw new Error("x"); location.assign("/"); })
       .catch(function () { btn.disabled = false; if (msg) msg.textContent = "Das hat nicht geklappt. Versuch es gleich noch einmal."; });
   });

@@ -457,6 +457,9 @@ async function profileDelete(req, env) {
   if (req.headers.get("origin") !== `https://${MAIN}`) return json({ error: "forbidden" }, 403);
   const u = await getUser(req, env).catch(() => null);
   if (!u) return json({ error: "unauthorized" }, 401);
+  // Explicit confirmation from the UI; the target is ALWAYS the session owner, never anything from the request.
+  const b = await req.json().catch(() => null);
+  if (!b || b.confirm !== "delete") return json({ error: "confirmation required" }, 400);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM entries WHERE discord_id = ?").bind(u.id),
     env.DB.prepare("DELETE FROM sessions WHERE discord_id = ?").bind(u.id),

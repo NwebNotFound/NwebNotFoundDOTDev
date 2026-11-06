@@ -236,9 +236,24 @@ try {
   { const DD = "999000111222333444"; sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('sdel','${DD}','deleter','Deleter',datetime('now','+1 day'))`); sql(`INSERT INTO entries (name, message, discord_id) VALUES ('Deleter','zum-loeschen-e2e','${DD}')`);
     const cd = await cookieFor("sdel"); const pg = await req("/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
     ok(pg.s === 200 && pg.t.includes("zum-loeschen-e2e") && pg.t.includes("1 Gruß"), "Profil zeigt eigenen Gästebucheintrag und Zähler");
-    const del = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
+    const noConfirm = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
+    const stillThere = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
+    ok(noConfirm.s === 400 && stillThere.j?.user?.id === DD, "Profil löschen: ohne ausdrückliche Bestätigung 400, nichts gelöscht");
+    const del = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { confirm: "delete" } });
     const after = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const me2 = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
     ok(del.s === 200 && !JSON.stringify(after.j).includes("zum-loeschen-e2e") && me2.j?.user === null, "Profil löschen: Einträge und Sitzung entfernt"); }
+  // Isolation: A can neither delete nor view B's data, even when B's id is supplied in body or query.
+  { const DA = "999000111222333555", DB_ = "999000111222333666"; const TOK_B = "b-privat-e2e", TOK_A = "a-privat-e2e";
+    sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('siA','${DA}','usera','User A',datetime('now','+1 day')),('siB','${DB_}','userb','User B',datetime('now','+1 day'))`);
+    sql(`INSERT INTO entries (name, message, discord_id) VALUES ('User A','${TOK_A}','${DA}'),('User B','${TOK_B}','${DB_}')`);
+    const cA = await cookieFor("siA"), cB = await cookieFor("siB");
+    const viewA = await req("/api/profile?discord_id=" + DB_, { cookie: cA, testHost: "nwebnotfound.dev" });
+    ok(viewA.j?.user?.id === DA && JSON.stringify(viewA.j).includes(TOK_A) && !JSON.stringify(viewA.j).includes(TOK_B) && !JSON.stringify(viewA.j).includes(DB_), "ansehen (/api/profile): nur die Daten des Sitzungsinhabers, ?discord_id wird ignoriert");
+    const pageA = await req("/profile?discord_id=" + DB_, { cookie: cA, testHost: "nwebnotfound.dev" });
+    ok(pageA.s === 200 && pageA.t.includes(TOK_A) && !pageA.t.includes(TOK_B), "Profilseite: nur eigene Einträge");
+    const delA = await req("/api/profile/delete?discord_id=" + DB_, { method: "POST", cookie: cA, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { confirm: "delete", discord_id: DB_, id: DB_, target: DB_, user: DB_ } });
+    const gbAfter = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const viewB = await req("/api/profile", { cookie: cB, testHost: "nwebnotfound.dev" });
+    ok(delA.s === 200 && !JSON.stringify(gbAfter.j).includes(TOK_A) && JSON.stringify(gbAfter.j).includes(TOK_B) && viewB.j?.user?.id === DB_, "Benutzer A löscht nur sich selbst: Einträge und Sitzung von B bleiben, auch mit untergeschobener Ziel-ID"); }
   ok((await req("/mc/inventory.js", { testHost: "nwebnotfound.dev" })).s === 200 && (await req("/mc/inventory.js")).s === 200, "/mc/inventory.js auf Haupt- und MC-Host");
   ok(!JSON.stringify((await req("/api/mc-players/Nils")).j).includes("diamond_sword"), "Inventar/Abholfach nicht öffentlich");
   const mine = (await req("/api/mc-auctions/a1", { cookie: c1 })).j; ok(mine.mine[0]?.status === "accepted" && mine.viewer.can_bid === true, "Auktionsseite zeigt eigenes Gebot 'accepted'");
