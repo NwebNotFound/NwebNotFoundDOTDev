@@ -8,6 +8,18 @@ import { AV } from "./asset-version.js";
 
 export const MC_CSS_PARTS = ["/design/minecraft.css", "/mc/ds.css", "/mc/theme-v2.css", "/design/unav.css"];
 
+// Static HTML in public/ cannot write ?v=${AV}. The one such page, the design preview, is routed
+// through the Worker (wrangler.jsonc run_worker_first) and gets the version stamped on every
+// /design and /mc CSS/JS link, so the immutable cache never pins an old file there.
+export const STAMPED_HTML = ["/design/summer-preview", "/design/summer-preview.html"];
+export const stampVersion = (html) => html.replace(/((?:src|href)="\/(?:design|mc)\/[^"?#]+\.(?:css|js))"/g, `$1?v=${AV}"`);
+export async function stampedAsset(req, env) {
+  const r = await env.ASSETS.fetch(req);
+  if (r.status !== 200 || !/text\/html/.test(r.headers.get("content-type") || "")) return r;
+  const h = new Headers(r.headers); h.delete("content-length"); h.delete("etag"); h.set("cache-control", "no-cache");
+  return new Response(stampVersion(await r.text()), { status: 200, headers: h });
+}
+
 export async function bundleResponse(req, env) {
   const url = new URL(req.url);
   const parts = await Promise.all(MC_CSS_PARTS.map(async (path) => {

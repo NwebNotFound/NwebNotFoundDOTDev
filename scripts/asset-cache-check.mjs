@@ -27,6 +27,28 @@ for (const f of files) {
   }
 }
 ok(refs > 20, `found ${refs} CSS/JS links to scan`);
+
+// Static HTML in public/ cannot carry ${AV}. Each such page must be stamped by the Worker
+// (src/bundle.js STAMPED_HTML) and routed to it first (wrangler.jsonc run_worker_first).
+const { STAMPED_HTML, stampVersion } = await import("../src/bundle.js");
+const wrangler = fs.readFileSync(path.join(ROOT, "wrangler.jsonc"), "utf8");
+const workerFirst = JSON.parse((wrangler.match(/"run_worker_first"\s*:\s*(\[[^\]]*\])/) || [, "[]"])[1]);
+const covered = (url) => workerFirst.some((p) => (p.endsWith("*") ? url.startsWith(p.slice(0, -1)) : url === p));
+const htmlBad = [];
+let htmlRefs = 0;
+for (const f of walk(path.join(ROOT, "public")).filter((f) => f.endsWith(".html"))) {
+  const url = "/" + path.relative(path.join(ROOT, "public"), f).split(path.sep).join("/");
+  const raw = fs.readFileSync(f, "utf8");
+  const stamped = STAMPED_HTML.includes(url) && covered(url);
+  const served = stamped ? stampVersion(raw) : raw;
+  for (const m of served.matchAll(REF)) {
+    htmlRefs++;
+    const p = m[1] || m[3], q = m[2] || m[4] || "";
+    if (!/-\d+\.\d+\.\d+(\.min)?\.(js|css)$/.test(p) && !/[?&]v=/.test(q)) htmlBad.push(`${url}: ${p}`);
+  }
+}
+ok(htmlRefs > 0, `found ${htmlRefs} CSS/JS links in static HTML`);
+ok(htmlBad.length === 0, "static HTML is served with versioned CSS/JS links" + (htmlBad.length ? "\n      " + htmlBad.join("\n      ") : ""));
 ok(bad.length === 0, "every /design, /mc, /vendor CSS/JS link is versioned" + (bad.length ? "\n      " + bad.join("\n      ") : ""));
 
 const deploy = fs.readFileSync(path.join(ROOT, "scripts/deploy.sh"), "utf8");

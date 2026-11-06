@@ -8,7 +8,7 @@ import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { headResponse, skinResponse, validSkinUrl } from "./mc-head.js";
 import { mainNav, mainItems, UNAV_HEAD, UNAV_JS } from "./unav.js";
-import { bundleResponse } from "./bundle.js";
+import { bundleResponse, stampedAsset, STAMPED_HTML } from "./bundle.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
 import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
@@ -990,6 +990,7 @@ export default {
     const p = url.pathname.replace(/\/$/, "") || "/";
     const isMc = siteHost === MCD;
     if (p === "/bundle/mc.css") return bundleResponse(req, env);
+    if (STAMPED_HTML.includes(url.pathname)) return stampedAsset(req, env);
 
     if (p.startsWith("/api/feedback")) { const r = FB().route(p, req, env, url); if (r) return r; }
     if (p.startsWith("/api/mc-")) { const r = TRADE().route(p, req, env, url); if (r) return r; }

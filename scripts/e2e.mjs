@@ -758,6 +758,8 @@ try {
     ok(/immutable/.test(b.headers.get("cache-control") || ""), "Bundle mit aktueller Version: immutable", b.headers.get("cache-control"));
     ok(!/immutable/.test((await fetch(BASE + "/bundle/mc.css?v=alt", { headers: { host: HOST } })).headers.get("cache-control") || ""), "Bundle mit fremder Version: nicht immutable");
     ok(/immutable/.test((await fetch(BASE + `/mc/common.js?v=${AV}`, { headers: { host: HOST } })).headers.get("cache-control") || ""), "versioniertes JS: immutable");
+    { const pv = await fetch(BASE + "/design/summer-preview", { headers: { host: "nwebnotfound.dev" } }); const t = await pv.text(); const links = [...t.matchAll(/(?:src|href)="(\/design\/[^"]+\.(?:css|js)[^"]*)"/g)].map((m) => m[1]);
+      ok(pv.status === 200 && links.length >= 3 && links.every((l) => l.endsWith(`?v=${AV}`)) && !/immutable/.test(pv.headers.get("cache-control") || ""), "Design-Vorschau: statisches HTML bekommt ?v=AV, HTML selbst revalidiert", links.join(" ")); }
     ok(/loading="lazy"/.test(html.match(/<img[^>]*\/mc-icon\/v2\/grass_block[^>]*>/)?.[0] || ""), "Nav-Icons laden lazy");
   }
   { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy-report-only") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && !r.headers.get("content-security-policy"), "CSP Report-Only gesetzt (nicht erzwingend)", c); }
