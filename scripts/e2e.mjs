@@ -227,7 +227,17 @@ try {
   const mm = inventorySlotMap(mixed);
   ok(mm[0]?.item === "bread" && mm[1]?.item === "diamond" && mm[9]?.item === "oak_log", "Gemischtes Inventar: slotted zuerst, Rest in freie Slots", JSON.stringify(mm));
   const mainProf = await req("/profile", { cookie: c1, testHost: "nwebnotfound.dev" });
-  ok(mainProf.s === 200 && mainProf.t.includes("/mc/inventory.js") && mainProf.t.includes("#pb .mch") && !/ds\.css\?v=/.test(mainProf.t), "Hauptdomain-Profil: inline CSS + Inventar-Skript");
+  ok(mainProf.s === 200 && mainProf.t.includes("p3-tagcard") && mainProf.t.includes("/design/profile.css?v=") && mainProf.t.includes('content="noindex"') && /private/.test(mainProf.h.get("cache-control") || ""), "Hauptdomain-Profil (privat): Namensschild, noindex, private no-store");
+  ok(!/inventory\.js|pbal|Kontostand|Inventar/.test(mainProf.t) && mainProf.t.includes("https://mc.nwebnotfound.dev/profile"), "Hauptdomain-Profil: keine Minecraft-Stats/Inventar, nur Textlink zum MC-Profil");
+  { const anon = await req("/profile", { testHost: "nwebnotfound.dev" }); ok(anon.s === 302 && (anon.h.get("location") || "").startsWith("/auth/discord/login?next=") && !anon.t.includes("p3-tagcard"), "Profil ohne Login: Weiterleitung zum Discord-Login, kein Inhalt"); }
+  { const noOrigin = await req("/api/profile/delete", { method: "POST", cookie: c2, testHost: "nwebnotfound.dev", body: {} }); const anonDel = await req("/api/profile/delete", { method: "POST", testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
+    ok(noOrigin.s === 403 && anonDel.s === 401, "Profil löschen: ohne Origin 403, ohne Login 401"); }
+  { const DD = "999000111222333444"; sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('sdel','${DD}','deleter','Deleter',datetime('now','+1 day'))`); sql(`INSERT INTO entries (name, message, discord_id) VALUES ('Deleter','zum-loeschen-e2e','${DD}')`);
+    const cd = await cookieFor("sdel"); const pg = await req("/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
+    ok(pg.s === 200 && pg.t.includes("zum-loeschen-e2e") && pg.t.includes("1 Gruß"), "Profil zeigt eigenen Gästebucheintrag und Zähler");
+    const del = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
+    const after = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const me2 = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
+    ok(del.s === 200 && !JSON.stringify(after.j).includes("zum-loeschen-e2e") && me2.j?.user === null, "Profil löschen: Einträge und Sitzung entfernt"); }
   ok((await req("/mc/inventory.js", { testHost: "nwebnotfound.dev" })).s === 200 && (await req("/mc/inventory.js")).s === 200, "/mc/inventory.js auf Haupt- und MC-Host");
   ok(!JSON.stringify((await req("/api/mc-players/Nils")).j).includes("diamond_sword"), "Inventar/Abholfach nicht öffentlich");
   const mine = (await req("/api/mc-auctions/a1", { cookie: c1 })).j; ok(mine.mine[0]?.status === "accepted" && mine.viewer.can_bid === true, "Auktionsseite zeigt eigenes Gebot 'accepted'");

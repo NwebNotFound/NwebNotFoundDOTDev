@@ -16,7 +16,8 @@ import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.
 import { normInv, renderInventoryCard } from "./mc-inventory.js";
 import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
-import { hubPage, hubPageExists } from "./hub.js";
+import { hubPage, hubPageExists, sitePage } from "./hub.js";
+import { siteProfileBody } from "./profile.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
@@ -436,8 +437,33 @@ B.innerHTML=h;MC3D.scan(B);MCP.bindTabs(B);document.dispatchEvent(new CustomEven
 {const L=document.getElementById('pordl');if(L)fetch('/api/mc-bestellungen',{credentials:'include'}).then(r=>r.json()).then(o=>{const S={pending:['wird bestätigt','tw'],bought:['gekauft','ts'],ready:['abholbereit','ts'],collected:['erledigt','ts'],failed:['abgelehnt','tr']};const O=(o.orders||[]).slice(0,5),P=(o.pickup||[]).length;
 L.innerHTML=(P?'<p class="mut" style="margin:0 0 .5rem">'+P+' Stapel im Abholfach · im Spiel <code>/abholen</code></p>':'')+(O.length?'<ul class="pord">'+O.map(x=>{const g=S[x.stage]||S.pending;return '<li class="hl"><span class="ic"><img alt="" loading="lazy" src="/mc-icon/v2/'+encodeURIComponent(x.item)+'"></span><span><b>'+(+x.qty).toLocaleString('de-DE')+'× '+E((window.MC_DE&&MC_DE[x.item])||String(x.item).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase()))+'</b> <span class="mut" style="font-size:.8rem">'+(x.order_type==='bank_buy'?'Bank':'Shop')+'</span></span><span class="tag '+g[1]+'">'+g[0]+'</span></li>'}).join('')+'</ul>':'<p class="mut" style="margin:0">Noch keine Bestellungen.</p>')}).catch(()=>{L.innerHTML='<p class="mut">Konnte Bestellungen nicht laden.</p>'})}})();
 </script>${PROFILE_DETAILS}`;
-const PROFILE_MAIN = () => portfolio({ title: "Profil · NwebNotFound", desc: "Dein Profil", nav: pNav("", "/profile"), body: PROFILE_BODY(false) });
 const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein Profil", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", body: PROFILE_BODY(true) });
+
+// Private site profile: only the signed-in owner; everyone else goes to the Discord login and comes back.
+async function siteProfile(req, env) {
+  const u = await getUser(req, env).catch(() => null);
+  if (!u) return redirect(`/auth/discord/login?next=${encodeURIComponent(`https://${MAIN}/profile`)}`);
+  const since = await env.DB.prepare("SELECT MIN(created_at) AS c FROM sessions WHERE discord_id = ?").bind(u.id).first().catch(() => null);
+  const cnt = await env.DB.prepare("SELECT COUNT(*) AS n FROM entries WHERE discord_id = ?").bind(u.id).first().catch(() => null);
+  const { results: entries } = await env.DB.prepare("SELECT message, created_at FROM entries WHERE discord_id = ? ORDER BY id DESC LIMIT 3").bind(u.id).all().catch(() => ({ results: [] }));
+  const lang = pickLang(null, cookies(req)[LANG_COOKIE]);
+  const body = siteProfileBody({ user: u, since: since?.c || "", gbCount: cnt?.n || 0, entries: entries || [], logoutHref: `/auth/discord/logout?next=${encodeURIComponent(`https://${MAIN}/`)}` });
+  const head = `<meta name="robots" content="noindex"><link rel="stylesheet" href="/design/profile.css?v=${AV}"><script src="/design/profile.js?v=${AV}" defer></script>`;
+  return html(sitePage({ lang, bare: "/profile", title: "Profil · NwebNotFound", desc: "Dein Profil", body, head }), 200, { "cache-control": "private, no-store" });
+}
+
+// Owner deletes their own data: guestbook entries and sessions. POST from the site itself only.
+async function profileDelete(req, env) {
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.headers.get("origin") !== `https://${MAIN}`) return json({ error: "forbidden" }, 403);
+  const u = await getUser(req, env).catch(() => null);
+  if (!u) return json({ error: "unauthorized" }, 401);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM entries WHERE discord_id = ?").bind(u.id),
+    env.DB.prepare("DELETE FROM sessions WHERE discord_id = ?").bind(u.id),
+  ]);
+  return json({ ok: true }, 200, { "set-cookie": sessCookie("", 0) });
+}
 
 async function profileApi(req, env) {
   const origin = req.headers.get("origin");
@@ -1002,6 +1028,7 @@ export default {
     if (p === "/api/mc-ingest") return mcIngest(req, env);
     if (p === "/api/mc-data") return mcData(env);
     if (p === "/api/profile") return profileApi(req, env);
+    if (p === "/api/profile/delete") return profileDelete(req, env);
     if (p === "/api/mc-players") return json({ players: await playersApi(env, url) });
     if (p.startsWith("/api/mc-players/")) { const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, decodeURIComponent(p.slice(16)), u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
     if (p === "/api/mc-leaderboards") return mcLeaderboards(env);
@@ -1072,7 +1099,7 @@ export default {
     }
     if (p === "/portfolio") return html(legacyNav(PORTFOLIO, req));
     if (p === "/guestbook") return html(legacyNav(GUEST, req));
-    if (p === "/profile") return html(legacyNav(PROFILE_MAIN(), req));
+    if (p === "/profile") return siteProfile(req, env);
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
     return assetOrNotFound(req, env, false);
   },
