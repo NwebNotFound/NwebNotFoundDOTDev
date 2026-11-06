@@ -133,10 +133,11 @@
         var A = [].slice.call(menu.querySelectorAll("a")), i = A.indexOf(document.activeElement);
         if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); A[(i + (e.key === "ArrowDown" ? 1 : A.length - 1)) % A.length].focus(); }
       });
-      var who = el("div", "u-me__who"); who.append(img(pic, fb), el("span", "", label));
-      var ml = el("div", "u-me__links");
-      (L.menu || []).forEach(function (m) { ml.append(link(m[0], m[1], "", m[2])); });
-      ml.append(link(out, L.logout || "Abmelden", "u-out"));
+      /* Phone drawer (mockup): avatar + name link to the profile, Abmelden on the right; no extra link row. */
+      var prof = (L.menu || [])[0], who = el("a", "u-me__who");
+      who.href = prof ? prof[0] : "/profile"; who.setAttribute("aria-label", (prof ? prof[1] : "Profil") + ": " + label);
+      who.append(img(pic, fb), el("span", "", label));
+      var ml = el("div", "u-me__links"); ml.append(link(out, L.logout || "Abmelden", "u-out"));
       me.append(who, ml);
     } else if (d && d.available) {
       var a = el("a", "u-login"); a.href = base + "/auth/discord/login?next=" + nx;

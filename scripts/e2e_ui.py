@@ -155,7 +155,7 @@ with sync_playwright() as p:
         pg.screenshot(path=f"{SH}/ux-dropdown-{w}.png")
         # 4) einheitliches Hover
         hov = []
-        for sel in ("#umm a[href='/bestellungen']" if w >= 900 else ".u-me__links a[href='/bestellungen']", "#pbal .acts .btn.sec"):
+        for sel in ("#umm a[href='/bestellungen']" if w >= 900 else ".u-me__links a.u-out", "#pbal .acts .btn.sec"):
             el = pg.locator(sel).first; el.hover(); pg.wait_for_timeout(200)
             hov.append(el.evaluate("e=>{const c=getComputedStyle(e);return c.backgroundColor+'|'+c.boxShadow}"))
         pg.keyboard.press("Escape")
