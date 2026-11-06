@@ -1,6 +1,7 @@
 // Spielershops + Auktionshaus + Warteschlangen (Website ist NICHT autoritativ fürs Geld; alle Beträge in Cent)
 import { hashIp } from "./ip-hash.js";
 import { safeDecode } from "./safe-decode.js";
+import { verifyTurnstile } from "./turnstile.js";
 const ID_RE = /^[A-Za-z0-9_.:-]{1,64}$/, ITEM_RE = /^[a-z0-9_]{1,48}$/, NAME_RE = /^[A-Za-z0-9_]{1,16}$/;
 const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 const normU = (x) => String(x).toLowerCase().replace(/-/g, "").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
@@ -81,10 +82,28 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const i = ip ? await env.DB.prepare(qIp).bind(ipHash, m, h, ip).first() : { m: 0, h: 0 };
     return (d?.m || 0) >= 5 || (d?.h || 0) >= 30 || (i?.m || 0) >= 10 || (i?.h || 0) >= 60;
   }
-  async function turnstileOk(env, req, token) {
-    if (!env.TURNSTILE_SECRET || !token) return true; // optional: nur geprüft, wenn mitgeschickt
-    const fd = new FormData(); fd.append("secret", env.TURNSTILE_SECRET); fd.append("response", String(token)); fd.append("remoteip", req.headers.get("CF-Connecting-IP") || "");
-    try { return !!(await (await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: fd })).json()).success; } catch { return false; }
+  // limited() ist nur die schnelle Vorabprüfung. Verbindlich ist dieselbe Bedingung im INSERT selbst
+  // (INSERT … SELECT … WHERE): sonst laufen 100 parallele Anfragen alle durch die Zählung, bevor die
+  // erste Zeile steht. Parameter folgen direkt auf die n Wert-Parameter des INSERT (?n+1 …).
+  // Pro IP zählt hier nur ip_hash: Klartext-ip gibt es nur in Altzeilen von vor 0014, die längst
+  // außerhalb des 1-h-Fensters liegen (die Vorabprüfung vergleicht sie weiterhin).
+  function limitGuard(n, r) {
+    const now = Date.now(), d = `?${n + 1}`, m = `?${n + 2}`, h = `?${n + 3}`, ih = `?${n + 4}`;
+    const cnt = (where, since) => `((SELECT COUNT(*) FROM mc_bids_pending WHERE ${where} AND created_at > ${since}) + (SELECT COUNT(*) FROM mc_shop_orders_pending WHERE ${where} AND created_at > ${since}))`;
+    let sql = `${cnt(`discord_id = ${d}`, m)} < 5 AND ${cnt(`discord_id = ${d}`, h)} < 30`;
+    if (r.ipHash) sql += ` AND ${cnt(`ip_hash = ${ih}`, m)} < 10 AND ${cnt(`ip_hash = ${ih}`, h)} < 60`;
+    return { sql, args: r.ipHash ? [r.a.discordId, now - 60000, now - 3600000, r.ipHash] : [r.a.discordId, now - 60000, now - 3600000] };
+  }
+  const RATE_LIMITED = () => json({ error: "Zu viele Aktionen, bitte kurz warten" }, 429, { "retry-after": "60" });
+  // Turnstile für Website-Aktionen. Pflicht (sobald TURNSTILE_SECRET gesetzt ist) dort, wo die Seite
+  // ein Widget hat und den Token mitschickt: Bank-Direktkauf (bankbuy.js). Shop-Kauf und Gebot
+  // (shop.js, auction.js) haben kein Widget; dort wird ein mitgeschickter Token geprüft, ein
+  // fehlender aber noch hingenommen. Schutz dort: Login + verifizierter Link + Rolle, Origin-Check
+  // und das atomare Rate-Limit. Ein mitgeschickter Token muss success UND unseren Hostnamen haben.
+  async function turnstileOk(env, req, token, required) {
+    if (!env.TURNSTILE_SECRET) return true;
+    if (!token) return !required;
+    return verifyTurnstile(env, token, { ip: req.headers.get("CF-Connecting-IP") || "", hosts: [MAIN, MCD] });
   }
   // Wer handelt? Website: nur Discord-Session (+ Origin). Bot: nur Ingest-Token + discord_id. UUID immer aus mc_links.
   async function actor(req, env, b) {
@@ -92,7 +111,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (viaBot) { if (!tokenOk(req, env)) return { err: [401, "unauthorized"] }; const did = String(b?.discord_id ?? ""); if (!/^\d{15,21}$/.test(did)) return { err: [400, "discord_id fehlt"] }; return { discordId: did, source: "discord" }; }
     if (!originOk(req)) return { err: [403, "Ungültige Herkunft"] };
     const u = await getUser(req, env); if (!u) return { err: [401, "Bitte mit Discord anmelden"] };
-    if (!(await turnstileOk(env, req, b?.turnstile))) return { err: [403, "Captcha fehlgeschlagen"] };
+    if (!(await turnstileOk(env, req, b?.turnstile, b?.type === "bank_buy" || new URL(req.url).pathname === "/api/mc-bank-buy"))) return { err: [403, "Captcha fehlgeschlagen"] };
     return { discordId: u.id, source: "web" };
   }
   async function prep(req, env) {
@@ -105,7 +124,7 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (!l.verified || !l.has_role) return { err: json({ error: "Account nicht bestätigt oder Rolle fehlt" }, 403) };
     const ip = a.source === "web" ? req.headers.get("CF-Connecting-IP") || "" : null;
     const ipHash = await hashIp(env, ip);
-    if (await limited(env, a.discordId, ipHash, ip)) return { err: json({ error: "Zu viele Aktionen, bitte kurz warten" }, 429, { "retry-after": "60" }) };
+    if (await limited(env, a.discordId, ipHash, ip)) return { err: RATE_LIMITED() };
     return { b, a, l, ip, ipHash };
   }
 
@@ -122,8 +141,9 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const own = await env.DB.prepare("SELECT MAX(amount) AS m FROM mc_bids_pending WHERE auction_id = ? AND bidder_uuid = ? AND status = 'pending'").bind(au.id, l.mc_uuid).first();
     const need = Math.max(minNext(au), own?.m ? own.m + 1 : 0);
     if (amount < need) return json({ error: "Mindestgebot ist " + (need / 100).toFixed(2) + " CP", min_next: need }, 409);
-    const id = crypto.randomUUID(), now = Date.now();
-    await env.DB.prepare("INSERT INTO mc_bids_pending (id, auction_id, bidder_uuid, bidder_name, discord_id, amount, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?)").bind(id, au.id, l.mc_uuid, l.mc_name, a.discordId, amount, a.source, now, ipHash).run();
+    const id = crypto.randomUUID(), now = Date.now(), g = limitGuard(9, r);
+    const ins = await env.DB.prepare(`INSERT INTO mc_bids_pending (id, auction_id, bidder_uuid, bidder_name, discord_id, amount, source, created_at, status, ip, ip_hash) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', NULL, ?9 WHERE ${g.sql}`).bind(id, au.id, l.mc_uuid, l.mc_name, a.discordId, amount, a.source, now, ipHash, ...g.args).run();
+    if (!ins.meta?.changes) return RATE_LIMITED();
     return json({ ok: true, request_id: id, status: "pending", amount }, 202);
   }
   async function order(req, env) {
@@ -146,8 +166,9 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     const dup = (ex) => same(ex) ? json({ ok: true, duplicate: true, request_id: ex.id, status: ex.status, qty: ex.qty, unit_price: ex.unit_price, total: ex.unit_price * ex.qty }, 200) : json({ error: "request_id schon für eine andere Bestellung benutzt" }, 409);
     const ex = await orderById(env, rid); if (ex) return dup(ex);
     const now = Date.now();
-    const ins = await env.DB.prepare("INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?)").bind(rid, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ipHash).run();
-    if (!ins.meta?.changes) { const ex2 = await orderById(env, rid); return ex2 ? dup(ex2) : json({ error: "request_id kollidiert, bitte erneut senden" }, 409); } // paralleler Doppel-Submit
+    const g = limitGuard(12, r);
+    const ins = await env.DB.prepare(`INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'pending', NULL, ?12 WHERE ${g.sql}`).bind(rid, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ipHash, ...g.args).run();
+    if (!ins.meta?.changes) { const ex2 = await orderById(env, rid); return ex2 ? dup(ex2) : RATE_LIMITED(); } // paralleler Doppel-Submit oder Limit erreicht
     return json({ ok: true, request_id: rid, status: "pending", qty, unit_price: off.price, total: off.price * qty }, 202);
   }
   // Bank-Direktkauf: gleiche Queue wie Shop-Orders (type='bank_buy', shop_id NULL). Preis ist nur Anzeige/Obergrenze;
@@ -167,8 +188,9 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (!m) return json({ error: "Item gibt es bei der Bank nicht" }, 404);
     if (m.buy_locked || !(m.buy_price > 0)) return json({ error: "Nicht bei der Bank kaufbar" }, 409);
     const unit = Math.max(1, Math.round(m.buy_price * 100)), now = Date.now();
-    const ins = await env.DB.prepare("INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash, type) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, 'bank_buy')").bind(rid, it, qty, l.mc_uuid, l.mc_name, a.discordId, unit, a.source, now, ipHash).run();
-    if (!ins.meta?.changes) { const ex2 = await orderById(env, rid); return ex2 ? dup(ex2) : json({ error: "request_id kollidiert, bitte erneut senden" }, 409); } // paralleler Doppel-Submit
+    const g = limitGuard(10, r);
+    const ins = await env.DB.prepare(`INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash, type) SELECT ?1, NULL, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', NULL, ?10, 'bank_buy' WHERE ${g.sql}`).bind(rid, it, qty, l.mc_uuid, l.mc_name, a.discordId, unit, a.source, now, ipHash, ...g.args).run();
+    if (!ins.meta?.changes) { const ex2 = await orderById(env, rid); return ex2 ? dup(ex2) : RATE_LIMITED(); } // paralleler Doppel-Submit oder Limit erreicht
     return json({ ok: true, request_id: rid, type: "bank_buy", status: "pending", item: it, amount: qty, unit_price: unit, total: unit * qty }, 202);
   }
   // Ausblenden (nur für den eigenen User, nur erledigte/abgelehnte; nichts wird gelöscht)

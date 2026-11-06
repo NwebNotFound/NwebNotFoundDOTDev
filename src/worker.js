@@ -19,6 +19,7 @@ import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie } from "./i18n/index.js";
 import { safeDecode } from "./safe-decode.js";
+import { verifyTurnstile } from "./turnstile.js";
 // nwebnotfound.dev – Portfolio (nwebnotfound.dev) + Minecraft-Bereich (mc.nwebnotfound.dev) + Discord-Login
 const SITEKEY = "0x4AAAAAAFplEJyvitu_qwlx";
 const MAIN = "nwebnotfound.dev", MCD = "mc.nwebnotfound.dev", MC_HOST = "mc.nwebnotfound.dev";
@@ -1058,9 +1059,7 @@ async function guestbookApi(req, env) {
     let b; try { b = await req.json(); } catch { return json({ error: "Ungültige Anfrage" }, 400); }
     const message = String(b.message || "").trim();
     if (!message || message.length > 500) return json({ error: "Nachricht 1–500 Zeichen" }, 400);
-    const fd = new FormData(); fd.append("secret", env.TURNSTILE_SECRET); fd.append("response", String(b.token || "")); fd.append("remoteip", req.headers.get("CF-Connecting-IP") || "");
-    const v = await (await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: fd })).json();
-    if (!v.success) return json({ error: "Captcha fehlgeschlagen" }, 403);
+    if (!(await verifyTurnstile(env, b?.token, { ip: req.headers.get("CF-Connecting-IP") || "", hosts: [MAIN, MCD] }))) return json({ error: "Captcha fehlgeschlagen" }, 403);
     const row = await env.DB.prepare("SELECT avatar FROM sessions WHERE id = ?").bind(user.sid).first();
     await env.DB.prepare("INSERT INTO entries (name, message, discord_id, avatar) VALUES (?, ?, ?, ?)").bind(user.name.slice(0, 50), message, user.id, row?.avatar || null).run();
     return json({ ok: true }, 201);

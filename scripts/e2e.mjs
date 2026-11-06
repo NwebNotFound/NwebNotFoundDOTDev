@@ -311,7 +311,8 @@ try {
   ok((await req("/api/mc-ingest", { method: "POST", token: TOK, body: { links: [{ discord_id: D9, mc_name: "Buyer", mc_uuid: U9, has_role: true, verified: true }] } })).s === 200, "Link für Käufer");
   const pend0 = (await req("/api/mc-shop-orders/pending", { token: TOK })).j.items;
   ok(pend0.every((x) => x.type === "shop"), "pending (alt, ohne ?types) liefert nur type=shop", JSON.stringify(pend0.map((x) => x.type)));
-  const BB = (body, o = {}) => req("/api/mc-shop-order", { method: "POST", body: { type: "bank_buy", ...body }, cookie: c9, origin: O, ip: "10.0.0.33", ...o });
+  const BB = (body, o = {}) => req("/api/mc-shop-order", { method: "POST", body: { type: "bank_buy", turnstile: "XXXX.DUMMY.TOKEN.XXXX", ...body }, cookie: c9, origin: O, ip: "10.0.0.33", ...o });
+  ok((await BB({ item: "diamond", amount: 1, turnstile: undefined })).s === 403, "bank_buy Website ohne Turnstile-Token → 403");
   ok((await BB({ item: "diamond", amount: 1 }, { cookie: undefined })).s === 401, "bank_buy ohne Login → 401");
   ok((await BB({ item: "diamond", amount: 1 }, { origin: "https://evil.example" })).s === 403, "bank_buy fremde Origin → 403");
   ok((await BB({ item: "diamond", amount: 0 })).s === 400, "bank_buy Menge 0 → 400");

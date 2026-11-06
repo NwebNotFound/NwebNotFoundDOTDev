@@ -13,8 +13,14 @@ cookie_val = unquote(cookie_val)
 def ok(c, m, x=""):
     global fails
     print(("  ✓ " if c else "  ✗ ") + m + ("" if c else "  " + str(x)[:300])); fails += (not c)
+# Turnstile-Attrappe: das echte Widget löst in Headless-Chrome (bzw. ohne Netz) nicht zuverlässig.
+# Der Bank-Kauf verlangt seit #81 einen Token; der Test-Secret der e2e-Umgebung akzeptiert jeden.
+FAKE_TURNSTILE = """(()=>{const T='XXXX.DUMMY.TOKEN.XXXX';const put=el=>{el=typeof el==='string'?document.querySelector(el):el;if(!el||el.querySelector('input[name="cf-turnstile-response"]'))return;const i=document.createElement('input');i.type='hidden';i.name='cf-turnstile-response';i.value=T;el.appendChild(i)};
+window.turnstile={render:put,reset(){},getResponse:()=>T};const all=()=>document.querySelectorAll('.cf-turnstile').forEach(put);all();new MutationObserver(all).observe(document.documentElement,{childList:true,subtree:true})})();"""
 def route(r):
     u = r.request.url
+    if "challenges.cloudflare.com/turnstile/" in u and u.split("?")[0].endswith("/api.js"):
+        r.fulfill(status=200, content_type="application/javascript", body=FAKE_TURNSTILE); return
     if u.startswith("https://" + H):
         h = {k: v for k, v in r.request.all_headers().items() if not k.startswith(":")}; h["host"] = H
         try: r.fulfill(response=r.fetch(url=BASE + u[len("https://" + H):], headers=h, max_redirects=0))
