@@ -220,6 +220,16 @@ with sync_playwright() as p:
             ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "true" and pg.locator('.u-group[data-g=community] a[href="/spieler"]').count() == 1, f"{w}px Nav: Klick öffnet Community")
             pg.locator(".u-group[data-g=community] .u-gbtn").dispatch_event("click")
             ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "false", f"{w}px Nav: zweiter Klick schließt")
+            # Wiki has the longest dropdown: with space it must show every link (no 440px clip),
+            # on a short viewport it scrolls while the scrollbar stays hidden (Nils' request).
+            pg.locator(".u-group[data-g=wiki] .u-gbtn").dispatch_event("click")
+            wd = pg.evaluate("""() => { const d = document.querySelector('.u-group[data-g=wiki] .u-drop'); const r = d.getBoundingClientRect(); const a = [...d.querySelectorAll('a')]; return { n: a.length, hidden: a.filter(x => x.getBoundingClientRect().bottom > r.bottom - 1).map(x => x.textContent.trim()), clipped: d.scrollHeight > d.clientHeight, bottom: Math.round(r.bottom), vh: innerHeight, bar: getComputedStyle(d).scrollbarWidth }; }""")
+            ok(wd["n"] == 11 and not wd["hidden"] and not wd["clipped"] and wd["bottom"] < wd["vh"] and wd["bar"] == "none", f"{w}px Wiki-Dropdown: alle Links sichtbar ohne Beschnitt, Scrollbar bleibt versteckt", wd)
+            pg.set_viewport_size({"width": w, "height": 520}); pg.wait_for_timeout(150)
+            ws = pg.evaluate("""() => { const d = document.querySelector('.u-group[data-g=wiki] .u-drop'); const a = [...d.querySelectorAll('a')]; const last = a[a.length - 1]; const fits = () => last.getBoundingClientRect().bottom <= d.getBoundingClientRect().bottom + 1; const before = fits(); d.scrollTop = d.scrollHeight; const after = fits(); return { scrolls: d.scrollHeight > d.clientHeight, before, after, bar: getComputedStyle(d).scrollbarWidth, page: document.documentElement.scrollWidth - innerWidth }; }""")
+            ok(ws["scrolls"] and not ws["before"] and ws["after"] and ws["bar"] == "none" and ws["page"] <= 0, f"{w}px Wiki-Dropdown kurz: scrollt bis zum letzten Link, Scrollbar bleibt versteckt", ws)
+            pg.set_viewport_size({"width": w, "height": 900}); pg.wait_for_timeout(150)
+            pg.keyboard.press("Escape")
         ok(pg.locator(".pkt .btn").count() >= 3 and pg.locator('.pkt .btn[aria-selected=true][data-k="test"]').count() == 1 and pg.locator('.u-links a[href="/parkour"][aria-current=page]').count() == 1, f"{w}px Parkour: Kurs-Auswahl + Nav aktiv")
         hs = pg.eval_on_selector_all(".pkr", "els=>els.map(e=>e.getBoundingClientRect().height)"); ok(max(hs) < 70, f"{w}px Parkour: Zeilen einzeilig", hs)
         pg.screenshot(path=f"{SH}/local-parkour-{w}.png", full_page=True)
@@ -396,6 +406,13 @@ with sync_playwright() as p:
         pg.click("#vip-admin-worlds button[data-more]"); pg.wait_for_timeout(200)
         ok(pg.locator("#vip-admin-worlds .v2-world:visible").count() == 14 and pg.get_attribute("#vip-admin-worlds button[data-more]", "aria-expanded") == "true" and "Weniger anzeigen" in pg.inner_text("#vip-admin-worlds button[data-more]"), f"{w}px VIP-Admin: alle Welten nach Klick", pg.locator("#vip-admin-worlds .v2-world:visible").count())
         ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Admin: viele Welten ohne Overflow/Inline-Styles")
+        pg.unroute("**/api/mc-vip")
+        # 24-character world name: the name wraps, the rename button stays inside the card and visible (#97 review).
+        long_ = dict(MANYBASE, worlds={"placeholder": False, "slots": [{"id": "22222222-3333-4444-8555-000000000001", "label": "abcdefghijklmnopqrstuvwx", "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Gast", "owner": False, "visibility": "friends", "info": "", "type": "flat", "can_manage": True, "can_start": True}]})
+        pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(long_)))
+        go("/vip"); pg.locator("#vip-admin-worlds .v2-world").first.wait_for(timeout=10000)
+        geo = pg.evaluate("() => { const c = document.querySelector('#vip-admin-worlds .v2-world').getBoundingClientRect(); const b = document.querySelector('#vip-admin-worlds .v2-wname [data-rename]'); if (!b) return null; const r = b.getBoundingClientRect(); const n = document.querySelector('#vip-admin-worlds .v2-wn').getBoundingClientRect(); return [r.width, r.left - c.left, c.right - r.right, c.width, n.height]; }")
+        ok(geo and geo[0] >= 24 and geo[1] >= 0 and geo[2] >= 0 and geo[3] >= min(w - 32, 288) and geo[4] < 30, f"{w}px VIP: 24-Zeichen-Name einzeilig (Ellipsis), Umbenennen-Button sichtbar, Karte nie schmal", geo)
         pg.unroute("**/api/mc-vip")
         now_s = int(time.time()); hour = 3600
         def bucket(back):
