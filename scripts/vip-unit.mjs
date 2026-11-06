@@ -191,4 +191,15 @@ assert.equal(cleanWorlds([{ ...CW, settings: { pvp: 1 } }]).worlds.length, 1, "f
 assert.equal(cleanWorlds([{ ...CW, settings: { pvp: 1 } }]).worlds[0].settings.pvp, undefined, "falscher Wert fällt weg");
 assert.equal(cleanWorlds([{ ...CW }]).worlds[0].settings, null, "ohne settings bleibt null (Defaults im Panel)");
 
+// HTML pattern attributes compile with the regex v flag: an unescaped "-" in a class is an error and
+// the browser then ignores the check. Every pattern in vip.js must compile with "v" (create, rename, member).
+import { readFileSync } from "node:fs";
+const vipJs = readFileSync(new URL("../public/mc/vip.js", import.meta.url), "utf8");
+const pats = [...vipJs.matchAll(/pattern="([^"]+)"/g)].map((m) => new Function("return `" + m[1] + "`")());  // as the template literal renders it (\- -> \-)
+assert.ok(pats.length >= 3, "vip.js pattern attributes found");
+for (const p of pats) assert.doesNotThrow(() => new RegExp(`^(?:${p})$`, "v"), "pattern compiles with the v flag: " + p);
+const nameRe = new RegExp(`^(?:${pats.find((p) => p.includes("{3,24}"))})$`, "v");
+for (const ok of ["abc", "My-World_1", "a".repeat(24)]) assert.ok(nameRe.test(ok), "name accepted: " + ok);
+for (const bad of ["ab", "bad name", "a".repeat(25), "wel!t"]) assert.ok(!nameRe.test(bad), "name rejected: " + bad);
+
 console.log("vip-unit ok");
