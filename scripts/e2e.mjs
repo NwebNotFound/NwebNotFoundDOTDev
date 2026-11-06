@@ -1054,6 +1054,7 @@ try {
     // Panel v2: create prüft laufende Aufträge mit, settings hat einen eigenen Eimer.
     { await post("/api/mc-vip-worlds", { vip_worlds: [] }, { token: TOK, origin: null, cookie: null });
       // Admin (Nils, 06.11.): eigene Welten anlegen und verwalten wie VIP/MVP (Admin = 3 Plätze).
+      await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }] } });
       const ac = await post("/api/mc-vip/worlds", { request_id: "vip-admin-create", name: "AdminWelt", type: "normal" }, { cookie: c1 });
       ok(ac.s === 202 && ac.j?.op === "create", "Admin: eigene Welt anlegen → 202", ac.t);
       await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ status: "stopped", slot: null, players: 0 })] }, { token: TOK, origin: null, cookie: null });
