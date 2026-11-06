@@ -274,13 +274,15 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     const spec = { action, world_id: id, name, role, visibility };
     const rid = body?.request_id != null ? String(body.request_id) : crypto.randomUUID();
     if (!RID.test(rid)) return json({ error: "request_id ungültig (1-64 Zeichen [A-Za-z0-9_-])" }, 400);
-    const ex = await env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, info, world_type, settings, status FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
-    if (ex) {
+    const existing = () => env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, info, world_type, settings, status FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
+    const dup = (ex) => {
       const same = ex.action === spec.action && (ex.world_id || "") === spec.world_id && (ex.name || null) === name && (ex.role || null) === role && (ex.visibility || null) === visibility
         && (ex.world_type || null) === worldType && (ex.settings || null) === (settings ? JSON.stringify(settings) : null);
       if (!same) return json({ error: "request_id schon benutzt" }, 409);
       return json({ ok: true, duplicate: true, request_id: rid, op: ex.action, status: ex.status }, 200);
-    }
+    };
+    const ex = await existing();
+    if (ex) return dup(ex);
     const ip = req.headers.get("CF-Connecting-IP") || "";
     const ipHash = await hashIp(env, ip);
     const now = Date.now(), since = now - HOUR;
@@ -316,7 +318,10 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
       }
     }
     const rowId = crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, world_type, settings, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web', ?, 'pending', NULL, ?)").bind(rowId, rid, action, id, a.uuid, a.name, create ? a.uuid : world.owner_uuid, a.user.id, name, role, visibility, info, worldType, settings ? JSON.stringify(settings) : null, now, ipHash).run();
+    // OR IGNORE: zwei parallele Submits mit derselben request_id sehen oben beide keine Zeile; der
+    // zweite INSERT verletzt dann UNIQUE (discord_id, request_id). Statt 500 → erneut lesen → duplicate.
+    const ins = await env.DB.prepare("INSERT OR IGNORE INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, world_type, settings, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web', ?, 'pending', NULL, ?)").bind(rowId, rid, action, id, a.uuid, a.name, create ? a.uuid : world.owner_uuid, a.user.id, name, role, visibility, info, worldType, settings ? JSON.stringify(settings) : null, now, ipHash).run();
+    if (!ins.meta?.changes) { const ex2 = await existing(); if (ex2) return dup(ex2); return json({ error: "Auftrag konnte nicht angelegt werden" }, 409); }
     return json({ ok: true, request_id: rid, op: action, status: "pending" }, 202);
   }
 

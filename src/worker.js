@@ -657,6 +657,21 @@ async function auth(p, req, env, url) {
 }
 
 /* ---------- MC-Ingest (Push von PC-Nils) ---------- */
+// mc_snapshot: servers und leaderboards kommen in getrennten Pushes. Nur den gesendeten Teil in SQL
+// ersetzen (json_set), statt die ganze Zeile in JS zu lesen, zu ändern und zurückzuschreiben: zwei
+// parallele Pushes überschreiben sich sonst gegenseitig mit dem alten Stand des jeweils anderen Teils.
+// Für den nicht gesendeten Teil wird ein fehlender Zeitstempel (Altdaten) aus dem bisherigen
+// updated_at nachgetragen, bevor updated_at weiterspringt. undefined = Teil nicht gesendet.
+export function snapshotStatement(env, servers, leaderboards, now) {
+  const parts = [["servers", servers], ["leaderboards", leaderboards]];
+  const fresh = {}; for (const [k, v] of parts) if (v !== undefined) { fresh[k] = v; fresh[k + "_at"] = now; }
+  const sets = [], args = [JSON.stringify(fresh), now];
+  for (const [k, v] of parts) {
+    if (v !== undefined) { sets.push(`'$.${k}', json(?${args.length + 1}), '$.${k}_at', ?2`); args.push(JSON.stringify(v)); }
+    else sets.push(`'$.${k}_at', COALESCE(json_extract(mc_snapshot.data, '$.${k}_at'), CASE WHEN json_type(mc_snapshot.data, '$.${k}') IS NOT NULL THEN mc_snapshot.updated_at END)`);
+  }
+  return env.DB.prepare(`INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?1, ?2) ON CONFLICT(id) DO UPDATE SET data = json_set(json(mc_snapshot.data), ${sets.join(", ")}), updated_at = excluded.updated_at`).bind(...args);
+}
 // Craft-Views direkt annehmen (v_leaderboards, v_player_stats_ext, v_market_history) → interne Formen
 const pk = (o, ...k) => { for (const x of k) if (o?.[x] != null && o[x] !== "") return o[x]; return null; };
 const UUIDX = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
@@ -829,14 +844,7 @@ async function mcIngest(req, env) {
   const { links, players_stats, details, leaderboards_weekly, ...data } = cleanIngest(b), now = Date.now();
   const st = [], market = cleanMarket(b?.market), market_history = cleanHistory(b?.market_history);
   if (b?.servers || b?.leaderboards) {
-    // Teile unabhängig mergen: jeder Teil mit eigenem Zeitstempel
-    const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
-    const cur = row ? JSON.parse(row.data) : {};
-    if (cur.servers && !cur.servers_at) cur.servers_at = row.updated_at;
-    if (cur.leaderboards && !cur.leaderboards_at) cur.leaderboards_at = row.updated_at;
-    if (b.servers) { cur.servers = data.servers; cur.servers_at = now; }
-    if (b.leaderboards) { cur.leaderboards = data.leaderboards; cur.leaderboards_at = now; }
-    st.push(env.DB.prepare("INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(JSON.stringify(cur), now));
+    st.push(snapshotStatement(env, b.servers ? data.servers ?? null : undefined, b.leaderboards ? data.leaderboards ?? null : undefined, now));
   }
   if (links) {
     if (b.links_full === true) st.push(env.DB.prepare("DELETE FROM mc_links"));

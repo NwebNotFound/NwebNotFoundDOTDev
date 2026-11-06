@@ -109,6 +109,8 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     return { b, a, l, ip, ipHash };
   }
 
+  const RID_RE = /^[A-Za-z0-9_.:-]{8,64}$/;
+  const orderById = (env, id) => env.DB.prepare("SELECT id, discord_id, listing_id, item, qty, unit_price, status, type FROM mc_shop_orders_pending WHERE id = ?").bind(id).first();
   async function bid(req, env) {
     const r = await prep(req, env); if (r.err) return r.err; const { b, a, l, ipHash } = r;
     const amount = cents(b.amount); if (amount == null || amount < 1) return json({ error: "Betrag in Cent (Ganzzahl) angeben" }, 400);
@@ -136,9 +138,17 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (sh.owner_uuid && sh.owner_uuid === l.mc_uuid) return json({ error: "Du kannst nicht in deinem eigenen Shop kaufen" }, 403);
     if (!off) off = sh.items.filter((x) => x.item === it && x.mode === "sell").sort((x, y) => y.stock - x.stock)[0]; if (!off) return json({ error: "Item wird hier nicht verkauft" }, 404);
     if (off.stock < qty) return json({ error: "Nur noch " + off.stock + " auf Lager" }, 409);
-    const id = crypto.randomUUID(), now = Date.now();
-    await env.DB.prepare("INSERT INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?)").bind(id, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ipHash).run();
-    return json({ ok: true, request_id: id, status: "pending", qty, unit_price: off.price, total: off.price * qty }, 202);
+    // Idempotenz wie bei bank_buy: request_id vom Client ist der Primärschlüssel. Ein Retry oder
+    // Doppelklick mit derselben request_id legt keine zweite Bestellung an.
+    const rid = b.request_id != null ? String(b.request_id) : crypto.randomUUID();
+    if (!RID_RE.test(rid)) return json({ error: "request_id ungültig (8-64 Zeichen [A-Za-z0-9_.:-])" }, 400);
+    const same = (ex) => ex.discord_id === a.discordId && (ex.type || "shop") === "shop" && ex.listing_id === off.listing_id && ex.item === it && ex.qty === qty;
+    const dup = (ex) => same(ex) ? json({ ok: true, duplicate: true, request_id: ex.id, status: ex.status, qty: ex.qty, unit_price: ex.unit_price, total: ex.unit_price * ex.qty }, 200) : json({ error: "request_id schon für eine andere Bestellung benutzt" }, 409);
+    const ex = await orderById(env, rid); if (ex) return dup(ex);
+    const now = Date.now();
+    const ins = await env.DB.prepare("INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?)").bind(rid, off.listing_id, sh.id, it, qty, l.mc_uuid, l.mc_name, a.discordId, off.price, a.source, now, ipHash).run();
+    if (!ins.meta?.changes) { const ex2 = await orderById(env, rid); return ex2 ? dup(ex2) : json({ error: "request_id kollidiert, bitte erneut senden" }, 409); } // paralleler Doppel-Submit
+    return json({ ok: true, request_id: rid, status: "pending", qty, unit_price: off.price, total: off.price * qty }, 202);
   }
   // Bank-Direktkauf: gleiche Queue wie Shop-Orders (type='bank_buy', shop_id NULL). Preis ist nur Anzeige/Obergrenze;
   // der Server prüft beim Ausführen Sperre, Tageslimit, Kontostand und aktuellen Preis.
@@ -149,16 +159,16 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (b.mc_uuid != null && (!UUID_RE.test(String(b.mc_uuid)) || normU(b.mc_uuid) !== l.mc_uuid)) return json({ error: "mc_uuid passt nicht zum verknüpften Account" }, 403);
     // Idempotenz: request_id vom Client (Bot/Website); fehlt sie, erzeugt der Server eine
     const rid = b.request_id != null ? String(b.request_id) : crypto.randomUUID();
-    if (!/^[A-Za-z0-9_.:-]{8,64}$/.test(rid)) return json({ error: "request_id ungültig (8-64 Zeichen [A-Za-z0-9_.:-])" }, 400);
-    const ex = await env.DB.prepare("SELECT id, discord_id, item, qty, unit_price, status, type FROM mc_shop_orders_pending WHERE id = ?").bind(rid).first();
-    if (ex) { if (ex.discord_id !== a.discordId || ex.type !== "bank_buy" || ex.item !== it || ex.qty !== qty) return json({ error: "request_id schon für eine andere Bestellung benutzt" }, 409);
-      return json({ ok: true, duplicate: true, request_id: ex.id, type: "bank_buy", status: ex.status, item: ex.item, amount: ex.qty, unit_price: ex.unit_price, total: ex.unit_price * ex.qty }, 200); }
+    if (!RID_RE.test(rid)) return json({ error: "request_id ungültig (8-64 Zeichen [A-Za-z0-9_.:-])" }, 400);
+    const dup = (ex) => ex.discord_id !== a.discordId || ex.type !== "bank_buy" || ex.item !== it || ex.qty !== qty ? json({ error: "request_id schon für eine andere Bestellung benutzt" }, 409)
+      : json({ ok: true, duplicate: true, request_id: ex.id, type: "bank_buy", status: ex.status, item: ex.item, amount: ex.qty, unit_price: ex.unit_price, total: ex.unit_price * ex.qty }, 200);
+    const ex = await orderById(env, rid); if (ex) return dup(ex);
     const m = await env.DB.prepare("SELECT buy_locked, buy_price FROM mc_market WHERE item = ?").bind(it).first().catch(() => null);
     if (!m) return json({ error: "Item gibt es bei der Bank nicht" }, 404);
     if (m.buy_locked || !(m.buy_price > 0)) return json({ error: "Nicht bei der Bank kaufbar" }, 409);
     const unit = Math.max(1, Math.round(m.buy_price * 100)), now = Date.now();
     const ins = await env.DB.prepare("INSERT OR IGNORE INTO mc_shop_orders_pending (id, listing_id, shop_id, item, qty, buyer_uuid, buyer_name, discord_id, unit_price, source, created_at, status, ip, ip_hash, type) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, 'bank_buy')").bind(rid, it, qty, l.mc_uuid, l.mc_name, a.discordId, unit, a.source, now, ipHash).run();
-    if (!ins.meta?.changes) return json({ error: "request_id kollidiert, bitte erneut senden" }, 409);
+    if (!ins.meta?.changes) { const ex2 = await orderById(env, rid); return ex2 ? dup(ex2) : json({ error: "request_id kollidiert, bitte erneut senden" }, 409); } // paralleler Doppel-Submit
     return json({ ok: true, request_id: rid, type: "bank_buy", status: "pending", item: it, amount: qty, unit_price: unit, total: unit * qty }, 202);
   }
   // Ausblenden (nur für den eigenen User, nur erledigte/abgelehnte; nichts wird gelöscht)
