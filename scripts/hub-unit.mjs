@@ -89,7 +89,7 @@ for (const lang of LANGS) {
     ok(!/\son[a-z]+\s*=/i.test(html), `${label}: no inline event handler`);
     // Summer Theme v2: the mascot is the approved inline pixel art (artboard), not the Phase 1
     // placeholder sprite — an inline SVG follows the theme tokens and needs no second request.
-    ok(html.includes('shape-rendering="crispEdges"') && html.includes("var(--sm-cream)"), `${label}: uses the inline pixel art (crispEdges)`);
+    ok(html.includes('shape-rendering="crispEdges"'), `${label}: uses inline pixel art (crispEdges)`);
     ok(html.includes("data-summer-theme-toggle") && html.includes('data-label-day="') && html.includes('data-label-night="'), `${label}: theme toggle is wired for summer-theme.js`);
     ok(html.includes(`href="${withLang("/", lang)}"`), `${label}: brand links to the language home`);
     const urls = [...html.matchAll(/(?:href|src)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
@@ -116,14 +116,14 @@ for (const lang of LANGS) {
   ok(home.includes(`href="https://${MC_HOST}/" target="_blank" rel="noopener noreferrer"`), "home tile opens the Minecraft server externally");
   // Summer Theme v2: real Minecraft texture (the same /mc-icon endpoint the MC surface uses) plus
   // the parallax layer markup and the external parallax helper.
-  ok(home.includes('src="/mc-icon/v2/grass_block"') && home.includes("sm-mc-icon"), "the Minecraft tile shows the real grass_block texture");
-  ok(home.includes("data-sm-parallax") && home.includes('class="sm-layer sm-parallax'), "the hero scene carries the parallax layers");
-  ok(home.includes(`<script src="/design/summer-parallax.js?v=${AV}" defer></script>`), "the start page loads the external parallax helper");
+  ok(home.includes('src="/mc-icon/v2/grass_block"') && home.includes('class="h2-tile"'), "the Minecraft project card shows the real grass_block texture");
+  // New start page (mockups/feat-home-about-me): no hero illustration, no parallax.
+  ok(!home.includes("data-sm-parallax") && !home.includes("sm-scene") && !home.includes("summer-parallax.js"), "the start page has no hero scene and no parallax");
+  ok(home.includes(`/design/home.css?v=${AV}`) && home.includes(`/design/home.js?v=${AV}`) && !hubPage("/about", "en").includes("/design/home.css"), "only the start page loads home.css/home.js");
   // Night hero (artboard Main-night): the moon and the star field are in the markup, the swap itself
   // is pure CSS (data-theme / prefers-color-scheme), so no script is involved.
-  ok(home.includes("sm-scene__moon") && home.includes("sm-scene__stars") && home.includes("sm-twinkle--d4"), "the hero carries the moon and the star field for the night theme");
-  ok(home.includes('class="sm-kicker"') && home.includes("Sections") && home.includes("What&#39;s here"), "the section block opens with a pixel kicker and the artboard heading");
-  ok(hubPage("/", "de").includes("Was es hier gibt") && hubPage("/", "de").includes(">Bereiche<"), "the German heading comes from the new i18n keys");
+  ok(home.includes("Hi, I&#39;m ") && home.includes("What I&#39;m building"), "the English start page uses the content file (src/home-content.js)");
+  ok(hubPage("/", "de").includes("Hi, ich bin ") && hubPage("/", "de").includes("Woran ich baue") && hubPage("/", "de").includes("Steckbrief"), "the German start page: hero, project heading and Steckbrief");
   // Unified nav (mockup fix-unified-nav): one bar, the phone drawer is the same panel, the burger
   // controls it, and the account slot is empty until /api/me answers (no avatar before the session).
   const bar = home.slice(home.indexOf("<header"), home.indexOf("</header>"));
@@ -147,14 +147,15 @@ for (const lang of LANGS) {
   ok(hubPage("/reviews", "de") === null && hubPage("/reviews", "en") === null && !hubPageExists("/reviews"), "/reviews gehört dem Hub nicht mehr (fällt auf die 404-Seite)");
   // Sechs Kacheln passen in ein 3-Spalten-Raster ohne Lücke: kein `sm-tile--wide` mehr, weil zwei
   // breite Kacheln + vier normale nur acht von neun Zellen belegt hätten.
-  const tileCount = (home.match(/sm-card sm-card--link sm-tile/g) || []).length;
-  ok(tileCount === 6 && tileCount % 3 === 0 && !home.includes("sm-tile--wide"), `sechs gleich große Kacheln, Raster ohne Lücke (${tileCount})`);
+  const tileCount = (home.match(/class="h2-proj"/g) || []).length;
+  ok(tileCount === 6 && tileCount % 3 === 0, `sechs gleich große Projektkarten, Raster ohne Lücke (${tileCount})`);
+  ok(["Zuletzt", "Latest"].some((x) => hubPage("/", "de").includes(x)) && hubPage("/", "de").includes("data-gb-latest") && hubPage("/", "de").includes("h2-log"), "Zuletzt (Changelog) and the guestbook teaser are on the start page");
   // Und die Chips auf /about zählen dieselben Bereiche.
   const aboutChips = (hubPage("/about", "de").match(/sm-badge sm-badge--(ramune|sakura|lavender|peach|sun)/g) || []).length;
   ok(aboutChips >= 3 && !hubPage("/about", "de").includes("Rezensionen"), "die Bereichs-Chips auf /about passen zur Navigation");
-  ok(home.includes("sm-badge--sun") && home.includes("soon"), "still-empty sections are marked as soon");
+  ok(home.includes("h2-st is-soon") && home.includes("h2-st is-idea") && home.includes(">soon<"), "projects without a page are marked soon / idea");
   const de = hubPage("/", "de");
-  ok(de.includes("sm-badge--sun") && de.includes("bald"), "the German home says 'bald'");
+  ok(de.includes("h2-st is-soon") && de.includes(">bald<") && de.includes(">Idee<"), "the German home says 'bald' and 'Idee'");
   const soon = hubPage("/writing", "de");
   ok(soon.includes("sm-hammer") && soon.includes("(◕‿◕)"), "empty state shows the building mascot and a kaomoji");
   ok(soon.includes("Texte kommt bald"), "empty state names the section", soon.slice(soon.indexOf("sm-h1"), soon.indexOf("sm-h1") + 120));

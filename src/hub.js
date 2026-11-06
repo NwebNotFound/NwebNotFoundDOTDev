@@ -20,6 +20,7 @@ import { epubPath, seriesEpubPath } from "./epub.js";
 import { FEED_MIME } from "./feed.js";
 import { htmlToText } from "./markdown.js";
 import { mainNav, mainItems, UNAV_HEAD } from "./unav.js";
+import { homeAbout } from "./home.js";
 
 export const SITE = "nwebnotfound.dev";
 export const MC_HOST = "mc.nwebnotfound.dev";
@@ -644,6 +645,7 @@ function document_(o) {
   // exists — story chapters and series pages. The parallax helper is a small external file too, and
   // only the page that has a hero scene loads it.
   const printScript = o.print ? `<script src="/design/summer-print.js?v=${AV}" defer></script>` : "";
+  const homeAssets = o.home ? `<link rel="stylesheet" href="/design/home.css?v=${AV}"><script src="/design/home.js?v=${AV}" defer></script>` : "";
   const parallaxScript = o.parallax ? `<script src="/design/summer-parallax.js?v=${AV}" defer></script>` : "";
   const readerScript = o.reading ? `<script src="/design/summer-reader.js?v=${AV}" defer></script>` : "";
   // Reading progress: a lavender 4px line pinned above the header, driven by scroll position
@@ -661,7 +663,7 @@ ${hreflangTags}
 ${feedTags}
 <link rel="preload" href="/design/fonts/pixelify-sans-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/design/fonts/nunito-latin-400.woff2" as="font" type="font/woff2" crossorigin>
-<script src="/design/summer-theme.js?v=${AV}"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${UNAV_HEAD}${printScript}${parallaxScript}${readerScript}
+<script src="/design/summer-theme.js?v=${AV}"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${UNAV_HEAD}${printScript}${parallaxScript}${readerScript}${homeAssets}
 </head><body class="sm-shell">
 ${progressBar}
 <a class="sm-skip-link" href="#main">${esc(t("skip"))}</a>
@@ -697,36 +699,7 @@ function tile({ href_, iconKey, mcId, tone, title, text, badge, cta, ctaMuted, e
   return `<a class="${cls}" href="${href_}">${head}${inner}</a>`;
 }
 
-function homeBody(t, lang) {
-  const soon = `<span class="sm-badge sm-badge--sun"><span class="sm-badge__dot"></span>${esc(t("nav.soon"))}</span>`;
-  return `
-<section class="sm-hero"><div class="sm-wrap sm-hero__inner">
-<div class="sm-hero__text">
-<span class="sm-badge sm-badge--live sm-rise"><span class="sm-badge__dot"></span>${esc(t("home.eyebrow"))}</span>
-<h1 class="sm-display sm-rise">${esc(t("home.title"))}<br><span class="sm-display__soft">${esc(t("home.title2"))}</span></h1>
-<p class="sm-lead sm-rise">${esc(t("home.lead"))}</p>
-<p class="sm-hero__cta sm-rise"><a class="sm-btn" href="${href("/portfolio", lang)}">${esc(t("tile.portfolio.title"))} ${arrow}</a><a class="sm-btn sm-btn--soft" href="https://${MC_HOST}/">${esc(t("tile.minecraft.cta"))}</a></p>
-</div>
-<div class="sm-hero__art sm-rise">${scene(t)}</div>
-</div></section>
-<section class="sm-section"><div class="sm-wrap">
-<div class="sm-section__head">
-<div>
-<p class="sm-kicker">${twinkleArt(10, "var(--sm-sun-edge)", "sm-twinkle--still")}<span>${esc(t("home.sections_kicker"))}</span></p>
-<h2 class="sm-h2 sm-h2--lg">${esc(t("home.sections_title"))}</h2>
-</div>
-<p class="sm-lead">${esc(t("home.sections_lead"))}</p>
-</div>
-<div class="sm-tiles">
-${tile({ href_: `https://${MC_HOST}/`, mcId: "grass_block", iconKey: "minecraft", tone: "grass", title: t("tile.minecraft.title"), text: t("tile.minecraft.text"), cta: t("tile.minecraft.cta"), external: true })}
-${tile({ href_: href("/about", lang), iconKey: "about", tone: "sakura", title: t("tile.about.title"), text: t("tile.about.text"), cta: t("tile.cta.more") })}
-${tile({ href_: href("/music", lang), iconKey: "music", tone: "ramune", title: t("tile.music.title"), text: t("tile.music.text"), badge: soon, cta: t("tile.cta.soon"), ctaMuted: true })}
-${tile({ href_: href("/writing", lang), iconKey: "writing", tone: "lavender", title: t("tile.writing.title"), text: t("tile.writing.text"), badge: soon, cta: t("tile.cta.soon"), ctaMuted: true })}
-${tile({ href_: "/guestbook", iconKey: "guestbook", tone: "peach", title: t("tile.guestbook.title"), text: t("tile.guestbook.text"), cta: t("tile.cta.more") })}
-${tile({ href_: href("/portfolio", lang), iconKey: "projects", tone: "surface", title: t("tile.portfolio.title"), text: t("tile.portfolio.text"), cta: t("tile.cta.more") })}
-</div>
-</div></section>`;
-}
+const homeBody = (t, lang) => homeAbout(lang, { href, github: GITHUB_URL, x: X_URL });
 
 function aboutBody(t, lang) {
   // Pastel chips for the three sections the hub offers. No `sm-badge--sun` here: that tint marks a
@@ -889,7 +862,7 @@ export function hubPage(bare, lang, opts = {}) {
   const meta = META[bare];
   if (!meta) return null;
   const body = bare === "/" ? homeBody(t, lang) : bare === "/about" ? aboutBody(t, lang) : soonBody(t, lang, bare);
-  return document_({ lang, bare, t, title: t(meta[0]), desc: t(meta[1]), body, parallax: bare === "/" });
+  return document_({ lang, bare, t, title: t(meta[0]), desc: t(meta[1]), body, home: bare === "/" });
 }
 
 export const hubPageExists = (bare) => Object.prototype.hasOwnProperty.call(META, bare) || writingRoute(bare) !== null;
