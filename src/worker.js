@@ -4,7 +4,7 @@ import { cleanRanks, rankStatements } from "./mc-ranks.js";
 import { cleanPvp, pvpStatements, pvpApi, pvpPlayerApi, pvpBody } from "./mc-pvp.js";
 import { vipApi, vipBody } from "./mc-vip.js";
 import { makeVip } from "./mc-vip-cmd.js";
-import { resolveIcon, TEX_BASE } from "./mc-icon.js";
+import { resolveIcon, TEX_BASE, ICON_ID_RE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { headResponse, skinResponse, validSkinUrl } from "./mc-head.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
@@ -1110,7 +1110,7 @@ async function route(req, env, ctx) {
     if (p.startsWith("/mc-head/")) return headResponse(req, p, ctx, env);
     if (p.startsWith("/mc-skin/")) return skinResponse(req, p, ctx, env);
     if (p.startsWith("/mc-mob/")) { const k = safeDecode(p.slice(8)); if (k == null) return new Response("Not found", { status: 404 }); return new Response(null, { status: 302, headers: { location: mobIcon(k.replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } }); }
-    if (p.startsWith("/mc-icon/")) { const q = p.slice(9).replace(/^v2\//, ""); let dq; try { dq = decodeURIComponent(q); } catch { return new Response("Not found", { status: 404 }); } const r = resolveIcon(dq.replace(/\.png$/, "")); return r ? new Response(null, { status: 302, headers: { location: /^(https:|\/)/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=86400" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${dq.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
+    if (p.startsWith("/mc-icon/")) { const dq = safeDecode(p.slice(9).replace(/^v2\//, "")), id = dq == null ? "" : dq.toLowerCase().replace(/\.png$/, "").replace(/^minecraft:/, ""); if (!ICON_ID_RE.test(id)) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=3600" } }); const r = resolveIcon(id); return r ? new Response(null, { status: 302, headers: { location: /^(https:|\/)/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=86400" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${id.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
     if (p.startsWith("/auth/")) {
       if (isMc) { url.hostname = MAIN; return redirect(url.toString()); }
       const r = await auth(p, req, env, url); if (r) return r;

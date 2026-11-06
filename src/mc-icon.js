@@ -41,15 +41,23 @@ const has = (p) => (p.startsWith("block/") ? TEX_BLOCK : TEX_ITEM).has(p.slice(p
 // Texturen, die nur in der neueren Version existieren (26.x): selbst gehostet unter /mc/icons/tex/ (aus misode/mcmeta)
 const abs = (r) => (typeof r === "string" && !/^(https:|\/)/.test(r) && isNew(r) && !inOld(r) ? NEW_BASE + r + ".png" : r);
 const first = (...c) => c.find((p) => p && has(p)) || null;
-const cache = new Map();
+// Ergebnis-Cache pro Isolate, hart begrenzt: sonst wächst er mit jeder neuen (auch erfundenen) ID
+// bis zum Speicherende des Isolates. Bei vollem Cache fliegt der älteste Eintrag (Map hält die
+// Einfügereihenfolge, ein Treffer wird ans Ende umgehängt → LRU).
+const cache = new Map(), CACHE_MAX = 4096;
+export const iconCacheSize = () => cache.size;
+export const ICON_ID_RE = /^[a-z0-9_]{1,48}$/;
 // Mob-/Spielerköpfe haben keine Item-Textur (3D-Modell aus Entity-Skin) -> isometrischer Kopf über mc-heads (MHF_-Skins)
 export const HEAD_URL = "https://mc-heads.net/head/";
 const HEADS = { zombie: "MHF_Zombie", skeleton: "MHF_Skeleton", wither_skeleton: "MHF_WSkeleton", creeper: "MHF_Creeper", piglin: "MHF_Piglin", dragon: "MHF_Enderdragon", ender_dragon: "MHF_Enderdragon", player: "MHF_Steve" };
 export function resolveIcon(raw) {
   const id = String(raw || "").toLowerCase().replace(/^minecraft:/, "").replace(/[^a-z0-9_]/g, "");
   if (!id) return null;
-  if (cache.has(id)) return cache.get(id);
-  const r = /^(cave_|void_)?air$/.test(id) ? null : abs(resolve(id, 0) || FALLBACK); cache.set(id, r); return r;
+  if (id.length > 48) return abs(FALLBACK); // keine echte Item-ID; Regex-Kaskade und Cache nicht bemühen
+  if (cache.has(id)) { const r = cache.get(id); cache.delete(id); cache.set(id, r); return r; }
+  const r = /^(cave_|void_)?air$/.test(id) ? null : abs(resolve(id, 0) || FALLBACK);
+  if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
+  cache.set(id, r); return r;
 }
 function resolve(id, depth) {
   if (depth > 3) return null;
