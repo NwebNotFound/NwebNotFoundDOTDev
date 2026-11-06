@@ -61,9 +61,10 @@
   function setG(g, o) { g.classList.toggle("open", !!o); g.querySelector(".u-gbtn").setAttribute("aria-expanded", o ? "true" : "false"); }
   function shut(except) { groups().forEach(function (g) { if (g !== except) setG(g, false); }); }
   groups().forEach(function (g) {
-    var b = g.querySelector(".u-gbtn"), t = 0;
-    b.addEventListener("click", function (e) { e.stopPropagation(); clearTimeout(t); var o = b.getAttribute("aria-expanded") === "true"; if (!mob()) shut(g); setG(g, !o); });
+    var b = g.querySelector(".u-gbtn"), t = 0, hv = false; /* hv: the open state came from mouse hover, not from a click */
+    b.addEventListener("click", function (e) { e.stopPropagation(); clearTimeout(t); var o = b.getAttribute("aria-expanded") === "true", h = hv; hv = false; if (o && h && e.detail > 0 && !mob()) return; /* a real click on a hover-opened menu keeps it open */ if (!mob()) shut(g); setG(g, !o); });
     g.addEventListener("keydown", function (e) {
+      hv = false;
       var I = [].slice.call(g.querySelectorAll(".u-drop a")), i = I.indexOf(document.activeElement);
       if (e.key === "Escape" && g.classList.contains("open") && !mob()) { setG(g, false); b.focus(); e.preventDefault(); e.stopPropagation(); }
       else if (e.key === "ArrowDown") { e.preventDefault(); if (!g.classList.contains("open")) { if (!mob()) shut(g); setG(g, true); } var n = I[i < 0 ? 0 : Math.min(I.length - 1, i + 1)]; if (n) n.focus(); }
@@ -71,8 +72,8 @@
     });
     g.addEventListener("focusout", function (e) { if (!mob() && !g.contains(e.relatedTarget)) setG(g, false); });
     if (window.matchMedia("(hover:hover) and (pointer:fine)").matches) {
-      g.addEventListener("mouseenter", function () { clearTimeout(t); if (!mob() && !g.classList.contains("open")) { shut(g); setG(g, true); } });
-      g.addEventListener("mouseleave", function () { if (mob()) return; clearTimeout(t); t = setTimeout(function () { if (!g.contains(document.activeElement)) setG(g, false); }, 150); });
+      g.addEventListener("mouseenter", function () { clearTimeout(t); if (!mob() && !g.classList.contains("open")) { shut(g); setG(g, true); hv = true; } });
+      g.addEventListener("mouseleave", function () { if (mob()) return; clearTimeout(t); t = setTimeout(function () { hv = false; if (!g.contains(document.activeElement)) setG(g, false); }, 150); });
     }
   });
 

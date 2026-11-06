@@ -221,6 +221,16 @@ with sync_playwright() as p:
             ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "true" and pg.locator('.u-group[data-g=community] a[href="/spieler"]').count() == 1, f"{w}px Nav: Klick öffnet Community")
             pg.locator(".u-group[data-g=community] .u-gbtn").dispatch_event("click")
             ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "false", f"{w}px Nav: zweiter Klick schließt")
+            # real mouse: hover opens, the click that follows keeps it open, a second click closes it (intentional close)
+            gb = ".u-group[data-g=community] .u-gbtn"; pg.mouse.move(5, 400); pg.wait_for_timeout(250)
+            bx = pg.locator(gb).bounding_box(); cx, cy = bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2
+            pg.mouse.move(cx, cy); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "true", f"{w}px Nav: Hover öffnet Community")
+            pg.mouse.down(); pg.mouse.up(); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "true", f"{w}px Nav: echter Klick nach Hover lässt das Menü offen")
+            pg.mouse.down(); pg.mouse.up(); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "false", f"{w}px Nav: zweiter echter Klick schließt absichtlich")
+            pg.mouse.move(5, 400); pg.wait_for_timeout(300)
+            pg.mouse.move(cx, cy); pg.wait_for_timeout(120); pg.focus(gb); pg.keyboard.press("Enter"); pg.wait_for_timeout(120)
+            ok(pg.get_attribute(gb, "aria-expanded") == "false", f"{w}px Nav: Enter nach Hover schaltet um (Tastatur unverändert)")
+            pg.mouse.move(5, 400); pg.wait_for_timeout(300); pg.keyboard.press("Escape")
             # Wiki has the longest dropdown: with space it must show every link (no 440px clip),
             # on a short viewport it scrolls while the scrollbar stays hidden (Nils' request).
             pg.locator(".u-group[data-g=wiki] .u-gbtn").dispatch_event("click")
