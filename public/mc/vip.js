@@ -130,15 +130,18 @@
     return `<section class="vip-block" id="${admin ? "vip-admin-worlds" : "v2-worlds"}"><div class="vip-head v2-head-row"><div><p class="eyb">${admin ? "Verwaltung" : "Verwalten"}</p><h2 class="hub-h2">${admin ? "Alle VIP-Welten" : "Deine Welten"}</h2></div><span class="mut vip-head-n">${NF(mine)} von ${NF(max)} belegt</span></div><div class="v2-wlist">${ownHtml}${empty}${add}</div></section>${invitedBlock}`;
   };
   const ADMIN_PAGE = 12;
-  const adminWorlds = (w) => {
+  // Admin has own slots too (limits.mine, 3): the free-slot card sits in front of all worlds, as in
+  // the member view, so an admin can create a world from the panel.
+  const adminWorlds = (w, max, mine) => {
     const slots = w && Array.isArray(w.slots) ? w.slots : [];
-    const head = `<section class="vip-block" id="vip-admin-worlds"><div class="vip-head"><div><p class="eyb">Verwaltung</p><h2 class="hub-h2">Alle VIP-Welten</h2></div></div>`;
+    const head = `<section class="vip-block" id="vip-admin-worlds"><div class="vip-head v2-head-row"><div><p class="eyb">Verwaltung</p><h2 class="hub-h2">Alle VIP-Welten</h2></div><span class="mut vip-head-n">${NF(mine)} von ${NF(max)} eigenen belegt</span></div>`;
+    const add = max > 0 ? `<div class="v2-wlist">${mine < max ? createCard() : full(max)}</div>` : "";
     const html = slots.map((s, i) => world(s, { admin: true, extra: i >= ADMIN_PAGE })).filter(Boolean).join("");
-    if (!html) return `${head}<div class="g vip-soon">${slot("barrier", true)}<p class="tag tw">keine Welten</p><p class="mut">Der Server hat noch keine VIP-Welten gemeldet.</p></div></section>`;
+    if (!html) return `${head}${add}<div class="g vip-soon">${slot("barrier", true)}<p class="tag tw">keine Welten</p><p class="mut">Der Server hat noch keine VIP-Welten gemeldet.</p></div></section>`;
     const more = slots.length > ADMIN_PAGE
       ? `<button class="btn sm sec vip-more" type="button" data-more="1" aria-expanded="false">Alle ${NF(slots.length)} Welten zeigen</button>`
       : "";
-    return `${head}<div class="v2-wlist vip-aworlds" id="vip-aworlds">${html}</div>${more}</section>`;
+    return `${head}${add}<div class="v2-wlist vip-aworlds" id="vip-aworlds">${html}</div>${more}</section>`;
   };
   const when = (iso) => {
     if (!iso) return "–";
@@ -180,7 +183,7 @@
     const rk = ["vip", "mvp", "admin"].includes(p.rank) ? p.rank : "";
     const headCard = `<div class="g v2-me is-${rk}">${headImg}<div class="v2-me-id"><p class="eyb">Dein Rang ${abadge}</p><h2 class="hub-h2">${E(name || "Spieler")} ${badge(p.rank, p.color)}</h2><p class="vip-acts"><a class="btn sm" href="/profile">Zum Profil</a>${pub}</p></div><div class="v2-kpis"><div class="v2-kpi"><span class="k">Guthaben</span><b class="v tnum">${bal}</b></div><div class="v2-kpi"><span class="k">Spielzeit</span><b class="v tnum">${st.playtime == null ? "–" : up(st.playtime)}</b></div><div class="v2-kpi is-worlds"><span class="k">Deine Welten</span><b class="v tnum">${NF(mine)} / ${NF(max)}</b>${pips(mine, max)}</div></div></div>`;
     const ranks = `<section class="vip-block" id="vip-ranks"><div class="vip-head"><div><p class="eyb">Ränge</p><h2 class="hub-h2">VIP und MVP</h2></div><p class="mut vip-head-note">Beide Ränge kosten nichts. Nils vergibt sie von Hand an enge Freunde.</p></div>${cards(d.catalog, d.limits)}${note(d.note)}</section>`;
-    const worlds = admin ? adminWorlds(d.worlds) + adminLog(d.admin_log) : ownSection(d.worlds, max, false);
+    const worlds = admin ? adminWorlds(d.worlds, max, mine) + adminLog(d.admin_log) : ownSection(d.worlds, max, false);
     return `${headCard}<p class="vip-say v2-toast" id="vip-say" role="status" aria-live="polite"></p>${worlds}${ranks}`;
   };
   const gate = (d) => {

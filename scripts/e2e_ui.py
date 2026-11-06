@@ -337,7 +337,9 @@ with sync_playwright() as p:
         ok(pg.locator("#vip-admin-worlds button[data-act=start]").count() == 1 and pg.locator("#vip-admin-worlds button[data-set=visibility]").count() == 4 and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-set=visibility][data-val=friends]").count() == 1, f"{w}px VIP-Admin: Start und Sichtbarkeit je Welt")
         ok(pg.locator("#vip-admin-log li").count() == 2 and pg.locator("#vip-admin-log li").first.inner_text().find("Welt gestartet") >= 0 and "Admin-Log" in at, f"{w}px VIP-Admin: Protokoll neueste zuerst", pg.locator("#vip-admin-log").inner_text()[:200])
         ok(XSS in at and "&lt;img" in ah and pg.locator("#vip img[src='x']").count() == 0 and pg.locator("#vip script").count() == 0 and not pg.evaluate("window.vipx") and len(dlg) == adlg0, f"{w}px VIP-Admin: Besitzer und Log escaped", ah[:240])
-        ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0 and pg.locator("#vip .v2-free").count() == 0, f"{w}px VIP-Admin: kein Overflow, keine Inline-Styles, kein VIP-Block für Adminwelt")
+        ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Admin: kein Overflow, keine Inline-Styles")
+        # Admin has 3 own slots (#134 rules): with 1 own world the free-slot create form is there.
+        ok(pg.locator("#vip-admin-worlds .v2-free").count() == 1 and pg.locator("#vip-admin-worlds .v2-free form, #vip-admin-worlds .v2-free input").count() > 0 and "1 von 3 eigenen belegt" in at, f"{w}px VIP-Admin: freier Platz zum Anlegen", at[:240])
         pins = pg.evaluate("""() => { const R = e => e.getBoundingClientRect(); return [...document.querySelectorAll('#vip .g')].flatMap(card => [...card.querySelectorAll('.slot')].map(s => { const a = R(card), b = R(s); return [b.left-a.left, b.top-a.top, a.right-b.right]; })); }""")
         ok(pins and all(x >= 12 and y >= 12 and r >= 12 for x, y, r in pins), f"{w}px VIP-Admin: Slots in allen Karten eingerückt", pins[:6])
         pg.screenshot(path=f"{SH}/local-vip-admin-{w}.png", full_page=True)
