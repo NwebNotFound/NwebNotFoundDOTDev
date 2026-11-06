@@ -350,15 +350,41 @@ with sync_playwright() as p:
         ok(pins and all(x >= 12 and y >= 12 and r >= 12 for x, y, r in pins), f"{w}px VIP-Admin: Slots in allen Karten eingerückt", pins[:6])
         pg.screenshot(path=f"{SH}/local-vip-admin-{w}.png", full_page=True)
         pg.route("**/api/mc-vip/worlds/**", lambda r: r.fulfill(status=202, content_type="application/json", body='{"ok":true,"request_id":"r1","op":"visibility","status":"pending"}'))
+        pg.route("**/api/mc-vip/requests/**", lambda r: r.fulfill(status=200, content_type="application/json", body='{"request_id":"r1","op":"set_visibility","status":"done","reason":""}'))
         pg.click(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-set=visibility][data-val=friends]")
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('Sichtbarkeit')", timeout=10000)
         ok(pg.locator("#vip-say").inner_text().find("Sichtbarkeit geändert") >= 0 and pg.locator("#vip-say").get_attribute("role") == "status", f"{w}px VIP-Admin: Verwaltung meldet Erfolg ohne alert", pg.locator("#vip-say").inner_text())
+        INVIEW = "() => { const r = document.querySelector('#vip-say').getBoundingClientRect(); return r.width > 0 && r.top >= 0 && r.bottom <= innerHeight; }"
+        ok(pg.evaluate(INVIEW) and pg.evaluate("() => document.querySelector('#vip-say').classList.contains('is-on')"), f"{w}px VIP: Rückmeldung (erledigt) von einer unteren Karte im Sichtfeld")
+        # done start: completion wording, distinct from the queued text
+        pg.click(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-act=start]")
+        pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('Welt gestartet')", timeout=10000)
+        ok("gesendet" not in pg.locator("#vip-say").inner_text() and pg.evaluate(INVIEW), f"{w}px VIP: erledigter Start nennt Abschluss, nicht 'gesendet'", pg.locator("#vip-say").inner_text())
         pg.unroute("**/api/mc-vip/worlds/**")
         pg.route("**/api/mc-vip/worlds/**", lambda r: r.fulfill(status=403, content_type="application/json", body='{"error":"not_owner","reason":"not_owner"}'))
         pg.click(f"#v2-worlds .v2-world[data-wid='{WIDA}'] button[data-set=visibility][data-val=private]")
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('nicht ändern')", timeout=10000)
         ok(len(dlg) == adlg0 and "Du darfst diese Welt nicht ändern." in pg.locator("#vip-say").inner_text(), f"{w}px VIP-Admin: Fehler als Meldung, kein Dialog", pg.locator("#vip-say").inner_text())
-        pg.unroute("**/api/mc-vip/worlds/**"); pg.unroute("**/api/mc-vip")
+        ok(pg.evaluate(INVIEW) and pg.evaluate("() => document.querySelector('#vip-say').classList.contains('is-bad')"), f"{w}px VIP: Ablehnung im Sichtfeld")
+        pg.unroute("**/api/mc-vip/worlds/**"); pg.unroute("**/api/mc-vip/requests/**")
+        # Live test 06.11.: a create that mc-stack acked denied/not_linked was shown as "Welt angelegt".
+        # Success only after the ack done; otherwise the server's reason. The name pattern compiles
+        # under the browser's v flag (a bare "-" at the end of a class threw).
+        ok(pg.evaluate("() => { const i = document.querySelector('#v2-nm'); i.value = 'Admin-Test_1'; return i.checkValidity() && (i.value = 'a b', !i.checkValidity()); }"), f"{w}px VIP: Namensmuster gültig (v-Flag), prüft Eingaben")
+        # 202 exactly as mutate() sends it (e2e.mjs "Echte 202-Antwort"); a 202 without status is followed too.
+        pg.route("**/api/mc-vip/worlds", lambda r: r.fulfill(status=202, content_type="application/json", body='{"ok":true,"request_id":"r2","op":"create"}'))
+        seen = []
+        def req_status(r):
+            seen.append(1)
+            body = '{"request_id":"r2","op":"create","status":"pending","reason":""}' if len(seen) < 2 else '{"request_id":"r2","op":"create","status":"denied","reason":"not_linked"}'
+            r.fulfill(status=200, content_type="application/json", body=body)
+        pg.route("**/api/mc-vip/requests/r2", req_status)
+        pg.fill("#v2-nm", "AdminTest"); pg.click("#v2-worlds form.v2-create button[type=submit]")
+        pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('Warte')", timeout=10000)
+        pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('verknüpft')", timeout=15000)
+        say = pg.locator("#vip-say").inner_text()
+        ok("nicht verknüpft" in say and "angelegt" not in say and len(seen) >= 2, f"{w}px VIP: abgelehnter Auftrag zeigt den Grund statt Erfolg", say)
+        pg.unroute("**/api/mc-vip/worlds"); pg.unroute("**/api/mc-vip/requests/r2"); pg.unroute("**/api/mc-vip")
         # Admin invited/trusted in a foreign world: exactly one card for it, unique input ids, still manageable.
         WIDC = "cccccccc-3333-4333-8333-333333333333"
         inv = dict(MANYBASE, worlds={"placeholder": False, "slots": [

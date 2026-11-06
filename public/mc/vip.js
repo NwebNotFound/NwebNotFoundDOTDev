@@ -159,9 +159,19 @@
     }).join("");
     return `${head}<ul class="vip-log">${rows}</ul></section>`;
   };
+  // The feedback pill lives on <body>, not inside the panel: <main> carries a transform (page rise
+  // animation), which would turn "position:fixed" into "fixed to main" and push it below the fold.
+  const sayNode = () => {
+    let n = document.getElementById("vip-say");
+    if (!n) {
+      n = document.createElement("p");
+      n.id = "vip-say"; n.className = "vip-say v2-toast"; n.setAttribute("role", "status"); n.setAttribute("aria-live", "polite");
+      document.body.appendChild(n);
+    }
+    return n;
+  };
   const say = (msg, bad) => {
-    const n = document.getElementById("vip-say");
-    if (!n) return;
+    const n = sayNode();
     n.textContent = msg || "";
     n.className = "vip-say v2-toast" + (msg ? " is-on" : "") + (bad ? " is-bad" : "");
   };
@@ -188,7 +198,7 @@
     const others = d.worlds ? { ...d.worlds, slots: slotsOf.filter((s) => !(s && s.owner === true)) } : d.worlds;
     const mineOnly = d.worlds ? { ...d.worlds, slots: slotsOf.filter((s) => s && s.owner === true) } : d.worlds;
     const worlds = admin ? ownSection(mineOnly, max, false) + adminWorlds(others) + adminLog(d.admin_log) : ownSection(d.worlds, max, false);
-    return `${headCard}<p class="vip-say v2-toast" id="vip-say" role="status" aria-live="polite"></p>${worlds}${ranks}`;
+    return `${headCard}${worlds}${ranks}`;
   };
   const gate = (d) => {
     const raw = location.pathname + location.search + location.hash;
@@ -227,6 +237,29 @@
     busy: "Für diese Welt läuft schon ein Auftrag.", not_linked: "Dein Minecraft-Account ist nicht verknüpft.",
     member_not_found: "Dieser Spieler ist nicht eingeladen.", "schon eingeladen": "Dieser Spieler ist schon eingeladen.",
     "nicht eingeladen": "Dieser Spieler ist nicht eingeladen.", "höchstens 12 Mitglieder": "Höchstens 12 Mitglieder.",
+    host_unavailable: "Der Server war nicht erreichbar. Versuch es gleich noch einmal.",
+    invalid_player: "Dein Minecraft-Account ist nicht verknüpft.",
+  };
+  // A 202 only means "queued". The success text comes once mc-stack acks the command as done;
+  // denied/failed/expired show the server's reason (live test 06.11.: a not_linked create had
+  // been shown as "Welt angelegt").
+  const POLL_MS = 2500, POLL_MAX = 36;
+  const follow = async (rid, okMsg) => {
+    say("Auftrag an den Server gesendet. Warte auf seine Antwort …", false);
+    for (let i = 0; i < POLL_MAX; i++) {
+      await new Promise((res) => setTimeout(res, POLL_MS));
+      let r;
+      try {
+        const x = await fetch("/api/mc-vip/requests/" + encodeURIComponent(rid), { credentials: "include", cache: "no-store" });
+        r = { status: x.status, j: await x.json().catch(() => ({})) };
+      } catch { continue; }
+      if (r.status !== 200 || !r.j || r.j.status === "pending") continue;
+      await load();
+      if (r.j.status === "done") return say(okMsg || "Erledigt.", false);
+      const why = r.j.reason || "";
+      return say(ERR[why] || (r.j.status === "expired" ? "Der Server hat den Auftrag nicht rechtzeitig ausgeführt." : "Der Server hat den Auftrag abgelehnt" + (why ? " (" + String(why).slice(0, 40) + ")." : ".")), true);
+    }
+    say("Der Server hat noch nicht geantwortet. Der Auftrag bleibt in der Warteschlange; der Stand erscheint nach dem nächsten Abgleich.", false);
   };
   const send = async (path, body, method) => {
     try {
@@ -238,7 +271,11 @@
     const r = await send(path, body, method);
     if (r.ok) {
       await load();
-      say(okMsg || "Auftrag an den Server gesendet.", false);
+      const st = r.j && r.j.status;
+      if (r.j && typeof r.j.request_id === "string" && (st === undefined || st === null || st === "pending")) await follow(r.j.request_id, okMsg);
+      else if (st === "done") say(okMsg || "Erledigt.", false);
+      else if (st) say(ERR[r.j.reason] || (st === "expired" ? "Der Server hat den Auftrag nicht rechtzeitig ausgeführt." : "Der Server hat den Auftrag abgelehnt."), true);
+      else say("Auftrag an den Server gesendet. Der Stand erscheint nach dem nächsten Abgleich.", false);
     } else if (r.status === 429) {
       say("Zu viele Aktionen in der letzten Stunde. Bitte später erneut versuchen.", true);
     } else {
@@ -325,7 +362,7 @@
       const id = btn.getAttribute("data-id") || "";
       if (!UUID.test(id)) return;
       btn.disabled = true;
-      await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/" + act, { request_id: rid() }, "POST", act === "start" ? "Startauftrag an den Server gesendet. Der Status aktualisiert sich, sobald die Welt läuft." : "Stopauftrag an den Server gesendet.");
+      await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/" + act, { request_id: rid() }, "POST", act === "start" ? "Welt gestartet." : "Welt gestoppt.");
       return;
     }
     if (act === "trust") {
@@ -365,7 +402,7 @@
       const type = chosen && chosen.getAttribute("data-type") || "normal";
       const btn = f.querySelector('button[type="submit"]');
       if (btn) btn.disabled = true;
-      await run("/api/mc-vip/worlds", { request_id: rid(), name: nm, type }, "POST", "Welt angelegt. Der Server erstellt sie jetzt.");
+      await run("/api/mc-vip/worlds", { request_id: rid(), name: nm, type }, "POST", "Welt angelegt.");
       return;
     }
     if (f.matches(".v2-invite")) {
@@ -402,13 +439,14 @@
       if (!want || confirm !== want) { say("Zum Löschen den Weltnamen exakt eintippen.", true); return; }
       const btn = f.querySelector('button[type="submit"]');
       if (btn) btn.disabled = true;
-      await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/delete", { request_id: rid(), confirm }, "POST", "Löschauftrag an den Server gesendet. Die Welt verschwindet nach dem Abgleich.");
+      await run("/api/mc-vip/worlds/" + encodeURIComponent(id) + "/delete", { request_id: rid(), confirm }, "POST", "Welt gelöscht. Sie verschwindet nach dem nächsten Abgleich aus der Liste.");
     }
   });
   const load = async () => {
     let d;
     try { d = await get("/api/mc-vip"); } catch { d = { access: false, reason: "error", catalog: [], note: "" }; }
     T.innerHTML = d && d.access ? panel(d) : gate(d || {});
+    if (d && d.access) sayNode();
   };
   load();
 })();

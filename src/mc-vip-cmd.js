@@ -282,12 +282,12 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     const spec = { action, world_id: id, name, role, visibility };
     const rid = body?.request_id != null ? String(body.request_id) : crypto.randomUUID();
     if (!RID.test(rid)) return json({ error: "request_id ungültig (1-64 Zeichen [A-Za-z0-9_-])" }, 400);
-    const existing = () => env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, info, world_type, settings, status FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
+    const existing = () => env.DB.prepare("SELECT request_id, discord_id, action, world_id, name, role, visibility, info, world_type, settings, status, reason FROM mc_vip_commands WHERE discord_id = ? AND request_id = ?").bind(a.user.id, rid).first();
     const dup = (ex) => {
-      const same = ex.action === spec.action && (ex.world_id || "") === spec.world_id && (ex.name || null) === name && (ex.role || null) === role && (ex.visibility || null) === visibility
+      const same = ex.action === spec.action && (ex.world_id || "") === spec.world_id && (ex.name || null) === (action === "delete" ? (confirm || null) : name) && (ex.role || null) === role && (ex.visibility || null) === visibility
         && (ex.world_type || null) === worldType && (ex.settings || null) === (settings ? JSON.stringify(settings) : null);
       if (!same) return json({ error: "request_id schon benutzt" }, 409);
-      return json({ ok: true, duplicate: true, request_id: rid, op: ex.action, status: ex.status }, 200);
+      return json({ ok: true, duplicate: true, request_id: rid, op: ex.action, status: ex.status, reason: ex.reason || "" }, 200);
     };
     const ex = await existing();
     if (ex) return dup(ex);
@@ -346,7 +346,7 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     // OR IGNORE: zwei parallele Submits mit derselben request_id sehen oben beide keine Zeile; der
     // zweite INSERT verletzt dann UNIQUE (discord_id, request_id). Statt 500 → erneut lesen → duplicate.
     const ins = await env.DB.prepare(`INSERT OR IGNORE INTO mc_vip_commands (id, request_id, action, world_id, actor_uuid, actor_name, owner_uuid, discord_id, name, role, visibility, info, world_type, settings, source, created_at, status, ip, ip_hash) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 'web', ?15, 'pending', NULL, ?16 WHERE ${guard}`)
-      .bind(rowId, rid, action, id, a.uuid, a.name, create ? a.uuid : world.owner_uuid, a.user.id, name, role, visibility, info, worldType, settings ? JSON.stringify(settings) : null, now, ipHash, since, ...(create ? [free] : [])).run();
+      .bind(rowId, rid, action, id, a.uuid, a.name, create ? a.uuid : world.owner_uuid, a.user.id, action === "delete" ? confirm : name, role, visibility, info, worldType, settings ? JSON.stringify(settings) : null, now, ipHash, since, ...(create ? [free] : [])).run();
     if (!ins.meta?.changes) {
       // Nichts eingefügt: gleiche request_id parallel (→ duplicate) oder ein Limit hat gegriffen.
       const ex2 = await existing(); if (ex2) return dup(ex2);
@@ -368,13 +368,20 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     if (!tokenOk(req, env, safeEq)) return json({ error: "unauthorized" }, 401);
     const since = Math.max(0, Number(url.searchParams.get("since")) || 0);
     const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 100));
-    const { results } = await env.DB.prepare("SELECT request_id, discord_id, action, world_id, actor_uuid, actor_name, owner_uuid, name, role, visibility, info, world_type, settings, created_at FROM mc_vip_commands WHERE status = 'pending' AND created_at > ? ORDER BY created_at ASC LIMIT ?").bind(since, limit).all();
+    // linked: the caller's link as it is NOW (mc_links verified + Discord role + same UUID as at
+    // enqueue). mc-stack trusts actor_uuid only when linked is true, so an unlink or a lost role
+    // while the command waited makes it not_linked at execution (review mc-stack#168).
+    const { results } = await env.DB.prepare("SELECT c.request_id, c.discord_id, c.action, c.world_id, c.actor_uuid, c.actor_name, c.owner_uuid, c.name, c.role, c.visibility, c.info, c.world_type, c.settings, c.created_at, l.mc_uuid AS link_uuid, l.verified AS link_verified, l.has_role AS link_role FROM mc_vip_commands c LEFT JOIN mc_links l ON l.discord_id = c.discord_id WHERE c.status = 'pending' AND c.created_at > ? ORDER BY c.created_at ASC LIMIT ?").bind(since, limit).all();
     // create hat noch keine Welt-ID: der Vertrag laesst world_id dann weg. settings kommt als Objekt.
     const items = results.map((r) => {
       let settings = null;
       if (r.settings) { try { settings = cleanSettings(JSON.parse(r.settings)).settings || null; } catch { settings = null; } }
       const item = { request_id: r.request_id, discord_id: r.discord_id, action: r.action, actor_uuid: r.actor_uuid, actor_name: r.actor_name, owner_uuid: r.owner_uuid, name: r.name, role: r.role, visibility: r.visibility, info: r.info, world_type: r.world_type, settings, created_at: r.created_at };
       if (r.action !== "create") item.world_id = r.world_id;
+      item.linked = !!(r.link_verified && r.link_role && normU(r.link_uuid) && normU(r.link_uuid) === normU(r.actor_uuid));
+      // delete: the name the user typed travels as confirm; mc-stack compares it with the world's
+      // name at execution, so a rename in between makes the delete invalid_name.
+      if (r.action === "delete") { item.confirm = r.name || ""; item.name = null; }
       return item;
     });
     return json({ now: Date.now(), items });
@@ -418,8 +425,22 @@ export function makeVip({ json, getUser, safeEq, MAIN, MCD }) {
     return json({ ok: true, vip_worlds: worldsC ? worldsC.worlds.length : null, vip_admin_log: logC ? logC.log.length : null });
   }
 
+  // The panel's answer after a 202: the server's real outcome of one own command (read-only, the
+  // caller's discord_id only). pending until mc-stack acks; then done, denied, failed or expired.
+  async function requestStatus(req, env, rid) {
+    if (req.method !== "GET") return json({ error: "Method not allowed" }, 405);
+    if (!RID.test(rid)) return json({ error: "request_id ungültig" }, 400);
+    const u = await getUser(req, env).catch(() => null);
+    if (!u) return json({ error: "Bitte mit Discord anmelden", reason: "login" }, 401);
+    const row = await env.DB.prepare("SELECT action, status, reason FROM mc_vip_commands WHERE request_id = ? AND discord_id = ? LIMIT 1").bind(rid, String(u.id)).first().catch(() => null);
+    if (!row) return json({ error: "Auftrag nicht gefunden" }, 404);
+    return json({ request_id: rid, op: row.action, status: row.status, reason: row.reason || "" }, 200, { "cache-control": "no-store" });
+  }
+
   return {
     async route(p, req, env, url) {
+      const rq = p.match(/^\/api\/mc-vip\/requests\/([^/]+)$/);
+      if (rq) return requestStatus(req, env, decodeURIComponent(rq[1]));
       if (p === "/api/mc-vip-commands/pending") return pending(req, env, url);
       if (p === "/api/mc-vip-commands/ack") return ack(req, env);
       if (p === "/api/mc-vip-worlds") return sync(req, env);
