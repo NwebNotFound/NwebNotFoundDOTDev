@@ -7,7 +7,8 @@ import { makeVip } from "./mc-vip-cmd.js";
 import { resolveIcon, TEX_BASE } from "./mc-icon.js";
 import { mobIcon } from "./mc-mob.js";
 import { headResponse, skinResponse, validSkinUrl } from "./mc-head.js";
-import { mainNav, mainItems, UNAV_HEAD } from "./unav.js";
+import { mainNav, mainItems, UNAV_HEAD, UNAV_JS } from "./unav.js";
+import { bundleResponse, stampedAsset, STAMPED_HTML } from "./bundle.js";
 import { HUB_CSS, hubNav, homeBody, marketBody, marketItemBody, WIKI, wikiIndexBody, wikiArticleBody, shopsBody, shopBody, auctionsBody, auctionBody } from "./mc-hub.js";
 import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js";
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
@@ -209,7 +210,7 @@ function shell({ title, desc, css, nav, body, head = "", footer, themeColor }) {
   return `<!doctype html><html lang="de"${css === MC_CSS ? ' class="mc"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${themeColor}">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
-<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/design/minecraft.css?v=${AV}"><link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/mc/ds.css?v=${AV}"><link rel="stylesheet" href="/mc/theme-v2.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>` : ""}${UNAV_HEAD}${head}</head><body>
+<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/bundle/mc.css?v=${AV}"><link rel="preload" href="/mc/fonts/Monocraft.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/mc/fonts/Monocraft-Bold.woff2" as="font" type="font/woff2" crossorigin><script src="/mc/item-names-de.js?v=${AV}"></script>${UNAV_JS}` : UNAV_HEAD}${head}</head><body>
 ${nav}
 <main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}</body></html>`;
 }
@@ -223,7 +224,7 @@ const GRASSLINE = `<svg class="px grassline" viewBox="0 0 80 2" preserveAspectRa
 // The German-only pages share the unified nav (src/unav.js). Its labels and the DE/EN switch follow
 // the language cookie, so the marker is filled per request by legacyNav(); /de/… and /en/… of these
 // pages set the cookie and come back to the same page.
-const THEME_BOOT = `<script src="/design/summer-theme.js"></script>`;
+const THEME_BOOT = `<script src="/design/summer-theme.js?v=${AV}"></script>`;
 const pNav = (cur, bare = "") => `{{UNAV:${cur}:${bare}}}`;
 const legacyNav = (h, req) => h.replace(/\{\{UNAV:([a-z]*):([^}]*)\}\}/, (_, cur, bare) => {
   const lang = pickLang(null, cookies(req)[LANG_COOKIE]);
@@ -357,12 +358,12 @@ const O=document.getElementById('out');
 if(tab==='pvp'){document.getElementById('upd').textContent='';
 if(PV===null){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:2rem"><p class="mut" style="margin:0">Lade PvP…</p></div>';return}
 const L=PV.map(p=>({name:p.name,wins:+p.wins||0,line:NF(p.wins)+' Siege',quote:WR(p)}));
-if(!L.length){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:3rem 1.5rem"><div style="font-size:2.4rem"><img alt="" width="48" height="48" style="image-rendering:pixelated;margin:0 auto" src="/mc-icon/v2/iron_sword"></div><h3 style="justify-content:center;margin:.6rem 0 .3rem">Noch niemand auf dem Treppchen</h3><p class="mut" style="margin:0">Für die PvP-Arena gibt es noch keine Kämpfe.</p></div>';return}
+if(!L.length){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:3rem 1.5rem"><div style="font-size:2.4rem"><img loading="lazy" alt="" width="48" height="48" style="image-rendering:pixelated;margin:0 auto" src="/mc-icon/v2/iron_sword"></div><h3 style="justify-content:center;margin:.6rem 0 .3rem">Noch niemand auf dem Treppchen</h3><p class="mut" style="margin:0">Für die PvP-Arena gibt es noch keine Kämpfe.</p></div>';return}
 const pd=[L[1],L[0],L[2]];O.innerHTML='<div class="pod">'+pd.map((x,i)=>x?'<div class="'+(i===1?'p1':'')+'"><div class="r">#'+(i===1?1:i===0?2:3)+'</div>'+MC3D.html(x.name,'pod-model',i===1?72:56)+'<b><a href="/spieler/'+encodeURIComponent(x.name)+'" style="color:inherit">'+E(x.name)+'</a></b><span>'+E(x.line)+'<br>'+E(x.quote)+'</span></div>':'<div style="opacity:0"></div>').join('')+'</div>'+
 (L.length>3?'<div class="dc">'+L.slice(3).map((x,i)=>'<div class="lbr"><span class="px">'+(i+4)+'</span><img alt="" src="'+av(x.name).replace('/72','/30')+'"><span class="n">'+E(x.name)+'</span><b>'+E(x.line+' · '+x.quote)+'</b></div>').join('')+'</div>':'');if(window.MC3D)MC3D.scan(O);return}
 const hit=T.find(t=>t[0]===tab)||T[0],lbl=hit[1],f=hit[2],P=D[per],L=(P&&P.lists&&P.lists[tab])||[];
 document.getElementById('upd').textContent=P&&P.updated_at?'Stand: '+new Date(P.updated_at).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'}):'';
-if(!L.length){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:3rem 1.5rem"><div style="font-size:2.4rem"><img alt="" width="48" height="48" style="image-rendering:pixelated;margin:0 auto" src="/mc-icon/v2/diamond"></div><h3 style="justify-content:center;margin:.6rem 0 .3rem">Noch niemand auf dem Treppchen</h3><p class="mut" style="margin:0">'+(per==='weekly'?'Diese Woche gibt es noch keine Werte für '+lbl+'.':'Für '+lbl+' gibt es noch keine Werte.')+' Spiel auf Survival und hol dir Platz 1.</p></div>';return}
+if(!L.length){O.innerHTML='<div class="dc" style="margin-top:1.6rem;text-align:center;padding:3rem 1.5rem"><div style="font-size:2.4rem"><img loading="lazy" alt="" width="48" height="48" style="image-rendering:pixelated;margin:0 auto" src="/mc-icon/v2/diamond"></div><h3 style="justify-content:center;margin:.6rem 0 .3rem">Noch niemand auf dem Treppchen</h3><p class="mut" style="margin:0">'+(per==='weekly'?'Diese Woche gibt es noch keine Werte für '+lbl+'.':'Für '+lbl+' gibt es noch keine Werte.')+' Spiel auf Survival und hol dir Platz 1.</p></div>';return}
 const pd=[L[1],L[0],L[2]];O.innerHTML='<div class="pod">'+pd.map((x,i)=>x?'<div class="'+(i===1?'p1':'')+'"><div class="r">#'+(i===1?1:i===0?2:3)+'</div>'+MC3D.html(x.name,'pod-model',i===1?72:56)+'<b><a href="/spieler/'+encodeURIComponent(x.name)+'" style="color:inherit">'+E(x.name)+'</a></b><span>'+E(f(x.value))+'</span></div>':'<div style="opacity:0"></div>').join('')+'</div>'+
 (L.length>3?'<div class="dc">'+L.slice(3).map((x,i)=>'<div class="lbr"><span class="px">'+(i+4)+'</span><img alt="" src="'+av(x.name).replace('/72','/30')+'"><span class="n">'+E(x.name)+'</span><b>'+E(f(x.value))+'</b></div>').join('')+'</div>':'');if(window.MC3D)MC3D.scan(O);}
 document.getElementById('tabs').onclick=e=>{const b=e.target.closest('[data-k]');if(!b)return;tab=b.dataset.k;history.replaceState(null,'','#'+tab);draw()};
@@ -416,11 +417,11 @@ const LBL={money:['Kontostand',v=>(+v).toLocaleString('de-DE')+' CP'],playtime:[
 (async()=>{const H=document.getElementById('ph'),B=document.getElementById('pb');
 const r=await fetch('/api/profile',{credentials:'include'});const d=await r.json().catch(()=>({}));
 if(!d.user){H.innerHTML='<h1 class="h-l">Dein Profil.</h1><p class="lead">Melde dich mit Discord an, um dein Profil zu sehen.</p><p style="margin-top:2rem"><a class="btn discord" href="${mc ? `https://${MAIN}` : ""}/auth/discord/login?next='+encodeURIComponent(location.href)+'">${DISCORD_SVG} Mit Discord anmelden</a></p>';return}
-const u=d.user;const mcName=d.minecraft&&d.minecraft.mc_name;const pic=${mc ? "(mcName&&/^[A-Za-z0-9_]{1,16}$/.test(mcName)?'/mc-head/'+mcName+'/64?v=5':'/mc-head/MHF_Steve/64?v=5')" : "u.avatar"};H.innerHTML='<img alt="" ${mc ? 'onerror="this.onerror=null;this.src=&quot;/mc-head/MHF_Steve/64?v=5&quot;"' : ''} src="'+E(pic)+'" width="112" height="112" style="width:112px;height:112px;border-radius:50%;margin:0 auto 1.2rem;box-shadow:0 10px 40px -10px var(--shadow)"><h1 class="h-l">'+E(u.name)+'</h1><p class="mut" style="margin:.4rem 0 0">@'+E(u.username)+(u.member_since?' · Mitglied seit '+E(fd(u.member_since)):'')+'</p>';
+const u=d.user;const mcName=d.minecraft&&d.minecraft.mc_name;const pic=${mc ? "(mcName&&/^[A-Za-z0-9_]{1,16}$/.test(mcName)?'/mc-head/'+mcName+'/64?v=5':'/mc-head/MHF_Steve/64?v=5')" : "u.avatar"};H.innerHTML='<img loading="lazy" alt="" ${mc ? 'onerror="this.onerror=null;this.src=&quot;/mc-head/MHF_Steve/64?v=5&quot;"' : ''} src="'+E(pic)+'" width="112" height="112" style="width:112px;height:112px;border-radius:50%;margin:0 auto 1.2rem;box-shadow:0 10px 40px -10px var(--shadow)"><h1 class="h-l">'+E(u.name)+'</h1><p class="mut" style="margin:.4rem 0 0">@'+E(u.username)+(u.member_since?' · Mitglied seit '+E(fd(u.member_since)):'')+'</p>';
 let h='';const m=d.minecraft;
 if(m&&m.visible){const st=m.stats||{};const ks=Object.keys(st).filter(k=>k!=='inventory'&&k!=='pickup');
 const SK=['playtime','kills','deaths','blocks_mined'].concat(ks.filter(k=>!LBL[k]&&k!=='money'));const bal=st.money!=null&&st.money!=='';const id=encodeURIComponent(m.mc_uuid||m.mc_name);
-const PBAL='<section class="pblk" id="pbal" aria-labelledby="pbal-h"><header><h2 id="pbal-h">Kontostand</h2><span class="mut" style="font-size:.8rem">'+(m.updated_at?'Stand '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})):'')+'</span></header><div class="pbal"><img alt="" width="40" height="40" class="mi" src="/mc-icon/v2/gold_ingot" style="image-rendering:pixelated"><span class="v tnum">'+(bal?E(LBL.money[1](st.money)):'–')+'</span><div class="acts"><a class="btn sm sec" href="${mc ? "" : "https://mc." + MAIN}/markt">Markt & Bank</a><a class="btn sm sec" href="${mc ? "" : "https://mc." + MAIN}/bestellungen">Bestellungen</a></div></div></section>';
+const PBAL='<section class="pblk" id="pbal" aria-labelledby="pbal-h"><header><h2 id="pbal-h">Kontostand</h2><span class="mut" style="font-size:.8rem">'+(m.updated_at?'Stand '+E(new Date(m.updated_at).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})):'')+'</span></header><div class="pbal"><img loading="lazy" alt="" width="40" height="40" class="mi" src="/mc-icon/v2/gold_ingot" style="image-rendering:pixelated"><span class="v tnum">'+(bal?E(LBL.money[1](st.money)):'–')+'</span><div class="acts"><a class="btn sm sec" href="${mc ? "" : "https://mc." + MAIN}/markt">Markt & Bank</a><a class="btn sm sec" href="${mc ? "" : "https://mc." + MAIN}/bestellungen">Bestellungen</a></div></div></section>';
 const PORD='<section class="pblk" id="pord" aria-labelledby="pord-h"><header><h2 id="pord-h">Bestellungen</h2><a href="${mc ? "" : "https://mc." + MAIN}/bestellungen">Alle ansehen ›</a></header><div id="pordl"><p class="mut">Lade …</p></div></section>';
 const inv=(st.inventory||[]).length&&typeof window.MCInv==='function'?window.MCInv(st.inventory):'';
 const G=await MCP.games(m.mc_name).catch(()=>({}));const NFm=v=>(+v).toLocaleString('de-DE');const KMm=v=>v>=1000?(v/1000).toLocaleString('de-DE',{maximumFractionDigits:1})+' km':NFm(Math.round(v))+' m';const num=k=>st[k]!=null&&st[k]!==''&&Number.isFinite(+st[k])?+st[k]:null;
@@ -990,6 +991,8 @@ export default {
     if (siteHost === `www.${MAIN}`) { url.hostname = MAIN; return Response.redirect(url.toString(), 301); }
     const p = url.pathname.replace(/\/$/, "") || "/";
     const isMc = siteHost === MCD;
+    if (p === "/bundle/mc.css") return bundleResponse(req, env);
+    if (STAMPED_HTML.includes(url.pathname)) return stampedAsset(req, env);
 
     if (p.startsWith("/api/feedback")) { const r = FB().route(p, req, env, url); if (r) return r; }
     if (p.startsWith("/api/mc-")) { const r = TRADE().route(p, req, env, url); if (r) return r; }
@@ -1012,7 +1015,7 @@ export default {
     if (p.startsWith("/mc-head/")) return headResponse(req, p, ctx, env);
     if (p.startsWith("/mc-skin/")) return skinResponse(req, p, ctx, env);
     if (p.startsWith("/mc-mob/")) return new Response(null, { status: 302, headers: { location: mobIcon(decodeURIComponent(p.slice(8)).replace(/\.png$/, "")), "cache-control": "public, max-age=86400" } });
-    if (p.startsWith("/mc-icon/")) { const q = p.slice(9).replace(/^v2\//, ""); let dq; try { dq = decodeURIComponent(q); } catch { return new Response("Not found", { status: 404 }); } const r = resolveIcon(dq.replace(/\.png$/, "")); return r ? new Response(null, { status: 302, headers: { location: /^(https:|\/)/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=86400" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${dq.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
+    if (p.startsWith("/mc-icon/")) { const q = p.slice(9).replace(/^v2\//, ""); let dq; try { dq = decodeURIComponent(q); } catch { return new Response("Not found", { status: 404 }); } const r = resolveIcon(dq.replace(/\.png$/, "")); return r ? new Response(null, { status: 302, headers: { location: /^(https:|\/)/.test(r) ? r : TEX_BASE + r + ".png", "cache-control": "public, max-age=604800" } }) : new Response(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#2a2f3a"/><text x="8" y="11.2" font-family="monospace" font-size="7" font-weight="700" fill="#9aa3b2" text-anchor="middle">${dq.replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()}</text></svg>`, { status: 200, headers: { "content-type": "image/svg+xml", "x-icon-fallback": "1", "cache-control": "public, max-age=86400" } }); }
     if (p.startsWith("/auth/")) {
       if (isMc) { url.hostname = MAIN; return redirect(url.toString()); }
       const r = await auth(p, req, env, url); if (r) return r;

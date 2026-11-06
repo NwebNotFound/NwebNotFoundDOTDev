@@ -26,6 +26,8 @@ jobs:
         run: npm i -g wrangler
       - name: Icon-Referenzcheck
         run: node scripts/icon-check.mjs
+      - name: Asset cache check
+        run: node scripts/asset-cache-check.mjs
       - name: Kontrast-Gate (WCAG AA)
         run: node scripts/contrast-check.mjs
       - name: Skin-Lookup gegen echte lokale D1

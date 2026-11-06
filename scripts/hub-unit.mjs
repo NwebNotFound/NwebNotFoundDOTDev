@@ -7,6 +7,7 @@
 //
 // The HTTP half of the same story (status codes, Set-Cookie, redirects, Minecraft regression) runs
 // in scripts/e2e.mjs against a real `wrangler dev`; this file is the cheap, deterministic half.
+import { AV } from "../src/asset-version.js";
 import { MESSAGES, LANGS, LANG_COOKIE, makeT, missingKeys, parseAcceptLanguage, pickLang, splitLang, withLang } from "../src/i18n/index.js";
 import { GITHUB_URL, HUB_PAGES, MC_HOST, X_URL, formatNumber, hubPage, hubPageExists, writingListBody, writingListPage, writingPostPage, writingSeriesPage } from "../src/hub.js";
 
@@ -79,7 +80,7 @@ for (const lang of LANGS) {
     ok(!!html && html.startsWith(`<!doctype html><html lang="${lang}" class="sm-root">`), `${label}: <html lang> and the .sm-root landmark`, html && html.slice(0, 80));
     ok(html.includes(`<link rel="canonical" href="https://nwebnotfound.dev${url(bare)}"`), `${label}: canonical points at the language URL`);
     ok(["de", "en", "x-default"].every((h) => html.includes(`<link rel="alternate" hreflang="${h}" href="https://nwebnotfound.dev`)), `${label}: hreflang de/en/x-default`);
-    ok(html.includes("/design/summer.css?v=") && html.includes(`<script src="/design/summer-theme.js"></script>`), `${label}: summer.css and the theme bootstrap`);
+    ok(html.includes("/design/summer.css?v=") && html.includes(`<script src="/design/summer-theme.js?v=${AV}"></script>`), `${label}: summer.css and the theme bootstrap`);
     ok(html.indexOf("summer-theme.js") < html.indexOf("summer.css?v="), `${label}: theme bootstrap runs before the stylesheet (no theme flash)`);
     ok(html.includes(`class="sm-skip-link" href="#main"`) && html.includes(`<main id="main">`), `${label}: skip link targets the main landmark`);
     ok(html.indexOf("sm-skip-link") < html.indexOf("<header class=\"u-nav u-main sm-nav\""), `${label}: skip link is the first focusable element`);
@@ -117,7 +118,7 @@ for (const lang of LANGS) {
   // the parallax layer markup and the external parallax helper.
   ok(home.includes('src="/mc-icon/v2/grass_block"') && home.includes("sm-mc-icon"), "the Minecraft tile shows the real grass_block texture");
   ok(home.includes("data-sm-parallax") && home.includes('class="sm-layer sm-parallax'), "the hero scene carries the parallax layers");
-  ok(home.includes('<script src="/design/summer-parallax.js" defer></script>'), "the start page loads the external parallax helper");
+  ok(home.includes(`<script src="/design/summer-parallax.js?v=${AV}" defer></script>`), "the start page loads the external parallax helper");
   // Night hero (artboard Main-night): the moon and the star field are in the markup, the swap itself
   // is pure CSS (data-theme / prefers-color-scheme), so no script is involved.
   ok(home.includes("sm-scene__moon") && home.includes("sm-scene__stars") && home.includes("sm-twinkle--d4"), "the hero carries the moon and the star field for the night theme");
@@ -240,12 +241,12 @@ for (const lang of LANGS) {
 
   /* export (phase 3c) */
   ok(ch1.includes('href="/downloads/story-ch-1.epub"') && ch1.includes('href="/downloads/series-serie.epub"'), "chapter: chapter EPUB and series EPUB are linked");
-  ok(ch1.includes("data-sm-print") && ch1.includes('<script src="/design/summer-print.js" defer></script>'), "chapter: print button with the external helper");
+  ok(ch1.includes("data-sm-print") && ch1.includes(`<script src="/design/summer-print.js?v=${AV}" defer></script>`), "chapter: print button with the external helper");
   ok(ch1.includes("© Nils, nur zum persönlichen Lesen."), "chapter: the rights line is on the page");
   ok(ch1.includes("Öffnet den Druckdialog"), "chapter: the print hint is shown");
   /* reading aids of the chapter page (review findings + artboard Story.html) */
   ok(ch1.includes('class="sm-kicker sm-kicker--center"') && ch1.includes("Kapitel 1 von 2"), "chapter: the head names chapter and count as a centered kicker");
-  ok(ch1.includes("data-sm-progress") && ch1.includes("data-sm-reading-size") && ch1.includes('<script src="/design/summer-reader.js" defer></script>'), "chapter: progress line, Aa control and the external reader helper");
+  ok(ch1.includes("data-sm-progress") && ch1.includes("data-sm-reading-size") && ch1.includes(`<script src="/design/summer-reader.js?v=${AV}" defer></script>`), "chapter: progress line, Aa control and the external reader helper");
   ok(ch1.includes('data-size-small="klein"') && ch1.includes("Schriftgröße: normal"), "chapter: the Aa control carries the German labels");
   ok(!hubPage("/writing", "de").includes("summer-reader.js"), "the list page does not load the reader helper");
   ok(!ch1.includes("sm-feed-note__sep") && ch1.includes("sm-feed-note__links"), "chapter: the feed note is a quiet row without separators");

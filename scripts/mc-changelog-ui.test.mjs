@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import worker from "../src/worker.js";
+import { bundleCss } from "./fixtures/bundle-asset.mjs";
 
 const root = fileURLToPath(new URL("../public/", import.meta.url));
 const response = await worker.fetch(new Request("https://mc.nwebnotfound.dev/changelog"), {}, {});
@@ -20,6 +21,7 @@ for (const width of [390, 1280]) {
         const url = new URL(route.request().url());
         if (url.hostname !== "mc.nwebnotfound.dev") return route.abort();
         if (url.pathname === "/changelog") return route.fulfill({ contentType: "text/html", body: html });
+        if (url.pathname === "/bundle/mc.css") return route.fulfill({ contentType: "text/css", body: await bundleCss(root, url.href) });
         const file = resolve(root, `.${url.pathname}`);
         if (!file.startsWith(resolve(root) + "\\") && !file.startsWith(resolve(root) + "/")) return route.abort();
         try {

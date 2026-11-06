@@ -1,6 +1,6 @@
 /* Summer Theme v2 — mouse parallax for the hero scene.
 
-   Loaded from the start page only (`<script src="/design/summer-parallax.js" defer>`), never inline:
+   Loaded from the start page only (`<script src="/design/summer-parallax.js?v=…" defer>`), never inline:
    the page ships `script-src 'self'` without a nonce, so a classic external file is the only shape
    that passes. No dependency, no network, no eval, no innerHTML — it only writes three custom
    properties on the scene element:

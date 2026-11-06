@@ -643,9 +643,9 @@ function document_(o) {
   // The print helper is an external file (never an inline handler), loaded only where a print button
   // exists — story chapters and series pages. The parallax helper is a small external file too, and
   // only the page that has a hero scene loads it.
-  const printScript = o.print ? `<script src="/design/summer-print.js" defer></script>` : "";
-  const parallaxScript = o.parallax ? `<script src="/design/summer-parallax.js" defer></script>` : "";
-  const readerScript = o.reading ? `<script src="/design/summer-reader.js" defer></script>` : "";
+  const printScript = o.print ? `<script src="/design/summer-print.js?v=${AV}" defer></script>` : "";
+  const parallaxScript = o.parallax ? `<script src="/design/summer-parallax.js?v=${AV}" defer></script>` : "";
+  const readerScript = o.reading ? `<script src="/design/summer-reader.js?v=${AV}" defer></script>` : "";
   // Reading progress: a lavender 4px line pinned above the header, driven by scroll position
   // (artboard Story.html). Purely visual — it duplicates the scrollbar, so it is hidden from the
   // accessibility tree instead of announcing a value that only exists once the script runs.
@@ -661,7 +661,7 @@ ${hreflangTags}
 ${feedTags}
 <link rel="preload" href="/design/fonts/pixelify-sans-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/design/fonts/nunito-latin-400.woff2" as="font" type="font/woff2" crossorigin>
-<script src="/design/summer-theme.js"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${UNAV_HEAD}${printScript}${parallaxScript}${readerScript}
+<script src="/design/summer-theme.js?v=${AV}"></script><link rel="stylesheet" href="/design/summer.css?v=${AV}">${UNAV_HEAD}${printScript}${parallaxScript}${readerScript}
 </head><body class="sm-shell">
 ${progressBar}
 <a class="sm-skip-link" href="#main">${esc(t("skip"))}</a>

@@ -1,6 +1,6 @@
 /* Summer Theme v2 — reader helpers for chapter pages (artboard Story.html).
 
-   Loaded from post/chapter pages only (`<script src="/design/summer-reader.js" defer>`), never
+   Loaded from post/chapter pages only (`<script src="/design/summer-reader.js?v=…" defer>`), never
    inline: the page ships `script-src 'self'` without a nonce. No dependency, no network, no eval,
    no innerHTML.
 
