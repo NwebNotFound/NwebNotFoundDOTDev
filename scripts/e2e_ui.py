@@ -371,6 +371,13 @@ with sync_playwright() as p:
         ok(pg.locator("#vip-admin-worlds .v2-world:visible").count() == 14 and pg.get_attribute("#vip-admin-worlds button[data-more]", "aria-expanded") == "true" and "Weniger anzeigen" in pg.inner_text("#vip-admin-worlds button[data-more]"), f"{w}px VIP-Admin: alle Welten nach Klick", pg.locator("#vip-admin-worlds .v2-world:visible").count())
         ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px VIP-Admin: viele Welten ohne Overflow/Inline-Styles")
         pg.unroute("**/api/mc-vip")
+        # 24-character world name: the name wraps, the rename button stays inside the card and visible (#97 review).
+        long_ = dict(MANYBASE, worlds={"placeholder": False, "slots": [{"id": "22222222-3333-4444-8555-000000000001", "label": "abcdefghijklmnopqrstuvwx", "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Gast", "owner": False, "visibility": "friends", "info": "", "type": "flat", "can_manage": True, "can_start": True}]})
+        pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(long_)))
+        go("/vip"); pg.locator("#vip-admin-worlds .v2-world").first.wait_for(timeout=10000)
+        geo = pg.evaluate("() => { const c = document.querySelector('#vip-admin-worlds .v2-world').getBoundingClientRect(); const b = document.querySelector('#vip-admin-worlds .v2-wname [data-rename]'); if (!b) return null; const r = b.getBoundingClientRect(); return [r.width, r.left - c.left, c.right - r.right]; }")
+        ok(geo and geo[0] >= 24 and geo[1] >= 0 and geo[2] >= 0, f"{w}px VIP: Umbenennen-Button bleibt bei 24 Zeichen sichtbar", geo)
+        pg.unroute("**/api/mc-vip")
         now_s = int(time.time()); hour = 3600
         def bucket(back):
             return (now_s // hour - back) * hour

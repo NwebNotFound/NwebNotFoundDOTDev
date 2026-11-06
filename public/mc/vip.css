@@ -85,7 +85,7 @@ html.mc .v2-world.is-on::after{content:"";position:absolute;inset:0;border-radiu
 html.mc .v2-wlist{display:grid;gap:.8rem}
 html.mc .v2-wh{display:grid;grid-template-columns:56px minmax(0,1fr);gap:.4rem .9rem;align-items:center;padding:1rem 1.1rem}
 html.mc .v2-wt{min-width:0}
-html.mc .v2-wname{display:block;min-width:0;font-family:var(--f-px);font-size:1.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.mc .v2-wname{display:block;min-width:0;font-family:var(--f-px);font-size:1.15rem;line-height:1.3;overflow-wrap:anywhere}
 html.mc .v2-wname>*{vertical-align:middle;margin-left:.35rem}
 html.mc .v2-wmeta{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;margin:.3rem 0 0;font-size:.85rem;font-weight:700;line-height:1.4;overflow-wrap:normal;word-break:normal}
 html.mc .v2-wacts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
