@@ -1,6 +1,7 @@
 /* Unified navigation behaviour (markup: src/unav.js). External file, no inline handlers.
    - phone drawer: burger, Esc, focus stays inside the drawer, click outside, scroll lock (#69)
    - mc.* group dropdowns: click, hover (fine pointer), arrow keys, Esc; active entry by path
+   - logo site switcher "Wohin?": both sites, the current one marked; Esc and click outside close it
    - account: /api/me fills the bar and the drawer (Discord avatar on the main site, MC head on mc.*) */
 (function () {
   var N = document.querySelector("[data-unav]");
@@ -22,7 +23,7 @@
     if (!isMc) return;
     var p = location.pathname.replace(/\/$/, "") || "/";
     var best = null;
-    [].forEach.call(N.querySelectorAll(".u-drop a[href^='/'], .u-menu a[href^='/'], .u-me__links a[href^='/']"), function (a) {
+    [].forEach.call(N.querySelectorAll(".u-links .u-drop a[href^='/'], .u-menu a[href^='/'], .u-me__links a[href^='/']"), function (a) {
       a.removeAttribute("aria-current");
       var h = a.getAttribute("href").split("#")[0].split("?")[0];
       if (!(h === p || (h !== "/" && p.indexOf(h + "/") === 0))) return;
@@ -31,7 +32,7 @@
     groups().forEach(function (g) { g.querySelector(".u-gbtn").removeAttribute("data-cur"); });
     if (mbtn) mbtn.removeAttribute("data-cur");
     if (best) {
-      [].forEach.call(N.querySelectorAll("a[href='" + best.h + "']"), function (x) { if (!x.closest(".u-links") || x.closest(".u-drop")) x.setAttribute("aria-current", "page"); });
+      [].forEach.call(N.querySelectorAll("a[href='" + best.h + "']:not(.u-site-o)"), function (x) { if (!x.closest(".u-links") || x.closest(".u-drop")) x.setAttribute("aria-current", "page"); });
       var g = best.a.closest(".u-group");
       if (g) g.querySelector(".u-gbtn").setAttribute("data-cur", "");
       else if (mbtn) mbtn.setAttribute("data-cur", "");
@@ -75,6 +76,25 @@
     }
   });
 
+  /* ---------- logo site switcher "Wohin?": click or Enter toggles, arrows move, Esc closes ---------- */
+  var site = N.querySelector(".u-site"), sbtn = site && site.querySelector(".u-brand");
+  var siteOpen = function () { return !!(site && site.classList.contains("open")); };
+  function setSite(o, focusBack) {
+    if (!site) return;
+    site.classList.toggle("open", !!o);
+    sbtn.setAttribute("aria-expanded", o ? "true" : "false");
+    if (!o && focusBack) sbtn.focus();
+  }
+  if (site) {
+    sbtn.addEventListener("click", function (e) { e.stopPropagation(); shut(); closeMenu(); if (isOpen()) drawer(false); setSite(!siteOpen()); });
+    site.addEventListener("keydown", function (e) {
+      var I = [].slice.call(site.querySelectorAll(".u-sites a")), i = I.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") { e.preventDefault(); setSite(true); I[i < 0 ? 0 : Math.min(I.length - 1, i + 1)].focus(); }
+      else if (e.key === "ArrowUp" && i >= 0) { e.preventDefault(); (i ? I[i - 1] : sbtn).focus(); }
+    });
+    site.addEventListener("focusout", function (e) { if (!site.contains(e.relatedTarget)) setSite(false); });
+  }
+
   /* ---------- phone drawer ---------- */
   var isOpen = function () { return N.classList.contains("u-open"); };
   function focusables() {
@@ -86,6 +106,7 @@
     bur.setAttribute("aria-label", o ? L.close || "Menü schließen" : L.open || "Menü öffnen");
     root.classList.toggle("u-lock", !!o && mob());
     if (o) {
+      setSite(false);
       var c = N.querySelector(".u-gbtn[data-cur]");
       shut(c && c.parentNode);
       if (c) setG(c.parentNode, true);
@@ -175,12 +196,14 @@
   /* ---------- global keys and clicks ---------- */
   document.addEventListener("keydown", function (e) {
     if (e.key !== "Escape") return;
-    if (openMenu()) { setMenu(false); mbtn.focus(); }
+    if (siteOpen()) setSite(false, true);
+    else if (openMenu()) { setMenu(false); mbtn.focus(); }
     else if (isOpen()) drawer(false, true);
     else shut();
   });
   document.addEventListener("click", function (e) {
     if (menu && !menu.parentNode.contains(e.target)) setMenu(false);
+    if (site && !site.contains(e.target)) setSite(false);
     if (!N.contains(e.target)) { shut(); if (isOpen()) drawer(false); }
   });
   mark();

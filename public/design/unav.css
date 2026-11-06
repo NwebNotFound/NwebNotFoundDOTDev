@@ -19,6 +19,19 @@ html.mc .u-mc{--u-glass:var(--glass);--u-s1:var(--surface);--u-s2:var(--surface-
 .u-brand:hover .u-logo{transform:rotate(-8deg) scale(1.06)}
 .u-logo img,.u-logo svg{width:26px;height:26px;image-rendering:pixelated}
 .u-mcname{color:var(--u-acc)}
+/* Logo site switcher "Wohin?" (Nils 06.11.): the brand is a button, the list reuses the dropdown look. */
+.u-site{position:relative;flex:none}
+button.u-brand{margin:0;border:0;background:none;cursor:pointer}
+.u-site.open>.u-brand .u-chev{transform:rotate(180deg)}
+.u-site.open>.u-sites{visibility:visible;opacity:1;transform:none;pointer-events:auto;transition-delay:0s}
+.u-sites{min-width:260px;max-width:calc(100vw - 40px)}
+.u-sites-h{margin:4px 10px 6px;font-family:var(--u-px);font-size:13px;font-weight:700;color:var(--u-mut)}
+.u-sites a.u-site-o{min-height:56px;gap:12px}
+.u-site-o .u-logo{width:36px;height:36px;border-radius:12px}
+.u-site-o .u-logo img,.u-site-o .u-logo svg{width:22px;height:22px}
+.u-sites a.u-site-o[aria-current]{background:var(--u-s2);box-shadow:inset 3px 0 0 var(--u-acc)}
+.u-site-t{display:grid;gap:2px;line-height:1.15}
+.u-site-t small{font-size:12px;font-weight:600;color:var(--u-mut)}
 
 /* Links: soft hover pill that grows in, text lifts 1px, sun pixel glides to the link (unav.js) */
 .u-panel{display:contents}
@@ -42,17 +55,17 @@ html.mc .u-mc{--u-glass:var(--glass);--u-s1:var(--surface);--u-s2:var(--surface-
 
 /* Popovers (groups, "Mehr", account): fade + scale in; visibility keeps closed menus out of Tab */
 .u-group{position:relative}
-.u-menu,.u-drop{position:absolute;top:calc(100% + 12px);z-index:60;display:grid;gap:2px;min-width:240px;max-height:min(70vh,440px);overflow:auto;padding:8px;border-radius:22px;background:var(--u-s1);box-shadow:inset 0 0 0 1px var(--u-line),var(--u-lift);text-align:left;visibility:hidden;opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top left;pointer-events:none;transition:opacity .2s var(--u-ease),transform .3s var(--u-spring),visibility 0s .3s}
+.u-menu,.u-drop,.u-sites{position:absolute;top:calc(100% + 12px);z-index:60;display:grid;gap:2px;min-width:240px;max-height:min(70vh,440px);overflow:auto;padding:8px;border-radius:22px;background:var(--u-s1);box-shadow:inset 0 0 0 1px var(--u-line),var(--u-lift);text-align:left;visibility:hidden;opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top left;pointer-events:none;transition:opacity .2s var(--u-ease),transform .3s var(--u-spring),visibility 0s .3s}
 .u-drop{left:0}
 .u-menu,.u-end .u-drop,.u-more .u-drop{left:auto;right:0;transform-origin:top right}
 .u-menu{min-width:230px}
 .u-ac.open>.u-menu,.u-group.open>.u-drop{visibility:visible;opacity:1;transform:none;pointer-events:auto;transition-delay:0s}
-.u-menu a,.u-drop a,.u-me__links a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px;border-radius:12px;font-size:14px;font-weight:700;color:var(--u-fg)!important;text-decoration:none!important;white-space:nowrap;transition:transform .3s var(--u-spring)}
-.u-menu a:hover,.u-menu a:focus-visible,.u-drop a:hover,.u-drop a:focus-visible{background:var(--u-s2);transform:translateX(3px)}
+.u-menu a,.u-drop a,.u-sites a,.u-me__links a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px;border-radius:12px;font-size:14px;font-weight:700;color:var(--u-fg)!important;text-decoration:none!important;white-space:nowrap;transition:transform .3s var(--u-spring)}
+.u-menu a:hover,.u-menu a:focus-visible,.u-drop a:hover,.u-drop a:focus-visible,.u-sites a:hover,.u-sites a:focus-visible{background:var(--u-s2);transform:translateX(3px)}
 /* mc.*: entries share the hover token of buttons and list rows (--hl-*, /mc/ds.css). */
-html.mc .u-mc :is(.u-menu a,.u-drop a,.u-me__links a):is(:hover,:focus-visible){background:var(--hl-bg);color:var(--hl-fg)!important;box-shadow:var(--hl-ring)}
+html.mc .u-mc :is(.u-menu a,.u-drop a,.u-sites a,.u-me__links a):is(:hover,:focus-visible){background:var(--hl-bg);color:var(--hl-fg)!important;box-shadow:var(--hl-ring)}
 .u-drop a[aria-current="page"],.u-menu a[aria-current="page"]{background:var(--u-s2);box-shadow:inset 3px 0 0 var(--u-acc)}
-.u-menu img,.u-drop img,.u-me__links img,.u-drop .u-ti{width:22px;height:22px;flex:none;image-rendering:pixelated}
+.u-menu img,.u-drop img,.u-me__links img,.u-sites .u-logo img,.u-drop .u-ti{width:22px;height:22px;flex:none;image-rendering:pixelated}
 .u-drop .u-soon{color:var(--u-mut)!important}
 .u-tag{margin-left:auto;padding:2px 8px;border-radius:999px;background:var(--u-s3);font-size:10px;font-weight:800;color:var(--u-mut)}
 .u-menu hr{border:0;border-top:1px solid var(--u-line);margin:6px}
@@ -114,7 +127,8 @@ html.mc .u-mc :is(.u-menu a,.u-drop a,.u-me__links a):is(:hover,:focus-visible){
   .u-nav{padding:calc(10px + env(safe-area-inset-top)) 0 6px}
   .u-wrap{width:calc(100% - 20px)}
   .u-bar{min-height:60px;padding:6px;gap:6px}
-  .u-brand{font-size:15px;padding-right:6px;margin-right:auto;min-width:0}
+  .u-brand{font-size:15px;padding-right:6px;min-width:0}
+  .u-site{margin-right:auto;min-width:0}
   .u-tools>.u-seg,.u-tools>.u-theme,.u-acct .u-name,.u-acct .u-chev,.u-login .u-txt,.u-menu{display:none!important}
   .u-acct{padding:0 5px}
   .u-login{padding:0 14px}

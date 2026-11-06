@@ -26,7 +26,7 @@ const px = (k) => `<svg class="u-ti" viewBox="0 0 8 8" aria-hidden="true" focusa
 // All labels come from the hub dictionary (src/i18n); mc.* is German only.
 const labels = (lang) => {
   const t = makeT(lang);
-  return { t, nav: t("nav.label"), lang: t("lang.label"), open: t("nav.menu_open"), close: t("nav.menu_close"), login: t("acct.login"), logout: t("acct.logout"), soon: t("acct.soon"), account: t("acct.label"), profile: t("acct.profile"), orders: t("acct.orders"), day: t("theme.day"), night: t("theme.night"), toDay: t("theme.switch_to_day"), toNight: t("theme.switch_to_night"), settings: t("nav.settings"), theme: t("theme.label"), more: t("nav.more") };
+  return { t, nav: t("nav.label"), lang: t("lang.label"), open: t("nav.menu_open"), close: t("nav.menu_close"), login: t("acct.login"), logout: t("acct.logout"), soon: t("acct.soon"), account: t("acct.label"), profile: t("acct.profile"), orders: t("acct.orders"), day: t("theme.day"), night: t("theme.night"), toDay: t("theme.switch_to_day"), toNight: t("theme.switch_to_night"), settings: t("nav.settings"), theme: t("theme.label"), more: t("nav.more"), where: t("nav.where"), whereLabel: t("nav.where_label"), siteMain: t("nav.site_main"), siteMc: t("nav.site_mc"), here: t("nav.here") };
 };
 
 export const UNAV_JS = `<script src="/design/unav.js?v=${AV}" defer></script>`;
@@ -42,6 +42,17 @@ function themeToggle(l) {
 // DE/EN as one sliding switch: real links, the knob sits under the current language.
 function langSeg(lang, hrefs, l) {
   return `<nav class="u-seg" data-v="${lang === "en" ? "en" : "de"}" aria-label="${esc(l.lang)}">${["de", "en"].map((x) => `<a href="${esc(hrefs[x])}" hreflang="${x}" lang="${x}"${x === lang ? ' aria-current="true"' : ""}>${x.toUpperCase()}</a>`).join("")}</nav>`;
+}
+
+// Logo site switcher "Wohin?" (Nils, 06.11.: "OK as shown, build it including the logo menu"): the
+// logo opens a small list with both sites, the current one marked. Replaces the old site chips.
+function siteSwitch(site, l, logo, name, homeHref) {
+  const sites = [
+    ["main", site === "main" ? homeHref : `https://${MAIN_HOST}/`, l.siteMain, MAIN_HOST, `<span class="u-logo">${CAT}</span>`],
+    ["mc", site === "mc" ? "/" : `https://${MC_HOST}/`, l.siteMc, MC_HOST, `<span class="u-logo">${icon("grass_block")}</span>`],
+  ];
+  const opts = sites.map(([k, href, label, host, ic]) => `<a class="u-site-o" href="${esc(href)}"${k === site ? ' aria-current="true"' : ""}>${ic}<span class="u-site-t"><b>${esc(label)}</b><small>${host}</small></span>${k === site ? `<span class="u-tag">${esc(l.here)}</span>` : ""}</a>`).join("");
+  return `<div class="u-site"><button class="u-brand" type="button" aria-expanded="false" aria-controls="u-sites" aria-label="${esc(name.replace(/<[^>]*>/g, "") + ": " + l.whereLabel)}"><span class="u-logo">${logo}</span><span class="u-bname">${name}</span>${CHEV}</button><div class="u-sites" id="u-sites"><p class="u-sites-h">${esc(l.where)}</p>${opts}</div></div>`;
 }
 
 function shellNav({ site, lang, brand, list, tools, row, loginBase, menu }) {
@@ -64,7 +75,7 @@ const link = (i, l) => `<a class="u-link${i.soon ? " u-soon" : ""}" href="${esc(
  */
 export function mainNav({ lang = "de", items, langHrefs, brandHref = "/", extra = "" }) {
   const l = labels(lang);
-  const brand = `<a class="u-brand" href="${esc(brandHref)}"><span class="u-logo">${CAT}</span><span class="u-bname">NwebNotFound</span></a>`;
+  const brand = siteSwitch("main", l, CAT, "NwebNotFound", brandHref);
   const top = items.filter((i) => !i.more), more = items.filter((i) => i.more);
   const moreCur = more.some((i) => i.cur);
   const drop = more.map((i) => `<a href="${esc(i.href)}"${i.cur ? ' aria-current="page"' : ""}${i.soon ? ' class="u-soon"' : ""}>${px(i.k)}${esc(i.label)}${tag(i, l)}</a>`).join("");
@@ -98,7 +109,7 @@ export function mainItems(lang, cur, href = (p) => p, ready = {}) {
 /** mc.* groups: `groups` is `[key, label, [[href, label, icon], …], sub?]`. The active entry is marked by unav.js. */
 export function mcNav(groups) {
   const l = labels("de");
-  const brand = `<a class="u-brand" href="/"><span class="u-logo">${icon("grass_block")}</span><span class="u-bname">NwebNotFound <span class="u-mcname">MC</span></span></a>`;
+  const brand = siteSwitch("mc", l, icon("grass_block"), 'NwebNotFound <span class="u-mcname">MC</span>', "/");
   const list = groups.map(([k, label, links, sub], n) => `<li class="u-group${n === groups.length - 1 ? " u-end" : ""}" data-g="${k}"><button class="u-link u-gbtn" type="button" aria-expanded="false" aria-controls="ug-${k}">${links[0] ? icon(links[0][2]) : ""}<span class="u-lt">${esc(label)}</span>${CHEV}<small class="u-sub">${esc(sub || links.map((x) => x[1]).slice(0, 2).join(", "))}</small></button><div class="u-drop" id="ug-${k}">${links.map(([h, n, i]) => `<a href="${esc(h)}">${icon(i)}${esc(n)}</a>`).join("")}</div></li>`).join("");
   const menu = [["/profile", l.profile, "name_tag"], ["/vip", "VIP", "nether_star"], ["/bestellungen", l.orders, "chest"]];
   return shellNav({ site: "mc", lang: "de", brand, list, tools: "", row: "", loginBase: `https://${MAIN_HOST}`, menu });
