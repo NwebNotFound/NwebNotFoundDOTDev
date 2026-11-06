@@ -53,6 +53,7 @@ const WORLD_STATUS = new Set(["stopped", "starting", "running", "stopping", "err
 const WORLD_TYPES = new Set(["normal", "flat", "void"]);
 const ADDONS = new Set(["keep-inventory", "peaceful", "creative", "day-lock", "pvp"]);
 const EXPIRE_MS = 600000;
+export const SYNC_MAX_WORLDS = 500;
 const HOUR = 3600000;
 const NAME = /^[A-Za-z0-9_]{1,16}$/;
 const RID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -104,7 +105,8 @@ function playersOf(v) {
 // Schema wie im Vertrag: name, status, slot, player_limit, invites[].uuid (name nullable).
 export function cleanWorlds(raw) {
   if (!Array.isArray(raw)) return { error: "vip_worlds muss ein Array sein" };
-  if (raw.length > 30) return { error: "höchstens 30 Welten" };
+  // Full replace: mc-stack sends every live world and never a shortened list (docs/vip-api.md, 500).
+  if (raw.length > SYNC_MAX_WORLDS) return { error: `höchstens ${SYNC_MAX_WORLDS} Welten` };
   const out = [], seen = new Set();
   for (const w of raw) {
     const id = normU(w?.id ?? w?.world_id);
