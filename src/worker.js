@@ -88,6 +88,8 @@ const PORT_CSS = `.hero{padding-top:clamp(4.5rem,12vw,9rem)}
 const PORT_V2_CSS = `
 @font-face{font-family:"SmPixel";src:url("/design/fonts/pixelify-sans-latin-400.woff2") format("woff2");font-weight:400;font-display:swap}
 @font-face{font-family:"SmPixel";src:url("/design/fonts/pixelify-sans-latin-700.woff2") format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"SmBody";src:url("/design/fonts/nunito-latin-400.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"SmBody";src:url("/design/fonts/nunito-latin-700.woff2") format("woff2");font-weight:700;font-display:swap}
 :root{--px-font:"SmPixel",ui-monospace,Menlo,monospace;
 --sky1:#9ad8ff;--sky2:#e6f6ff;--bg:#f4faff;--bg2:#e8f4ff;--card:#ffffff;--panel2:#eff6fe;
 --fg:#1f2a44;--mut:#55648a;--line:rgba(31,42,68,.10);--strong:rgba(31,42,68,.18);--edge:#647aa0;
