@@ -544,9 +544,9 @@ try {
     ok(home.t.includes('href="https://github.com/NwebNotFound" target="_blank" rel="noopener noreferrer"') && home.t.includes('href="https://x.com/NwebNotFound" target="_blank" rel="noopener noreferrer"'), "Footer: GitHub und X als normale Links mit rel=noopener noreferrer");
     ok(extUrls(home.t).length === 0, "keine fremden Requests (kein CDN, kein Tracker, keine externen Schriften)", extUrls(home.t).slice(0, 3).join(" "));
     { const nav = home.t.slice(home.t.indexOf("<header"), home.t.indexOf("</header>"));
-      ok(!nav.includes(">Musik<") && home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche: nicht in der Navigation (Nils 05.11.), 'bald' auf den Kacheln"); }
+      ok(!nav.includes(">Musik<") && home.t.includes("h2-st is-soon") && home.t.includes(">bald<"), "noch leere Bereiche: nicht in der Navigation (Nils 05.11.), 'bald' auf den Projektkarten"); }
     const en = await hub("/", { headers: { "accept-language": "en-GB,en;q=0.9" } });
-    ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("Welcome to my corner"), "Accept-Language en → englische Oberfläche");
+    ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("What I&#39;m building"), "Accept-Language en → englische Oberfläche");
     ok(en.t.includes('href="/de"') && en.t.includes('href="/en"') && en.t.includes('aria-current="true"'), "Sprachumschalter verlinkt beide Sprachen und markiert die aktuelle");
     const bare = await hub("/");
     ok(/<html lang="de"/.test(bare.t), "ohne Accept-Language → Deutsch als Standard");
