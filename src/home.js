@@ -32,9 +32,9 @@ export function homeAbout(lang, ctx) {
     const st = `<span class="h2-st is-${esc(p.st)}">${p.st === "live" ? "<i></i>" : ""}${esc(c.states[p.st])}</span>`;
     return `<a class="h2-proj" href="${esc(url(p.href))}"${ext(p.href)} style="--tint:var(--sm-accent-${esc(p.tint)})">${tile(ico, p.tint)}<span class="h2-ph"><b>${esc(p.title)}</b>${st}</span><span class="h2-pt">${esc(p.text)}</span><span class="h2-tags">${p.tags.map((t) => `<span>${esc(t)}</span>`).join("")}</span><span class="h2-more">${esc(p.cta)} <span class="h2-arrow" aria-hidden="true">&#8250;</span></span></a>`;
   }).join("");
-  const recent = latestEntries(4);
+  const recent = latestEntries(4, undefined, lang);
   const log = recent.length
-    ? `<ul class="h2-log${recent.some((e) => e.date) ? "" : " is-nodate"}">${recent.map((e, i) => `<li>${recent.some((x) => x.date) ? `<span class="h2-when">${esc(e.date)}</span>` : ""}<span class="h2-lic">${pxIcon(ICYCLE[i % ICYCLE.length], 20)}</span><span><b>${esc(e.text)}</b></span></li>`).join("")}</ul>`
+    ? `<ul class="h2-log${recent.some((e) => e.date) ? "" : " is-nodate"}">${recent.map((e, i) => `<li>${recent.some((x) => x.date) ? `<span class="h2-when">${esc(e.date)}</span>` : ""}<span class="h2-lic">${pxIcon(ICYCLE[i % ICYCLE.length], 20)}</span><span><b>${esc(e.title)}</b>${e.sub ? `<small>${esc(e.sub)}</small>` : ""}</span></li>`).join("")}</ul>`
     : `<p class="h2-gbt">${esc(c.recentNone)}</p>`;
   return `<div class="h2">
 <section class="h2-hero">
