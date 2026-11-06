@@ -52,6 +52,21 @@ function renderEntry(text) {
   return `<li data-category="${category.id}"><span class="slot cl-icon"><img loading="lazy" class="mi" alt="" width="20" height="20" src="/mc-icon/v2/${category.icon}"></span><span class="cl-entry"><span class="chip ${category.chip}">${category.label}</span><span class="cl-copy">${inline(text)}</span></span></li>`;
 }
 
+/** Latest player-facing entries for the start page: [{ date: "06.11." | "", text }], source order (newest first). */
+export function latestEntries(limit = 4, md = CHANGELOG_MD) {
+  const out = [];
+  for (const section of playerSections(md)) {
+    const d = sectionDate(section.title);
+    const date = d ? `${d.iso.slice(8, 10)}.${d.iso.slice(5, 7)}.` : "";
+    for (const raw of section.items) {
+      const text = raw.replace(/^\s*(?:\*\*)?\[[^\]]+\](?:\*\*)?\s*/, "").replace(/[`*]/g, "").trim();
+      if (text) out.push({ date, text });
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}
+
 export const changelogBody = (md = CHANGELOG_MD) => {
   const groups = [];
   for (const section of playerSections(md)) {
