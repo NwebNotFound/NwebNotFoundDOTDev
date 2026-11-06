@@ -333,11 +333,13 @@ with sync_playwright() as p:
         adlg0 = len(dlg)
         go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000); ah = pg.inner_html("#vip"); at = pg.inner_text("#vip")
         ok(pg.locator(".vip-admin-tag").count() == 1 and "Admin-Ansicht" in at and pg.locator(".vip-card.is-you.is-admin").count() == 1, f"{w}px VIP-Admin: Badge und eigene Karte", at[:200])
-        ok(pg.locator("#vip-admin-worlds .v2-world").count() == 2 and "Besitzer Seller" in at and "Deine Welt" in at and "Alle VIP-Welten" in at, f"{w}px VIP-Admin: alle Welten mit Besitzer", at[:240])
-        ok(pg.locator("#vip-admin-worlds button[data-act=start]").count() == 1 and pg.locator("#vip-admin-worlds button[data-set=visibility]").count() == 4 and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-set=visibility][data-val=friends]").count() == 1, f"{w}px VIP-Admin: Start und Sichtbarkeit je Welt")
+        ok(pg.locator("#vip-admin-worlds .v2-world").count() == 1 and "Besitzer Seller" in at and "Alle VIP-Welten" in at, f"{w}px VIP-Admin: fremde Welten mit Besitzer", at[:240])
+        # Nils, 06.11.: Admin hat eigene Welten wie VIP/MVP, oberhalb der Admin-Ansicht, mit freiem Platz.
+        ok(pg.locator(f"#v2-worlds .v2-world[data-wid='{WIDA}']").count() == 1 and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDA}']").count() == 0 and pg.locator("#v2-worlds .v2-free form").count() == 1 and "1 von 3 belegt" in pg.inner_text("#v2-worlds") and pg.evaluate("document.querySelector('#v2-worlds').compareDocumentPosition(document.querySelector('#vip-admin-worlds')) & 4") > 0, f"{w}px VIP-Admin: eigene Welten mit Anlegen über der Admin-Ansicht", pg.inner_text("#v2-worlds")[:200])
+        ok(pg.locator("#vip-admin-worlds button[data-act=start]").count() == 1 and pg.locator("#vip button[data-set=visibility]").count() == 4 and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDB}'] button[data-set=visibility][data-val=friends]").count() == 1, f"{w}px VIP-Admin: Start und Sichtbarkeit je Welt")
         ok(pg.locator("#vip-admin-log li").count() == 2 and pg.locator("#vip-admin-log li").first.inner_text().find("Welt gestartet") >= 0 and "Admin-Log" in at, f"{w}px VIP-Admin: Protokoll neueste zuerst", pg.locator("#vip-admin-log").inner_text()[:200])
         ok(XSS in at and "&lt;img" in ah and pg.locator("#vip img[src='x']").count() == 0 and pg.locator("#vip script").count() == 0 and not pg.evaluate("window.vipx") and len(dlg) == adlg0, f"{w}px VIP-Admin: Besitzer und Log escaped", ah[:240])
-        ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0 and pg.locator("#vip .v2-free").count() == 0, f"{w}px VIP-Admin: kein Overflow, keine Inline-Styles, kein VIP-Block für Adminwelt")
+        ok(pg.locator("#vip [style]").count() == 0 and pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0 , f"{w}px VIP-Admin: kein Overflow, keine Inline-Styles")
         pins = pg.evaluate("""() => { const R = e => e.getBoundingClientRect(); return [...document.querySelectorAll('#vip .g')].flatMap(card => [...card.querySelectorAll('.slot')].map(s => { const a = R(card), b = R(s); return [b.left-a.left, b.top-a.top, a.right-b.right]; })); }""")
         ok(pins and all(x >= 12 and y >= 12 and r >= 12 for x, y, r in pins), f"{w}px VIP-Admin: Slots in allen Karten eingerückt", pins[:6])
         pg.screenshot(path=f"{SH}/local-vip-admin-{w}.png", full_page=True)
@@ -347,10 +349,20 @@ with sync_playwright() as p:
         ok(pg.locator("#vip-say").inner_text().find("Sichtbarkeit geändert") >= 0 and pg.locator("#vip-say").get_attribute("role") == "status", f"{w}px VIP-Admin: Verwaltung meldet Erfolg ohne alert", pg.locator("#vip-say").inner_text())
         pg.unroute("**/api/mc-vip/worlds/**")
         pg.route("**/api/mc-vip/worlds/**", lambda r: r.fulfill(status=403, content_type="application/json", body='{"error":"not_owner","reason":"not_owner"}'))
-        pg.click(f"#vip-admin-worlds .v2-world[data-wid='{WIDA}'] button[data-set=visibility][data-val=private]")
+        pg.click(f"#v2-worlds .v2-world[data-wid='{WIDA}'] button[data-set=visibility][data-val=private]")
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('nicht ändern')", timeout=10000)
         ok(len(dlg) == adlg0 and "Du darfst diese Welt nicht ändern." in pg.locator("#vip-say").inner_text(), f"{w}px VIP-Admin: Fehler als Meldung, kein Dialog", pg.locator("#vip-say").inner_text())
         pg.unroute("**/api/mc-vip/worlds/**"); pg.unroute("**/api/mc-vip")
+        # Admin invited/trusted in a foreign world: exactly one card for it, unique input ids, still manageable.
+        WIDC = "cccccccc-3333-4333-8333-333333333333"
+        inv = dict(MANYBASE, worlds={"placeholder": False, "slots": [
+            {"id": WIDA, "label": "Insel", "online": True, "players": 2, "max": 10, "tps": 20, "owner_name": "Nils", "owner": True, "visibility": "friends", "info": "", "type": "normal", "can_manage": True, "can_start": True},
+            {"id": WIDC, "label": "Fremdwelt", "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Seller", "owner": False, "invited": True, "role": "trusted", "visibility": "friends", "info": "", "type": "flat", "can_manage": True, "can_start": True}]})
+        pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(inv)))
+        go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000)
+        dup = pg.evaluate("() => { const ids = [...document.querySelectorAll('#vip [id]')].map(e => e.id); return ids.filter((x, i) => ids.indexOf(x) !== i); }")
+        ok(pg.locator(f"#vip .v2-world[data-wid='{WIDC}']").count() == 1 and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDC}']").count() == 1 and pg.locator("#v2-invited").count() == 0 and pg.locator(f"#vip .v2-world[data-wid='{WIDA}']").count() == 1 and not dup and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDC}'] button[data-set=visibility]").count() >= 1, f"{w}px VIP-Admin: eingeladene Fremdwelt genau einmal, ids eindeutig", dup)
+        pg.unroute("**/api/mc-vip")
         many = dict(MANYBASE, worlds={"placeholder": False, "slots": [{"id": "11111111-2222-4333-8444-%012d" % i, "label": "Welt %d" % i, "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Gast%d" % i, "owner": False, "visibility": "friends", "info": ""} for i in range(14)]})
         pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(many)))
         go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000); pg.wait_for_timeout(300)
