@@ -220,6 +220,16 @@ with sync_playwright() as p:
             ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "true" and pg.locator('.u-group[data-g=community] a[href="/spieler"]').count() == 1, f"{w}px Nav: Klick öffnet Community")
             pg.locator(".u-group[data-g=community] .u-gbtn").dispatch_event("click")
             ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "false", f"{w}px Nav: zweiter Klick schließt")
+            # Wiki has the longest dropdown: with space it must show every link (no 440px clip),
+            # on a short viewport it scrolls while the scrollbar stays hidden (Nils' request).
+            pg.locator(".u-group[data-g=wiki] .u-gbtn").dispatch_event("click")
+            wd = pg.evaluate("""() => { const d = document.querySelector('.u-group[data-g=wiki] .u-drop'); const r = d.getBoundingClientRect(); const a = [...d.querySelectorAll('a')]; return { n: a.length, hidden: a.filter(x => x.getBoundingClientRect().bottom > r.bottom - 1).map(x => x.textContent.trim()), clipped: d.scrollHeight > d.clientHeight, bottom: Math.round(r.bottom), vh: innerHeight, bar: getComputedStyle(d).scrollbarWidth }; }""")
+            ok(wd["n"] == 11 and not wd["hidden"] and not wd["clipped"] and wd["bottom"] < wd["vh"] and wd["bar"] == "none", f"{w}px Wiki-Dropdown: alle Links sichtbar ohne Beschnitt, Scrollbar bleibt versteckt", wd)
+            pg.set_viewport_size({"width": w, "height": 520}); pg.wait_for_timeout(150)
+            ws = pg.evaluate("""() => { const d = document.querySelector('.u-group[data-g=wiki] .u-drop'); const a = [...d.querySelectorAll('a')]; const last = a[a.length - 1]; const fits = () => last.getBoundingClientRect().bottom <= d.getBoundingClientRect().bottom + 1; const before = fits(); d.scrollTop = d.scrollHeight; const after = fits(); return { scrolls: d.scrollHeight > d.clientHeight, before, after, bar: getComputedStyle(d).scrollbarWidth, page: document.documentElement.scrollWidth - innerWidth }; }""")
+            ok(ws["scrolls"] and not ws["before"] and ws["after"] and ws["bar"] == "none" and ws["page"] <= 0, f"{w}px Wiki-Dropdown kurz: scrollt bis zum letzten Link, Scrollbar bleibt versteckt", ws)
+            pg.set_viewport_size({"width": w, "height": 900}); pg.wait_for_timeout(150)
+            pg.keyboard.press("Escape")
         ok(pg.locator(".pkt .btn").count() >= 3 and pg.locator('.pkt .btn[aria-selected=true][data-k="test"]').count() == 1 and pg.locator('.u-links a[href="/parkour"][aria-current=page]').count() == 1, f"{w}px Parkour: Kurs-Auswahl + Nav aktiv")
         hs = pg.eval_on_selector_all(".pkr", "els=>els.map(e=>e.getBoundingClientRect().height)"); ok(max(hs) < 70, f"{w}px Parkour: Zeilen einzeilig", hs)
         pg.screenshot(path=f"{SH}/local-parkour-{w}.png", full_page=True)

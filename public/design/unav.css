@@ -50,7 +50,8 @@ html.mc .u-mc{--u-glass:var(--glass);--u-s1:var(--surface);--u-s2:var(--surface-
 .u-login{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;background:var(--u-acc);color:var(--u-acc-ink)!important;font-size:14px;font-weight:800;text-decoration:none!important;white-space:nowrap;box-shadow:0 3px 0 var(--u-acc-edge)}
 .u-login svg{width:20px;height:16px;flex:none}
 .u-login[aria-disabled="true"]{background:var(--u-s2);color:var(--u-mut)!important;box-shadow:inset 0 0 0 1px var(--u-line)}
-.u-menu,.u-drop{display:none;position:absolute;top:calc(100% + 10px);z-index:60;min-width:220px;max-height:min(70vh,440px);overflow:auto;padding:6px;gap:2px;border-radius:18px;background:var(--u-s1);box-shadow:inset 0 0 0 1px var(--u-line),var(--u-lift);text-align:left}
+/* Menus use the space below the bar instead of a fixed 440px cap, so long lists (Wiki) are not clipped; short screens scroll, with the scrollbar hidden on mc.*. */
+.u-menu,.u-drop{display:none;position:absolute;top:calc(100% + 10px);z-index:60;min-width:220px;max-height:calc(100dvh - 96px);overflow:auto;padding:6px;gap:2px;border-radius:18px;background:var(--u-s1);box-shadow:inset 0 0 0 1px var(--u-line),var(--u-lift);text-align:left}
 .u-menu{right:0}
 .u-drop{left:0}
 .u-group{position:relative}
