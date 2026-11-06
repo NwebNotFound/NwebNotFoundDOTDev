@@ -358,7 +358,8 @@ with sync_playwright() as p:
         # Success only after the ack done; otherwise the server's reason. The name pattern compiles
         # under the browser's v flag (a bare "-" at the end of a class threw).
         ok(pg.evaluate("() => { const i = document.querySelector('#v2-nm'); i.value = 'Admin-Test_1'; return i.checkValidity() && (i.value = 'a b', !i.checkValidity()); }"), f"{w}px VIP: Namensmuster gültig (v-Flag), prüft Eingaben")
-        pg.route("**/api/mc-vip/worlds", lambda r: r.fulfill(status=202, content_type="application/json", body='{"ok":true,"request_id":"r2","op":"create","status":"pending"}'))
+        # 202 exactly as mutate() sends it (e2e.mjs "Echte 202-Antwort"); a 202 without status is followed too.
+        pg.route("**/api/mc-vip/worlds", lambda r: r.fulfill(status=202, content_type="application/json", body='{"ok":true,"request_id":"r2","op":"create"}'))
         seen = []
         def req_status(r):
             seen.append(1)

@@ -1079,6 +1079,24 @@ try {
       ok(ar.s === 202 && ar.j?.op === "rename", "Admin: eigene Welt umbenennen → 202", ar.t);
       const ad = await post(`/api/mc-vip/worlds/${WID}/delete`, { request_id: "vip-admin-delete", confirm: "Insel" }, { cookie: c1 });
       ok(ad.s === 202 && ad.j?.op === "delete", "Admin: eigene Welt löschen → 202", ad.t);
+      // Real website → pending path (review #96/#168): the exact 202 shape the panel follows, the
+      // typed delete name as confirm, and the link as it is at dispatch.
+      ok(ad.j?.status === "pending" && typeof ad.j?.request_id === "string" && ad.j.request_id === "vip-admin-delete", "Echte 202-Antwort: request_id + status pending", ad.t);
+      const dup = await post(`/api/mc-vip/worlds/${WID}/delete`, { request_id: "vip-admin-delete", confirm: "Insel" }, { cookie: c1 });
+      ok(dup.s === 200 && dup.j?.duplicate === true && dup.j?.status === "pending", "Delete-Wiederholung mit gleichem Namen → duplicate statt 409", dup.t);
+      const pq = (await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || [];
+      const pDel = pq.find((x) => x.request_id === "vip-admin-delete"), pRen = pq.find((x) => x.request_id === "vip-admin-rename");
+      ok(pDel?.confirm === "Insel" && pDel?.name === null && pDel?.world_id === WID, "Pending: delete trägt den eingetippten Namen als confirm", JSON.stringify(pDel));
+      ok(pDel?.linked === true && pDel?.actor_uuid === U1 && pRen?.linked === true, "Pending: linked=true bei gültiger Verknüpfung", JSON.stringify(pDel));
+      sql(`UPDATE mc_links SET verified = 0 WHERE discord_id = '${D1}'`);
+      ok(((await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || []).find((x) => x.request_id === "vip-admin-delete")?.linked === false, "Pending: nach Entknüpfen linked=false (Prüfung beim Abholen)");
+      sql(`UPDATE mc_links SET verified = 1, has_role = 0 WHERE discord_id = '${D1}'`);
+      ok(((await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || []).find((x) => x.request_id === "vip-admin-delete")?.linked === false, "Pending: ohne Discord-Rolle linked=false");
+      const keepUuid = sqlRows(`SELECT mc_uuid FROM mc_links WHERE discord_id = '${D1}'`)[0].mc_uuid;
+      sql(`UPDATE mc_links SET has_role = 1, mc_uuid = '${U2}' WHERE discord_id = '${D1}'`);
+      ok(((await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || []).find((x) => x.request_id === "vip-admin-delete")?.linked === false, "Pending: neu auf anderen Account verknüpft → linked=false");
+      sql(`UPDATE mc_links SET mc_uuid = '${keepUuid}' WHERE discord_id = '${D1}'`);
+      ok(((await req("/api/mc-vip-commands/pending", { token: TOK })).j?.items || []).find((x) => x.request_id === "vip-admin-delete")?.linked === true, "Pending: zurückverknüpft → linked=true");
       sql("DELETE FROM mc_vip_commands WHERE request_id IN ('vip-admin-create','vip-admin-rename','vip-admin-delete')");
       await post("/api/mc-vip-worlds", { vip_worlds: [] }, { token: TOK, origin: null, cookie: null });
       await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }] } });

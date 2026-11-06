@@ -261,8 +261,11 @@
     const r = await send(path, body, method);
     if (r.ok) {
       await load();
-      if (r.j && r.j.status === "pending" && typeof r.j.request_id === "string") await follow(r.j.request_id, okMsg);
-      else say(okMsg || "Auftrag an den Server gesendet.", false);
+      const st = r.j && r.j.status;
+      if (r.j && typeof r.j.request_id === "string" && (st === undefined || st === null || st === "pending")) await follow(r.j.request_id, okMsg);
+      else if (st === "done") say(okMsg || "Erledigt.", false);
+      else if (st) say(ERR[r.j.reason] || (st === "expired" ? "Der Server hat den Auftrag nicht rechtzeitig ausgeführt." : "Der Server hat den Auftrag abgelehnt."), true);
+      else say("Auftrag an den Server gesendet. Der Stand erscheint nach dem nächsten Abgleich.", false);
     } else if (r.status === 429) {
       say("Zu viele Aktionen in der letzten Stunde. Bitte später erneut versuchen.", true);
     } else {
