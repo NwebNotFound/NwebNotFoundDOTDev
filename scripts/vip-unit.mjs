@@ -2,7 +2,7 @@
 // Reine VIP-Helfer (ohne Worker). Wird von scripts/e2e.mjs importiert und kann allein laufen.
 import assert from "node:assert/strict";
 import { isVipWorldKey, pickVipWorlds, vipStats, vipWorldLabel, vipCatalog, vipRankView, normU, WORLD_LIMITS, worldLimit } from "../src/mc-vip.js";
-import { sanitizeInfo, cleanWorlds, cleanLog, cleanSettings, ACTIONS } from "../src/mc-vip-cmd.js";
+import { sanitizeInfo, cleanWorlds, cleanLog, cleanSettings, ACTIONS, SYNC_MAX_BYTES } from "../src/mc-vip-cmd.js";
 import { WORLD_DEFAULTS } from "../src/mc-vip.js";
 
 const worlds = {
@@ -90,6 +90,20 @@ assert.equal(cleanWorlds({ id: "nope" }).error.includes("Array"), true);
   assert.equal(cleanWorlds(many(31)).worlds.length, 31, "31 Welten vollständig");
   assert.equal(cleanWorlds(many(500)).worlds.length, 500, "500 Welten vollständig");
   assert.equal(cleanWorlds(many(501)).error, "höchstens 500 Welten", "501 abgelehnt statt gekürzt");
+  // D1: ein Wert höchstens 2.000.000 Bytes. Gemessen in UTF-8-Bytes, mit den Vertragsgrenzen:
+  // 32 Einladungen (cleanInvites), 120 Zeichen Name/Info (sanitizeInfo), Mehrbyte-Text.
+  const bytesOf = (r) => new TextEncoder().encode(JSON.stringify(r.worlds)).length;
+  const inv = (n) => Array.from({ length: n }, (_, i) => ({ uuid: `22222222-2222-4222-8222-${String(i).padStart(12, "0")}`, name: "Player_Name_" + String(i).padStart(4, "0"), role: "trusted", added_at: 1793503000000 }));
+  const big = (n, o) => many(n).map((w) => ({ ...w, owner_name: "NwebNotFound_123", slot: "vipworld-12", addons: ["keep-inventory", "peaceful", "creative"], ...o }));
+  const full = cleanWorlds(big(500, { name: "世".repeat(120), info: "界".repeat(120), invites: inv(40) }));
+  assert.ok(full.error && full.error.startsWith("vip_worlds zu groß"), "Vertrags-Maximum (≈2,5 MB) wird ganz abgelehnt, nicht gekürzt: " + (full.error || ""));
+  const real = cleanWorlds(big(500, { name: "W".repeat(24), invites: inv(12) }));
+  assert.equal(real.worlds?.length, 500, "500 Welten mit 12 Mitgliedern (Web-Limit) und Plugin-Namen passen");
+  assert.ok(bytesOf(real) <= SYNC_MAX_BYTES && bytesOf(real) < 2_000_000, "unter der D1-Grenze: " + bytesOf(real));
+  const mb = cleanWorlds(big(120, { name: "世".repeat(120), info: "界".repeat(120), invites: inv(32) }));
+  assert.equal(mb.worlds?.length, 120, "Mehrbyte-Namen und 32 Einladungen: 120 Welten passen");
+  assert.ok(bytesOf(mb) > JSON.stringify(mb.worlds).length * 1.1, "Mehrbyte-Text zählt als UTF-8-Bytes, nicht als Zeichen");
+  assert.equal(mb.worlds[0].invites.length, 32, "32 Einladungen behalten");
 }
 assert.equal(cleanWorlds([{ ...CW, visibility: "public" }]).worlds.length, 0, "visibility public raus");
 const cw = cleanWorlds([CW]).worlds[0];
