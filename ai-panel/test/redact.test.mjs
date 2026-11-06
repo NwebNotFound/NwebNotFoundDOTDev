@@ -20,6 +20,18 @@ const cases = [
   ["env line lower", "client_secret: s3cr3t-value", "s3cr3t-value"],
   ["db url", "postgres://nils:pw-in-the-url@127.0.0.1:5432/db", "pw-in-the-url"],
   ["hex blob", "sha 3f4b2c1d9e8a7b6c5d4e3f2a1b0c9d8e"],
+  ["discord bot token", "token is MTA5NzY1NDMyMTAxMjM0NTY3OA.GhX1aB.abcdefGHIJKLmnopQRSTuvwxYZ012", "MTA5NzY1NDMyMTAxMjM0NTY3OA.GhX1aB.abcdefGHIJKLmnopQRSTuvwxYZ012"],
+  ["hugging face token", "hf_AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGh"],
+  [
+    "discord webhook url",
+    "post to https://discord.com/api/webhooks/123456789012345678/AbCd-ef_GhIjKl now",
+    "123456789012345678/AbCd-ef_GhIjKl",
+  ],
+  [
+    "discordapp webhook url",
+    "https://ptb.discordapp.com/api/webhooks/123456789012345678/abcdefghijk",
+    "abcdefghijk",
+  ],
   ["base64 blob", "blob Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWprbA=="],
 ];
 

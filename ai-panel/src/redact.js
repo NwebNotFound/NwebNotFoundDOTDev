@@ -31,6 +31,13 @@ const RULES = [
   [/\bglpat-[A-Za-z0-9_-]{16,}\b/g, MASK],
   [/\bnpm_[A-Za-z0-9]{30,}\b/g, MASK],
   [/\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{16,}\b/g, MASK],
+  // Hugging Face access tokens: may be letters only, so the mixed-case long-token pass misses them.
+  [/\bhf_[A-Za-z0-9]{30,}\b/g, MASK],
+  // Discord bot tokens: three dot-separated base64url parts, none long enough on its own for the
+  // long-token pass. The first part is the base64 of a snowflake id, hence the M/N/O lead.
+  [/\b[MNO][A-Za-z0-9_-]{22,27}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,40}\b/g, MASK],
+  // Discord webhook URLs: the URL itself is the credential (anyone holding it can post).
+  [/https?:\/\/(?:\w+\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+/g, `${MASK} webhook`],
 
   // .env style assignments whose name says it is a credential: KEY=…, API_TOKEN=…,
   // DB_PASSWORD=…, CLIENT_SECRET=… Only the value is replaced, so the line stays readable.
