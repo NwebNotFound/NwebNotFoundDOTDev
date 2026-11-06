@@ -82,8 +82,8 @@ for (const lang of LANGS) {
     ok(html.includes("/design/summer.css?v=") && html.includes(`<script src="/design/summer-theme.js"></script>`), `${label}: summer.css and the theme bootstrap`);
     ok(html.indexOf("summer-theme.js") < html.indexOf("summer.css?v="), `${label}: theme bootstrap runs before the stylesheet (no theme flash)`);
     ok(html.includes(`class="sm-skip-link" href="#main"`) && html.includes(`<main id="main">`), `${label}: skip link targets the main landmark`);
-    ok(html.indexOf("sm-skip-link") < html.indexOf("<header class=\"sm-nav\""), `${label}: skip link is the first focusable element`);
-    ok(html.includes('<header class="sm-nav"') && html.includes('<footer class="sm-footer"'), `${label}: header and footer landmarks`);
+    ok(html.indexOf("sm-skip-link") < html.indexOf("<header class=\"u-nav u-main sm-nav\""), `${label}: skip link is the first focusable element`);
+    ok(html.includes('<header class="u-nav u-main sm-nav"') && html.includes('<footer class="sm-footer"'), `${label}: header and footer landmarks`);
     ok(!/<script(?![^>]*\bsrc=)/.test(html), `${label}: no inline script (script-src 'self')`);
     ok(!/\son[a-z]+\s*=/i.test(html), `${label}: no inline event handler`);
     // Summer Theme v2: the mascot is the approved inline pixel art (artboard), not the Phase 1
@@ -123,9 +123,15 @@ for (const lang of LANGS) {
   ok(home.includes("sm-scene__moon") && home.includes("sm-scene__stars") && home.includes("sm-twinkle--d4"), "the hero carries the moon and the star field for the night theme");
   ok(home.includes('class="sm-kicker"') && home.includes("Sections") && home.includes("What&#39;s here"), "the section block opens with a pixel kicker and the artboard heading");
   ok(hubPage("/", "de").includes("Was es hier gibt") && hubPage("/", "de").includes(">Bereiche<"), "the German heading comes from the new i18n keys");
-  // One wrapper around brand + controls: narrow screens paint the pill around it alone, wide screens
-  // dissolve it (`display: contents`) and keep brand | nav | tools in one row.
-  ok(home.includes('class="sm-hdr__bar"') && home.includes('class="sm-hdr__tools"'), "the header keeps the bar wrapper for the mobile pill");
+  // Unified nav (mockup fix-unified-nav): one bar, the phone drawer is the same panel, the burger
+  // controls it, and the account slot is empty until /api/me answers (no avatar before the session).
+  const bar = home.slice(home.indexOf("<header"), home.indexOf("</header>"));
+  ok(bar.includes('class="u-bar"') && bar.includes('id="u-panel"') && bar.includes('aria-controls="u-panel"') && bar.includes("data-u-acct></div>"), "the header is the unified bar with drawer panel, burger and empty account slot");
+  ok(home.includes('<script src="/design/unav.js?v=') && home.includes('/design/unav.css?v='), "the hub loads the shared nav assets");
+  ok([">Home<", ">Projects<", ">Guestbook<", ">About<"].every((x) => bar.includes(x)) && !bar.includes(">Music<"), "nav: Home, Projects, Guestbook, About; Music stays hidden until it has a page");
+  ok(bar.indexOf(">Home<") < bar.indexOf(">Projects<") && bar.indexOf(">Guestbook<") < bar.indexOf(">About<"), "nav order follows the mockup");
+  ok(bar.includes(`class="u-switch" href="https://${MC_HOST}/"`), "the Minecraft site switch is a chip, not a nav item");
+  ok(!bar.includes("sm-nav__link--soon"), "no dimmed 'soon' entries in the nav any more");
   ok(!hubPage("/about", "de").includes("summer-parallax.js"), "inner pages do not load the parallax helper");
   // Formatted numbers follow the page language.
   ok(formatNumber(1234, "de") === "1.234" && formatNumber(1234, "en") === "1,234", "counts are grouped per language", `${formatNumber(1234, "de")} / ${formatNumber(1234, "en")}`);
