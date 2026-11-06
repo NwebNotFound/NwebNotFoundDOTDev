@@ -211,7 +211,8 @@ with sync_playwright() as p:
             ok(pg.evaluate("document.activeElement.closest('.u-panel') !== null"), f"{w}px Nav mobil: Fokus springt in den Drawer")
             for _ in range(40): pg.keyboard.press("Tab")
             ok(pg.evaluate("!!document.activeElement.closest('.u-nav')"), f"{w}px Nav mobil: Tab bleibt im Drawer")
-            pg.keyboard.press("Escape"); ok(not pg.locator(".u-panel").is_visible() and pg.evaluate("document.activeElement.classList.contains('u-burger')"), f"{w}px Nav mobil: Escape schließt, Fokus zurück auf dem Menüknopf")
+            # nav v2: the drawer fades out (opacity), visibility switches after 0.35 s
+            pg.keyboard.press("Escape"); pg.wait_for_timeout(450); ok(not pg.locator(".u-panel").is_visible() and pg.evaluate("document.activeElement.classList.contains('u-burger')"), f"{w}px Nav mobil: Escape schließt, Fokus zurück auf dem Menüknopf")
         else:
             pg.focus(".u-group[data-g=wirtschaft] .u-gbtn"); pg.keyboard.press("Enter"); pg.keyboard.press("ArrowDown")
             ok(pg.evaluate("document.activeElement.getAttribute('href')") == "/markt", f"{w}px Nav: Tastatur öffnet Dropdown")
