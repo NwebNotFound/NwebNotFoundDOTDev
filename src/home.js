@@ -34,7 +34,7 @@ export function homeAbout(lang, ctx) {
   }).join("");
   const recent = latestEntries(4);
   const log = recent.length
-    ? `<ul class="h2-log${recent.some((e) => e.date) ? "" : " is-nodate"}">${recent.map((e, i) => `<li>${recent.some((x) => x.date) ? `<span class="h2-when">${esc(e.date)}</span>` : ""}<span class="h2-lic">${pxIcon(ICYCLE[i % ICYCLE.length], 20)}</span><span><b>${esc(e.text)}</b></span></li>`).join("")}</ul>`
+    ? `<ul class="h2-log${recent.some((e) => e.date) ? "" : " is-nodate"}">${recent.map((e, i) => `<li>${recent.some((x) => x.date) ? `<span class="h2-when">${esc(e.date)}</span>` : ""}<span class="h2-lic">${pxIcon(ICYCLE[i % ICYCLE.length], 20)}</span><span><b>${esc(e.title)}</b>${e.sub ? `<small>${esc(e.sub)}</small>` : ""}</span></li>`).join("")}</ul>`
     : `<p class="h2-gbt">${esc(c.recentNone)}</p>`;
   return `<div class="h2">
 <section class="h2-hero">

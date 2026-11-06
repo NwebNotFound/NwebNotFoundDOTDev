@@ -52,15 +52,21 @@ function renderEntry(text) {
   return `<li data-category="${category.id}"><span class="slot cl-icon"><img loading="lazy" class="mi" alt="" width="20" height="20" src="/mc-icon/v2/${category.icon}"></span><span class="cl-entry"><span class="chip ${category.chip}">${category.label}</span><span class="cl-copy">${inline(text)}</span></span></li>`;
 }
 
-/** Latest player-facing entries for the start page: [{ date: "06.11." | "", text }], source order (newest first). */
+/** Latest player-facing entries for the start page: [{ date: "06.11." | "", title, sub, text }], newest first.
+ *  An entry is "Title sentence. Optional second sentence as subline." under a dated `### dd.mm.yyyy` heading. */
 export function latestEntries(limit = 4, md = CHANGELOG_MD) {
   const out = [];
   for (const section of playerSections(md)) {
     const d = sectionDate(section.title);
     const date = d ? `${d.iso.slice(8, 10)}.${d.iso.slice(5, 7)}.` : "";
     for (const raw of section.items) {
-      const text = raw.replace(/^\s*(?:\*\*)?\[[^\]]+\](?:\*\*)?\s*/, "").replace(/[`*]/g, "").trim();
-      if (text) out.push({ date, text });
+      const plain = (x) => x.replace(/^\s*(?:\*\*)?\[[^\]]+\](?:\*\*)?\s*/, "").replace(/[`*]/g, "").trim();
+      // "**Title** – subline" (preferred), else the first sentence is the title and the rest the subline.
+      const bold = /^\s*\*\*(.+?)\*\*\s*[–—-]\s*(\S.*)$/s.exec(raw);
+      const text = bold ? plain(bold[2]) : plain(raw);
+      if (!text) continue;
+      const cut = bold ? null : /^(.+?[.!?])\s+(\S.*)$/s.exec(text);
+      out.push({ date, text, title: bold ? plain(bold[1]) : (cut ? cut[1] : text).replace(/[.]$/, ""), sub: bold ? text : cut ? cut[2] : "" });
       if (out.length >= limit) return out;
     }
   }

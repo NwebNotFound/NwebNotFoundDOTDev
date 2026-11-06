@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { changelogBody, playerSections } from "../src/mc-changelog.js";
+import { changelogBody, playerSections, latestEntries } from "../src/mc-changelog.js";
 import { resolveIcon } from "../src/mc-icon.js";
 
 test("player entries with the same date share a timeline card without exposing admin entries", () => {
@@ -40,12 +40,30 @@ test("category icons and labels follow explicit entry categories with a neutral 
   }
 });
 
-test("the bundled undated player entries get topic icons without invented dates or update types", () => {
+test("the bundled player entries carry their real dates and keep topic icons, without invented update types", () => {
   const html = changelogBody();
   assert.match(html, /data-category="trade"[^>]*>[\s\S]*?\/mc-icon\/v2\/emerald/);
   assert.match(html, /data-category="connection"[^>]*>[\s\S]*?\/mc-icon\/v2\/ender_pearl/);
-  assert.doesNotMatch(html, /<time\b|data-category="(?:new|fix|change)"/);
+  assert.match(html, /<time class="chip cl-date" datetime="2026-11-01">01\.11\.2026<\/time>/);
+  assert.match(html, /<time class="chip cl-date" datetime="2026-10-31">31\.10\.2026<\/time>/);
+  assert.doesNotMatch(html, /data-category="(?:new|fix|change)"/);
   assert.ok(html.includes("Stack für Stack"));
+});
+
+test("latestEntries gives date, title and subline for the start page", () => {
+  const md = `## Für Spieler
+### 06.11.2026
+- **Neue Navigation** – Hauptseite und Server-Seite teilen sich dieselbe Leiste.
+- Ohne Fettdruck. Der zweite Satz ist die Unterzeile.
+### 04.11.2026
+- Nur ein Satz ohne Unterzeile.
+`;
+  assert.deepEqual(latestEntries(3, md), [
+    { date: "06.11.", text: "Hauptseite und Server-Seite teilen sich dieselbe Leiste.", title: "Neue Navigation", sub: "Hauptseite und Server-Seite teilen sich dieselbe Leiste." },
+    { date: "06.11.", text: "Ohne Fettdruck. Der zweite Satz ist die Unterzeile.", title: "Ohne Fettdruck", sub: "Der zweite Satz ist die Unterzeile." },
+    { date: "04.11.", text: "Nur ein Satz ohne Unterzeile.", title: "Nur ein Satz ohne Unterzeile", sub: "" },
+  ]);
+  assert.equal(latestEntries(2, md).length, 2);
 });
 
 test("a new player section without a heading does not inherit an earlier date", () => {
