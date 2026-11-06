@@ -353,6 +353,16 @@ with sync_playwright() as p:
         pg.wait_for_function("() => (document.querySelector('#vip-say')||{}).textContent?.includes('nicht ändern')", timeout=10000)
         ok(len(dlg) == adlg0 and "Du darfst diese Welt nicht ändern." in pg.locator("#vip-say").inner_text(), f"{w}px VIP-Admin: Fehler als Meldung, kein Dialog", pg.locator("#vip-say").inner_text())
         pg.unroute("**/api/mc-vip/worlds/**"); pg.unroute("**/api/mc-vip")
+        # Admin invited/trusted in a foreign world: exactly one card for it, unique input ids, still manageable.
+        WIDC = "cccccccc-3333-4333-8333-333333333333"
+        inv = dict(MANYBASE, worlds={"placeholder": False, "slots": [
+            {"id": WIDA, "label": "Insel", "online": True, "players": 2, "max": 10, "tps": 20, "owner_name": "Nils", "owner": True, "visibility": "friends", "info": "", "type": "normal", "can_manage": True, "can_start": True},
+            {"id": WIDC, "label": "Fremdwelt", "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Seller", "owner": False, "invited": True, "role": "trusted", "visibility": "friends", "info": "", "type": "flat", "can_manage": True, "can_start": True}]})
+        pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(inv)))
+        go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000)
+        dup = pg.evaluate("() => { const ids = [...document.querySelectorAll('#vip [id]')].map(e => e.id); return ids.filter((x, i) => ids.indexOf(x) !== i); }")
+        ok(pg.locator(f"#vip .v2-world[data-wid='{WIDC}']").count() == 1 and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDC}']").count() == 1 and pg.locator("#v2-invited").count() == 0 and pg.locator(f"#vip .v2-world[data-wid='{WIDA}']").count() == 1 and not dup and pg.locator(f"#vip-admin-worlds .v2-world[data-wid='{WIDC}'] button[data-set=visibility]").count() >= 1, f"{w}px VIP-Admin: eingeladene Fremdwelt genau einmal, ids eindeutig", dup)
+        pg.unroute("**/api/mc-vip")
         many = dict(MANYBASE, worlds={"placeholder": False, "slots": [{"id": "11111111-2222-4333-8444-%012d" % i, "label": "Welt %d" % i, "online": False, "players": 0, "max": 5, "tps": None, "owner_name": "Gast%d" % i, "owner": False, "visibility": "friends", "info": ""} for i in range(14)]})
         pg.route("**/api/mc-vip", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(many)))
         go("/vip"); pg.locator("#vip-admin-worlds").wait_for(timeout=10000); pg.wait_for_timeout(300)

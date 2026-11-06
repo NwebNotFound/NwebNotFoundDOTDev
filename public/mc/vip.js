@@ -182,8 +182,12 @@
     const ranks = `<section class="vip-block" id="vip-ranks"><div class="vip-head"><div><p class="eyb">Ränge</p><h2 class="hub-h2">VIP und MVP</h2></div><p class="mut vip-head-note">Beide Ränge kosten nichts. Nils vergibt sie von Hand an enge Freunde.</p></div>${cards(d.catalog, d.limits)}${note(d.note)}</section>`;
     // Admin (Nils, 06.11.): own worlds with the free-slot card on top, as for VIP/MVP; the all-worlds
     // view below keeps the other players' worlds (no card twice, ids stay unique).
-    const others = d.worlds ? { ...d.worlds, slots: (d.worlds.slots || []).filter((s) => !(s && s.owner === true)) } : d.worlds;
-    const worlds = admin ? ownSection(d.worlds, max, false) + adminWorlds(others) + adminLog(d.admin_log) : ownSection(d.worlds, max, false);
+    // An admin who is also invited/trusted in someone else's world gets that world only once, in the
+    // all-worlds view (full admin controls): no "Eingeladen" copy, so the rn-/inv-/dc- ids stay unique.
+    const slotsOf = d.worlds && Array.isArray(d.worlds.slots) ? d.worlds.slots : [];
+    const others = d.worlds ? { ...d.worlds, slots: slotsOf.filter((s) => !(s && s.owner === true)) } : d.worlds;
+    const mineOnly = d.worlds ? { ...d.worlds, slots: slotsOf.filter((s) => s && s.owner === true) } : d.worlds;
+    const worlds = admin ? ownSection(mineOnly, max, false) + adminWorlds(others) + adminLog(d.admin_log) : ownSection(d.worlds, max, false);
     return `${headCard}<p class="vip-say v2-toast" id="vip-say" role="status" aria-live="polite"></p>${worlds}${ranks}`;
   };
   const gate = (d) => {
