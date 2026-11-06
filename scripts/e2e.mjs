@@ -50,6 +50,7 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   if (origin) h.origin = origin;
   const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
 };
+const TS_OK = "XXXX.DUMMY.TOKEN.XXXX"; // Turnstile test secret: every token passes
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
 const now = Date.now(), H = 3600, HR0 = Math.floor(now / 1000 / H) * H, RESET = new Date((HR0 - 28 * H) * 1000).toISOString();
 
@@ -173,32 +174,36 @@ try {
   ok(A.a1.created_at === Math.floor(now / 1000) * 1000, "created_at Sekunden → ms");
   const d2 = (await req("/api/mc-auctions/a2")).j.auction; ok(d2.bids.length === 2 && d2.bids[0].name === "Seller" && d2.bids[1].name === "99999999…", "Gebotsverlauf mit Namen / Kurz-UUID", JSON.stringify(d2.bids));
   ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, origin: O })).s === 401, "Gebot ohne Session → 401");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1, origin: "https://evil.example" })).s === 403, "falscher Origin → 403");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1 })).s === 403, "kein Origin → 403");
-  let r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 4999 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5000, "unter min_price → 409");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000, bidder_uuid: U2 }, cookie: c1, origin: O }); ok(r.s === 202, "Gebot = min_price → 202", r.t);
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 5000 }, cookie: c1, origin: "https://evil.example" })).s === 403, "falscher Origin → 403");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 5000 }, cookie: c1 })).s === 403, "kein Origin → 403");
+  // Nils, 06.11.: Turnstile is required for every web buy and bid, like bank_buy (audit #88).
+  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1, origin: O })).s === 403, "Gebot ohne Turnstile-Token → 403");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1 }, cookie: c1, origin: O })).s === 403, "Shop-Kauf ohne Turnstile-Token → 403");
+  ok((await req("/api/mc-bid", { method: "POST", token: TOK, body: { discord_id: D2, auction_id: "a4", amount: 1 } })).s !== 403, "Bot-Gebot braucht keinen Turnstile-Token (Ingest-Token)");
+  let r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 4999 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5000, "unter min_price → 409");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 5000, bidder_uuid: U2 }, cookie: c1, origin: O }); ok(r.s === 202, "Gebot = min_price → 202", r.t);
   const bidId = r.j?.request_id;
   ok(sqlRows(`SELECT bidder_uuid FROM mc_bids_pending WHERE id='${bidId}'`)[0]?.bidder_uuid === U1, "bidder_uuid serverseitig aus mc_links (Client-UUID ignoriert)");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5001, "eigenes offenes Gebot hebt Minimum");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a2", amount: 21499 }, cookie: c1, origin: O })).s === 409, "a2 21499 < min_next_bid → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a2", amount: 21500 }, cookie: c1, origin: O })).s === 202, "a2 21500 → 202");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a3", amount: 20999 }, cookie: c1, origin: O })).s === 409, "a3 20999 → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a4", amount: 500 }, cookie: c1, origin: O })).s === 403, "eigene Auktion → 403");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a5", amount: 500 }, cookie: c1, origin: O })).s === 409, "beendete Auktion → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 50.5 }, cookie: c1, origin: O })).s === 400, "Kommabetrag → 400");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 5000 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5001, "eigenes offenes Gebot hebt Minimum");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a2", amount: 21499 }, cookie: c1, origin: O })).s === 409, "a2 21499 < min_next_bid → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a2", amount: 21500 }, cookie: c1, origin: O })).s === 202, "a2 21500 → 202");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a3", amount: 20999 }, cookie: c1, origin: O })).s === 409, "a3 20999 → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a4", amount: 500 }, cookie: c1, origin: O })).s === 403, "eigene Auktion → 403");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a5", amount: 500 }, cookie: c1, origin: O })).s === 409, "beendete Auktion → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 50.5 }, cookie: c1, origin: O })).s === 400, "Kommabetrag → 400");
 
   console.log("5) Shop-Bestellungen");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 11 }, cookie: c1, origin: O })).s === 409, "Menge > Lager → 409");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L2", qty: 1 }, cookie: c1, origin: O })).s === 404, "Angebot mit Preis null wird verworfen → 404");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L3", qty: 1 }, cookie: c1, origin: O })).s === 403, "eigener Shop → 403");
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 2 }, cookie: c1, origin: O }); ok(r.s === 202 && r.j.total === 3000, "Bestellung per listing_id → 202, total 3000", r.t);
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L1", qty: 11 }, cookie: c1, origin: O })).s === 409, "Menge > Lager → 409");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L2", qty: 1 }, cookie: c1, origin: O })).s === 404, "Angebot mit Preis null wird verworfen → 404");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L3", qty: 1 }, cookie: c1, origin: O })).s === 403, "eigener Shop → 403");
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L1", qty: 2 }, cookie: c1, origin: O }); ok(r.s === 202 && r.j.total === 3000, "Bestellung per listing_id → 202, total 3000", r.t);
   const ordId = r.j?.request_id;
   { const row = sqlRows(`SELECT type, shop_id, listing_id FROM mc_shop_orders_pending WHERE id='${ordId}'`)[0]; ok(row && row.type === "shop" && row.shop_id === "s1" && row.listing_id === "L1" && /^[0-9a-f-]{36}$/.test(ordId), "Shop-Order unverändert: type shop, shop_id/listing_id gesetzt, request_id serverseitig", JSON.stringify(row)); }
   { const pz = (await req("/api/mc-shop-orders/pending", { token: TOK })).j.items.find((x) => x.request_id === ordId || x.id === ordId); ok(pz && pz.type === "shop" && pz.shop_id === "s1", "Shop-Order in /pending wie bisher (+type)", JSON.stringify(pz)); }
-  r = await req("/api/mc-shop-order", { method: "POST", body: { shop_id: "s1", item: "diamond", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 202, "Legacy shop_id+item → 202 (4. Aktion)");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a3", amount: 21000 }, cookie: c1, origin: O }); ok(r.s === 202, "a3 21000 → 202 (5. Aktion)", r.t);
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 429, "6. Aktion in 1 min → 429 Rate-Limit", r.s);
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1 }, cookie: c2, origin: O, ip: "10.0.0.1" }); ok(r.s === 403, "anderer User, eigener Shop → 403 (nicht vom Limit des ersten Users betroffen)", r.s);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, shop_id: "s1", item: "diamond", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 202, "Legacy shop_id+item → 202 (4. Aktion)");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a3", amount: 21000 }, cookie: c1, origin: O }); ok(r.s === 202, "a3 21000 → 202 (5. Aktion)", r.t);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L1", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 429, "6. Aktion in 1 min → 429 Rate-Limit", r.s);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L1", qty: 1 }, cookie: c2, origin: O, ip: "10.0.0.1" }); ok(r.s === 403, "anderer User, eigener Shop → 403 (nicht vom Limit des ersten Users betroffen)", r.s);
 
   console.log("6) Bot: pending + ack");
   ok((await req("/api/mc-bids/pending")).s === 401, "pending ohne Token → 401");
@@ -269,7 +274,7 @@ try {
   console.log("6d) Feedback");
   const fb = (body, o = {}) => req("/api/feedback", { method: "POST", body, cookie: c1, origin: O, ...o });
   const good = { category: "bug", text: "Beschreibung mit genug Text c0de", location: "Spawn", token: "XXXX.DUMMY.TOKEN.XXXX" };
-  for (const h of [HOST, "nwebnotfound.dev"]) { const pg = await req("/feedback", { testHost: h }); ok(pg.s === 200 && pg.t.includes("/api/feedback") && pg.t.includes("challenges.cloudflare.com/turnstile") && /mc\/ds\.css|ds\.css\?v=/.test(pg.t), "GET /feedback auf " + h + " → 200 (MC-Design)", pg.s); }
+  for (const h of [HOST, "nwebnotfound.dev"]) { const pg = await req("/feedback", { testHost: h }); ok(pg.s === 200 && pg.t.includes("/api/feedback") && pg.t.includes("challenges.cloudflare.com/turnstile") && /\/bundle\/mc\.css\?v=/.test(pg.t), "GET /feedback auf " + h + " → 200 (MC-Design)", pg.s); }
   ok((await req("/feedback", { testHost: "nwebnotfound.dev" })).t.includes('href="https://mc.nwebnotfound.dev/markt"'), "Hauptdomain: MC-Navigation absolut");
   // Login-Gate
   ok((await req("/api/feedback")).j.logged_in === false, "Login-Gate: GET ohne Login → logged_in false (Seite zeigt Login-Button)");
@@ -323,7 +328,7 @@ try {
   ok((await BB({ item: "unobtainium", amount: 1 })).s === 404, "bank_buy unbekanntes Item → 404");
   ok((await BB({ item: "elytra", amount: 1 })).s === 409, "bank_buy gesperrtes Item → 409");
   ok((await BB({ item: "diamond", amount: 1, mc_uuid: U1 })).s === 403, "bank_buy fremde mc_uuid → 403");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { type: "kaputt", item: "diamond", qty: 1 }, cookie: c9, origin: O, ip: "10.0.0.33" })).s === 400, "unbekannter type → 400");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, type: "kaputt", item: "diamond", qty: 1 }, cookie: c9, origin: O, ip: "10.0.0.33" })).s === 400, "unbekannter type → 400");
   const RID1 = "web-" + "a".repeat(20);
   r = await BB({ item: "diamond", amount: 3, mc_uuid: U9, request_id: RID1 }); ok(r.s === 202 && r.j.request_id === RID1 && r.j.unit_price === 1100 && r.j.total === 3300 && r.j.type === "bank_buy", "bank_buy Website → 202, Preis aus Markt (11 CP = 1100 Cent)", r.t);
   r = await BB({ item: "diamond", amount: 3, request_id: RID1 }); ok(r.s === 200 && r.j.duplicate === true, "gleiche request_id → idempotent 200, keine zweite Zeile", r.t);
@@ -432,12 +437,12 @@ try {
   const iau = JSON.parse(execSync("node scripts/icon-audit.mjs --json", { cwd: ROOT }).toString());
   ok(iau.placeholder.length === 0 && iau.approx.length === 0, "icon-audit: 0 Platzhalter, 0 falsche Icons", JSON.stringify({ p: iau.placeholder, a: iau.approx }).slice(0, 300));
   console.log("9c) Navigation, Theme, Seiten");
-  const home = (await req("/")).t; ok(!/<nav class="nl"[^]*?href="\/profile">Profil<\/a>[^]*?<\/nav>/.test(home), "kein doppelter Profil-Tab in der Nav");
-  { const port = await req("/portfolio", { testHost: "nwebnotfound.dev" }); const chip = (port.t.split("else if(d.user)")[1] || "").split("else if(d.available)")[0];
-    ok(port.s === 200 && port.t.includes("protocol!=='https:'") && chip.includes("createElement('img')") && chip.includes("httpsAvatar(d.user.avatar)") && !chip.includes("innerHTML") && !/onerror\s*=\s*["']/.test(chip), "Portfolio-Chip: Avatar nur als DOM-Property, nur https", chip.slice(0, 160));
-    const mc = (port.t.split("if(k)")[1] || "").split("else if(d.user)")[0];
-    ok(mc.includes("httpsAvatar(d.user.avatar)") && !mc.includes("this.src=d.user.avatar") && !/av\.src=nm\?/.test(mc), "MC-Konto: Avatar nur über httpsAvatar", mc.slice(0, 180)); }
-  ok(home.includes('href="/bestellungen"') && home.includes("item(orders,'Bestellungen')"), "Dropdown verlinkt zusammengelegte Bestellungen");
+  const home = (await req("/")).t; ok(!/<ul class="u-links">[^]*?href="\/profile"[^]*?<\/ul>/.test(home), "kein doppelter Profil-Tab in der Nav");
+  // The account slot of the unified nav is filled by the external /design/unav.js (no inline script).
+  { const port = await req("/portfolio", { testHost: "nwebnotfound.dev" }); const js = fs.readFileSync(ROOT + "public/design/unav.js", "utf8"); const chip = js.slice(js.indexOf("function render(d)"), js.indexOf("} else if (d && d.available)"));
+    ok(port.s === 200 && port.t.includes('<script src="/design/unav.js?v=') && js.includes('x.protocol === "https:"') && js.includes('var i = el("img")') && chip.includes("img(pic, fb)") && chip.includes("httpsUrl(d.user.avatar)") && !chip.includes("innerHTML") && !/onerror\s*=\s*["']/.test(port.t.slice(port.t.indexOf("<header"), port.t.indexOf("</header>"))), "Portfolio-Chip: Avatar nur als DOM-Property, nur https", chip.slice(0, 160));
+    ok(chip.includes('isMc ? (nm ? "/mc-head/" + nm + "/64?v=5" : "") : httpsUrl(d.user.avatar)') && !chip.includes("src = d.user.avatar"), "Konto: MC-Kopf auf mc.*, sonst nur https-Discord-Avatar", chip.slice(0, 180)); }
+  ok(home.includes("&quot;/bestellungen&quot;") && fs.readFileSync(ROOT + "public/design/unav.js", "utf8").includes("L.menu"), "Dropdown verlinkt zusammengelegte Bestellungen");
   for (const p of ["/bestellungen", "/abholungen"]) { const x = await req(p); ok(x.s === 200 && x.t.includes("/mc/orders.js"), p + " → 200, gemeinsame Liste"); }
   ok((await req("/markt/diamond")).t.includes('id="bbuy"'), "Item-Seite hat Bank-Kauf");
   const css = fs.readFileSync(ROOT + "public/mc/ds.css", "utf8");
@@ -486,7 +491,7 @@ try {
     const api = (await req("/api/mc-parkour")).j, L = api.courses.test;
     ok(L.length === 10 && L.every((x, i) => x.rank === i + 1 && (i === 0 || L[i - 1].time_ms <= x.time_ms)) && L[0].mc_name === "Nils" && L[0].time_ms === 39000, "Top 10 aufsteigend sortiert, max 10", JSON.stringify(L.map((x) => x.time_ms)));
     ok(api.courses.nether_run?.length === 1 && api.courses.nether_run[0].mc_uuid === PU(2), "Zweiter Kurs separat");
-    const pg = await req("/parkour"); ok(pg.s === 200 && /ds\.css\?v=/.test(pg.t) && pg.t.includes('href="/parkour"'), "GET /parkour → 200, im MC-Nav");
+    const pg = await req("/parkour"); ok(pg.s === 200 && /\/bundle\/mc\.css\?v=/.test(pg.t) && pg.t.includes('href="/parkour"'), "GET /parkour → 200, im MC-Nav");
     ok(api.course_names?.test === "Test" && L[0].course_name === "Test" && api.course_icons?.test === "paper" && L[0].course_icon === "paper", "Ohne course_name/icon → Fallback hübsche Kurs-ID + paper", JSON.stringify(api.course_names));
     r = await ing([e0({ course: "cave_rush", mc_uuid: PU(3), mc_name: "Cave", time_ms: 30000, course_name: "  Cave\u0000  Rush  " }), e0({ course: "kurs1", mc_uuid: PU(4), time_ms: 31000, course_name: "<img src=x onerror=alert(1)>" }), e0({ course: "lang", mc_uuid: PU(5), time_ms: 32000, course_name: "x".repeat(60) }), e0({ course: "leer", mc_uuid: PU(6), time_ms: 33000, course_name: "   " }), e0({ course: "zahl", mc_uuid: PU(7), time_ms: 34000, course_name: 5 })]);
     ok(r.j.parkour === 5 && r.j.parkour_rejected === 0 && r.j.parkour_course_names === 3, "course_name optional, ungültig → Zeit zählt trotzdem", r.t);
@@ -533,7 +538,7 @@ try {
     { const m = await req("/parkour", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes("/api/mc-parkour")), "/parkour nur auf mc-Domain", m.s); }
   }
   console.log("7) Seiten");
-  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle", "/parkour", "/vip"]) { const x = await req(p); ok(x.s === 200 && /ds\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
+  for (const p of ["/", "/markt", "/markt/diamond", "/markt/elytra", "/markt/copper_ingot", "/shops", "/shops/s1", "/auktionen", "/auktionen/a1", "/leaderboards", "/spieler", "/spieler/Nils", "/profile", "/wiki", "/wiki/befehle", "/parkour", "/vip"]) { const x = await req(p); ok(x.s === 200 && /\/bundle\/mc\.css\?v=/.test(x.t), "GET " + p + " → 200", x.s); }
   ok((await req("/bestenlisten")).s === 301, "/bestenlisten → 301 /leaderboards");
   ok((await req("/markt")).t.includes('autocomplete="off"'), "Suchfeld ohne Autofill");
   console.log("7b) Hub: Shell, Sprache, Weiterleitungen");
@@ -543,12 +548,13 @@ try {
       .filter((u) => !/^https:\/\/(github\.com\/NwebNotFound|x\.com\/NwebNotFound|mc\.nwebnotfound\.dev|nwebnotfound\.dev)(\/|$)/.test(u));
     const home = await hub("/", { headers: { "accept-language": "de-DE,de;q=0.9,en;q=0.8" } });
     ok(home.s === 200 && /<html lang="de" class="sm-root">/.test(home.t), "GET / → 200, <html lang=de> aus Accept-Language", home.s);
-    ok(home.t.includes("/design/summer.css?v=") && home.t.includes('src="/design/summer-theme.js"') && home.t.indexOf("summer-theme.js") < home.t.indexOf("summer.css?v="), "Hub lädt das Phase-1-Theme (Themeskript vor dem Stylesheet)");
+    ok(home.t.includes("/design/summer.css?v=") && home.t.includes('src="/design/summer-theme.js?v=') && home.t.indexOf("summer-theme.js") < home.t.indexOf("summer.css?v="), "Hub lädt das Phase-1-Theme (Themeskript vor dem Stylesheet)");
     ok(home.t.includes('class="sm-skip-link"') && home.t.includes('<main id="main">') && home.t.includes('<footer class="sm-footer"'), "Skip-Link und Landmarks vorhanden");
     ok(home.t.includes('hreflang="de"') && home.t.includes('hreflang="en"') && home.t.includes('hreflang="x-default"'), "hreflang de/en/x-default gesetzt");
     ok(home.t.includes('href="https://github.com/NwebNotFound" target="_blank" rel="noopener noreferrer"') && home.t.includes('href="https://x.com/NwebNotFound" target="_blank" rel="noopener noreferrer"'), "Footer: GitHub und X als normale Links mit rel=noopener noreferrer");
     ok(extUrls(home.t).length === 0, "keine fremden Requests (kein CDN, kein Tracker, keine externen Schriften)", extUrls(home.t).slice(0, 3).join(" "));
-    ok(home.t.includes("sm-nav__link--soon") && home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche: gedaempfte Navigation mit Sonnen-Pixel, 'bald' auf den Kacheln");
+    { const nav = home.t.slice(home.t.indexOf("<header"), home.t.indexOf("</header>"));
+      ok(!nav.includes(">Musik<") && home.t.includes("sm-badge--sun") && home.t.includes("bald"), "noch leere Bereiche: nicht in der Navigation (Nils 05.11.), 'bald' auf den Kacheln"); }
     const en = await hub("/", { headers: { "accept-language": "en-GB,en;q=0.9" } });
     ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("Welcome to my corner"), "Accept-Language en → englische Oberfläche");
     ok(en.t.includes('href="/de"') && en.t.includes('href="/en"') && en.t.includes('aria-current="true"'), "Sprachumschalter verlinkt beide Sprachen und markiert die aktuelle");
@@ -563,21 +569,28 @@ try {
     ok((await hub("/en")).s === 200 && /<html lang="en"/.test((await hub("/en")).t), "/en (ohne Schluss-Slash) → 200, englisch");
     for (const p of ["/de/guestbook", "/en/guestbook", "/en/portfolio", "/de/unbekannt"]) {
       const r = await hub(p), want = p.slice(3);
-      ok(r.s === 301 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}`, `${p} → 301 ${want} (Hub-fremde Route ohne Präfix)`, `${r.s} ${r.h.get("location")}`);
+      ok(r.s === 302 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}` && /no-store/.test(r.h.get("cache-control") || ""), `${p} → 302 no-store ${want} (Hub-fremde Route ohne Präfix, nie aus dem Cache)`, `${r.s} ${r.h.get("location")} ${r.h.get("cache-control")}`);
+      ok((r.h.get("set-cookie") || "").includes(`nnf_lang=${p.slice(1, 3)}`), `${p} merkt sich die Sprache (DE/EN-Schalter bleibt auf der Seite)`, r.h.get("set-cookie"));
     }
+    // Unified nav on the German-only pages: EN stays on the page and the nav follows the cookie.
+    { const gde = await hub("/guestbook"), gen = await hub("/guestbook", { cookie: "nnf_lang=en" });
+      const nav = (t) => t.slice(t.indexOf("<header"), t.indexOf("</header>"));
+      ok(nav(gde.t).includes('href="/en/guestbook"') && nav(gde.t).includes('href="/de/guestbook" hreflang="de" lang="de" aria-current="true"'), "/guestbook: EN-Link bleibt auf der Seite, DE markiert", nav(gde.t).slice(0, 120));
+      ok(nav(gen.t).includes('href="/en/guestbook" hreflang="en" lang="en" aria-current="true"') && nav(gen.t).includes(">Guestbook<") && nav(gen.t).includes('aria-current="page">Guestbook<'), "/guestbook mit nnf_lang=en: EN markiert, Navigation englisch");
+      ok(!/<img[^>]*class="[^"]*u-acct/.test(nav(gde.t)) && nav(gde.t).includes("data-u-acct></div>"), "kein Avatar im HTML, bevor die Sitzung bekannt ist"); }
     for (const p of ["/", "/about", "/music", "/writing"]) {
       const r = await hub(p);
       ok(r.s === 200 && r.t.includes("/design/summer.css?v="), `Hub-Route ${p} → 200`, r.s);
     }
     // Rezensionen wurden am 04.11.2026 entfernt: die Route liefert die normale 404-Seite, die
-    // Sprachvarianten laufen über den üblichen 301 auf den präfixlosen Pfad.
+    // Sprachvarianten laufen über den üblichen 302 (no-store) auf den präfixlosen Pfad.
     {
       const gone = await hub("/reviews");
       const goneDe = await hub("/de/reviews");
       const goneEn = await hub("/en/reviews");
       ok(gone.s === 404 && gone.t.includes("Fehler 404") && !gone.t.includes("sm-root"), "/reviews → normale 404-Seite", gone.s);
-      ok(goneDe.s === 301 && (goneDe.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/de/reviews → 301 auf /reviews", goneDe.s);
-      ok(goneEn.s === 301 && (goneEn.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/en/reviews → 301 auf /reviews", goneEn.s);
+      ok(goneDe.s === 302 && (goneDe.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/de/reviews → 302 auf /reviews", goneDe.s);
+      ok(goneEn.s === 302 && (goneEn.h.get("location") || "") === "https://nwebnotfound.dev/reviews", "/en/reviews → 302 auf /reviews", goneEn.s);
       ok(!gone.t.includes("Rezensionen") && !(await hub("/")).t.includes("Rezensionen") && !(await hub("/about")).t.includes("Rezensionen"), "nirgends mehr ein Rezensionen-Link");
     }
     const soon = await hub("/en/music");
@@ -696,7 +709,7 @@ try {
     const chapter = await hub("/writing/test-fixture-chapter-2");
     ok(chapter.t.includes('href="/downloads/story-test-fixture-chapter-2.epub"') && chapter.t.includes("EPUB herunterladen"), "Kapitel: EPUB-Download-Button", chapter.s);
     ok(chapter.t.includes('href="/downloads/series-test-fixture-serie.epub"'), "Kapitel: Serien-EPUB verlinkt");
-    ok(chapter.t.includes("data-sm-print") && chapter.t.includes('<script src="/design/summer-print.js" defer></script>'), "Kapitel: Druck-Button mit externem Skript");
+    ok(chapter.t.includes("data-sm-print") && /<script src="\/design\/summer-print\.js\?v=[0-9a-f]+" defer><\/script>/.test(chapter.t), "Kapitel: Druck-Button mit externem Skript");
     ok(chapter.t.includes("© Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
     ok(!/onclick=/.test(chapter.t) && !/<script(?![^>]*\ssrc=)/i.test(chapter.t), "Kapitel: kein Inline-Handler, kein Inline-Skript");
     const blog = await hub("/writing/test-fixture-hello");
@@ -741,6 +754,23 @@ try {
     ok((await mob("creeper")) === "/mc/heads/creeper.png" && (await mob("minecraft:zombie")) === "/mc/heads/zombie.png", "Mob-Icon: Creeper/Zombie → eigener Kopf");
     ok((await mob("phantom")) === "/mc-icon/v2/phantom_spawn_egg" && (await mob("fall")) === "/mc-icon/v2/feather" && (await mob("..%2Fx")) === "/mc-icon/v2/bone", "Mob-Icon: Spawn-Ei / Ursache / ungültig → Fallback");
     const hp = await fetch(BASE + "/mc/heads/creeper.png", { headers: { host: HOST } }); ok(hp.status === 200 && /image\/png/.test(hp.headers.get("content-type") || ""), "Kopf-PNG selbst gehostet");
+  }
+  { // Performance: one bundled stylesheet on mc., immutable only for the current version, HTML revalidated.
+    const { AV } = await import("../src/asset-version.js");
+    const page = await fetch(BASE + "/wiki", { headers: { host: HOST } }); const html = await page.text();
+    ok(html.includes(`/bundle/mc.css?v=${AV}`) && !/\/mc\/(ds|theme-v2)\.css|\/design\/(minecraft|unav)\.css/.test(html), "mc.: ein CSS-Bundle statt minecraft/ds/theme-v2/unav");
+    ok(!/immutable/.test(page.headers.get("cache-control") || ""), "mc.: HTML bleibt revalidiert", page.headers.get("cache-control"));
+    const b = await fetch(BASE + `/bundle/mc.css?v=${AV}`, { headers: { host: HOST } }); const css = await b.text();
+    const parts = ["public/design/minecraft.css", "public/mc/ds.css", "public/mc/theme-v2.css", "public/design/unav.css"].map((f) => fs.readFileSync(ROOT + f, "utf8").replaceAll("\r\n", "\n"));
+    const all = css.replaceAll("\r\n", "\n");
+    let at = 0; const inOrder = parts.every((x) => { const i = all.indexOf(x, at); if (i < 0) return false; at = i + x.length; return true; });
+    ok(b.status === 200 && /text\/css/.test(b.headers.get("content-type") || "") && inOrder, "Bundle: alle vier Teile vollständig, in Kaskaden-Reihenfolge");
+    ok(/immutable/.test(b.headers.get("cache-control") || ""), "Bundle mit aktueller Version: immutable", b.headers.get("cache-control"));
+    ok(!/immutable/.test((await fetch(BASE + "/bundle/mc.css?v=alt", { headers: { host: HOST } })).headers.get("cache-control") || ""), "Bundle mit fremder Version: nicht immutable");
+    ok(/immutable/.test((await fetch(BASE + `/mc/common.js?v=${AV}`, { headers: { host: HOST } })).headers.get("cache-control") || ""), "versioniertes JS: immutable");
+    { const pv = await fetch(BASE + "/design/summer-preview", { headers: { host: "nwebnotfound.dev" } }); const t = await pv.text(); const links = [...t.matchAll(/(?:src|href)="(\/design\/[^"]+\.(?:css|js)[^"]*)"/g)].map((m) => m[1]);
+      ok(pv.status === 200 && links.length >= 3 && links.every((l) => l.endsWith(`?v=${AV}`)) && !/immutable/.test(pv.headers.get("cache-control") || ""), "Design-Vorschau: statisches HTML bekommt ?v=AV, HTML selbst revalidiert", links.join(" ")); }
+    ok(/loading="lazy"/.test(html.match(/<img[^>]*\/mc-icon\/v2\/grass_block[^>]*>/)?.[0] || ""), "Nav-Icons laden lazy");
   }
   { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && /form-action 'self' https:\/\/nwebnotfound\.dev (https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+) /.test(c) && !r.headers.get("content-security-policy-report-only"), "CSP wird erzwungen (inkl. form-action für den Logout-POST)", c);
     ok(r.headers.get("strict-transport-security") === "max-age=31536000; includeSubDomains", "HSTS gesetzt", r.headers.get("strict-transport-security")); }
@@ -888,8 +918,8 @@ try {
     sql("DELETE FROM mc_player_ranks");
     sql(`UPDATE mc_player_stats SET stats = json_remove(stats, '$.skin_url') WHERE mc_uuid = '${U1}'`);
     const pg = await req("/vip"); const sec = pg.t.slice(pg.t.indexOf('id="vip"'));
-    { const comm = (pg.t.split('data-g="community"')[1] || "").split("</div></div>")[0], konto = (pg.t.split('data-g="konto"')[1] || "").split("</div></div>")[0];
-      ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && konto.includes('href="/vip"') && !comm.includes('href="/vip"'), "GET /vip bindet Panel ein, Link im Konto-Menü", String(pg.s)); }
+    { const comm = (pg.t.split('data-g="community"')[1] || "").split("</li>")[0], konto = pg.t.match(/data-l="([^"]*)"/)?.[1] || "";
+      ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && konto.includes("&quot;/vip&quot;") && !comm.includes('href="/vip"'), "GET /vip bindet Panel ein, Link im Konto-Menü", String(pg.s)); }
     ok(!/<script|<style| style=/.test(sec.slice(0, sec.indexOf("</section>"))), "/vip-Inhalt ohne Inline-Script/-Style");
     { const m = await req("/vip", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes('id="vip"')), "/vip nur auf mc-Domain", String(m.s)); }
     { const js = await req("/mc/vip.js"); ok(js.s === 200 && js.t.includes("E(p.title)") && js.t.includes("E(s.label)") && js.t.includes('href="/profile"') && js.t.includes("encodeURIComponent(rel)") && !js.t.includes("location.href") && !/style=|\.style\./.test(js.t), "vip.js escaped, Login-next relativ, keine Inline-Styles"); }
@@ -912,7 +942,9 @@ try {
       ok(ev.s === 403 && no.s === 403 && has(), "POST-Logout mit fremder/ohne Origin → 403, Session bleibt", ev.s + "/" + no.s);
       const po = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://mc.nwebnotfound.dev", testHost: "nwebnotfound.dev" });
       ok(po.s === 303 && /^(https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+)\/vip$/.test(po.h.get("location") || "") && /nnf_session=;.*Max-Age=0/.test(po.h.get("set-cookie") || "") && !has(), "POST-Logout von mc. → 303, Cookie gelöscht, Session weg", po.s + " " + po.h.get("location"));
-      const pg = await req("/", { cookie: ck }); ok(pg.t.includes("closest('a[href*=\"/auth/discord/logout\"]')") && pg.t.includes("f.method='post'"), "Konto-Menü: Abmelden-Link sendet POST-Formular"); }
+      // The shared nav (#73) carries the handler in its external script (CSP: no inline handler).
+      const pg = await req("/", { cookie: ck }); const unavJs = fs.readFileSync(ROOT + "public/design/unav.js", "utf8");
+      ok(/<script src="\/design\/unav\.js\?v=/.test(pg.t) && unavJs.includes(`closest('a[href*="/auth/discord/logout"]')`) && unavJs.includes('f.method = "post"'), "Konto-Menü: Abmelden-Link sendet POST-Formular (unav.js)"); }
   }
   // Ingest: null bleibt NULL (nicht 0), online pro Spieler wird gespeichert (Dict- und View-Form)
   { const nm = sqlRows(`SELECT mc_name FROM mc_links WHERE mc_uuid = '${U1}'`)[0]?.mc_name, bak = sqlRows(`SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0];
@@ -1062,6 +1094,17 @@ try {
     ok(!JSON.stringify(seen.j?.worlds?.slots || []).includes(WID), "nach leerem Sync keine UUID-Slots aus vip_worlds", JSON.stringify(seen.j?.worlds || seen.j?.reason));
     // Panel v2: create prüft laufende Aufträge mit, settings hat einen eigenen Eimer.
     { await post("/api/mc-vip-worlds", { vip_worlds: [] }, { token: TOK, origin: null, cookie: null });
+      // Admin (Nils, 06.11.): eigene Welten anlegen und verwalten wie VIP/MVP (Admin = 3 Plätze).
+      await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "admin", color: "&c", weight: 100 }] } });
+      const ac = await post("/api/mc-vip/worlds", { request_id: "vip-admin-create", name: "AdminWelt", type: "normal" }, { cookie: c1 });
+      ok(ac.s === 202 && ac.j?.op === "create", "Admin: eigene Welt anlegen → 202", ac.t);
+      await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ status: "stopped", slot: null, players: 0 })] }, { token: TOK, origin: null, cookie: null });
+      const ar = await post(`/api/mc-vip/worlds/${WID}/rename`, { request_id: "vip-admin-rename", name: "AdminNeu" }, { cookie: c1 });
+      ok(ar.s === 202 && ar.j?.op === "rename", "Admin: eigene Welt umbenennen → 202", ar.t);
+      const ad = await post(`/api/mc-vip/worlds/${WID}/delete`, { request_id: "vip-admin-delete", confirm: "Insel" }, { cookie: c1 });
+      ok(ad.s === 202 && ad.j?.op === "delete", "Admin: eigene Welt löschen → 202", ad.t);
+      sql("DELETE FROM mc_vip_commands WHERE request_id IN ('vip-admin-create','vip-admin-rename','vip-admin-delete')");
+      await post("/api/mc-vip-worlds", { vip_worlds: [] }, { token: TOK, origin: null, cookie: null });
       await req("/api/mc-ingest", { method: "POST", token: TOK, body: { player_ranks: [{ uuid: U1, name: "Nils", rank: "vip", color: "&6", weight: 40 }] } });
       const c1r = await post("/api/mc-vip/worlds", { request_id: "vip-create-1", name: "Kirschtal", type: "flat" }, { cookie: c1 });
       ok(c1r.s === 202 && c1r.j?.op === "create", "create → 202", c1r.t);

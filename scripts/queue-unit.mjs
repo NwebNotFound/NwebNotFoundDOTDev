@@ -126,8 +126,14 @@ else {
       assert.equal((await bb({ turnstile: "good" })).status, 202, "gültiger Token → 202");
       host = "evil.example"; assert.equal((await bb({ turnstile: "good" })).status, 403, "Token für fremden Hostnamen → 403"); host = "nwebnotfound.dev";
       const so = (extra) => trade.route(p, web(p, { listing_id: "L1", qty: 1, request_id: crypto.randomUUID(), ...extra }), env, U(p));
-      assert.equal((await so({})).status, 202, "Shop-Kauf ohne Widget: Token weiter optional");
-      assert.equal((await so({ turnstile: "bad" })).status, 403, "mitgeschickter falscher Token wird geprüft");
+      // Nils, 06.11.: Shop-Kauf und Gebot brauchen den Token wie bank_buy.
+      assert.equal((await so({})).status, 403, "Shop-Kauf ohne Token → 403");
+      assert.equal((await so({ turnstile: "bad" })).status, 403, "Shop-Kauf mit falschem Token → 403");
+      assert.equal((await so({ turnstile: "good" })).status, 202, "Shop-Kauf mit gültigem Token → 202");
+      const bp = "/api/mc-bid", bd = (extra) => trade.route(bp, web(bp, { auction_id: "a1", amount: 100000, ...extra }), env, U(bp));
+      assert.equal((await bd({})).status, 403, "Gebot ohne Token → 403");
+      assert.equal((await bd({ turnstile: "bad" })).status, 403, "Gebot mit falschem Token → 403");
+      assert.notEqual((await bd({ turnstile: "good" })).status, 403, "Gebot mit gültigem Token kommt am Captcha vorbei");
       // Bot-Weg (Ingest-Token) braucht kein Captcha
       const bot = new Request("https://mc.nwebnotfound.dev" + p, { method: "POST", headers: { "x-ingest-token": "tok", "content-type": "application/json" }, body: JSON.stringify({ type: "bank_buy", item: "diamond", amount: 1, discord_id: DID }) });
       assert.equal((await trade.route(p, bot, { ...env, MC_INGEST_TOKEN: "tok" }, U(p))).status, 202, "Bot ohne Captcha → 202");

@@ -95,11 +95,11 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     return { sql, args: r.ipHash ? [r.a.discordId, now - 60000, now - 3600000, r.ipHash] : [r.a.discordId, now - 60000, now - 3600000] };
   }
   const RATE_LIMITED = () => json({ error: "Zu viele Aktionen, bitte kurz warten" }, 429, { "retry-after": "60" });
-  // Turnstile für Website-Aktionen. Pflicht (sobald TURNSTILE_SECRET gesetzt ist) dort, wo die Seite
-  // ein Widget hat und den Token mitschickt: Bank-Direktkauf (bankbuy.js). Shop-Kauf und Gebot
-  // (shop.js, auction.js) haben kein Widget; dort wird ein mitgeschickter Token geprüft, ein
-  // fehlender aber noch hingenommen. Schutz dort: Login + verifizierter Link + Rolle, Origin-Check
-  // und das atomare Rate-Limit. Ein mitgeschickter Token muss success UND unseren Hostnamen haben.
+  // Turnstile für Website-Aktionen: Pflicht (sobald TURNSTILE_SECRET gesetzt ist) für jeden Kauf und
+  // jedes Gebot über die Website: Bank-Direktkauf (bankbuy.js), Shop-Kauf (shop.js), Gebot
+  // (auction.js), Entscheidung Nils 06.11. Dazu Login + verifizierter Link + Rolle, Origin-Check und
+  // das atomare Rate-Limit. Der Token muss success UND unseren Hostnamen haben. Der Bot (Ingest-Token)
+  // braucht keinen Token.
   async function turnstileOk(env, req, token, required) {
     if (!env.TURNSTILE_SECRET) return true;
     if (!token) return !required;
@@ -111,7 +111,8 @@ export function makeTrade({ json, getUser, safeEq, MAIN, MCD }) {
     if (viaBot) { if (!tokenOk(req, env)) return { err: [401, "unauthorized"] }; const did = String(b?.discord_id ?? ""); if (!/^\d{15,21}$/.test(did)) return { err: [400, "discord_id fehlt"] }; return { discordId: did, source: "discord" }; }
     if (!originOk(req)) return { err: [403, "Ungültige Herkunft"] };
     const u = await getUser(req, env); if (!u) return { err: [401, "Bitte mit Discord anmelden"] };
-    if (!(await turnstileOk(env, req, b?.turnstile, b?.type === "bank_buy" || new URL(req.url).pathname === "/api/mc-bank-buy"))) return { err: [403, "Captcha fehlgeschlagen"] };
+    // Nils, 06.11.: Turnstile is required for every web buy and bid (shop order, bank_buy, auction bid).
+    if (!(await turnstileOk(env, req, b?.turnstile, true))) return { err: [403, "Captcha fehlgeschlagen"] };
     return { discordId: u.id, source: "web" };
   }
   async function prep(req, env) {

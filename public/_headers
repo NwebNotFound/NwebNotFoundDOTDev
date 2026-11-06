@@ -8,3 +8,22 @@
 /downloads/*
   Content-Type: application/epub+zip
   Cache-Control: public, max-age=86400
+
+# Versioned CSS/JS (every link carries ?v=<AV>, a hash over public/mc, public/design and
+# public/vendor, see scripts/deploy.sh): cached for a year, never revalidated. HTML stays no-cache.
+/design/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/design/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/mc/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/mc/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/vendor/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+# Fonts are linked without a version; they change rarely, so a month without revalidation.
+/design/fonts/*
+  Cache-Control: public, max-age=2592000
+/mc/fonts/*
+  Cache-Control: public, max-age=2592000

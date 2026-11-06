@@ -501,7 +501,7 @@ async function styleProbe(browser, cookie) {
         buttonHeight: document.querySelector(".btn") ? Math.round(document.querySelector(".btn").getBoundingClientRect().height) : null,
         navRadius: nav ? getComputedStyle(nav).borderRadius : null,
         navBlur: nav ? getComputedStyle(nav).backdropFilter : null,
-        themeCss: [...document.styleSheets].some((s) => (s.href || "").includes("theme-v2.css")),
+        themeCss: [...document.styleSheets].some((s) => /theme-v2\.css|\/bundle\/mc\.css/.test(s.href || "")),
       };
     });
     await ctx.close();

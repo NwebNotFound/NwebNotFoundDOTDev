@@ -2,7 +2,7 @@
 // Reine VIP-Helfer (ohne Worker). Wird von scripts/e2e.mjs importiert und kann allein laufen.
 import assert from "node:assert/strict";
 import { isVipWorldKey, pickVipWorlds, vipStats, vipWorldLabel, vipCatalog, vipRankView, normU, WORLD_LIMITS, worldLimit } from "../src/mc-vip.js";
-import { sanitizeInfo, cleanWorlds, cleanLog, cleanSettings, ACTIONS } from "../src/mc-vip-cmd.js";
+import { sanitizeInfo, cleanWorlds, cleanLog, cleanSettings, ACTIONS, SYNC_MAX_BYTES } from "../src/mc-vip-cmd.js";
 import { WORLD_DEFAULTS } from "../src/mc-vip.js";
 
 const worlds = {
@@ -85,6 +85,26 @@ const CW = {
 };
 const CL = { at: 1793504000000, admin_uuid: "cccccccc-0000-4000-8000-0000000000cc", admin_name: "Nils", owner_uuid: "1b2c3d4e-0000-4000-8000-000000000001", owner_name: "Ada", world_id: "7f1e0000-0000-4000-8000-000000000010", action: "set_visibility", detail: "private" };
 assert.equal(cleanWorlds({ id: "nope" }).error.includes("Array"), true);
+{ // Sync-Grenze laut Vertrag 500 (vorher 30): 31 Welten kommen vollständig an, 501 werden abgelehnt.
+  const many = (n) => Array.from({ length: n }, (_, i) => ({ ...CW, id: `11111111-2222-4333-8444-${String(i).padStart(12, "0")}` }));
+  assert.equal(cleanWorlds(many(31)).worlds.length, 31, "31 Welten vollständig");
+  assert.equal(cleanWorlds(many(500)).worlds.length, 500, "500 Welten vollständig");
+  assert.equal(cleanWorlds(many(501)).error, "höchstens 500 Welten", "501 abgelehnt statt gekürzt");
+  // D1: ein Wert höchstens 2.000.000 Bytes. Gemessen in UTF-8-Bytes, mit den Vertragsgrenzen:
+  // 32 Einladungen (cleanInvites), 120 Zeichen Name/Info (sanitizeInfo), Mehrbyte-Text.
+  const bytesOf = (r) => new TextEncoder().encode(JSON.stringify(r.worlds)).length;
+  const inv = (n) => Array.from({ length: n }, (_, i) => ({ uuid: `22222222-2222-4222-8222-${String(i).padStart(12, "0")}`, name: "Player_Name_" + String(i).padStart(4, "0"), role: "trusted", added_at: 1793503000000 }));
+  const big = (n, o) => many(n).map((w) => ({ ...w, owner_name: "NwebNotFound_123", slot: "vipworld-12", addons: ["keep-inventory", "peaceful", "creative"], ...o }));
+  const full = cleanWorlds(big(500, { name: "世".repeat(120), info: "界".repeat(120), invites: inv(40) }));
+  assert.ok(full.error && full.error.startsWith("vip_worlds zu groß"), "Vertrags-Maximum (≈2,5 MB) wird ganz abgelehnt, nicht gekürzt: " + (full.error || ""));
+  const real = cleanWorlds(big(500, { name: "W".repeat(24), invites: inv(12) }));
+  assert.equal(real.worlds?.length, 500, "500 Welten mit 12 Mitgliedern (Web-Limit) und Plugin-Namen passen");
+  assert.ok(bytesOf(real) <= SYNC_MAX_BYTES && bytesOf(real) < 2_000_000, "unter der D1-Grenze: " + bytesOf(real));
+  const mb = cleanWorlds(big(120, { name: "世".repeat(120), info: "界".repeat(120), invites: inv(32) }));
+  assert.equal(mb.worlds?.length, 120, "Mehrbyte-Namen und 32 Einladungen: 120 Welten passen");
+  assert.ok(bytesOf(mb) > JSON.stringify(mb.worlds).length * 1.1, "Mehrbyte-Text zählt als UTF-8-Bytes, nicht als Zeichen");
+  assert.equal(mb.worlds[0].invites.length, 32, "32 Einladungen behalten");
+}
 assert.equal(cleanWorlds([{ ...CW, visibility: "public" }]).worlds.length, 0, "visibility public raus");
 const cw = cleanWorlds([CW]).worlds[0];
 assert.equal(cw.name, "Insel");
@@ -170,5 +190,16 @@ assert.deepEqual(cleanWorlds([{ ...CW, settings: { weather: "rain", gamemode: "c
 assert.equal(cleanWorlds([{ ...CW, settings: { pvp: 1 } }]).worlds.length, 1, "falscher Wert wirft die Welt nicht raus");
 assert.equal(cleanWorlds([{ ...CW, settings: { pvp: 1 } }]).worlds[0].settings.pvp, undefined, "falscher Wert fällt weg");
 assert.equal(cleanWorlds([{ ...CW }]).worlds[0].settings, null, "ohne settings bleibt null (Defaults im Panel)");
+
+// HTML pattern attributes compile with the regex v flag: an unescaped "-" in a class is an error and
+// the browser then ignores the check. Every pattern in vip.js must compile with "v" (create, rename, member).
+import { readFileSync } from "node:fs";
+const vipJs = readFileSync(new URL("../public/mc/vip.js", import.meta.url), "utf8");
+const pats = [...vipJs.matchAll(/pattern="([^"]+)"/g)].map((m) => new Function("return `" + m[1] + "`")());  // as the template literal renders it (\- -> \-)
+assert.ok(pats.length >= 3, "vip.js pattern attributes found");
+for (const p of pats) assert.doesNotThrow(() => new RegExp(`^(?:${p})$`, "v"), "pattern compiles with the v flag: " + p);
+const nameRe = new RegExp(`^(?:${pats.find((p) => p.includes("{3,24}"))})$`, "v");
+for (const ok of ["abc", "My-World_1", "a".repeat(24)]) assert.ok(nameRe.test(ok), "name accepted: " + ok);
+for (const bad of ["ab", "bad name", "a".repeat(25), "wel!t"]) assert.ok(!nameRe.test(bad), "name rejected: " + bad);
 
 console.log("vip-unit ok");

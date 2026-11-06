@@ -54,6 +54,10 @@ const WORLD_STATUS = new Set(["stopped", "starting", "running", "stopping", "err
 const WORLD_TYPES = new Set(["normal", "flat", "void"]);
 const ADDONS = new Set(["keep-inventory", "peaceful", "creative", "day-lock", "pvp"]);
 const EXPIRE_MS = 600000;
+export const SYNC_MAX_WORLDS = 500;
+// D1 stores the list as one value (mc_blobs.data), max 2,000,000 bytes. Keep a margin; measured in
+// UTF-8 bytes, not string length. A larger list is rejected whole, never shortened.
+export const SYNC_MAX_BYTES = 1_900_000;
 const HOUR = 3600000;
 const NAME = /^[A-Za-z0-9_]{1,16}$/;
 const RID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -105,7 +109,8 @@ function playersOf(v) {
 // Schema wie im Vertrag: name, status, slot, player_limit, invites[].uuid (name nullable).
 export function cleanWorlds(raw) {
   if (!Array.isArray(raw)) return { error: "vip_worlds muss ein Array sein" };
-  if (raw.length > 30) return { error: "höchstens 30 Welten" };
+  // Full replace: mc-stack sends every live world and never a shortened list (docs/vip-api.md, 500).
+  if (raw.length > SYNC_MAX_WORLDS) return { error: `höchstens ${SYNC_MAX_WORLDS} Welten` };
   const out = [], seen = new Set();
   for (const w of raw) {
     const id = normU(w?.id ?? w?.world_id);
@@ -139,6 +144,8 @@ export function cleanWorlds(raw) {
       last_started_at: ms(w?.last_started_at),
     });
   }
+  const bytes = new TextEncoder().encode(JSON.stringify(out)).length;
+  if (bytes > SYNC_MAX_BYTES) return { error: `vip_worlds zu groß (${bytes} Bytes, höchstens ${SYNC_MAX_BYTES})` };
   return { worlds: out };
 }
 // Schema wie im Vertrag: at, admin_uuid, admin_name, owner_uuid, owner_name, world_id, action, detail.

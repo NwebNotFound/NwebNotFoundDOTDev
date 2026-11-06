@@ -7,6 +7,7 @@
 //
 // The HTTP half of the same story (status codes, Set-Cookie, redirects, Minecraft regression) runs
 // in scripts/e2e.mjs against a real `wrangler dev`; this file is the cheap, deterministic half.
+import { AV } from "../src/asset-version.js";
 import { MESSAGES, LANGS, LANG_COOKIE, makeT, missingKeys, parseAcceptLanguage, pickLang, splitLang, withLang } from "../src/i18n/index.js";
 import { GITHUB_URL, HUB_PAGES, MC_HOST, X_URL, formatNumber, hubPage, hubPageExists, writingListBody, writingListPage, writingPostPage, writingSeriesPage } from "../src/hub.js";
 
@@ -79,11 +80,11 @@ for (const lang of LANGS) {
     ok(!!html && html.startsWith(`<!doctype html><html lang="${lang}" class="sm-root">`), `${label}: <html lang> and the .sm-root landmark`, html && html.slice(0, 80));
     ok(html.includes(`<link rel="canonical" href="https://nwebnotfound.dev${url(bare)}"`), `${label}: canonical points at the language URL`);
     ok(["de", "en", "x-default"].every((h) => html.includes(`<link rel="alternate" hreflang="${h}" href="https://nwebnotfound.dev`)), `${label}: hreflang de/en/x-default`);
-    ok(html.includes("/design/summer.css?v=") && html.includes(`<script src="/design/summer-theme.js"></script>`), `${label}: summer.css and the theme bootstrap`);
+    ok(html.includes("/design/summer.css?v=") && html.includes(`<script src="/design/summer-theme.js?v=${AV}"></script>`), `${label}: summer.css and the theme bootstrap`);
     ok(html.indexOf("summer-theme.js") < html.indexOf("summer.css?v="), `${label}: theme bootstrap runs before the stylesheet (no theme flash)`);
     ok(html.includes(`class="sm-skip-link" href="#main"`) && html.includes(`<main id="main">`), `${label}: skip link targets the main landmark`);
-    ok(html.indexOf("sm-skip-link") < html.indexOf("<header class=\"sm-nav\""), `${label}: skip link is the first focusable element`);
-    ok(html.includes('<header class="sm-nav"') && html.includes('<footer class="sm-footer"'), `${label}: header and footer landmarks`);
+    ok(html.indexOf("sm-skip-link") < html.indexOf("<header class=\"u-nav u-main sm-nav\""), `${label}: skip link is the first focusable element`);
+    ok(html.includes('<header class="u-nav u-main sm-nav"') && html.includes('<footer class="sm-footer"'), `${label}: header and footer landmarks`);
     ok(!/<script(?![^>]*\bsrc=)/.test(html), `${label}: no inline script (script-src 'self')`);
     ok(!/\son[a-z]+\s*=/i.test(html), `${label}: no inline event handler`);
     // Summer Theme v2: the mascot is the approved inline pixel art (artboard), not the Phase 1
@@ -117,15 +118,21 @@ for (const lang of LANGS) {
   // the parallax layer markup and the external parallax helper.
   ok(home.includes('src="/mc-icon/v2/grass_block"') && home.includes("sm-mc-icon"), "the Minecraft tile shows the real grass_block texture");
   ok(home.includes("data-sm-parallax") && home.includes('class="sm-layer sm-parallax'), "the hero scene carries the parallax layers");
-  ok(home.includes('<script src="/design/summer-parallax.js" defer></script>'), "the start page loads the external parallax helper");
+  ok(home.includes(`<script src="/design/summer-parallax.js?v=${AV}" defer></script>`), "the start page loads the external parallax helper");
   // Night hero (artboard Main-night): the moon and the star field are in the markup, the swap itself
   // is pure CSS (data-theme / prefers-color-scheme), so no script is involved.
   ok(home.includes("sm-scene__moon") && home.includes("sm-scene__stars") && home.includes("sm-twinkle--d4"), "the hero carries the moon and the star field for the night theme");
   ok(home.includes('class="sm-kicker"') && home.includes("Sections") && home.includes("What&#39;s here"), "the section block opens with a pixel kicker and the artboard heading");
   ok(hubPage("/", "de").includes("Was es hier gibt") && hubPage("/", "de").includes(">Bereiche<"), "the German heading comes from the new i18n keys");
-  // One wrapper around brand + controls: narrow screens paint the pill around it alone, wide screens
-  // dissolve it (`display: contents`) and keep brand | nav | tools in one row.
-  ok(home.includes('class="sm-hdr__bar"') && home.includes('class="sm-hdr__tools"'), "the header keeps the bar wrapper for the mobile pill");
+  // Unified nav (mockup fix-unified-nav): one bar, the phone drawer is the same panel, the burger
+  // controls it, and the account slot is empty until /api/me answers (no avatar before the session).
+  const bar = home.slice(home.indexOf("<header"), home.indexOf("</header>"));
+  ok(bar.includes('class="u-bar"') && bar.includes('id="u-panel"') && bar.includes('aria-controls="u-panel"') && bar.includes("data-u-acct></div>"), "the header is the unified bar with drawer panel, burger and empty account slot");
+  ok(home.includes('<script src="/design/unav.js?v=') && home.includes('/design/unav.css?v='), "the hub loads the shared nav assets");
+  ok([">Home<", ">Projects<", ">Guestbook<", ">About<"].every((x) => bar.includes(x)) && !bar.includes(">Music<"), "nav: Home, Projects, Guestbook, About; Music stays hidden until it has a page");
+  ok(bar.indexOf(">Home<") < bar.indexOf(">Projects<") && bar.indexOf(">Guestbook<") < bar.indexOf(">About<"), "nav order follows the mockup");
+  ok(bar.includes(`class="u-switch" href="https://${MC_HOST}/"`), "the Minecraft site switch is a chip, not a nav item");
+  ok(!bar.includes("sm-nav__link--soon"), "no dimmed 'soon' entries in the nav any more");
   ok(!hubPage("/about", "de").includes("summer-parallax.js"), "inner pages do not load the parallax helper");
   // Formatted numbers follow the page language.
   ok(formatNumber(1234, "de") === "1.234" && formatNumber(1234, "en") === "1,234", "counts are grouped per language", `${formatNumber(1234, "de")} / ${formatNumber(1234, "en")}`);
@@ -234,12 +241,12 @@ for (const lang of LANGS) {
 
   /* export (phase 3c) */
   ok(ch1.includes('href="/downloads/story-ch-1.epub"') && ch1.includes('href="/downloads/series-serie.epub"'), "chapter: chapter EPUB and series EPUB are linked");
-  ok(ch1.includes("data-sm-print") && ch1.includes('<script src="/design/summer-print.js" defer></script>'), "chapter: print button with the external helper");
+  ok(ch1.includes("data-sm-print") && ch1.includes(`<script src="/design/summer-print.js?v=${AV}" defer></script>`), "chapter: print button with the external helper");
   ok(ch1.includes("© Nils, nur zum persönlichen Lesen."), "chapter: the rights line is on the page");
   ok(ch1.includes("Öffnet den Druckdialog"), "chapter: the print hint is shown");
   /* reading aids of the chapter page (review findings + artboard Story.html) */
   ok(ch1.includes('class="sm-kicker sm-kicker--center"') && ch1.includes("Kapitel 1 von 2"), "chapter: the head names chapter and count as a centered kicker");
-  ok(ch1.includes("data-sm-progress") && ch1.includes("data-sm-reading-size") && ch1.includes('<script src="/design/summer-reader.js" defer></script>'), "chapter: progress line, Aa control and the external reader helper");
+  ok(ch1.includes("data-sm-progress") && ch1.includes("data-sm-reading-size") && ch1.includes(`<script src="/design/summer-reader.js?v=${AV}" defer></script>`), "chapter: progress line, Aa control and the external reader helper");
   ok(ch1.includes('data-size-small="klein"') && ch1.includes("Schriftgröße: normal"), "chapter: the Aa control carries the German labels");
   ok(!hubPage("/writing", "de").includes("summer-reader.js"), "the list page does not load the reader helper");
   ok(!ch1.includes("sm-feed-note__sep") && ch1.includes("sm-feed-note__links"), "chapter: the feed note is a quiet row without separators");

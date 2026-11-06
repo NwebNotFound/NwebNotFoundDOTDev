@@ -586,7 +586,7 @@ readable in both themes instead of only the sunflower surviving.
 | `.sm-stars` `--lg|--sm` | display only: 5 stars filled to `--sm-rating` (0–5, one decimal) with `role="img"` + `aria-label`; no widget, no script |
 | `.sm-sticker`, `.sm-sky` `--night`, `.sm-dither`, `.sm-mascot` `--placeholder`, `.sm-icon` `--lg` | pixel/sticker detail and the mascot slot |
 | `.sm-wrap`, `.sm-stack`, `.sm-row`, `.sm-section`, `.sm-visually-hidden` | shell helpers for phase 2 |
-| `.sm-shell`, `.sm-nav` (`__inner` `__nav` `__links` `__link` `__tools`), `.sm-brand` (`__name`), `.sm-lang` (`__link`), `.sm-theme` | hub shell: skip link → sticky header, navigation, DE/EN switch, theme toggle (§11.9) |
+| `.sm-shell`, `.sm-nav__link` (footer links), `.sm-lang` (`__link`), `.sm-theme` | hub shell: skip link, footer links, footer DE/EN switch and theme toggle (§11.9). The header of both sites is the unified nav: `src/unav.js`, `/design/unav.css`, `/design/unav.js` (`.u-*`, mockup `fix-unified-nav`) |
 | `.sm-hero` (`__inner` `__cta` `__note`), `.sm-display__soft`, `.sm-tiles`, `.sm-tile` (`__text` `__cta` `--soon`), `.sm-measure`, `.sm-placeholder` (`__note`), `.sm-soon` | home hero, section tiles, the "soon" empty state (§11.9) |
 | `.sm-footer` (`__grid` `__col` `__title` `__list` `__bottom`), `.sm-mascot--xl`, `.sm-mascot--brand`, `.sm-mascot__art` | footer (links, language, theme) and the mascot slot sizes |
 
