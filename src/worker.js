@@ -16,7 +16,7 @@ import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.
 import { normInv, renderInventoryCard } from "./mc-inventory.js";
 import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
-import { hubPage, hubPageExists } from "./hub.js";
+import { hubPage, hubPageExists, navReady } from "./hub.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
@@ -228,7 +228,7 @@ const THEME_BOOT = `<script src="/design/summer-theme.js?v=${AV}"></script>`;
 const pNav = (cur, bare = "") => `{{UNAV:${cur}:${bare}}}`;
 const legacyNav = (h, req) => h.replace(/\{\{UNAV:([a-z]*):([^}]*)\}\}/, (_, cur, bare) => {
   const lang = pickLang(null, cookies(req)[LANG_COOKIE]);
-  return mainNav({ lang, items: mainItems(lang, cur, (x) => withLang(x, lang)), langHrefs: { de: withLang(bare || "/", "de"), en: withLang(bare || "/", "en") }, brandHref: withLang("/", lang) });
+  return mainNav({ lang, items: mainItems(lang, cur, (x) => withLang(x, lang), navReady()), langHrefs: { de: withLang(bare || "/", "de"), en: withLang(bare || "/", "en") }, brandHref: withLang("/", lang) });
 });
 const pFoot = `${GRASSLINE}<span class="brand brand--sm">${BRAND_PX}<span class="bname">NwebNotFound</span></span><nav class="pnl" aria-label="Links"><a href="/">Start</a><a href="/portfolio">Projekte</a><a href="/guestbook">Gästebuch</a><a href="https://${MCD}/">Minecraft</a></nav><p class="hint">© {{Y}} Nils Weberruß · Made with Cloudflare Workers · kein Tracking.</p>`;
 const portfolio = (o) => shell({ css: PORT_CSS + PORT_V2_CSS, footer: pFoot, themeColor: "#f4faff", ...o, head: `${THEME_BOOT}${o.head || ""}` });

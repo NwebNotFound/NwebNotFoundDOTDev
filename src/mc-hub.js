@@ -55,11 +55,11 @@ main{animation:hubin .45s cubic-bezier(.2,.8,.2,1) both}@keyframes hubin{from{op
 export const hubNav = () => {
   const wiki = [["/wiki", "Übersicht", "bookshelf"], ...WIKI.map((a) => [`/wiki/${a.slug}`, a.title, a.icon])];
   return mcNav([
-    ["server", "Server", [["/", "Status", "grass_block"], ["/changelog", "Changelog", "writable_book"]]],
-    ["wirtschaft", "Wirtschaft", [["/markt", "Markt", "emerald"], ["/shops", "Shops", "barrel"], ["/auktionen", "Auktionen", "bell"]]],
-    ["minispiele", "Minispiele", [["/parkour", "Parkour", "golden_boots"], ["/pvp", "PvP", "iron_sword"]]],
-    ["community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"], ["/feedback", "Feedback", "writable_book"]]],
-    ["wiki", "Wiki", wiki],
+    ["server", "Server", [["/", "Status", "grass_block"], ["/changelog", "Changelog", "writable_book"]], "Status, Changelog"],
+    ["wirtschaft", "Wirtschaft", [["/markt", "Markt", "emerald"], ["/shops", "Shops", "barrel"], ["/auktionen", "Auktionen", "bell"]], "Markt, Shops"],
+    ["minispiele", "Minispiele", [["/parkour", "Parkour", "golden_boots"], ["/pvp", "PvP", "iron_sword"]], "PvP, Parkour"],
+    ["community", "Community", [["/spieler", "Spieler", "name_tag"], ["/leaderboards", "Bestenlisten", "diamond"], ["/feedback", "Feedback", "writable_book"]], "Spieler, Listen"],
+    ["wiki", "Wiki", wiki, "Anleitungen"],
   ]);
 };
 

@@ -129,9 +129,13 @@ for (const lang of LANGS) {
   const bar = home.slice(home.indexOf("<header"), home.indexOf("</header>"));
   ok(bar.includes('class="u-bar"') && bar.includes('id="u-panel"') && bar.includes('aria-controls="u-panel"') && bar.includes("data-u-acct></div>"), "the header is the unified bar with drawer panel, burger and empty account slot");
   ok(home.includes('<script src="/design/unav.js?v=') && home.includes('/design/unav.css?v='), "the hub loads the shared nav assets");
-  ok([">Home<", ">Projects<", ">Guestbook<", ">About<"].every((x) => bar.includes(x)) && !bar.includes(">Music<"), "nav: Home, Projects, Guestbook, About; Music stays hidden until it has a page");
-  ok(bar.indexOf(">Home<") < bar.indexOf(">Projects<") && bar.indexOf(">Guestbook<") < bar.indexOf(">About<"), "nav order follows the mockup");
-  ok(bar.includes(`class="u-switch" href="https://${MC_HOST}/"`), "the Minecraft site switch is a chip, not a nav item");
+  // Nav v2 (Nils 06.11.): Start · Projekte · Blog (bald) · Musik (bald) · Gästebuch · Mehr (Über mich, Texte, Pixelwand).
+  ok([">Home<", ">Projects<", ">Blog<", ">Music<", ">Guestbook<", ">More<", ">About<", ">Pixel wall<"].every((x) => bar.includes(x)), "nav v2: Home, Projects, Blog, Music, Guestbook, More (About, Writing, Pixel wall)");
+  ok(/class="u-link u-soon" href="\/en\/music"/.test(bar) && /class="u-link u-soon" href="\/en\/blog"/.test(bar) && /href="\/en\/pixelwand"[^>]*class="u-soon"/.test(bar), "\"bald\" items stay visible, marked, and lead to their coming-soon page");
+  ok(bar.indexOf(">Home<") < bar.indexOf(">Projects<") && bar.indexOf(">Projects<") < bar.indexOf(">Blog<") && bar.indexOf(">Music<") < bar.indexOf(">Guestbook<") && bar.indexOf(">Guestbook<") < bar.indexOf(">More<"), "nav order follows the mockup");
+  ok(!bar.includes("u-switch") && !bar.includes(`href="https://${MC_HOST}/"`), "no site switch in the bar (Nils 06.11., mockup fix-nav-v2)");
+  ok(/<nav class="u-seg" data-v="en"/.test(bar) && (bar.match(/class="u-theme"/g) || []).length === 2 && bar.includes('class="u-knob"') && bar.includes("data-summer-theme-toggle"), "nav v2: DE/EN as a sliding switch, day/night as a switch (bar + drawer)");
+  ok(bar.includes('class="u-group u-more"') && bar.includes('class="u-dot"') && bar.includes('class="u-tile"') && bar.includes('class="u-dsect"') && bar.includes("/design/nav-icons.svg?v="), "nav v2: Mehr dropdown, sun pixel, drawer tiles with icons and the settings section");
   ok(!bar.includes("sm-nav__link--soon"), "no dimmed 'soon' entries in the nav any more");
   ok(!hubPage("/about", "de").includes("summer-parallax.js"), "inner pages do not load the parallax helper");
   // Formatted numbers follow the page language.

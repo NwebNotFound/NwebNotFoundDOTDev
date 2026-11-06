@@ -12,7 +12,7 @@
   try { L = JSON.parse(N.getAttribute("data-l") || "{}"); } catch (e) {}
   var isMc = N.getAttribute("data-site") === "mc";
   var base = N.getAttribute("data-login-base") || "";
-  var mq = window.matchMedia("(max-width:860px)");
+  var mq = window.matchMedia("(max-width:900px)");
   var mob = function () { return mq.matches; };
   var groups = function () { return [].slice.call(N.querySelectorAll(".u-group")); };
   var visible = function (el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); };
@@ -36,6 +36,24 @@
       if (g) g.querySelector(".u-gbtn").setAttribute("data-cur", "");
       else if (mbtn) mbtn.setAttribute("data-cur", "");
     }
+    if (typeof place === "function") place(cur());
+  }
+
+  /* ---------- sun pixel under the links (desktop): glides to the hovered link, back to the current ----------
+     Reads layout only on pointer events and once on load; no scroll or resize listeners. */
+  var linksBox = N.querySelector(".u-links"), dot = N.querySelector(".u-dot");
+  function cur() { return N.querySelector(".u-links > li > .u-link[aria-current='page'], .u-links > li > .u-link[data-cur]"); }
+  function place(a) {
+    if (!dot || !linksBox || mob()) return;
+    if (!a) { dot.style.opacity = "0"; return; }
+    var r = linksBox.getBoundingClientRect(), b = a.getBoundingClientRect();
+    dot.style.setProperty("--x", (b.left - r.left + b.width / 2 - 9).toFixed(1) + "px");
+    dot.style.opacity = "1";
+  }
+  if (linksBox) {
+    linksBox.addEventListener("pointerover", function (e) { var a = e.target.closest && e.target.closest(".u-links > li > .u-link"); if (a) place(a); });
+    linksBox.addEventListener("pointerleave", function () { place(cur()); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { place(cur()); }); else place(cur());
   }
 
   /* ---------- group dropdowns / accordions ---------- */
