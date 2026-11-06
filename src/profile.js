@@ -6,18 +6,18 @@ import { pxIcon } from "./home-icons.js";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const parse = (iso) => { const d = new Date(String(iso || "").replace(" ", "T") + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(iso)) ? "" : "Z")); return Number.isNaN(d.getTime()) ? null : d; };
-export const sinceLabel = (iso) => { const d = parse(iso); return d ? `${d.getUTCDate()}. ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}` : ""; };
 const stamp = (iso) => { const d = parse(iso); return d ? `${String(d.getUTCDate()).padStart(2, "0")}. ${MONTHS[d.getUTCMonth()].slice(0, 3).toUpperCase()}<br>${d.getUTCFullYear()}` : ""; };
 
 /**
- * @param {{ user: {name:string, username?:string, avatar?:string}, since?: string, gbCount: number, entries: {message:string, created_at:string}[], logoutHref: string }} d
+ * @param {{ user: {name:string, username?:string, avatar?:string}, gbCount: number, entries: {message:string, created_at:string}[], logoutHref: string }} d
  */
 export function siteProfileBody(d) {
   const { user, entries = [], gbCount = 0 } = d;
   const name = String(user.name || user.username || "Du");
   const avatar = /^https:\/\//.test(user.avatar || "") ? user.avatar : "";
   const gb = gbCount === 1 ? "1 Gruß" : gbCount > 1 ? `${gbCount} Grüße` : "noch keinen Gruß";
-  const line = [user.username ? `@${esc(user.username)}` : "", d.since ? `seit ${esc(sinceLabel(d.since))} da` : ""].filter(Boolean).join(" · ");
+  // No "member since" date: there is no durable first-login record (sessions expire / are deleted on logout).
+  const line = user.username ? `@${esc(user.username)}` : "";
   const paper = entries.length
     ? entries.slice(0, 3).map((e) => `<p class="p3-entry">${esc(e.message)}</p>`).join("") + `<p class="p3-sign">– ${esc(name)}</p>`
     : `<p class="p3-ps">Hier ist noch Platz. Dein erster Gruß landet auf diesem Blatt.</p>`;
@@ -52,7 +52,7 @@ ${line ? `<p class="p3-line">${line}</p>` : ""}
 <span class="p3-tape" aria-hidden="true"></span>
 <header class="p3-ph"><h2>Mein Gästebuch</h2>${entries.length ? `<span class="p3-stamp">${stamp(entries[0].created_at)}</span>` : ""}</header>
 <div class="p3-lines">${paper}</div>
-<footer class="p3-pf">${entries.length ? `<a href="/guestbook">bearbeiten</a> · ` : ""}<a href="/guestbook">${entries.length ? "noch was schreiben" : "Eintrag schreiben"}</a>${pxIcon("heart", 16)}</footer>
+<footer class="p3-pf"><a href="/guestbook">${entries.length ? "noch was schreiben" : "Eintrag schreiben"}</a>${pxIcon("heart", 16)}</footer>
 <span class="p3-doodle" aria-hidden="true">${pxIcon("star", 28)}</span>
 </section>
 <section class="p3-acc" id="einstellungen">

@@ -443,11 +443,10 @@ const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein
 async function siteProfile(req, env) {
   const u = await getUser(req, env).catch(() => null);
   if (!u) return redirect(`/auth/discord/login?next=${encodeURIComponent(`https://${MAIN}/profile`)}`);
-  const since = await env.DB.prepare("SELECT MIN(created_at) AS c FROM sessions WHERE discord_id = ?").bind(u.id).first().catch(() => null);
   const cnt = await env.DB.prepare("SELECT COUNT(*) AS n FROM entries WHERE discord_id = ?").bind(u.id).first().catch(() => null);
   const { results: entries } = await env.DB.prepare("SELECT message, created_at FROM entries WHERE discord_id = ? ORDER BY id DESC LIMIT 3").bind(u.id).all().catch(() => ({ results: [] }));
   const lang = pickLang(null, cookies(req)[LANG_COOKIE]);
-  const body = siteProfileBody({ user: u, since: since?.c || "", gbCount: cnt?.n || 0, entries: entries || [], logoutHref: `/auth/discord/logout?next=${encodeURIComponent(`https://${MAIN}/`)}` });
+  const body = siteProfileBody({ user: u, gbCount: cnt?.n || 0, entries: entries || [], logoutHref: `/auth/discord/logout?next=${encodeURIComponent(`https://${MAIN}/`)}` });
   const head = `<meta name="robots" content="noindex"><link rel="stylesheet" href="/design/profile.css?v=${AV}"><script src="/design/profile.js?v=${AV}" defer></script>`;
   return html(sitePage({ lang, bare: "/profile", title: "Profil · NwebNotFound", desc: "Dein Profil", body, head }), 200, { "cache-control": "private, no-store" });
 }

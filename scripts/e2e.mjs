@@ -229,6 +229,7 @@ try {
   const mainProf = await req("/profile", { cookie: c1, testHost: "nwebnotfound.dev" });
   ok(mainProf.s === 200 && mainProf.t.includes("p3-tagcard") && mainProf.t.includes("/design/profile.css?v=") && mainProf.t.includes('content="noindex"') && /private/.test(mainProf.h.get("cache-control") || ""), "Hauptdomain-Profil (privat): Namensschild, noindex, private no-store");
   ok(!/inventory\.js|pbal|Kontostand|Inventar/.test(mainProf.t) && mainProf.t.includes("https://mc.nwebnotfound.dev/profile"), "Hauptdomain-Profil: keine Minecraft-Stats/Inventar, nur Textlink zum MC-Profil");
+  ok(!mainProf.t.includes("bearbeiten") && !/seit \d+\. \w+ \d{4} da/.test(mainProf.t), "Profil: kein totes bearbeiten-Link, kein Sitzungsdatum als Mitglied-seit");
   { const anon = await req("/profile", { testHost: "nwebnotfound.dev" }); ok(anon.s === 302 && (anon.h.get("location") || "").startsWith("/auth/discord/login?next=") && !anon.t.includes("p3-tagcard"), "Profil ohne Login: Weiterleitung zum Discord-Login, kein Inhalt"); }
   { const noOrigin = await req("/api/profile/delete", { method: "POST", cookie: c2, testHost: "nwebnotfound.dev", body: {} }); const anonDel = await req("/api/profile/delete", { method: "POST", testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
     ok(noOrigin.s === 403 && anonDel.s === 401, "Profil löschen: ohne Origin 403, ohne Login 401"); }
