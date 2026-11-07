@@ -61,6 +61,8 @@
     if ((b = t.closest("[data-paper]"))) { var rd2 = b.closest(".rd"), on2 = rd2.classList.toggle("npaper"); b.setAttribute("aria-pressed", String(on2)); return; }
     if ((b = t.closest("[data-jump]"))) { e.preventDefault(); var rd3 = b.closest(".rd"), h = rd3.querySelector("#" + CSS.escape(b.dataset.jump)), sc = $(".rscroll", rd3); if (h) sc.scrollTo({ top: h.offsetTop - sc.offsetTop - 8, behavior: RM ? "auto" : "smooth" }); return; }
     if ((b = t.closest("[data-copy]"))) { if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).catch(function () {}); var o = b.textContent; b.textContent = T("Kopiert ✓", "Copied ✓"); setTimeout(function () { b.textContent = o; }, 1400); return; }
+    if ((b = t.closest(".mctl [aria-disabled=true]"))) return;   /* no tracks yet: the controls do nothing */
+    if ((b = t.closest(".mctl [data-toggle]"))) { b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); return; }
     if ((b = t.closest("[data-play]"))) {   /* no tracks exist yet: the player only shows its state, nothing plays */
       var mp = b.closest("[data-mp]"), on3 = mp.classList.toggle("on"); b.setAttribute("aria-pressed", String(on3)); b.setAttribute("aria-label", on3 ? "Pause" : T("Abspielen", "Play")); return;
     }
@@ -76,7 +78,10 @@
       return;
     }
   });
-  document.addEventListener("input", function (e) { var bq = e.target.closest("[data-bq]"); if (bq) filter(bq.closest(".bl")); });
+  document.addEventListener("input", function (e) {
+    var bq = e.target.closest("[data-bq]"); if (bq) filter(bq.closest(".bl"));
+    var r = e.target; if (r.type === "range") r.style.setProperty("--v", (r.value - r.min) / ((r.max - r.min) || 1) * 100);   /* slider fill (phone polish 2) */
+  });
   document.addEventListener("submit", function (e) { if (e.target.closest(".bsearch")) e.preventDefault(); });   /* search filters in place */
   document.addEventListener("keydown", function (e) {
     if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "")) { var w = $(".win.focus [data-bq]"); if (w) { e.preventDefault(); w.focus(); } }
