@@ -171,7 +171,7 @@
       grid = []; for (var y = 0; y < 6; y++) grid.push(["", "", "", "", ""]);
       G.innerHTML = ""; for (y = 0; y < 6; y++) { var r = document.createElement("div"); r.className = "fr"; for (var x = 0; x < 5; x++) { var s = document.createElement("span"); s.className = "ft"; s.setAttribute("role", "img"); r.appendChild(s); } G.appendChild(r); }
       for (y = 0; y < 6; y++) for (x = 0; x < 5; x++) tile(y, x).setAttribute("aria-label", tlabel(y, x));
-      var rows = L === "en" ? ["QWERTYUIOP", "ASDFGHJKL", "↵ZXCVBNM⌫"] : ["QWERTZUIOPÜ", "ASDFGHJKLÖÄ", "↵YXCVBNM⌫"];
+      var rows = L === "en" ? ["QWERTYUIOP", "ASDFGHJKL", "↵ZXCVBNM⌫"] : (matchMedia("(max-width:700px)").matches ? ["QWERTZUIOP", "ASDFGHJKL", "↵YXCVBNM⌫", "ÄÖÜ"] : ["QWERTZUIOPÜ", "ASDFGHJKLÖÄ", "↵YXCVBNM⌫"])   /* phone: umlauts in their own row, 10 keys a row at most (#124 QA) */;
       K.innerHTML = rows.map(function (r) { return "<div>" + r.split("").map(function (k) { var w = k === "↵" || k === "⌫"; return '<button type="button" data-k="' + k + '"' + (w ? ' class="wide" aria-label="' + (k === "↵" ? t.enter : t.back) + '"' : "") + ">" + k + "</button>"; }).join("") + "</div>"; }).join("");
       kmark = {}; [].forEach.call(el.querySelectorAll("[data-v]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.v === L)); b.classList.toggle("on", b.dataset.v === L); });
       el.querySelector(".fvnew").textContent = t.newWord; say(t.start);

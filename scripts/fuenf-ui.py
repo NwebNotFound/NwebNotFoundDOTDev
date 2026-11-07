@@ -106,9 +106,15 @@ with sync_playwright() as p:
     pg.locator('.g-five .kb [data-k="↵"]').click(); pg.wait_for_timeout(150)
     assert pg.locator(".g-five .fvmsg").inner_text() == "Kein gültiges Wort" and rated(pg, 0) == 0
     w = pg.evaluate("(() => { const k = document.querySelector('.g-five .kb'); const rows = [...k.children].map(d => d.scrollWidth); return [Math.max(...rows), k.clientWidth, document.documentElement.scrollWidth]; })()")
-    assert w[0] <= w[1] and w[2] <= 375, ("keyboard fits", w)
-    small = pg.evaluate("[...document.querySelectorAll('.g-five .kb button')].filter(b => b.getBoundingClientRect().width < 26 || b.getBoundingClientRect().height < 40).length")
-    assert small == 0, ("keys stay tappable", small)
+    assert w[0] <= w[1] + 1 and w[2] <= 375, ("keyboard fits (1px sub-pixel rounding)", w)
+    small = pg.evaluate("[...document.querySelectorAll('.g-five .kb button')].filter(b => b.getBoundingClientRect().width < 30 || b.getBoundingClientRect().height < 48).length")
+    assert small == 0, ("keys stay tappable (>= 30x48, rows of 10 at most)", small)
+    assert pg.evaluate("Math.max(...[...document.querySelectorAll('.g-five .kb div')].map(d => d.children.length))") <= 10, "phone: at most 10 keys a row (Ä Ö Ü in their own row)"
+    # no dead zone: the point between two neighbouring keys hits one of them
+    gapHit = pg.evaluate("(() => { const a = document.querySelector('.g-five .kb [data-k=Q]').getBoundingClientRect(), b = document.querySelector('.g-five .kb [data-k=W]').getBoundingClientRect(); const t = document.elementFromPoint((a.right + b.left) / 2, (a.top + a.bottom) / 2); return !!t && !!t.closest('.kb button'); })()")
+    assert gapHit, "the gap between two keys still hits a key"
+    err = pg.evaluate("(() => { const m = document.querySelector('.g-five .fvmsg'); const cs = getComputedStyle(m); return [cs.color, cs.backgroundColor]; })()")
+    assert err == ["rgb(255, 255, 255)", "rgb(179, 38, 30)"], ("error chip white on dark red", err)
     shot(pg, "fuenf-invalid-de-375.png")
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 375 DE: invalid word from the screen keyboard, 11-key rows fit, keys tappable")

@@ -18,7 +18,7 @@
 .mnst{min-height:1.2em;margin:0;font-size:11.5px;font-weight:700}
 .mnhelp{margin:0;max-width:260px;text-align:center;font-size:10.5px;color:var(--mut)}.mnstat{margin:0;font-size:10.5px;color:var(--mut)}
 .fv{display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px;background:#fff;color:#1b1f2a}
-.fvtop{display:flex;align-items:center;gap:8px;width:100%}.fvmsg{flex:1;text-align:center;font-size:11.5px;color:#5b6170}.fvmsg.err{color:#b3261e;font-weight:700}[data-theme=summer-night] .fvmsg.err{color:#ff8a80}
+.fvtop{display:flex;align-items:center;gap:8px;width:100%}.fvmsg{flex:1;text-align:center;font-size:11.5px;color:#5b6170}.fvmsg.err{padding:2px 8px;border-radius:6px;background:#b3261e;color:#fff;font-weight:700}   /* a chip: >= 4.5:1 on a light or a dark pane */
 .fvnew{padding:2px 8px;border:1px solid #7f9db9;border-radius:3px;background:linear-gradient(#fff,#e3e1d3);color:#1b1f2a;font:700 11px var(--f);cursor:pointer}
 .seg2{display:inline-flex;border:1px solid #7f9db9;border-radius:3px;overflow:hidden}.seg2 button{padding:2px 7px;border:0;background:#fff;color:#1b1f2a;font:700 10px var(--f);cursor:pointer}.seg2 button.on{background:var(--sel);color:#fff}
 .fvgrid{display:grid;gap:4px}.fr{display:grid;grid-template-columns:repeat(5,44px);gap:4px}
@@ -37,6 +37,8 @@
  .mngrid{grid-template-columns:repeat(9,34px)}.mngrid .c{width:34px;height:34px}.mnbar{max-width:320px}
  .fr{grid-template-columns:repeat(5,52px)}.ft{height:52px}.kb button{min-width:30px;height:42px}.kb button.wide{min-width:44px}
  /* German rows have 11 keys (Ü, Ö, Ä): keys share the row instead of a fixed minimum width */
- #wins .kb{align-self:stretch;width:100%}#wins .kb div button{flex:1 1 0;min-width:0;max-width:40px}#wins .kb div button.wide{flex:1.6 1 0;max-width:64px}
+ #wins .kb{align-self:stretch;width:100%}#wins .kb div{gap:3px}#wins .kb div button{position:relative;flex:1 1 0;min-width:0;max-width:44px;height:48px;padding:0}#wins .kb div button.wide{flex:1.6 1 0;max-width:64px}
+ /* the hit area closes the 3px gaps and the 4px row gap: no dead zone between keys */
+ #wins .kb div button::after{content:"";position:absolute;inset:-2px -2px}
 }
 @media (prefers-reduced-motion:reduce){.g-mines *,.g-five *{animation:none!important;transition:none!important}}
