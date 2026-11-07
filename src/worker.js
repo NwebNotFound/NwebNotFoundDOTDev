@@ -19,7 +19,7 @@ import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-p
 import { hubPage, hubPageExists, navReady, sitePage } from "./hub.js";
 import { siteProfileBody } from "./profile.js";
 import { nwebosPage, nwebosChoice, nwebosRoute } from "./nwebos.js";
-import { blogList, blogPost, changelog as osChangelog, writing as osWriting, chapter as osChapter, profile as osProfile, notfound as osNotfound } from "./nwebos-apps.js";
+import { blogList, blogPost, changelog as osChangelog, changelogFeed as osChangelogFeed, writing as osWriting, chapter as osChapter, profile as osProfile, notfound as osNotfound } from "./nwebos-apps.js";
 import { CONTENT } from "./generated/content.js";
 import { publishedWriting, chaptersOf } from "./content.js";
 import { makeBlog } from "./blog.js";
@@ -1205,6 +1205,8 @@ async function route(req, env, ctx) {
     // Feed trägt die Sprache seines Inhalts, nicht die der Oberfläche). Vorgerendert, kein Markdown
     // zur Laufzeit.
     { const feed = feedFor(FEEDS, p); if (feed) return feedResponse(req, feed); }
+    // phone audit A14: the changelog window as RSS, per language (its rows exist in both)
+    if (/^\/(?:de\/|en\/)?changelog\/feed\.xml$/.test(p)) return new Response(osChangelogFeed(p.startsWith("/en/") ? "en" : "de"), { headers: { "content-type": "application/rss+xml; charset=utf-8", "cache-control": "public, max-age=300" } });
     // ---- Creative Hub (nwebnotfound.dev) ----
     // Sprachpfade `/de/…` und `/en/…` plus die sprachlosen Pfade. `/` selbst rendert die gewählte
     // Sprache (Cookie → Accept-Language → Deutsch), statt umzuleiten: so kann kein Redirect-Loop

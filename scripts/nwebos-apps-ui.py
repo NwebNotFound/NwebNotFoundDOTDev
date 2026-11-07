@@ -91,7 +91,7 @@ with sync_playwright() as p:
     assert urlsplit(pg.url).path == "/blog" and pg.evaluate("window.__marker") == 1, "Back to the list window"
     # recycle bin dialog
     pg.goto(f"https://{H}/trash", wait_until="load")
-    pg.locator(".win.focus [data-trash-empty]").click(); pg.locator(".win.focus [data-trash-yes]").click()
+    pg.locator(".win.focus [data-trash-empty]").click(); pg.locator(".shx.ask [data-yes]").click()   # phone audit A3: the confirm is a sheet (a card on desktop)
     assert pg.locator(".win.focus .tempty").is_visible()
     shot(pg, "x-trash-empty-1280.png")
     c.unroute_all(behavior="ignoreErrors"); c.close()
@@ -128,7 +128,7 @@ with sync_playwright() as p:
     pg.locator(".win.focus .rd .post h1").wait_for()
     assert urlsplit(pg.url).path == "/blog/vip-welten" and pg.locator("#startm").is_hidden()
     pg.locator("#startb").click(); pg.locator("#smq").fill("faq")
-    assert pg.locator("#smres button", has_text="Wiki: FAQ").locator("em").inner_text() == "↗"
+    assert pg.locator("#smres button", has_text="Wiki: FAQ").locator(".kind").inner_text() == "Wiki ↗"   # phone audit A1: kind chip
     pg.locator("#smq").fill("zzzqq"); assert "Nichts gefunden" in pg.locator("#smres").inner_text()
     shot(pg, "x-search-1280.png")
     c.unroute_all(behavior="ignoreErrors"); c.close()

@@ -60,21 +60,32 @@
     if ((b = t.closest("[data-fs]"))) { var rd = b.closest(".rd"), cur = parseFloat(getComputedStyle(rd).getPropertyValue("--fs")) || 14; rd.style.setProperty("--fs", Math.max(12, Math.min(20, cur + +b.dataset.fs)) + "px"); return; }
     if ((b = t.closest("[data-paper]"))) { var rd2 = b.closest(".rd"), on2 = rd2.classList.toggle("npaper"); b.setAttribute("aria-pressed", String(on2)); return; }
     if ((b = t.closest("[data-jump]"))) { e.preventDefault(); var rd3 = b.closest(".rd"), h = rd3.querySelector("#" + CSS.escape(b.dataset.jump)), sc = $(".rscroll", rd3); if (h) sc.scrollTo({ top: h.offsetTop - sc.offsetTop - 8, behavior: RM ? "auto" : "smooth" }); return; }
-    if ((b = t.closest("[data-copy]"))) { if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).catch(function () {}); var o = b.textContent; b.textContent = T("Kopiert ✓", "Copied ✓"); setTimeout(function () { b.textContent = o; }, 1400); return; }
+    if ((b = t.closest("[data-copy]"))) { if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).catch(function () {}); if (window.NwebOS && NwebOS.toast) NwebOS.toast("ok", T("Link kopiert", "Link copied"), b.dataset.copy); return; }   /* phone audit A4 */
     if ((b = t.closest(".mctl [aria-disabled=true]"))) return;   /* no tracks yet: the controls do nothing */
     if ((b = t.closest(".mctl [data-toggle]"))) { b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); return; }
     if ((b = t.closest("[data-play]"))) {   /* no tracks exist yet: the player only shows its state, nothing plays */
       var mp = b.closest("[data-mp]"), on3 = mp.classList.toggle("on"); b.setAttribute("aria-pressed", String(on3)); b.setAttribute("aria-label", on3 ? "Pause" : T("Abspielen", "Play")); return;
     }
     if ((b = t.closest(".trt tbody tr"))) { $$(".trt tr", b.closest("table")).forEach(function (r) { r.classList.toggle("sel", r === b); }); return; }
-    if ((b = t.closest("[data-trash-empty]"))) { $(".trq", b.closest(".trw")).hidden = false; return; }
+    if ((b = t.closest("[data-trash-empty]"))) {   /* phone audit A3: a danger sheet instead of the box in the list */
+      var tw = b.closest(".trw"), n0 = $$(".trt tbody tr", tw).length;
+      if (!(window.NwebOS && NwebOS.ask)) { $(".trq", tw).hidden = false; return; }
+      NwebOS.ask({ title: T("Papierkorb leeren?", "Empty the recycle bin?"), text: T("Alle " + n0 + " Objekte werden endgültig gelöscht. Das geht nicht rückgängig.", "All " + n0 + " items are deleted for good. This can’t be undone."), yes: T("Leeren", "Empty"), no: T("Abbrechen", "Cancel"), danger: true })
+        .then(function (ok) { if (ok) { var y = $("[data-trash-yes]", tw); if (y) y.click(); } });
+      return;
+    }
     if ((b = t.closest("[data-trash-no]"))) { b.closest(".trq").hidden = true; return; }
     if ((b = t.closest("[data-trash-yes]"))) { var w2 = b.closest(".trw"); $(".trq", w2).hidden = true; $(".trt", w2).hidden = true; $(".tempty", w2).hidden = false; $("[data-trash-count]", w2).textContent = T("0 Objekte", "0 items"); return; }
     if ((b = t.closest("[data-trash-restore]"))) { var c = $("[data-trash-count]", b.closest(".trw")), keep = c.textContent; c.textContent = T("Die bleiben lieber hier. 😺", "They'd rather stay. 😺"); setTimeout(function () { c.textContent = keep; }, 1800); return; }
-    if ((b = t.closest("[data-focus-search]"))) { if (win) $(".wb.x", win).click(); setTimeout(function () { var st = $("#startb"); if (st && $("#startm").hidden) st.click(); var q = $("#smq") || $("#hq"); if (q) q.focus(); }, 30); return; }
-    if ((b = t.closest("[data-pf-delete]"))) {
-      if (!confirm(T("Wirklich alle deine Gästebuch-Einträge, deinen Lesefortschritt, deine Reaktionen und Sitzungen löschen?", "Really delete all your guestbook entries, reading progress, reactions and sessions?"))) return;
-      post("/api/profile/delete", { confirm: "delete" }).then(function (r) { if (r.s === 200) location.href = EN ? "/en" : "/"; });
+    if ((b = t.closest("[data-focus-search]"))) {
+      if (matchMedia("(max-width:700px)").matches) { var ms = $("[data-msearch]"); if (ms) { ms.click(); return; } }
+      if (win) $(".wb.x", win).click(); setTimeout(function () { var st = $("#startb"); if (st && $("#startm").hidden) st.click(); var q = $("#smq") || $("#hq"); if (q) q.focus(); }, 30); return;
+    }
+    if ((b = t.closest("[data-pf-delete]"))) {   /* phone audit A3: a danger sheet, not window.confirm() */
+      var go = function () { post("/api/profile/delete", { confirm: "delete" }).then(function (r) { if (r.s === 200) { try { sessionStorage.setItem("nwebos.deleted", "1"); } catch (e) {} location.href = EN ? "/en" : "/"; } else if (window.NwebOS) NwebOS.toast("err", T("Nicht gelöscht – nochmal versuchen.", "Not deleted – try again.")); }); };
+      if (!(window.NwebOS && NwebOS.ask)) { if (confirm(T("Wirklich alle deine Gästebuch-Einträge, deinen Lesefortschritt, deine Reaktionen und Sitzungen löschen?", "Really delete all your guestbook entries, reading progress, reactions and sessions?"))) go(); return; }
+      NwebOS.ask({ title: T("Alle deine Daten löschen?", "Delete all your data?"), text: T("Deine Gästebuch-Einträge, dein Lesefortschritt, deine Reaktionen und alle Anmeldungen werden gelöscht. Das geht nicht rückgängig.", "Your guestbook entries, reading progress, reactions and all sessions are deleted. This can’t be undone."), yes: T("Ja, alles löschen", "Yes, delete everything"), no: T("Behalten", "Keep my data"), danger: true, stack: true })
+        .then(function (ok) { if (ok) go(); });
       return;
     }
   });
@@ -87,4 +98,5 @@
     if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "")) { var w = $(".win.focus [data-bq]"); if (w) { e.preventDefault(); w.focus(); } }
   });
   $$("#wins .win").forEach(initWin);
+  try { if (sessionStorage.getItem("nwebos.deleted")) { sessionStorage.removeItem("nwebos.deleted"); setTimeout(function () { if (window.NwebOS && NwebOS.toast) NwebOS.toast("ok", T("Deine Daten sind gelöscht.", "Your data is deleted.")); }, 300); } } catch (e) {}
 })();

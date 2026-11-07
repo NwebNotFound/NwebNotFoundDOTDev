@@ -139,7 +139,7 @@ with sync_playwright() as p:
     assert pg.locator("#smav").get_attribute("src").startswith("https://cdn.discordapp.com/"), "rule 10: Discord avatar"
     win.locator("textarea").fill("Hallo aus NwebOS")
     win.locator("button[type=submit]").click()
-    pg.wait_for_function("() => document.querySelector('.win .gb-st').textContent === 'Danke!'", timeout=15000)
+    pg.wait_for_function("() => document.querySelector('.win .gb-st.ok') && document.querySelector('.win .gb-st').textContent.includes('Danke!')", timeout=15000)
     pg.wait_for_function("() => [...document.querySelectorAll('.win .msg p')].some(p => p.textContent === 'Hallo aus NwebOS')", timeout=10000)
     shot(pg, "guestbook-1280.png")
     pg.goto(f"https://{H}/", wait_until="load")

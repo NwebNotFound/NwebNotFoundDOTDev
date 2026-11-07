@@ -1301,6 +1301,10 @@ try {
     const other = await Promise.all(["/music", "/writing", "/trash", "/pixelwand", "/en/blog", "/de/blog"].map((p) => n(p)));
     const unk = await n("/sommerfest"), ws = await n("/writing/series/x"), w1 = await n("/writing/gibt-es-nicht"), feed = await n("/blog/feed.xml"), css = await n("/design/nwebos-apps.css");
     ok(other.every((r) => r.s === 200 && osOn(r)) && unk.s === 404 && osOn(unk) && ws.s === 302 && ws.h.get("location") === "/writing" && w1.s === 404 && osOn(w1) && feed.s === 200 && !osOn(feed) && css.s === 200, "NwebOS: Musik, Texte, Papierkorb, Kommt bald, /de /en, 404-Fenster, alte /writing-Adressen, Feed und Assets unberührt", [...other, unk, ws, w1, feed, css].map((r) => r.s).join(" "));
+    // phone audit A14: the changelog as RSS per language, autodiscovery in every NwebOS head
+    const clf = await n("/changelog/feed.xml"), clfEn = await n("/en/changelog/feed.xml"), osHome = await n("/");
+    ok(clf.s === 200 && /application\/rss\+xml/.test(clf.h.get("content-type") || "") && clf.t.includes("<item>") && clf.t.includes("<language>de</language>") && clfEn.s === 200 && clfEn.t.includes("<language>en</language>")
+      && osHome.t.includes('type="application/rss+xml" title="Blog · NwebNotFound" href="/blog/feed.xml"') && osHome.t.includes('href="/changelog/feed.xml"') && !osHome.t.includes('href="/writing/feed.xml"'), "NwebOS: Neuigkeiten-Feed DE/EN, Autodiscovery im Head", `${clf.s} ${clfEn.s}`);
     // Reactions and reading progress: only signed in, same-origin JSON; sun is a valid kind (migration 0017).
     const rx = (o) => req("/api/blog/react", { method: "POST", testHost: MH, origin: "https://" + MH, ...o });
     const g = await rx({ body: { slug: "vip-welten", kind: "heart" } }), ev = await rx({ cookie: c1, origin: "https://evil.example", body: { slug: "vip-welten", kind: "heart" } });
@@ -1335,6 +1339,8 @@ try {
   py("NwebOS im Browser fehlgeschlagen", "scripts/nwebos-ui.py", BASE, c1);
   py("NwebOS-Apps im Browser fehlgeschlagen", "scripts/nwebos-apps-ui.py", BASE, c1);
   py("NwebOS-Handy-Feinschliff im Browser fehlgeschlagen", "scripts/nwebos-phone-ui.py", BASE, c1);
+  py("NwebOS-Handy-Sweep (Suche, Sheets, Toasts, Abonnieren) im Browser fehlgeschlagen", "scripts/nwebos-sweep-ui.py", BASE, c1);
+  py("NwebOS-Stil-Wächter (Tippflächen, Browser-Look, alte Leiste, Überlauf) fehlgeschlagen", "scripts/nwebos-guard-ui.py", BASE, c1);
   py("Logo-Seitenwechsel „Wohin?“ fehlgeschlagen", "scripts/site-switch-ui.py", BASE);
   py("3D-Viewer: Pause/Fortsetzen fehlgeschlagen", "scripts/player3d-ui.py", BASE);
   py("Turnstile-Challenge-Ablauf fehlgeschlagen", "scripts/turnstile-ui.py", BASE);
