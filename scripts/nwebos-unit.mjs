@@ -59,6 +59,7 @@ for (const k of ["mines", "five"]) {
   assert.ok(fs.readFileSync(new URL("../public/design/nwebos-icons.svg", import.meta.url), "utf8").includes(`id="i-${k}"`), k + " icon in the sprite");
 }
 assert.ok(home.includes("Pixelminen") && home.includes("nojs-g") && nwebosPage({ lang: "en" }).includes("Pixel Mines"), "game windows have names and no-JS text in both languages");
+assert.ok(["Pixelminen", "Fünf"].every((n) => idx.some((r) => r.t === n && r.k)) && JSON.parse(/<script type="application\/json" id="os-l">(.*?)<\/script>/.exec(nwebosPage({ lang: "en" }))[1]).idx.some((r) => r.t === "Pixel Mines" && r.k === "mines"), "games are in the search index");
 const gjs = fs.readFileSync(new URL("../public/design/nwebos-games.js", import.meta.url), "utf8");
 assert.ok(!/<canvas|getContext\(|requestAnimationFrame|addEventListener\("(scroll|resize)"/.test(gjs) && /NwebOS\.register\("mines"/.test(gjs) && /NwebOS\.register\("five"/.test(gjs), "games: registered, no canvas/rAF");
 // The committed sprite matches its source.

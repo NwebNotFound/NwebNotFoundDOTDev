@@ -40,8 +40,8 @@ export const APPS = [
   { k: "guestbook", path: "/guestbook", de: "Gästebuch", en: "Guestbook", w: 460, h: 420, win: true, inline: true },
   { k: "minecraft", path: "", de: "Minecraft-Server", en: "Minecraft server", href: `https://${MC_HOST}/` },
   { k: "trash", path: "/trash", de: "Papierkorb", en: "Recycle bin", w: 560, h: 340, x: 520, y: 220, win: true, inline: true },
-  { k: "mines", path: "", de: "Pixelminen", en: "Pixel Mines", w: 300, h: 372, win: true, inline: true, module: "/design/nwebos-games.js" },
-  { k: "five", path: "", de: "Fünf", en: "Five", w: 340, h: 560, win: true, inline: true, module: "/design/nwebos-games.js" },
+  { k: "mines", path: "", de: "Pixelminen", en: "Pixel Mines", w: 300, h: 456, x: 560, y: 60, win: true, inline: true, module: "/design/nwebos-games.js" },
+  { k: "five", path: "", de: "Fünf", en: "Five", w: 340, h: 580, x: 880, y: 30, win: true, inline: true, module: "/design/nwebos-games.js" },
 ];
 /** Windows without a desktop icon: opened from links, the start menu or their address. `re` matches the bare path. */
 export const EXTRA = [
@@ -138,7 +138,7 @@ const href = (lang, path) => (lang === "en" ? (path === "/" ? "/en" : "/en" + pa
 /** Search index without the blog (the shell loads /api/blog on the first search): windows, mc wiki, links. */
 function searchIndex(lang) {
   const t = T[lang], mc = `https://${MC_HOST}`;
-  const apps = ALL.filter((a) => a.path && a.k !== "soon").map((a) => ({ t: a[lang], d: "App", p: href(lang, a.path), ic: a.icon || a.k, kw: a.k }));
+  const apps = ALL.filter((a) => (a.path || a.module) && a.k !== "soon").map((a) => ({ t: a[lang], d: "App", p: a.path ? href(lang, a.path) : "", ic: a.icon || a.k, kw: a.k, ...(a.path ? {} : { k: a.k }) }));
   return [...apps,
     { t: "Minecraft-Server", d: `${MC_HOST} · ${t.newTab}`, url: `${mc}/`, ic: "minecraft", kw: "minecraft server mc" },
     ...WIKI.map((w) => ({ t: `Wiki: ${w.title}`, d: `${MC_HOST}/wiki · ${t.newTab}`, url: `${mc}/wiki/${w.slug}`, ic: "minecraft", kw: `wiki minecraft ${w.sum || ""}` })),

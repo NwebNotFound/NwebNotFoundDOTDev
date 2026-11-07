@@ -192,7 +192,7 @@
       if ((k === "ENTER" || e.key === " ") && onBtn) return;   // a focused button keeps its own Enter/Space
       if (/^[A-Z]$/.test(k) || k === "ENTER" || k === "BACKSPACE") { e.preventDefault(); key(k); }
     }
-    K.addEventListener("click", function (e) { var b = e.target.closest("[data-k]"); if (b) key(b.dataset.k); });
+    K.addEventListener("click", function (e) { var b = e.target.closest("[data-k]"); if (b) { key(b.dataset.k); win.focus({ preventScroll: true }); } });
     win.addEventListener("keydown", onkey);
     el.querySelector(".seg2").onclick = function (e) { var b = e.target.closest("button"); if (b) { L = b.dataset.v; start(); win.focus({ preventScroll: true }); } };
     el.querySelector(".fvnew").onclick = function () { start(1 + Math.floor(Math.random() * 29)); win.focus({ preventScroll: true }); };   // typing + Enter work right away

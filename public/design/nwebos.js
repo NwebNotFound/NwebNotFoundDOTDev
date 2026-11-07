@@ -224,7 +224,7 @@
       });
       var mid = $(".smmid", sm); if (list.id === "smres" && mid) mid.hidden = !list.hidden;
     };
-    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else openUrl(r.p); inp.value = ""; draw(); if (after) after(); };
+    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else if (r.k) openWin(r.k); else openUrl(r.p); inp.value = ""; draw(); if (after) after(); };
     inp.addEventListener("focus", function () { loadBlog().then(function () { if (inp.value.trim()) draw(); }); });
     inp.addEventListener("input", function () { sel = 0; draw(); });
     inp.addEventListener("keydown", function (e) {

@@ -221,6 +221,18 @@ with sync_playwright() as p:
     assert pg.locator(".g-five .fr").first.locator(".t, .o, .s").count() == 5, "row rated"
     shot(pg, "games-five-1280.png")
     pg.locator(".g-five [data-v=en]").click(); assert pg.locator(".g-five .kb [data-k=Y]").count() == 1 and pg.locator(".g-five .fvnew").inner_text() == "New word", "language switch"
+    # Fit: Fünf's content stays inside its frame; an on-screen key tap keeps Enter on the window.
+    assert pg.evaluate("(() => { const w = document.querySelector('.g-five'); return w.scrollHeight <= w.clientHeight + 1; })()"), "five content fits its frame"
+    pg.locator(".g-five .kb [data-k=A]").click(); pg.keyboard.type("bcde"); pg.keyboard.press("Enter"); pg.wait_for_timeout(600)
+    assert pg.locator(".g-five .fr").nth(1).locator(".t, .o, .s").count() == 5, "Enter submits after an on-screen key"
+    # Search finds both games (start menu), then opens them.
+    pg.locator('.win.focus .x').click(); pg.wait_for_timeout(300)
+    pg.locator("#startb").click()
+    for q, k in (("pixel", "mines"), ("minen", "mines"), ("fünf", "five"), ("five", "five")):
+        pg.fill("#smq", q); assert pg.locator("#smres button").count() >= 1, ("search finds", q)
+    pg.fill("#smq", "pixelminen"); pg.keyboard.press("Enter"); pg.wait_for_selector(".g-mines .mngrid .c")
+    assert pg.evaluate("(() => { const w = document.querySelector('.g-mines'); return w.scrollHeight <= w.clientHeight + 1; })()"), "mines content fits its frame"
+    assert pg.locator(".win.focus").bounding_box()["x"] > 130, "mines opens clear of the icon column"
     assert not errs, errs
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 1280 games: Pixelminen + Fünf open, play, keyboard, stats, no timer while minimised")
