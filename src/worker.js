@@ -18,7 +18,10 @@ import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
 import { hubPage, hubPageExists, navReady, sitePage } from "./hub.js";
 import { siteProfileBody } from "./profile.js";
-import { nwebosPage, nwebosChoice, nwebosApp } from "./nwebos.js";
+import { nwebosPage, nwebosChoice, nwebosRoute } from "./nwebos.js";
+import { blogList, blogPost, changelog as osChangelog, writing as osWriting, chapter as osChapter, profile as osProfile, notfound as osNotfound } from "./nwebos-apps.js";
+import { CONTENT } from "./generated/content.js";
+import { publishedWriting, chaptersOf } from "./content.js";
 import { makeBlog } from "./blog.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
@@ -464,7 +467,7 @@ async function siteProfile(req, env) {
   return html(sitePage({ lang, bare: "/profile", title: "Profil · NwebNotFound", desc: "Dein Profil", body, head }), 200, { "cache-control": "private, no-store" });
 }
 
-// Owner deletes their own data: guestbook entries and sessions. POST from the site itself only.
+// Owner deletes their own data: guestbook entries, blog reading progress and reactions, sessions. POST from the site itself only.
 async function profileDelete(req, env) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (req.headers.get("origin") !== `https://${MAIN}`) return json({ error: "forbidden" }, 403);
@@ -476,6 +479,9 @@ async function profileDelete(req, env) {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM entries WHERE discord_id = ?").bind(u.id),
     env.DB.prepare("DELETE FROM sessions WHERE discord_id = ?").bind(u.id),
+    // reading progress and reactions from the NwebOS blog/reader (Gatekeeper #115)
+    env.DB.prepare("DELETE FROM blog_reads WHERE discord_id = ?").bind(String(u.id)),
+    env.DB.prepare("DELETE FROM blog_reactions WHERE discord_id = ?").bind(String(u.id)),
   ]);
   return json({ ok: true }, 200, { "set-cookie": sessCookie("", 0) });
 }
@@ -842,7 +848,7 @@ async function mcIngest(req, env) {
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
-let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound }));
+let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, chapterExists: (s, n) => osSeries("de").some((se) => se.slug === s && se.chapters.some((c) => c.n === n)) }));
 let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
@@ -1017,7 +1023,70 @@ async function assetOrNotFound(req, env, mc) {
     const ar = await env.ASSETS.fetch(req);
     if (ar.status !== 404) return ar;
   }
+  // Main site with NwebOS: an unknown page is the 404 window (real HTTP 404), unless opted out.
+  if (!mc && req.method === "GET" && nwebosChoice(new URL(req.url), cookies(req), true).on) {
+    const url = new URL(req.url), pre = splitLang(url.pathname.replace(/\/$/, "") || "/");
+    const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
+    return osResponse(req, env, url, lang, { k: "notfound", path: pre.path });
+  }
   return notFound(mc, req);
+}
+
+// ---- NwebOS windows (src/nwebos.js + src/nwebos-apps.js): the data for the window at this address ----
+const WRITING_ALL = CONTENT.writing || [];
+function osSeries(lang) {
+  const stories = publishedWriting(WRITING_ALL).filter((w) => w.kind === "story");
+  const slugs = [...new Set(stories.map((w) => w.series))];
+  return slugs.map((s) => { const ch = chaptersOf(WRITING_ALL, s); return { slug: s, title: ch[0]?.seriesTitle || s, chapters: ch.map((c) => ({ n: c.chapter, title: c.title, slug: c.slug, item: c })) }; });
+}
+/* Old Creative Hub addresses that have no window of their own: /writing/series/<s> is the Texte window,
+   /writing/<slug> is its chapter window (or the 404 window). 302, not 301: with ?nwebos=0 the old pages still
+   answer at these addresses until the opt-out goes away. */
+function osLegacy(bare) {
+  const se = /^\/writing\/series\/([a-z0-9-]+)$/.exec(bare);
+  if (se) return { location: "/writing" };
+  const one = /^\/writing\/([a-z0-9-]+)$/.exec(bare);
+  if (!one) return null;
+  const it = publishedWriting(WRITING_ALL).find((w) => w.slug === one[1]);
+  if (it && it.kind === "story" && it.series && it.chapter) return { location: `/writing/${it.series}/${it.chapter}` };
+  return { route: { k: "notfound", path: bare } };
+}
+async function osResponse(req, env, url, lang, route) {
+  const de = lang !== "en";
+  let k = route.k, content = {}, title = "", status = 200, priv = false;
+  const u = ["profile", "blog-post"].includes(k) ? await getUser(req, env).catch(() => null) : null;
+  if (k === "blog") content.blog = blogList(lang, await BLOG().os.list(env, lang));
+  else if (k === "blog-post") {
+    const d = await BLOG().os.post(req, env, route.m[1], url.searchParams.get("preview"), lang).catch(() => null);
+    if (d) { content["blog-post"] = blogPost(lang, d.post, d.rx, { signedIn: d.signedIn, older: d.older, newer: d.newer, preview: d.priv }); title = d.post.title; priv = d.priv; }
+    else k = "notfound";
+  } else if (k === "profile") {
+    priv = true;
+    if (u) {
+      const cnt = await env.DB.prepare("SELECT COUNT(*) AS n FROM entries WHERE discord_id = ?").bind(u.id).first().catch(() => null);
+      const { results: entries } = await env.DB.prepare("SELECT message, created_at FROM entries WHERE discord_id = ? ORDER BY id DESC LIMIT 3").bind(u.id).all().catch(() => ({ results: [] }));
+      const rows = await BLOG().os.reads(env, u.id).catch(() => []);
+      const blogSlugs = rows.filter((r) => r.post_id.startsWith("blog:")).map((r) => r.post_id.slice(5));
+      const titles = await BLOG().os.titles(env, blogSlugs).catch(() => ({}));
+      const ser = osSeries(lang);
+      const reads = rows.map((r) => {
+        if (r.post_id.startsWith("blog:")) { const t = titles[r.post_id.slice(5)]; return t && { kind: "Blog", title: de || !t.title_en ? t.title_de : t.title_en, pct: r.pct, href: (de ? "" : "/en") + "/blog/" + r.post_id.slice(5) }; }
+        const [, s, n] = r.post_id.split(":"); const se = ser.find((x) => x.slug === s); const c = se && se.chapters.find((x) => String(x.n) === n);
+        return c && { kind: de ? "Roman" : "Novel", title: `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`, pct: r.pct, href: (de ? "" : "/en") + `/writing/${s}/${n}` };
+      }).filter(Boolean);
+      content.profile = osProfile(lang, { user: u, gbCount: cnt?.n || 0, entries: entries || [], reads });
+    } else content.profile = osProfile(lang, null);
+  } else if (k === "changelog") content.changelog = osChangelog(lang);
+  else if (k === "writing") content.writing = osWriting(lang, osSeries(lang), publishedWriting(WRITING_ALL).filter((w) => w.kind === "blog" && false));
+  else if (k === "chapter") {
+    const se = osSeries(lang).find((x) => x.slug === route.m[1]); const i = se ? se.chapters.findIndex((c) => String(c.n) === route.m[2]) : -1;
+    if (i >= 0) { const c = se.chapters[i]; content.chapter = osChapter(lang, se, { chapter: c.n, title: c.title }, c.item.html || "", se.chapters[i - 1], se.chapters[i + 1]); title = `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`; }
+    else k = "notfound";
+  }
+  if (k === "notfound") { content.notfound = osNotfound(lang, route.path); status = 404; }
+  const entries = await guestEntries(env).catch(() => []);
+  const page = nwebosPage({ lang, app: k, path: route.path, entries, sitekey: SITEKEY, content, title, status });
+  return html(page, status, { "cache-control": priv ? "private, no-store" : "no-store", vary: "cookie, accept-language", ...(priv ? { "x-robots-tag": "noindex" } : {}) });
 }
 
 // Latest guestbook entries (Discord avatar per rule 10), for the API and the server-rendered NwebOS window.
@@ -1147,11 +1216,12 @@ async function route(req, env, ctx) {
     {
       const os = nwebosChoice(url, cookies(req), true);
       if (os.setCookie && req.method === "GET") { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
-      const app = os.on ? nwebosApp(pre.path) : null;
-      if (app !== null) {
+      const old = os.on && req.method === "GET" ? osLegacy(pre.path) : null;
+      if (old && old.location) return new Response(null, { status: 302, headers: { location: (pre.lang ? "/" + pre.lang : "") + old.location + url.search, "cache-control": "no-store" } });
+      const route = old ? old.route : os.on && req.method === "GET" ? nwebosRoute(pre.path) : null;
+      if (route) {
         const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
-        const entries = await guestEntries(env).catch(() => []);
-        const res = html(nwebosPage({ lang, app, entries, sitekey: SITEKEY }), 200, { "cache-control": "no-store", vary: "cookie, accept-language" });
+        const res = await osResponse(req, env, url, lang, route);
         if (pre.lang) res.headers.append("set-cookie", langCookie(pre.lang));
         return res;
       }

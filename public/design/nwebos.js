@@ -23,13 +23,32 @@
   var desk = $("#desk"), wins = $("#wins"), tb = $("#tbtns"), sm = $("#startm"), sb = $("#startb");
   var APPS = {}; $$("#apps .app").forEach(function (s) { APPS[s.dataset.app] = s; });
   var DEF = { about: [150, 40], portfolio: [330, 70], guestbook: [790, 24], dlg: [480, 220] };
+  var ROUTES = {}; (L.routes || []).forEach(function (r) { ROUTES[r[0]] = r[1]; });
+  var bare = function (pathname) { var p = pathname.replace(/^\/(de|en)(?=\/|$)/, "") || "/"; return p.replace(/\/$/, "") || "/"; };
+  /* an address the shell can open as a window (the server renders it): no assets, APIs, auth or the old editor */
+  var osPath = function (u) { var p = bare(u.pathname); return u.origin === location.origin && !/\.[a-z0-9]{2,5}$/i.test(p) && !/^\/(api|auth|design|mc|vendor|bundle|downloads|content-assets|mc-icon|mc-head|mc-skin)(\/|$)/.test(p) && !/^\/blog\/admin(\/|$)/.test(p); };
   var open = new Map(), z = 10, seq = 0, me = null;
+  /* App modules (docs/nwebos-modules.md): NwebOS.register(key, { mount(content, ctx), unmount?(content) }).
+     A section with data-module loads that script on the first open; the window is mounted once it registered. */
+  var MODS = {}, loading = {}, waiting = {};
+  window.NwebOS = { register: function (key, mod) { MODS[key] = mod; (waiting[key] || []).forEach(function (f) { f(); }); delete waiting[key]; } };
+  function ctxFor(k, el) { return { key: k, lang: lang, window: el, sound: { click: function () { sound.click(); }, open: function () { sound.open(); }, close: function () { sound.close(); }, tone: tone },
+    store: { get: function (x) { return store.get(k + "." + x); }, set: function (x, v) { store.set(k + "." + x, v); } }, close: function () { close(k); } }; }
+  function mount(k, el) {
+    var src = APPS[k], url = src && src.dataset.module; if (!url) return;
+    var wc = $(".wc", el);
+    var go = function () { if (!open.has(k) || open.get(k).el !== el) return; try { wc.replaceChildren(); MODS[k].mount(wc, ctxFor(k, el)); } catch (e) { if (window.console) console.error("NwebOS module " + k, e); } };
+    if (MODS[k]) return go();
+    (waiting[k] = waiting[k] || []).push(go);
+    if (!loading[url]) { loading[url] = true; var s = document.createElement("script"); s.src = url; s.async = true; document.head.appendChild(s); }
+  }
 
   var title = function (k) { var a = APPS[k]; return a ? a.dataset[lang === "en" ? "titleEn" : "titleDe"] : (open.get(k) && open.get(k).title) || ""; };
   var icon16 = function (k) { var t = $("#ic-" + k); return t ? t.innerHTML : ""; };
-  var pathOf = function (k) { var p = k && APPS[k] ? APPS[k].dataset.path : "/"; return lang === "en" ? (p === "/" ? "/en" : "/en" + p) : p; };
-  var appOf = function (pathname) { var p = pathname.replace(/^\/en(?=\/|$)/, "") || "/"; p = p.replace(/\/$/, "") || "/"; var hit = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === p) hit = k; }); return hit; };
-  var push = function (k) { var p = pathOf(k); if (location.pathname !== p) history.pushState({ k: k || "" }, "", p); document.title = (k ? title(k) + " · " : "") + "NwebOS"; };
+  /* a window's address; `data-q` keeps the query of the address it was opened on (a draft's ?preview= token) */
+  var pathOf = function (k) { var p = k && APPS[k] ? APPS[k].dataset.path : "/", q = k && APPS[k] ? APPS[k].dataset.q || "" : ""; return (lang === "en" ? (p === "/" ? "/en" : "/en" + p) : p) + q; };
+  var appOf = function (pathname) { var p = pathname.replace(/^\/(de|en)(?=\/|$)/, "") || "/"; p = p.replace(/\/$/, "") || "/"; var hit = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === p) hit = k; }); return hit; };
+  var push = function (k) { if (k && APPS[k] && !APPS[k].dataset.path) return; var p = pathOf(k); if (location.pathname !== p) history.pushState({ k: k || "" }, "", p); document.title = (k ? title(k) + " · " : "") + "NwebOS"; };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
 
   /* ---------- sound: tiny WebAudio synth, created on the first gesture only ---------- */
@@ -50,10 +69,38 @@
   /* ---------- window state in localStorage ---------- */
   function save() {
     var list = [];
-    open.forEach(function (o, k) { if (!APPS[k]) return; list.push({ k: k, x: parseFloat(o.el.style.getPropertyValue("--x")) || 0, y: parseFloat(o.el.style.getPropertyValue("--y")) || 0, w: o.el.offsetWidth || parseFloat(o.el.style.width), h: o.el.offsetHeight || parseFloat(o.el.style.height), min: o.el.classList.contains("min"), max: o.el.classList.contains("max"), z: +o.el.style.zIndex || 0 }); });
+    open.forEach(function (o, k) { if (!APPS[k] || k === "notfound") return; list.push({ k: k, p: APPS[k].dataset.path || "", x: parseFloat(o.el.style.getPropertyValue("--x")) || 0, y: parseFloat(o.el.style.getPropertyValue("--y")) || 0, w: o.el.offsetWidth || parseFloat(o.el.style.width), h: o.el.offsetHeight || parseFloat(o.el.style.height), min: o.el.classList.contains("min"), max: o.el.classList.contains("max"), z: +o.el.style.zIndex || 0 }); });
     store.set("wins", JSON.stringify(list));
   }
-  function saved() { try { return JSON.parse(store.get("wins") || "[]").filter(function (w) { return w && APPS[w.k]; }); } catch (e) { return []; } }
+  function saved() { try { return JSON.parse(store.get("wins") || "[]").filter(function (w) { return w && w.k && (APPS[w.k] || w.p); }); } catch (e) { return []; } }
+  /* Open the window for an address: its section is in the page, or it is fetched from that address (the server renders
+     the window there) and added. A window already open for that app gets the new content (another post). */
+  var pending = {};
+  function openUrl(url, opt) {
+    opt = opt || {};
+    var u = new URL(url, location.href), b = bare(u.pathname);
+    var have = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === b) have = k; });
+    if (have && !u.search) { openWin(have, opt); return Promise.resolve(have); }
+    var key = u.pathname + u.search; if (pending[key]) return pending[key];
+    return (pending[key] = fetch(u.pathname + u.search, { credentials: "include", headers: { accept: "text/html" } }).then(function (r) { return r.text(); }).then(function (txt) {
+      delete pending[key];
+      var doc = new DOMParser().parseFromString(txt, "text/html"), sec = doc.querySelector("#apps .app");
+      if (!sec || !doc.documentElement.classList.contains("nwebos")) { location.href = u.href; return null; }
+      var k = sec.dataset.app, old = APPS[k], tpl = doc.getElementById("ic-" + k);
+      if (tpl && !document.getElementById("ic-" + k)) document.body.appendChild(document.importNode(tpl, true));
+      sec = document.importNode(sec, true);
+      if (old) old.replaceWith(sec); else $("#apps").appendChild(sec);
+      APPS[k] = sec;
+      var o = open.get(k);
+      if (o) {   /* same window, new content */
+        var wc = $(".wc", o.el); wc.replaceChildren(); [].slice.call(sec.cloneNode(true).childNodes).forEach(function (n) { if (!(n.classList && n.classList.contains("nojs-h"))) wc.appendChild(n); });
+        $(".tt", o.el).textContent = title(k); $("span", o.btn).textContent = title(k); o.el.setAttribute("aria-label", title(k));
+        document.dispatchEvent(new CustomEvent("nwebos:content", { detail: o.el }));
+        restore(k); focus(k, !opt.noPush);
+      } else openWin(k, opt);
+      return k;
+    }).catch(function () { delete pending[key]; location.href = u.href; return null; }));
+  }
 
   /* ---------- windows ---------- */
   function focus(k, doPush) {
@@ -72,7 +119,8 @@
     var src = APPS[k];
     var el = document.createElement("section"); el.className = "win" + (opt.quiet || RM ? "" : " opening"); el.setAttribute("role", "dialog"); el.setAttribute("aria-label", opt.title || title(k)); el.tabIndex = -1;
     var w = opt.w || +(src && src.dataset.w || 360), h = opt.h || +(src && src.dataset.h || 220);
-    var d = opt.pos || DEF[k] || [120 + 30 * (seq % 8), 60 + 24 * (seq % 8)]; seq++;
+    var d = opt.pos || DEF[k] || (src && src.dataset.x ? [+src.dataset.x, +src.dataset.y] : [120 + 30 * (seq % 8), 60 + 24 * (seq % 8)]); seq++;
+    if (src && src.dataset.menu === "no") opt.menu = false;
     var p = clampPos(d[0], d[1], w, h);
     el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = h + "px";
     var ico = opt.icon || icon16(k), tt = esc(opt.title || title(k));
@@ -101,6 +149,7 @@
     if (!opt.min) focus(k, !opt.noPush);
     if (!opt.quiet && !opt.min) el.focus({ preventScroll: true });
     if (k === "guestbook") guestbook(el);
+    mount(k, el);
     save();
     return rec;
   }
@@ -130,6 +179,7 @@
   function restore(k) { var o = open.get(k); if (!o || !o.el.classList.contains("min")) return; toBtn(k); o.el.classList.remove("min"); if (!RM) o.el.classList.add("restoring"); save(); }
   function close(k, fromHistory) {
     var o = open.get(k); if (!o) return; open.delete(k); o.btn.remove(); sound.close();
+    if (MODS[k] && MODS[k].unmount) { try { MODS[k].unmount($(".wc", o.el)); } catch (e) {} }
     var done = function () { o.el.remove(); };
     if (RM) done(); else { o.el.classList.add("closing"); after(o.el, done); }
     syncInert();   /* before focus moves: an inert icon list cannot take it */
@@ -145,11 +195,56 @@
 
   /* ---------- start menu ---------- */
   function closeStart() { sm.hidden = true; sb.setAttribute("aria-expanded", "false"); }
-  sb.onclick = function (e) { e.stopPropagation(); sound.click(); var o = sm.hidden; sm.hidden = !o; sb.setAttribute("aria-expanded", String(o)); if (o) { var f = $("a,button", sm); if (f) f.focus(); } };
+  sb.onclick = function (e) { e.stopPropagation(); sound.click(); var o = sm.hidden; sm.hidden = !o; sb.setAttribute("aria-expanded", String(o)); if (o) { var f = $("#smq", sm) || $("a,button", sm); if (f) f.focus(); } };
+  /* search (start menu, phone home): windows, mc wiki and links from the page, blog posts from /api/blog on first use */
+  var IDX = (L.idx || []).slice(), blogP = null;
+  var norm = function (x) { return String(x).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); };
+  function loadBlog() {
+    return blogP || (blogP = fetch("/api/blog", { credentials: "omit" }).then(function (r) { return r.ok ? r.json() : { posts: [] }; }).then(function (j) {
+      (j.posts || []).forEach(function (q) { IDX.push({ t: q.title, d: "Blog · " + new Date(q.published_at).toLocaleDateString(L.lang === "en" ? "en-GB" : "de-DE", { day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }), p: (L.lang === "en" ? "/en" : "") + "/blog/" + q.slug, ic: "blog", kw: [q.category].concat(q.tags || []).join(" ") + " " + (q.summary || "") }); });
+    }).catch(function () {}));
+  }
+  function find(q) { q = norm(q.trim()); if (!q) return []; var parts = q.split(/\s+/); /* title hits first, then windows of this site before links out */
+    var all = function (h) { return parts.every(function (x) { return h.indexOf(x) >= 0; }); };
+    return IDX.map(function (r, i) { var t = norm(r.t); return { r: r, i: i, s: all(t) ? 0 : all(t + " " + norm(r.kw + " " + r.d)) ? 2 : 9 }; }).filter(function (x) { return x.s < 9; })
+      .sort(function (a, b) { return (a.s + (a.r.url ? 1 : 0)) - (b.s + (b.r.url ? 1 : 0)) || a.i - b.i; }).slice(0, 8).map(function (x) { return x.r; }); }
+  function bindSearch(inp, list, after) {
+    if (!inp || !list) return;
+    var sel = 0, res = [];
+    var draw = function () {
+      res = find(inp.value); list.hidden = !inp.value.trim(); sel = Math.min(sel, Math.max(0, res.length - 1));
+      list.replaceChildren();
+      if (!res.length) { var li0 = document.createElement("li"); li0.className = "none"; li0.textContent = L.noHit + " „" + inp.value.trim() + "“"; list.appendChild(li0); }
+      res.forEach(function (r, i) {
+        var li = document.createElement("li"), b = document.createElement("button"), sp = document.createElement("span"), bt = document.createElement("b"), sm2 = document.createElement("small");
+        b.type = "button"; b.dataset.i = i; if (i === sel) b.className = "on";
+        b.innerHTML = icon16(r.ic); bt.textContent = r.t; sm2.textContent = r.d; sp.append(bt, sm2); b.appendChild(sp);
+        if (r.url) { var em = document.createElement("em"); em.textContent = "↗"; b.appendChild(em); }
+        li.appendChild(b); list.appendChild(li);
+      });
+      var mid = $(".smmid", sm); if (list.id === "smres" && mid) mid.hidden = !list.hidden;
+    };
+    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else openUrl(r.p); inp.value = ""; draw(); if (after) after(); };
+    inp.addEventListener("focus", function () { loadBlog().then(function () { if (inp.value.trim()) draw(); }); });
+    inp.addEventListener("input", function () { sel = 0; draw(); });
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { sel = Math.min(res.length - 1, sel + 1); draw(); e.preventDefault(); }
+      else if (e.key === "ArrowUp") { sel = Math.max(0, sel - 1); draw(); e.preventDefault(); }
+      else if (e.key === "Enter") { e.preventDefault(); go(res[sel]); }
+      else if (e.key === "Escape" && inp.value) { inp.value = ""; draw(); e.stopPropagation(); }
+    });
+    list.addEventListener("click", function (e) { var b = e.target.closest("[data-i]"); if (b) { e.stopPropagation(); go(res[+b.dataset.i]); } });
+  }
+  bindSearch($("#smq"), $("#smres"), closeStart); bindSearch($("#hq"), $("#hres"));
+  var hf = $(".hsearch"); if (hf) hf.addEventListener("submit", function (e) { e.preventDefault(); });
   document.addEventListener("click", function (e) {
     if (!sm.hidden && !e.target.closest("#startm,#startb")) closeStart();
     var op = e.target.closest("[data-open]");
-    if (op && !op.classList.contains("dicon") && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); openWin(op.dataset.open); return; }
+    if (op && !op.classList.contains("dicon") && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); if (APPS[op.dataset.open]) openWin(op.dataset.open); else if (op.href || ROUTES[op.dataset.open]) openUrl(op.href || ROUTES[op.dataset.open]); return; }
+    /* an internal link inside the desktop opens its window instead of reloading the page */
+    var a = e.target.closest("#desk a[href]");
+    if (a && !a.classList.contains("dicon") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href); return; } }
+    var cl = e.target.closest("[data-close]"); if (cl && cl.closest(".win")) { e.preventDefault(); var w0 = cl.closest(".win"); open.forEach(function (o, k) { if (o.el === w0) close(k); }); return; }
     var cw = e.target.closest("[data-closewin]"); if (cw) { var w = cw.closest(".win"); open.forEach(function (o, k) { if (o.el === w) close(k, true); }); return; }
     var egg = e.target.closest("[data-egg]"); if (egg) { closeStart(); if (eggs[egg.dataset.egg]) eggs[egg.dataset.egg](); }
     if (!e.target.closest(".dicon")) $$(".dicon.sel").forEach(function (d) { d.classList.remove("sel"); });
@@ -158,8 +253,8 @@
     logout: function () {
       store.set("loggedout", "1"); store.set("user", null);
       /* real Discord session: sign out with a same-origin POST (a GET only shows the confirmation page, audit #88),
-         come back here to the login */
-      if (me) { var f = document.createElement("form"); f.method = "post"; f.action = L.logoutUrl + encodeURIComponent(location.href); f.hidden = true; document.body.appendChild(f); f.submit(); return; }
+         back to the desktop address, where the login screen shows (a window address opens its window directly) */
+      if (me) { var f = document.createElement("form"); f.method = "post"; f.action = L.logoutUrl + encodeURIComponent(location.origin + (L.home || "/")); f.hidden = true; document.body.appendChild(f); f.submit(); return; }
       showLogin();
     },
     shutdown: function () { var off = $("#off"); off.hidden = false; desk.hidden = true; off.onclick = function () { off.hidden = true; showDesk(); }; },
@@ -169,12 +264,12 @@
   /* ---------- desktop icons: click selects, double click or Enter opens; links without a window navigate ---------- */
   $$(".dicon").forEach(function (d) {
     d.addEventListener("click", function (e) {
-      if (!d.dataset.open) return;                  // blog/music/… still their own page until the apps PR
+      if (!d.dataset.open) return;                  // links out (Minecraft server)
       e.preventDefault();
-      if (PHONE() || e.detail === 0) { openWin(d.dataset.open); return; }
+      if (PHONE() || e.detail === 0) { if (APPS[d.dataset.open]) openWin(d.dataset.open); else openUrl(d.href); return; }
       $$(".dicon.sel").forEach(function (x) { x.classList.remove("sel"); }); d.classList.add("sel");
     });
-    d.addEventListener("dblclick", function () { if (d.dataset.open) openWin(d.dataset.open); else location.href = d.href; });
+    d.addEventListener("dblclick", function () { if (d.dataset.open) { if (APPS[d.dataset.open]) openWin(d.dataset.open); else openUrl(d.href); } else location.href = d.href; });
   });
   $("[data-home]").onclick = function () { var t = topWindow(); if (t) minimize(t); };
   /* Phone: an open app covers the home screen, so its icons leave the Tab order (inert) until the app is minimized or closed. Home stays reachable. */
@@ -206,7 +301,7 @@
     var av = $("#smav"); av.src = useMe && /^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV;
   }
   var meP = fetch("/api/me", { credentials: "include" }).then(function (r) { return r.json(); }).then(function (d) {
-    me = d && d.user ? d.user : null;
+    me = d && d.user ? d.user : null; window.__me = d;
     var li = $("[data-login-me]"), dl = $("[data-login-discord]");
     if (me) { li.hidden = false; dl.hidden = true; $("[data-me-name]").textContent = me.name; if (/^https:\/\//.test(me.avatar || "")) $("[data-me-av]").src = me.avatar; }
     else if (d && !d.available) dl.hidden = true;
@@ -260,18 +355,27 @@
   addEventListener("popstate", function () {
     var k = appOf(location.pathname);
     if (k) { openWin(k, { noPush: true }); return; }
+    if (bare(location.pathname) !== "/") { openUrl(location.href, { noPush: true }); return; }
     open.forEach(function (o, key) { if (!o.el.classList.contains("min")) minimize(key); });   // back to the desktop address: show the desktop
   });
 
   setUser();
   var deep = appOf(location.pathname);
+  if (deep && /[?&]preview=/.test(location.search)) APPS[deep].dataset.q = location.search;
+  var atDesk = bare(location.pathname) === "/";   /* before restored windows change the address */
   var firstVisit = !store.get("booted");
   // restore the saved windows quietly (no sound, no animation), the deep-linked app goes on top
-  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { openWin(w.k, { quiet: true, noPush: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }); });
+  var restoring = [];
+  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { var o = { quiet: true, noPush: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
   if (deep) openWin(deep, { noPush: true, quiet: open.has(deep) });
-  else { var top = topWindow(); if (top) history.replaceState({ k: top }, "", pathOf(top)); }
-  // Boot: first visit to the desktop only (a direct app visit and reduced motion skip it). Login: first visit and after "Abmelden".
-  if (firstVisit && !deep && !RM) boot();
+  /* windows restored from their address arrive later: the deep-linked window stays on top */
+  if (deep && restoring.length) Promise.all(restoring).then(function () { if (open.has(deep)) { focus(deep, false); open.get(deep).el.focus({ preventScroll: true }); } });
+  else if (!deep) { var top = topWindow(); if (top) history.replaceState({ k: top }, "", pathOf(top)); }   /* a deep link keeps its address as typed */
+  // Boot and login: first visit to the desktop (/) only; login again after "Abmelden". A direct visit to a window's
+  // address (deep link, also the 404 window) opens it at once and counts as seen, so the boot does not play later
+  // (Planner 07.11.). Reduced motion skips the boot.
+  if (deep || !atDesk) { if (firstVisit) store.set("booted", "1"); showDesk(false); }
+  else if (firstVisit && !RM) boot();
   else if (firstVisit || store.get("loggedout")) { store.set("booted", "1"); showLogin(); }
   else showDesk(false);
 })();

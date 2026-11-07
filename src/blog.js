@@ -115,10 +115,13 @@ export function localized(row, lang) {
 }
 
 // body_en only as a flag (has an English body?), so the list never loads full texts.
-const LIST_COLS = "slug, status, category, tags, title_de, summary_de, title_en, summary_en, CASE WHEN length(trim(coalesce(body_en, ''))) > 0 THEN 'x' ELSE '' END AS body_en, published_at, updated_at";
+const LIST_COLS = "id, length(body_de) AS body_len, slug, status, category, tags, title_de, summary_de, title_en, summary_en, CASE WHEN length(trim(coalesce(body_en, ''))) > 0 THEN 'x' ELSE '' END AS body_en, published_at, updated_at";
 const fmtDate = (ms, lang) => (ms ? new Date(ms).toLocaleDateString(lang === "en" ? "en-GB" : "de-DE", { timeZone: "Europe/Berlin", dateStyle: "medium" }) : "");
 
-export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound }) {
+/** Most reading-progress rows one user can have (every post and chapter they open; Gatekeeper #115). */
+export const READS_CAP = 500;
+
+export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, chapterExists = () => false }) {
   const SITE = `https://${MAIN}`;
   // ---- admin check (fails closed) ----
   async function admin(req, env) {
@@ -238,6 +241,7 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
 
   // ---- API router: /api/blog… ----
   async function api(p, req, env, url) {
+    if (p === "/api/blog/react" || p === "/api/blog/progress") return readerApi(p, req, env);
     if (p === "/api/blog" || p.startsWith("/api/blog/post/")) {
       if (req.method !== "GET") return deny(405, "method_not_allowed");
       const lang = url.searchParams.get("lang") === "en" ? "en" : "de";
@@ -357,5 +361,86 @@ ${["de", "en"].map((l) => `<fieldset data-lang="${l}"${l === "en" ? " hidden" : 
     return null;
   }
 
-  return { api, page, admin };
+  // ---- NwebOS windows (src/nwebos-apps.js): data, reactions, reading progress ----
+  const KINDS = ["heart", "star", "sun"];
+  async function hearts(env, ids) {
+    if (!ids.length) return {};
+    const { results } = await env.DB.prepare(`SELECT post_id, COUNT(*) AS n FROM blog_reactions WHERE kind = 'heart' AND post_id IN (${ids.map(() => "?").join(",")}) GROUP BY post_id`).bind(...ids).all();
+    return Object.fromEntries((results || []).map((r) => [r.post_id, r.n]));
+  }
+  async function reactions(env, id, uid) {
+    const { results } = await env.DB.prepare("SELECT kind, COUNT(*) AS n FROM blog_reactions WHERE post_id = ? GROUP BY kind").bind(id).all();
+    const out = { heart: 0, star: 0, sun: 0, mine: new Set() };
+    for (const r of results || []) out[r.kind] = r.n;
+    if (uid) { const { results: m } = await env.DB.prepare("SELECT kind FROM blog_reactions WHERE post_id = ? AND discord_id = ?").bind(id, String(uid)).all(); for (const r of m || []) out.mine.add(r.kind); }
+    return out;
+  }
+  const os = {
+    /** Published posts for the Blog window: [{ slug, category, tags, title, summary, published_at, body_len, hearts }]. */
+    async list(env, lang) {
+      const rows = await listPublished(env).catch(() => []);
+      const h = await hearts(env, rows.map((r) => r.id)).catch(() => ({}));
+      return rows.map((r) => ({ ...localized({ ...r, body_de: "" }, lang), body_len: r.body_len, hearts: h[r.id] || 0 }));
+    },
+    /** One post for the reader window, or null (unknown, or a draft without the right token). */
+    async post(req, env, slug, preview, lang) {
+      const got = await readable(req, env, slug, preview);
+      if (!got) return null;
+      const u = await getUser(req, env).catch(() => null);
+      const p = postJson(got.row, lang);
+      const rx = got.priv ? { heart: 0, star: 0, sun: 0, mine: new Set() } : await reactions(env, got.row.id, u && u.id).catch(() => ({ heart: 0, star: 0, sun: 0, mine: new Set() }));
+      let older = null, newer = null;
+      if (!got.priv && got.row.published_at) {
+        older = await env.DB.prepare("SELECT slug, title_de, title_en FROM blog_posts WHERE status='published' AND published_at < ? ORDER BY published_at DESC LIMIT 1").bind(got.row.published_at).first().catch(() => null);
+        newer = await env.DB.prepare("SELECT slug, title_de, title_en FROM blog_posts WHERE status='published' AND published_at > ? ORDER BY published_at ASC LIMIT 1").bind(got.row.published_at).first().catch(() => null);
+      }
+      const t = (r) => r && { slug: r.slug, title: lang === "en" && r.title_en ? r.title_en : r.title_de };
+      return { post: { ...p, body_len: (got.row.body_de || "").length }, rx, older: t(older), newer: t(newer), priv: got.priv, signedIn: !!u };
+    },
+    /** The signed-in reader's progress, newest first: [{ key, pct }]. */
+    async reads(env, uid, limit = 6) {
+      const { results } = await env.DB.prepare("SELECT post_id, pct FROM blog_reads WHERE discord_id = ? ORDER BY updated_at DESC LIMIT ?").bind(String(uid), limit).all();
+      return results || [];
+    },
+    async titles(env, slugs) {
+      if (!slugs.length) return {};
+      const { results } = await env.DB.prepare(`SELECT slug, title_de, title_en FROM blog_posts WHERE status='published' AND slug IN (${slugs.map(() => "?").join(",")})`).bind(...slugs).all();
+      return Object.fromEntries((results || []).map((r) => [r.slug, r]));
+    },
+  };
+  // POST /api/blog/react { slug, kind }: toggle one reaction (signed in, one per kind and account). POST /api/blog/progress
+  // { key, pct }: "blog:<slug>" or "writing:<series>:<n>", 0..100, highest value kept. Both need the site's Origin and JSON.
+  async function readerApi(p, req, env) {
+    if (req.method !== "POST") return deny(405, "method_not_allowed");
+    if (!originOk(req)) return deny(403, "bad_origin");
+    const u = await getUser(req, env).catch(() => null);
+    if (!u) return deny(401, "login_required");
+    const r = await readJson(req); if (r.err) return deny(...r.err);
+    if (p === "/api/blog/react") {
+      const slug = String(r.body?.slug || ""), kind = String(r.body?.kind || "");
+      if (!KINDS.includes(kind)) return deny(400, "kind: heart|star|sun");
+      const row = await bySlug(env, slug);
+      if (!row || row.status !== "published") return deny(404, "not_found");
+      const had = await env.DB.prepare("SELECT 1 FROM blog_reactions WHERE post_id=? AND discord_id=? AND kind=?").bind(row.id, String(u.id), kind).first();
+      if (had) await env.DB.prepare("DELETE FROM blog_reactions WHERE post_id=? AND discord_id=? AND kind=?").bind(row.id, String(u.id), kind).run();
+      else await env.DB.prepare("INSERT OR IGNORE INTO blog_reactions (post_id, discord_id, kind, created_at) VALUES (?, ?, ?, ?)").bind(row.id, String(u.id), kind, Date.now()).run();
+      const rx = await reactions(env, row.id, u.id);
+      // `on` from the stored state: before migration 0017 an INSERT OR IGNORE of "sun" is dropped by the CHECK
+      return json({ ok: true, on: rx.mine.has(kind), counts: { heart: rx.heart, star: rx.star, sun: rx.sun } });
+    }
+    const key = String(r.body?.key || ""), pct = Math.round(Number(r.body?.pct));
+    if (!/^(?:blog:[a-z0-9-]{1,80}|writing:[a-z0-9-]{1,80}:\d{1,3})$/.test(key) || !(pct >= 0 && pct <= 100)) return deny(400, "invalid");
+    // only for something that exists: a published post or a chapter in content/ (no free-form keys)
+    if (key.startsWith("blog:")) { const row = await bySlug(env, key.slice(5)); if (!row || row.status !== "published") return deny(404, "not_found"); }
+    else { const [, s, n] = key.split(":"); if (!chapterExists(s, Number(n))) return deny(404, "not_found"); }
+    const known = await env.DB.prepare("SELECT 1 FROM blog_reads WHERE discord_id = ? AND post_id = ?").bind(String(u.id), key).first();
+    if (!known) {
+      const c = await env.DB.prepare("SELECT COUNT(*) AS n FROM blog_reads WHERE discord_id = ?").bind(String(u.id)).first();
+      if ((c?.n || 0) >= READS_CAP) return deny(429, "too_many_reads");
+    }
+    await env.DB.prepare("INSERT INTO blog_reads (discord_id, post_id, pct, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(discord_id, post_id) DO UPDATE SET pct = MAX(pct, excluded.pct), updated_at = excluded.updated_at").bind(String(u.id), key, pct, Date.now()).run();
+    return json({ ok: true });
+  }
+
+  return { api, page, admin, os, readerApi };
 }
