@@ -370,7 +370,7 @@
   var firstVisit = !store.get("booted");
   // restore the saved windows quietly (no sound, no animation), the deep-linked app goes on top
   var restoring = [];
-  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { var o = { quiet: true, noPush: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
+  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { if (deep && w.k === deep && w.p !== APPS[deep].dataset.path) return;   /* same app as the deep link (another post): the deep link wins */ var o = { quiet: true, noPush: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
   if (deep) openWin(deep, { noPush: true, quiet: open.has(deep) });
   /* windows restored from their address arrive later: the deep-linked window stays on top */
   if (deep && restoring.length) Promise.all(restoring).then(function () { if (open.has(deep)) { focus(deep, false); open.get(deep).el.focus({ preventScroll: true }); } });
