@@ -616,7 +616,7 @@ async function auth(p, req, env, url) {
   if (p === "/auth/discord/logout") {
     if (req.method === "POST") {
       const o = req.headers.get("origin");
-      if (o !== `https://${MAIN}` && o !== `https://${MCD}`) return html(portfolio({ title: "Abmelden fehlgeschlagen", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Abmelden nicht möglich.</h1><p class="lead">Die Anfrage kam nicht von dieser Seite.</p><p style="margin-top:2rem"><a class="btn" href="https://${MAIN}/">Zur Startseite</a></p></div></section>` }), 403);
+      if (o !== `https://${MAIN}` && o !== `https://${MCD}`) return html(legacyNav(portfolio({ title: "Abmelden fehlgeschlagen", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Abmelden nicht möglich.</h1><p class="lead">Die Anfrage kam nicht von dieser Seite.</p><p style="margin-top:2rem"><a class="btn" href="https://${MAIN}/">Zur Startseite</a></p></div></section>` }), req), 403);
       const user = await getUser(req, env);
       if (user) await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(user.sid).run();
       return new Response(null, { status: 303, headers: { location: next, "cache-control": "no-store", "set-cookie": sessCookie("", 0) } });
@@ -624,7 +624,7 @@ async function auth(p, req, env, url) {
     if (req.method !== "GET" && req.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { allow: "GET, POST" } });
     const user = await getUser(req, env);
     if (!user) return redirect(next);
-    return html(portfolio({ title: "Abmelden", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Abmelden?</h1><p class="lead">Du bist als ${esc(user.name)} angemeldet.</p><form method="post" action="/auth/discord/logout?next=${encodeURIComponent(next)}" style="margin-top:2rem"><button class="btn" type="submit">Abmelden</button> <a class="btn sec" href="${esc(next)}">Abbrechen</a></form></div></section>` }), 200, { "cache-control": "no-store" });
+    return html(legacyNav(portfolio({ title: "Abmelden", desc: "", nav: pNav(""), body: `<section class="hero center"><div class="wrap"><h1 class="h-l">Abmelden?</h1><p class="lead">Du bist als ${esc(user.name)} angemeldet.</p><form method="post" action="/auth/discord/logout?next=${encodeURIComponent(next)}" style="margin-top:2rem"><button class="btn" type="submit">Abmelden</button> <a class="btn sec" href="${esc(next)}">Abbrechen</a></form></div></section>` }), req), 200, { "cache-control": "no-store" });
   }
   return null;
 }
@@ -1203,7 +1203,7 @@ async function route(req, env, ctx) {
       if (p.startsWith("/wiki/")) { const a = WIKI.find((x) => x.slug === p.slice(6)); if (!a) return notFound(true); return html(mcPage(a.title + " · Wiki · NwebNotFound MC", a.sum, wikiArticleBody(a, MC_HOST))); }
       return assetOrNotFound(req, env, true);
     }
-    if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden, Idee oder Sonstiges einreichen", css: MC_CSS, nav: mNav.replace(/href="\//g, `href="https://${MCD}/`), footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
+    if (p === "/feedback") return new Response(null, { status: 301, headers: { location: `https://${MCD}/feedback`, "cache-control": "public, max-age=3600" } });
     if (p === "/api/guestbook") return guestbookApi(req, env);
     if (p === "/api/blog" || p.startsWith("/api/blog/")) { const r = await BLOG().api(p, req, env, url); if (r) return r; }
     // ---- Feeds (Creative Hub, phase 3b) ----
