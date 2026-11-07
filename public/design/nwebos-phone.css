@@ -136,7 +136,7 @@
 [data-theme=summer-night] #wins .mngrid .c{background-color:#3a4478;border-color:#05070f}[data-theme=summer-night] #wins .mngrid .c.o{background-color:var(--pn);border-color:var(--line);color:#e9e7f3}
 [data-theme=summer-night] #wins .mngrid .c.o[data-n="1"]{color:#8fb4ff}[data-theme=summer-night] #wins .mngrid .c.o[data-n="2"]{color:#7fdc6a}[data-theme=summer-night] #wins .mngrid .c.o[data-n="4"]{color:#c3b4ff}
 #wins .g-five,#wins .fv{background:var(--pn);color:var(--txt)}
-#wins .fvmsg{font-size:13px;color:var(--mut2)}
+#wins .fvmsg{font-size:13px}#wins .fvmsg:not(.err){color:var(--mut2)}
 #wins .seg2{border:2px solid var(--edge);border-radius:10px;box-shadow:0 2px 0 var(--ink)}#wins .seg2 button{min-width:40px;min-height:36px;padding:0 10px;font:700 13px var(--f);background:var(--pn);color:var(--txt)}#wins .seg2 button.on{background:var(--ink);color:#fff}
 #wins .fvnew{min-height:36px;padding:0 12px;border:2px solid var(--edge);border-radius:10px;background:var(--c-bg);color:var(--c-fg);font:700 13px var(--f);box-shadow:var(--c-sh)}
 #wins .ft{border:2px solid var(--line);border-radius:8px;background:var(--pn2);color:var(--txt)}#wins .ft.in{border-color:var(--edge);animation:pop .12s}
@@ -151,7 +151,7 @@
 @media (max-width:700px){
 #wins .mngrid{grid-template-columns:repeat(9,minmax(0,34px))}#wins .mngrid .c{width:auto;aspect-ratio:1;height:auto}
 #wins .fr{grid-template-columns:repeat(5,56px);gap:6px}#wins .fvgrid{gap:6px}#wins .ft{height:56px;font-size:24px}
-#wins .kb div{gap:4px}#wins .kb button{min-width:30px;height:48px}#wins .kb button.wide{min-width:50px}
+#wins .kb button{height:48px}   /* key widths: the flexible rows from #124 (nwebos-games.css) */
 }
 /* ---------- A7 Gästebuch signed in: textarea, Turnstile, status chip ---------- */
 @media (max-width:700px){
@@ -259,4 +259,9 @@
  .trw .tp .lnk{display:flex;align-items:center}
  .utabs button{min-width:44px}
  .ppl .lnk{display:inline-block;padding:14px 0;margin:-14px 0}.ppl .lnk::after{content:none}
+}
+/* after #119/#124 in main: Fünf keys have the A6 2px border, so the gap-closing overlay counts from inside it;
+   editor controls follow the 44px rule of the rest of the site (guard covers /blog/admin now) */
+@media (max-width:700px){
+ .ed .tabs button,.edl .lfil button,.edl .xtbl td.acts .xpbtn,.edl .xpbtn{min-height:44px}
 }
