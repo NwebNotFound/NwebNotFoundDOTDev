@@ -13,6 +13,7 @@ import "./markdown-unit.mjs";
 import "./feed-unit.mjs";
 import "./epub-unit.mjs";
 import "./nwebos-unit.mjs";
+import "./blog-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { hubPage } from "../src/hub.js";
@@ -1173,6 +1174,30 @@ try {
   }
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Rot', '$.team_color', '#FF5555', '$.team_color_code', '&c', '$.last_seen', '2026-10-31T23:05:00Z', '$.online', json('false')) WHERE mc_uuid = '${U1}'`);
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Grün', '$.team_color', 'red;x', '$.team_color_hex', '#55ff55', '$.online', 1) WHERE mc_uuid = '${U2}'`);
+  // Blog (src/blog.js) over HTTP against the real local D1: admin-only is enforced server-side
+  // (c1 = Nils, verified link + rank admin; c2 = Seller, no admin), drafts stay private.
+  {
+    // The VIP tests above end with an empty mc_player_ranks: make Nils admin for the blog checks and
+    // the browser editor test below, then remove the row again.
+    const blogAdminUuid = sqlRows(`SELECT mc_uuid FROM mc_links WHERE discord_id = '${D1}' AND verified = 1`)[0]?.mc_uuid;
+    sql(`INSERT OR REPLACE INTO mc_player_ranks (uuid, name, rank, color, weight, updated_at) VALUES ('${String(blogAdminUuid || "").replace(/-/g, "")}', 'Nils', 'admin', 'c', 100, 0)`);
+    const MH = "nwebnotfound.dev", MO = "https://" + MH, b = (path, o = {}) => req(path, { testHost: MH, ...o });
+    ok((await b("/api/blog/admin/posts")).s === 401 && (await b("/api/blog/admin/posts", { cookie: c2 })).s === 403, "Blog-Admin: ohne Login 401, Nicht-Admin 403");
+    ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c2, origin: MO, body: { title_de: "x" } })).s === 403 && (await b("/blog/admin", { cookie: c2 })).s === 404, "Blog: Nicht-Admin kann nichts anlegen, Editor 404");
+    ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: "https://evil.example", body: { title_de: "x" } })).s === 403, "Blog: fremde Origin → 403");
+    const cr = await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: MO, body: { title_de: "E2E Beitrag", category: "server", tags: ["e2e"] } });
+    ok(cr.s === 201 && cr.j?.slug === "e2e-beitrag", "Blog: Admin legt Entwurf an", cr.s + " " + cr.t.slice(0, 200));
+    ok((await b("/blog/e2e-beitrag")).s === 404, "Blog: Entwurf öffentlich unsichtbar");
+    const sv = await b(`/api/blog/admin/posts/${cr.j?.id}`, { method: "PUT", cookie: c1, origin: MO, body: { base: cr.j?.updated_at, body_de: "## Teil\n\n<script>alert(1)</script>" } });
+    const pb = await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "published", base: sv.j?.updated_at } });
+    const pg = await b("/blog/e2e-beitrag"), ls = await b("/api/blog?q=e2e");
+    ok(sv.s === 200 && pb.s === 200 && pg.s === 200 && pg.t.includes('<h2 id="h-teil">Teil</h2>') && !pg.t.includes("<script>alert(1)") && ls.j?.posts?.length === 1, "Blog: speichern, veröffentlichen, Seite sanitisiert, Suche findet Tag", `${sv.s} ${pb.s} ${pg.s}`);
+    const rss = await b("/blog/feed.xml");
+    ok(rss.s === 200 && /application\/rss\+xml/.test(rss.h.get("content-type") || "") && rss.t.includes("<title>E2E Beitrag</title>"), "Blog: RSS-Feed");
+    await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
+  }
+  try { execSync(`python3 scripts/blog-editor-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Blog-Editor im Browser fehlgeschlagen"); }
+  sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");
   // NwebOS (src/nwebos.js), opt-in until the switch-over PR: without the cookie every path keeps its old page.
   {
     const MH = "nwebnotfound.dev", n = (path, o = {}) => req(path, { testHost: MH, ...o });

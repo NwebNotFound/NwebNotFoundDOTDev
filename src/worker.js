@@ -19,6 +19,7 @@ import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-p
 import { hubPage, hubPageExists, navReady, sitePage } from "./hub.js";
 import { siteProfileBody } from "./profile.js";
 import { nwebosPage, nwebosChoice, nwebosApp } from "./nwebos.js";
+import { makeBlog } from "./blog.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
@@ -817,6 +818,7 @@ async function mcIngest(req, env) {
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
+let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound }));
 let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
@@ -1091,6 +1093,7 @@ export default {
     }
     if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden, Idee oder Sonstiges einreichen", css: MC_CSS, nav: mNav.replace(/href="\//g, `href="https://${MCD}/`), footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
     if (p === "/api/guestbook") return guestbookApi(req, env);
+    if (p === "/api/blog" || p.startsWith("/api/blog/")) { const r = await BLOG().api(p, req, env, url); if (r) return r; }
     // ---- Feeds (Creative Hub, phase 3b) ----
     // Vor dem Sprach-Redirect: /de/writing/feed.xml und /writing/feed.xml liefern denselben Feed (ein
     // Feed trägt die Sprache seines Inhalts, nicht die der Oberfläche). Vorgerendert, kein Markdown
@@ -1115,6 +1118,12 @@ export default {
         if (pre.lang) res.headers.append("set-cookie", langCookie(pre.lang));
         return res;
       }
+    }
+    // Blog (D1-backed, src/blog.js): before the hub, whose /blog is only the coming-soon page.
+    if (pre.path === "/blog" || pre.path.startsWith("/blog/")) {
+      const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
+      const r = await BLOG().page(pre.path, req, env, url, lang);
+      if (r) return r;
     }
     // The redirect also remembers the language, so the DE/EN switch of the German-only pages stays on
     // the same page and the nav there follows the choice. 302 + no-store: a cached 301 would skip the
