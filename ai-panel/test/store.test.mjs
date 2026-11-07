@@ -11,6 +11,7 @@ import {
   logRecent,
   revokedBefore,
   revokeAll,
+  RevocationUnavailableError,
   invalidateRevokedCache,
   resetCache,
   REVOKED_CACHE_TTL_MS,
@@ -241,6 +242,55 @@ test("without an explicit logout the marker still expires within the TTL", async
 
   t.mock.timers.tick(REVOKED_CACHE_TTL_MS + 1);
   assert.equal(await revokedBefore(env), 1700000000, "stale entry is gone after the TTL");
+  resetCache();
+});
+
+// Revocation fails closed: a store outage must never turn into "nothing is revoked".
+
+/** A store whose marker reads and writes can be switched to fail. */
+function flakyNamespace() {
+  const inner = fakeNamespace();
+  const ctl = { down: false };
+  return {
+    ctl,
+    idFromName: (n) => n,
+    get: (id) => ({
+      fetch: async (url, init) => {
+        if (ctl.down) throw new Error("store down");
+        return inner.get(id).fetch(url, init);
+      },
+    }),
+  };
+}
+
+test("an unreadable marker with nothing cached throws instead of answering 0", async () => {
+  resetCache();
+  const ns = flakyNamespace();
+  ns.ctl.down = true;
+  await assert.rejects(revokedBefore({ PANEL_STORE: ns }), RevocationUnavailableError);
+  resetCache();
+});
+
+test("an unreadable marker falls back to the last known value even after the TTL", async (t) => {
+  resetCache();
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const ns = flakyNamespace();
+  const env = { PANEL_STORE: ns };
+  await writeMarker(env, 1700000000);
+  assert.equal(await revokedBefore(env), 1700000000);
+  ns.ctl.down = true;
+  t.mock.timers.tick(REVOKED_CACHE_TTL_MS + 1);
+  assert.equal(await revokedBefore(env), 1700000000, "the last known marker, not 0");
+  invalidateRevokedCache({ all: true });
+  assert.equal(await revokedBefore(env), 1700000000, "a logout does not drop the fallback");
+  resetCache();
+});
+
+test("revokeAll reports a failed write instead of returning a marker", async () => {
+  resetCache();
+  const ns = flakyNamespace();
+  ns.ctl.down = true;
+  await assert.rejects(revokeAll({ PANEL_STORE: ns }), RevocationUnavailableError);
   resetCache();
 });
 

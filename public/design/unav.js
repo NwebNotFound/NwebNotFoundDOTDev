@@ -18,6 +18,18 @@
   var groups = function () { return [].slice.call(N.querySelectorAll(".u-group")); };
   var visible = function (el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); };
 
+  /* ---------- logout is a POST (CSRF, audit #88) ----------
+     The server answers a GET with a confirmation page; a plain click sends the POST directly so
+     logging out stays one click. Modified clicks (new tab etc.) keep the GET page. */
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest('a[href*="/auth/discord/logout"]');
+    if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    var f = document.createElement("form");
+    f.method = "post"; f.action = a.href; f.hidden = true;
+    document.body.appendChild(f); f.submit();
+  });
+
   /* ---------- active entry (mc groups: longest matching path wins) ---------- */
   function mark() {
     if (!isMc) return;

@@ -289,6 +289,66 @@ test("logout invalidates the cached revocation marker right away", async () => {
   }
 });
 
+test("a store outage fails closed: 503 for the API, logout-all is not reported as ok", async () => {
+  resetCache();
+  const broken = {
+    ...env,
+    PANEL_STORE: {
+      idFromName: (n) => n,
+      get: () => ({
+        fetch: async () => {
+          throw new Error("store down");
+        },
+      }),
+    },
+  };
+  try {
+    const me = await call("/api/me", { e: broken });
+    assert.equal(me.status, 503, "a cookie is not accepted while revocation is unknown");
+    assert.equal((await body(me)).error, "store_unavailable");
+
+    const health = await call("/api/health", { e: broken });
+    assert.deepEqual(await body(health), { ok: true }, "health treats the caller as signed out");
+
+    // Without a binding (local dev) the in-memory marker is authoritative and the API works.
+    const okStore = { ...broken, PANEL_STORE: undefined };
+    assert.equal((await call("/api/me", { e: okStore })).status, 200);
+  } finally {
+    resetCache();
+  }
+});
+
+test("logout-all answers 503 when the marker cannot be written", async () => {
+  resetCache();
+  let writes = 0;
+  const storage = new Map();
+  const flaky = {
+    ...env,
+    PANEL_STORE: {
+      idFromName: (n) => n,
+      get: () => ({
+        fetch: async (url, init) => {
+          if (init?.method === "POST") {
+            writes++;
+            throw new Error("write failed");
+          }
+          if (String(url).endsWith("/revoked")) return Response.json({ before: storage.get("r") || 0 });
+          return Response.json({ ok: true, entries: [] });
+        },
+      }),
+    },
+  };
+  try {
+    const out = await call("/api/logout-all", { method: "POST", e: flaky });
+    assert.equal(out.status, 503);
+    assert.equal((await body(out)).error, "revoke_failed");
+    assert.equal(out.headers.get("set-cookie"), null, "nothing claims the sign-out happened");
+    assert.ok(writes >= 1);
+  } finally {
+    resetCache();
+  }
+});
+
 test("me returns the user, csrf token and bots", async () => {
   const data = await body(await call("/api/me"));
   assert.equal(data.user.id, ALLOWED);
@@ -451,11 +511,11 @@ test("chat history: send, reload, and the transcript is still there", async () =
   const early = await body(await call(`/api/bots/cloudflare/conversations/${conversation_id}/messages`));
   assert.deepEqual(early.messages.map((m) => [m.role, m.content]), [["user", "Was ist der Status?"]]);
 
-  // The stream tap records tool row and final answer while the bytes go through untouched.
+  // The stream tap records tool row and final answer while the frames go through (redacted).
   const events = await call(`/api/bots/cloudflare/runs/${run_id}/events`);
   assert.equal(events.status, 200);
   const streamed = await events.text();
-  assert.match(streamed, /run\.completed/, "the client still sees the raw stream");
+  assert.match(streamed, /run\.completed/, "the client still sees the stream");
   assert.doesNotMatch(streamed, /: ping/, "the tap does not inject frames itself");
 
   // "Reload": a fresh list call finds the thread and its full transcript.
@@ -572,6 +632,38 @@ test("chat history survives a dropped stream through the poll fallback", async (
     assert.equal(last.content, "per Poll fertig", "the poll persisted the answer server-side");
   } finally {
     mock.state.streamDrops = false;
+  }
+});
+
+test("secrets in run streams, run polls, transcripts and jobs are redacted", async () => {
+  const key = "sk-proj-AbCdEf0123456789AbCdEf0123456789";
+  mock.state.runOutput = `cat .env\nOPENAI_API_KEY=${key}`;
+  mock.state.jobs.push({ id: "job_secret", name: "leak", schedule: "0 * * * *", prompt: `use ${key}` });
+  try {
+    const started = await body(await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "cat .env" } }));
+    const streamed = await (await call(`/api/bots/cloudflare/runs/${started.run_id}/events`)).text();
+    assert.match(streamed, /run\.completed/);
+    assert.ok(!streamed.includes(key), "the SSE frames reach the browser redacted");
+
+    const transcript = await body(
+      await call(`/api/bots/cloudflare/conversations/${started.conversation_id}/messages`),
+    );
+    assert.ok(transcript.messages.length > 1);
+    assert.ok(!JSON.stringify(transcript).includes(key), "the stored transcript is redacted");
+
+    mock.state.runs.set(started.run_id, { status: "completed", output: `token: ${key}` });
+    const polled = await call(`/api/bots/cloudflare/runs/${started.run_id}`);
+    assert.ok(!(await polled.text()).includes(key), "the run GET is redacted");
+    const again = await body(
+      await call(`/api/bots/cloudflare/conversations/${started.conversation_id}/messages`),
+    );
+    assert.ok(!JSON.stringify(again).includes(key), "the poll-persisted answer is redacted");
+
+    const jobs = await call("/api/bots/cloudflare/jobs");
+    assert.ok(!(await jobs.text()).includes(key), "the job list is redacted");
+  } finally {
+    mock.state.runOutput = undefined;
+    mock.state.jobs = mock.state.jobs.filter((j) => j.id !== "job_secret");
   }
 });
 
@@ -773,4 +865,97 @@ test("logout-all revokes every issued session", async () => {
   const after = await call("/api/me", { sessionCookie: mine });
   assert.equal(after.status, 401, "the old cookie no longer authenticates");
   resetCache();
+});
+
+// ---- abuse limits (#80) -----------------------------------------------------------------
+
+function storeEnv() {
+  const map = new Map();
+  const storage = {
+    async get(k) {
+      return map.get(k);
+    },
+    async put(k, v) {
+      map.set(k, v);
+    },
+    async delete(k) {
+      map.delete(k);
+    },
+    async list({ prefix = "" } = {}) {
+      return new Map([...map].filter(([k]) => k.startsWith(prefix)));
+    },
+  };
+  const doStore = new PanelStore({ storage }, {});
+  return {
+    map,
+    env: {
+      ...env,
+      PANEL_STORE: { idFromName: (n) => n, get: () => ({ fetch: (url, init) => doStore.fetch(new Request(url, init)) }) },
+    },
+  };
+}
+
+test("unauthenticated requests are rate-limited per IP and stay out of the audit ring", async () => {
+  resetCache();
+  const { map, env: e } = storeEnv();
+  const anon = (ip) => handle(new Request(`${HOST}/api/x`, { headers: { "cf-connecting-ip": ip } }), e);
+  try {
+    const statuses = [];
+    for (let i = 0; i < 40; i++) statuses.push((await anon("203.0.113.7")).status);
+    assert.equal(statuses[0], 401);
+    assert.ok(statuses.includes(429), "the flood is cut off before the auth check");
+    assert.equal(statuses.filter((s) => s === 401).length, 30, "at most the unauth budget reaches auth");
+    const ring = map.get("log") || [];
+    assert.equal(ring.filter((r) => r.status === 401 || r.status === 429).length, 0, "no 401/429 row in the durable log");
+    assert.equal((await anon("198.51.100.9")).status, 401, "another IP is not affected");
+  } finally {
+    resetCache();
+  }
+});
+
+test("/auth/callback is rate-limited per IP", async () => {
+  const statuses = [];
+  for (let i = 0; i < 12; i++) {
+    const res = await handle(
+      new Request(`${HOST}/auth/callback?code=abc&state=zzz`, { headers: { "cf-connecting-ip": "192.0.2.44" } }),
+      env,
+    );
+    statuses.push(res.status);
+  }
+  assert.equal(statuses[0], 302, "a bad state is a redirect to the denied page");
+  assert.equal(statuses.at(-1), 429);
+});
+
+test("input size limits are consistent across routes", async () => {
+  const big = (n) => "x".repeat(n);
+  const cases = [
+    ["/api/bots/minecraft/jobs/job_1", "PATCH", { prompt: big(5001) }],
+    ["/api/bots/minecraft/jobs/job_1", "PATCH", { name: big(201) }],
+    ["/api/bots/minecraft/jobs", "POST", { name: big(201), schedule: "0 * * * *" }],
+    ["/api/bots", "POST", { name: "sizecheck", soul: big(200_001) }],
+    ["/api/bots", "POST", { name: "sizecheck", description: big(2001) }],
+    ["/api/bots/cloudflare/runs/run_abc/steer", "POST", { input: big(20_001) }],
+    ["/api/bots/cloudflare/quick", "POST", { messages: Array.from({ length: 51 }, () => ({ role: "user", content: "hi" })) }],
+    ["/api/bots/cloudflare/quick", "POST", { messages: [{ role: "user", content: big(20_001) }] }],
+  ];
+  for (const [path, method, payload] of cases) {
+    const res = await call(path, { method, body: payload });
+    assert.equal(res.status, 413, `${method} ${path} ${Object.keys(payload)}`);
+  }
+  assert.ok(!mock.state.profiles.some((p) => p.name === "sizecheck"), "nothing oversized was forwarded");
+});
+
+test("a body over 256 KB is refused before it is read", async () => {
+  const declared = await handle(
+    new Request(`${HOST}/api/bots/cloudflare/runs`, {
+      method: "POST",
+      headers: { "content-length": String(300 * 1024), "content-type": "application/json", "cf-connecting-ip": "192.0.2.80" },
+      body: "{}",
+    }),
+    env,
+  );
+  assert.equal(declared.status, 413);
+
+  const undeclared = await call("/api/bots/cloudflare/runs", { method: "POST", body: { input: "x".repeat(300 * 1024) } });
+  assert.equal(undeclared.status, 400, "an oversized body without the header is not parsed");
 });

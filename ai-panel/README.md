@@ -1,6 +1,42 @@
 # AI-Panel (ai.nwebnotfound.dev)
 
 > **Retired (2026-11):** the panel is offline and `ai.nwebnotfound.dev` is detached; the code stays. To restore, re-add the `routes` custom_domain entry shown in `wrangler.jsonc` and deploy.
+>
+> Detaching the Worker route does **not** retire the origin side. Until the steps below are done,
+> `hermes.nwebnotfound.dev` (Cloudflare Tunnel → `origin-proxy/proxy.mjs`) still answers anyone
+> holding `PANEL_SECRET`, and the proxy still injects the gateway keys and the dashboard token.
+> `PANEL_HOST` / `HERMES_ORIGIN` in `wrangler.jsonc` still name those live hosts.
+
+## Retiring the origin side
+
+Run on the Hermes host (PowerShell). Nothing here can be done from the repository.
+
+1. **Stop and unregister the scheduled tasks** that `watchdog.ps1 -Install` created (they run at
+   logon and restart every minute, so killing the processes alone is not enough):
+
+   ```powershell
+   foreach ($t in "AIPanel_tunnel", "AIPanel_proxy", "AIPanel_dashboard") {
+     Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue
+     Unregister-ScheduledTask -TaskName $t -Confirm:$false -ErrorAction SilentlyContinue
+   }
+   powershell -ExecutionPolicy Bypass -File origin-proxy\watchdog.ps1 -Status   # expect nothing running
+   ```
+
+   Keep `AIPanel_dashboard` only if the Hermes dashboard is still wanted locally; it must then
+   stay bound to loopback and must not be reachable through any tunnel.
+2. **Remove the tunnel route:** delete the `hermes.nwebnotfound.dev` CNAME (→ `<UUID>.cfargotunnel.com`)
+   in the Cloudflare DNS dashboard, remove the hostname from the cloudflared `config.yml`
+   ingress, and delete the tunnel if nothing else uses it (`cloudflared tunnel delete ai-panel`).
+3. **Rotate every credential the proxy held,** assuming each may have leaked (Worker secrets,
+   `.env`, `.dev.vars`, logs):
+   - `PANEL_SECRET` (proxy `.env`) / `HERMES_PANEL_SECRET` (Worker secret: `wrangler secret delete`
+     while retired, or `wrangler secret put` with a new value before a restore);
+   - the gateway keys: `API_SERVER_KEY` in the Hermes home `.env` and in every
+     `profiles/<bot>/.env`, plus any `HERMES_KEY_<BOT>` override;
+   - `HERMES_DASHBOARD_SESSION_TOKEN`.
+4. **Before a restore,** re-check that `origin-proxy/proxy.mjs` still only allows the routes the
+   Worker calls (`ROUTES`), and consider putting Cloudflare Access (a service token the Worker
+   sends) in front of the tunnel hostname so the shared secret is not the only gate.
 
 Control panel for Nils' Hermes crew. One Cloudflare Worker, no dependencies, no build step.
 Chat with streamed thinking/tool events, streaming that survives a dropped connection,
@@ -51,8 +87,14 @@ OPENROUTER_API_KEY=...
 ```
 
 `node scripts/dev-server.mjs` runs the same handler under plain Node and serves `public/`;
-open `/__dev/login` to mint a session without Discord. It is a dev-only route and does not
-exist in the Worker.
+open the `/__dev/login?token=…` URL it prints at startup to mint a session without Discord
+(the token is random per start). It is a dev-only route and does not exist in the Worker. The
+dev server only answers `Host: 127.0.0.1:<port>` / `localhost:<port>`, so a DNS-rebound page
+cannot reach it.
+
+`.dev.vars` must **never** contain the production `SESSION_SECRET` or `HERMES_PANEL_SECRET`:
+a cookie minted by the dev server would then be valid in production, and a dev mistake would
+reach the real proxy. Use separate dev values.
 
 ## Credentials, and where they live
 

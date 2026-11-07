@@ -111,3 +111,10 @@ test("the two light token blocks in app.css stay identical", async () => {
   assert.ok(explicit && media, "both light blocks exist");
   assert.deepEqual(tokens(media), tokens(explicit), "light tokens: [data-theme] and prefers-color-scheme must match");
 });
+
+test("sign out everywhere only reports success after the server confirmed it", async () => {
+  const src = await read("app.js");
+  const fn = src.slice(src.indexOf("async function logoutAll"), src.indexOf("function wire()"));
+  assert.match(fn, /!res\.ok/, "logoutAll must check the response status");
+  assert.ok(fn.indexOf("!res.ok") < fn.indexOf("showLogin()"), "the status check comes before showLogin");
+});

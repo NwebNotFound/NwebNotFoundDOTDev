@@ -282,10 +282,12 @@ export const shopsBody = () => `${listHero("Spielershops", "Shops.", "Was deine 
 <script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/shops.js?v=${AV}" defer></script>`;
 export const shopBody = (id) => `<section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p style="margin:0 0 1rem"><a href="/shops">‹ Shops</a></p><div id="hd" data-id="${id}"><h1 class="hub-h">…</h1></div></div></section>
 <section class="sec" style="padding-top:.6rem"><div class="hub-wrap" id="root"><div class="g pad mut">Lade…</div></div></section>
+<section class="sec" style="padding-top:0"><div class="hub-wrap"><div id="ts" data-sitekey="${TS_SITEKEY}" hidden></div></div></section>
 <script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/shop.js?v=${AV}" defer></script>`;
 export const auctionsBody = () => `${listHero("Auktionshaus", "Auktionen.", "Live-Auktionen vom Server. Bieten geht mit verknüpftem Account direkt hier.", "Item oder Verkäufer suchen")}
 <section class="sec" style="padding-top:1.2rem"><div class="hub-wrap" id="root"><div class="g pad mut">Lade Auktionen…</div></div></section>
 <script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/auctions.js?v=${AV}" defer></script>`;
 export const auctionBody = (id) => `<section class="hero" style="padding-bottom:.5rem"><div class="pixbg"></div><div class="hub-wrap"><p style="margin:0 0 1rem"><a href="/auktionen">‹ Auktionen</a></p><div id="hd" data-id="${id}"><h1 class="hub-h">…</h1></div></div></section>
 <section class="sec" style="padding-top:.6rem"><div class="hub-wrap" id="root"><div class="g pad mut">Lade…</div></div></section>
+<section class="sec" style="padding-top:0"><div class="hub-wrap"><div id="ts" data-sitekey="${TS_SITEKEY}" hidden></div></div></section>
 <script src="/mc/common.js?v=${AV}" defer></script><script src="/mc/auction.js?v=${AV}" defer></script>`;

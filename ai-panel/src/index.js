@@ -9,8 +9,9 @@
 import * as auth from "./auth.js";
 import * as up from "./upstream.js";
 import * as store from "./store.js";
+import * as rl from "./ratelimit.js";
 import { teeSseFrames } from "./sse-tap.js";
-import { clampInt, redactValue, sessionKind } from "./redact.js";
+import { clampInt, redactText, redactValue, sessionKind } from "./redact.js";
 import * as crewRoutes from "./crew-routes.js";
 
 export { PanelStore } from "./store.js";
@@ -57,9 +58,24 @@ function clientIp(req) {
   return req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for") || "unknown";
 }
 
+// Input caps. One place, so a route cannot quietly skip the limit its sibling enforces.
+export const MAX_BODY_BYTES = 256 * 1024;
+const JOB_PROMPT_MAX = 5000;
+const JOB_FIELD_MAX = 200; // job name, schedule, deliver
+const SOUL_MAX = 200_000;
+const DESCRIPTION_MAX = 2000;
+const STEER_MAX = 20_000;
+const QUICK_MESSAGES_MAX = 50;
+const QUICK_MESSAGE_CHARS_MAX = 20_000;
+
+const tooLong = (value, max) => value !== undefined && value !== null && String(value).length > max;
+
 async function readJson(req) {
   try {
-    const body = await req.json();
+    // Read as text so a body without content-length is still capped.
+    const text = await req.text();
+    if (text.length > MAX_BODY_BYTES) return null;
+    const body = JSON.parse(text);
     return body && typeof body === "object" ? body : {};
   } catch {
     return null;
@@ -71,14 +87,15 @@ function upstreamProblem(where, status, data) {
   let detail = data;
   if (data && typeof data === "object") detail = data.error ?? data.detail ?? data.message ?? data;
   const text = typeof detail === "string" ? detail : JSON.stringify(detail ?? null);
-  console.error(JSON.stringify({ ai_panel_upstream: { where, status, detail: String(text).slice(0, 300) } }));
+  // Redact before truncating: upstream error text can quote the request or a tool's output.
+  console.error(JSON.stringify({ ai_panel_upstream: { where, status, detail: redactText(String(text)).slice(0, 300) } }));
 }
 
 function upstreamFailure(err) {
   let status = err instanceof up.UpstreamError ? err.status : 502;
   // Never forward an upstream 401/403: the browser would treat it as its own session expiring.
   if (status === 401 || status === 403 || !status) status = 502;
-  console.error(JSON.stringify({ ai_panel_upstream: { where: "transport", status, detail: String(err?.message || err).slice(0, 300) } }));
+  console.error(JSON.stringify({ ai_panel_upstream: { where: "transport", status, detail: redactText(String(err?.message || err)).slice(0, 300) } }));
   return json({ error: status === 503 ? "upstream_not_configured" : "upstream_unreachable" }, status);
 }
 
@@ -95,7 +112,7 @@ function usageError(res, where) {
   if (!code) return null;
   if (USAGE_ERRORS[code]) return USAGE_ERRORS[code];
   console.error(
-    JSON.stringify({ ai_panel_upstream: { where, status: Number(res?.status) || 0, detail: String(code).slice(0, 300) } }),
+    JSON.stringify({ ai_panel_upstream: { where, status: Number(res?.status) || 0, detail: redactText(String(code)).slice(0, 300) } }),
   );
   return GENERIC_UPSTREAM_ERROR;
 }
@@ -123,6 +140,11 @@ async function handleLogin(req, env) {
 async function handleCallback(req, env, url) {
   const clearState = auth.clearCookie(auth.STATE_COOKIE);
   const fail = (reason) => redirect(`/auth/denied?reason=${encodeURIComponent(reason)}`, { "set-cookie": clearState });
+
+  // Each callback can cost a Discord token exchange with the panel's client credentials, and
+  // one state cookie stays valid for minutes: limit it like /auth/login.
+  const limit = await store.rateTake(env, "auth", clientIp(req));
+  if (!limit.ok) return json({ error: "rate_limited", retry_after: limit.retryAfter }, 429, { "retry-after": String(limit.retryAfter) });
 
   const code = url.searchParams.get("code") || "";
   const state = url.searchParams.get("state") || "";
@@ -170,8 +192,15 @@ function handleLogout(req, env, url) {
 
 /** Sign out everywhere: bump the store marker so every issued cookie stops validating. */
 async function handleLogoutAll(env) {
-  // revokeAll clears every cached marker for the user before it writes the fresh one.
-  const before = await store.revokeAll(env);
+  // revokeAll clears every cached marker for the user before it writes the fresh one. If the
+  // marker cannot be persisted the sign-out did not happen: say so instead of answering ok.
+  let before;
+  try {
+    before = await store.revokeAll(env);
+  } catch (err) {
+    if (err instanceof store.RevocationUnavailableError) return json({ error: "revoke_failed" }, 503);
+    throw err;
+  }
   const headers = new Headers(SECURITY_HEADERS);
   headers.set("content-type", "application/json; charset=utf-8");
   headers.set("cache-control", "no-store");
@@ -212,6 +241,8 @@ async function listBots(env) {
 async function createBot(env, body) {
   const name = String(body.name || "").trim();
   if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(name)) return json({ error: "invalid_name" }, 400);
+  if (tooLong(body.description, DESCRIPTION_MAX)) return json({ error: "description_too_long" }, 413);
+  if (tooLong(body.soul, SOUL_MAX)) return json({ error: "too_large" }, 413);
   const payload = {
     name,
     description: String(body.description || ""),
@@ -242,7 +273,7 @@ async function getSoul(env, bot) {
 async function putSoul(env, bot, body) {
   if (body.confirm !== true) return json({ error: "confirm_required", message: `SOUL.md für ${bot} überschreiben?` }, 409);
   const content = String(body.content ?? "");
-  if (content.length > 200_000) return json({ error: "too_large" }, 413);
+  if (content.length > SOUL_MAX) return json({ error: "too_large" }, 413);
   const { status, data } = await up.call(env, "dash", `/api/profiles/${bot}/soul`, {
     method: "PUT",
     body: { content },
@@ -321,7 +352,7 @@ async function getJobs(env, bot) {
     upstreamProblem("jobs_list", status, data);
     return json({ error: "jobs_unavailable" }, 502);
   }
-  return json({ bot, jobs: Array.isArray(data?.jobs) ? data.jobs : [] });
+  return json({ bot, jobs: Array.isArray(data?.jobs) ? redactValue(data.jobs) : [] });
 }
 
 async function createJob(env, bot, body) {
@@ -329,7 +360,10 @@ async function createJob(env, bot, body) {
   const schedule = String(body.schedule || "").trim();
   const prompt = String(body.prompt || "").trim();
   if (!name || !schedule) return json({ error: "name_and_schedule_required" }, 400);
-  if (prompt.length > 5000) return json({ error: "prompt_too_long" }, 413);
+  if (prompt.length > JOB_PROMPT_MAX) return json({ error: "prompt_too_long" }, 413);
+  if (name.length > JOB_FIELD_MAX || schedule.length > JOB_FIELD_MAX || tooLong(body.deliver, JOB_FIELD_MAX)) {
+    return json({ error: "field_too_long" }, 413);
+  }
   const payload = { name, schedule, prompt };
   if (body.deliver) payload.deliver = String(body.deliver);
   const { status, data } = await up.call(env, "gw", `/p/${bot}/api/jobs`, { method: "POST", body: payload });
@@ -346,6 +380,9 @@ async function patchJob(env, bot, id, body) {
   const patch = {};
   for (const k of allowed) if (body[k] !== undefined) patch[k] = body[k];
   if (!Object.keys(patch).length) return json({ error: "nothing_to_update" }, 400);
+  // The same caps createJob enforces; a PATCH must not be the way around them.
+  if (tooLong(patch.prompt, JOB_PROMPT_MAX)) return json({ error: "prompt_too_long" }, 413);
+  for (const k of ["name", "schedule", "deliver"]) if (tooLong(patch[k], JOB_FIELD_MAX)) return json({ error: "field_too_long" }, 413);
   const { status, data } = await up.call(env, "gw", `/p/${bot}/api/jobs/${id}`, { method: "PATCH", body: patch });
   if (status >= 400) {
     upstreamProblem("job_patch", status, data);
@@ -673,6 +710,7 @@ async function runAction(env, bot, runId, action, body) {
   } else if (action === "steer") {
     const input = String(body.input || body.message || "").trim();
     if (!input) return json({ error: "input_required" }, 400);
+    if (input.length > STEER_MAX) return json({ error: "input_too_long" }, 413);
     payload = { input };
   } else if (action === "stop") {
     payload = {};
@@ -689,12 +727,18 @@ async function runAction(env, bot, runId, action, body) {
     run_id: runId,
     status: action === "approval" ? `approval:${payload.choice}` : action === "stop" ? "stopped" : "steered",
   });
-  return json({ ok: true, action, result: data });
+  return json({ ok: true, action, result: redactValue(data) });
 }
 
 async function quickChat(env, bot, body) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   if (!messages.length) return json({ error: "messages_required" }, 400);
+  if (messages.length > QUICK_MESSAGES_MAX) return json({ error: "too_many_messages" }, 413);
+  for (const m of messages) {
+    const content = m && typeof m === "object" ? m.content : m;
+    const size = typeof content === "string" ? content.length : JSON.stringify(content ?? "").length;
+    if (size > QUICK_MESSAGE_CHARS_MAX) return json({ error: "message_too_long" }, 413);
+  }
   const res = await up.stream(env, "gw", `/p/${bot}/v1/chat/completions`, {
     method: "POST",
     body: { model: "hermes-agent", messages, stream: true },
@@ -815,14 +859,32 @@ export async function route(request, env, ctx) {
   const path = url.pathname;
   const method = request.method.toUpperCase();
 
+  if (path.startsWith("/api/") || path.startsWith("/auth/")) {
+    // Before any session or store work: an IP that floods, or keeps failing authentication,
+    // is turned away here, in memory, without a revocation lookup or a DO write.
+    const ip = clientIp(request);
+    const perIp = rl.take("ip", ip);
+    if (!perIp.ok || rl.exhausted("unauth", ip)) {
+      ctx.anonymous = true;
+      const retry = perIp.ok ? 60 : perIp.retryAfter;
+      return json({ error: "rate_limited", retry_after: retry }, 429, { "retry-after": String(retry) });
+    }
+    const declared = Number(request.headers.get("content-length") || 0);
+    if (declared > MAX_BODY_BYTES) return json({ error: "payload_too_large" }, 413);
+  }
+
   if (path === "/api/health") {
     // Liveness is public so the browser can tell "panel down" from "tunnel down". Everything
     // else here (which bots exist, whether the store is bound, the session version) is
     // internal detail and only goes to a signed-in user.
     if (method !== "GET") return json({ error: "method_not_allowed" }, 405);
-    const revokedNow = await store.revokedBefore(env);
-    const who = await auth.currentUser(env, request, { revokedBefore: revokedNow });
-    if (!who) return json({ ok: true });
+    // An unreadable revocation marker means "treat as signed out" here, never "nothing revoked".
+    const revokedNow = await store.revokedBefore(env).catch(() => null);
+    const who = revokedNow === null ? null : await auth.currentUser(env, request, { revokedBefore: revokedNow });
+    if (!who) {
+      ctx.anonymous = true; // public liveness poll: not an audit event
+      return json({ ok: true });
+    }
     // The panel's own view plus the origin proxy's: a red "tunnel/gateway" dot here is what the
     // UI shows when things are down, instead of a generic "Load failed" in the chat.
     const [health, bots] = await Promise.all([up.proxyHealth(env), up.botList(env)]);
@@ -849,9 +911,20 @@ export async function route(request, env, ctx) {
   }
 
   // ---- authenticated API ----
-  const revoked = await store.revokedBefore(env);
+  let revoked;
+  try {
+    revoked = await store.revokedBefore(env);
+  } catch (err) {
+    // Fail closed: without the marker a revoked (possibly stolen) cookie cannot be told apart.
+    if (err instanceof store.RevocationUnavailableError) return json({ error: "store_unavailable" }, 503);
+    throw err;
+  }
   const user = await auth.currentUser(env, request, { revokedBefore: revoked });
-  if (!user) return json({ error: "unauthorized" }, 401);
+  if (!user) {
+    rl.take("unauth", clientIp(request));
+    ctx.anonymous = true;
+    return json({ error: "unauthorized" }, 401);
+  }
   ctx.user = user;
 
   const limit = await store.rateTake(env, "api", user.id);
@@ -1059,14 +1132,14 @@ export async function route(request, env, ctx) {
           run_id: runId,
           status: state,
           error: TERMINAL_RUN_STATES.has(state) && state !== "completed" && state !== "finished" && state !== "success"
-            ? String(data?.error || data?.detail || state).slice(0, 200)
+            ? redactText(String(data?.error || data?.detail || state)).slice(0, 200)
             : null,
         });
       }
       const pending = pendingControl(data);
       if (TERMINAL_RUN_STATES.has(state)) {
         const conversationId = await conversationForRun(env, bot, runId);
-        const out = typeof data?.output === "string" ? data.output.trim() : "";
+        const out = typeof data?.output === "string" ? redactText(data.output.trim()) : "";
         if (conversationId && out) {
           await store.messageAppend(env, {
             conversation_id: conversationId,
@@ -1077,7 +1150,7 @@ export async function route(request, env, ctx) {
           });
         }
       }
-      return json({ ...(data ?? {}), pending: pending.request_id ? pending : null });
+      return json({ ...redactValue(data ?? {}), pending: pending.request_id ? pending : null });
     }
     if (action === "events") {
       if (method !== "GET") return json({ error: "method_not_allowed" }, 405);
@@ -1090,6 +1163,9 @@ export async function route(request, env, ctx) {
 
   return json({ error: "not_found" }, 404);
 }
+
+const ANON_LOG_SAMPLE = 50;
+let anonymousSeen = 0;
 
 export async function handle(request, env) {
   const url = new URL(request.url);
@@ -1104,11 +1180,19 @@ export async function handle(request, env) {
     if (err instanceof up.UpstreamError) {
       res = upstreamFailure(err);
     } else {
-      console.error("ai-panel error", err && err.stack ? err.stack : String(err));
+      console.error("ai-panel error", redactText(err && err.stack ? err.stack : String(err)));
       res = json({ error: "internal_error" }, 500);
     }
   }
-  if (path.startsWith("/api/") || path.startsWith("/auth/")) {
+  // A 401/429 without a signed-in user (login/callback limits included) is noise, not audit.
+  if (ctx.anonymous || (!ctx.user && (res?.status === 401 || res?.status === 429))) {
+    // Unauthenticated noise (401, pre-auth 429) never goes to the durable audit ring: a flood
+    // would push the real entries out. Workers Logs get a sample so a flood is still visible.
+    anonymousSeen += 1;
+    if (anonymousSeen % ANON_LOG_SAMPLE === 1) {
+      store.logLocal({ method, path, status: res?.status ?? 0, ms: Date.now() - started, note: `anonymous sample 1/${ANON_LOG_SAMPLE}` });
+    }
+  } else if (path.startsWith("/api/") || path.startsWith("/auth/")) {
     await store.logAppend(env, {
       method,
       path,
