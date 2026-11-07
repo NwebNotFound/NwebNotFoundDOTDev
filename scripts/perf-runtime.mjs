@@ -12,6 +12,7 @@ import { chromium } from "playwright";
 const [BASE, OUT, FILTER] = process.argv.slice(2);
 const PAGES = [
   ["main", "/"], ["main", "/de"], ["main", "/portfolio"], ["main", "/guestbook"],
+  ["main", "/blog"], ["main", "/blog/eine-navigation-fuer-zwei-seiten"], ["main", "/changelog"], ["main", "/music"], ["main", "/writing"], ["main", "/profile"],
   ["mc", "/"], ["mc", "/spieler"], ["mc", "/spieler/NwebNotFound"], ["mc", "/wiki"], ["mc", "/changelog"],
   ["mc", "/leaderboards"], ["mc", "/markt"], ["mc", "/vip"],
 ].filter(([s, p]) => !FILTER || (s + p).includes(FILTER));
