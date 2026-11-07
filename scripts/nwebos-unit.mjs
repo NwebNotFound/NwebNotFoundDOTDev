@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { nwebosPage, nwebosChoice, nwebosApp, nwebosRoute, OS_PATHS, APPS } from "../src/nwebos.js";
-import { blogList, blogPost, notfound, profile, changelog } from "../src/nwebos-apps.js";
+import { blogList, blogPost, notfound, profile, changelog, music } from "../src/nwebos-apps.js";
 import { buildSprite } from "./build-nwebos-icons.mjs";
 
 const U = (q = "") => new URL("https://nwebnotfound.dev/guestbook" + q);
@@ -69,3 +69,7 @@ assert.equal(fs.readFileSync(new URL("../public/design/nwebos-icons.svg", import
 console.log("nwebos-unit ok");
 // Neuigkeiten: one row per change, also when the mc changelog repeats a website change of that day (Design QA #115)
 { const titles = [...changelog("de").matchAll(/<li data-t="[^"]+">.*?<b>([^<]+)<\/b>/g)].map((m) => m[1]); assert.ok(titles.length > 0 && new Set(titles).size === titles.length, "changelog rows unique: " + titles.join(" | ")); }
+// phone polish 3: no text glyphs in the player (iOS draws them as emoji), pixel icons, no made-up tracks
+{ const m = music("de"); assert.ok(!/[◀▶⤮↻❚]/.test(m) && (m.match(/#i-c-/g) || []).length >= 6 && m.includes("NOCH KEIN TRACK") && !/Sommerloop|Hitzefrei/.test(m) && /class="seek"[^>]* disabled/.test(m), "Musik: icons, honest empty state"); }
+{ const sp = fs.readFileSync(new URL("../public/design/nwebos-icons.svg", import.meta.url), "utf8"); for (const k of ["play", "pause", "prev", "next", "shuffle", "repeat", "back", "close", "search"]) assert.ok(sp.includes(`id="i-c-${k}"`), k); }
+

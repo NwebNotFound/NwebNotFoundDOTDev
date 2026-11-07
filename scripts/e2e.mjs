@@ -1334,6 +1334,7 @@ try {
   process.env.NWEBOS_LOGOUT_COOKIE = clo;   // py() hands process.env to the browser scripts
   py("NwebOS im Browser fehlgeschlagen", "scripts/nwebos-ui.py", BASE, c1);
   py("NwebOS-Apps im Browser fehlgeschlagen", "scripts/nwebos-apps-ui.py", BASE, c1);
+  py("NwebOS-Handy-Feinschliff im Browser fehlgeschlagen", "scripts/nwebos-phone-ui.py", BASE, c1);
   py("Logo-Seitenwechsel „Wohin?“ fehlgeschlagen", "scripts/site-switch-ui.py", BASE);
   py("3D-Viewer: Pause/Fortsetzen fehlgeschlagen", "scripts/player3d-ui.py", BASE);
   py("Turnstile-Challenge-Ablauf fehlgeschlagen", "scripts/turnstile-ui.py", BASE);

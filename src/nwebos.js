@@ -10,7 +10,7 @@
 // their current pages; their desktop/start-menu icons link there.
 import { AV } from "./asset-version.js";
 import { WIKI } from "./mc-hub.js";
-import { music, trash, soon } from "./nwebos-apps.js";
+import { music, trash, soon, ic2 } from "./nwebos-apps.js";
 
 export const MAIN_HOST = "nwebnotfound.dev";
 export const MC_HOST = "mc.nwebnotfound.dev";
@@ -126,7 +126,7 @@ function guestbook(lang, entries = []) {
     : `<p class="sys">${de ? "Noch keine Einträge. Sei die oder der Erste!" : "No entries yet. Be the first!"}</p>`;
   return `<div class="chat"><div class="buddy">${ic("guestbook", 40)}<span><b>${de ? "Gästebuch" : "Guestbook"}</b><small>${de ? `${n} ${n === 1 ? "Eintrag" : "Einträge"}` : `${n} ${n === 1 ? "entry" : "entries"}`}</small></span></div>
 <div class="msgs" data-gb-list>${msgs}</div>
-<div class="gb-form" data-gb-compose><div class="say"><input placeholder="${de ? "Mit Discord anmelden, um zu schreiben" : "Sign in with Discord to write"}" disabled aria-label="${de ? "Nachricht" : "Message"}"><a class="xpbtn" href="/auth/discord/login?next=${encodeURIComponent(`https://${MAIN_HOST}${de ? "" : "/en"}/guestbook`)}">${de ? "Mit Discord anmelden" : "Sign in with Discord"}</a></div></div></div>`;
+<div class="gb-form" data-gb-compose><div class="say"><a class="xpbtn discord" href="/auth/discord/login?next=${encodeURIComponent(`https://${MAIN_HOST}${de ? "" : "/en"}/guestbook`)}">${de ? "Mit Discord anmelden" : "Sign in with Discord"}</a></div></div></div>`;
 }
 
 const href = (lang, path) => (lang === "en" ? (path === "/" ? "/en" : "/en" + path) : path);
@@ -171,14 +171,14 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
   const other = lang === "en" ? "de" : "en";
   const alt = (l) => `https://${MAIN_HOST}${href(l, path)}`;
   const DISCORD = '<svg viewBox="0 0 71 55" fill="#fff" aria-hidden="true" focusable="false"><path d="M60.1 4.9A58.5 58.5 0 0045.4.4a40 40 0 00-1.9 3.8 54 54 0 00-16.2 0A40 40 0 0025.4.4 58.4 58.4 0 0010.7 4.9C1.4 18.7-1.1 32.2.1 45.5a59 59 0 0018 9.1 43 43 0 003.8-6.2 38 38 0 01-6-2.9l1.5-1.1a42 42 0 0036 0l1.5 1.1a38 38 0 01-6 2.9 43 43 0 003.8 6.2 58.7 58.7 0 0018-9.1c1.5-15.4-2.5-28.8-10.6-40.6zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2z"/></svg>';
-  const L = { ...t, lang, path, idx: searchIndex(lang), home: href(lang, "/"), login: `/auth/discord/login?next=`, logoutUrl: `/auth/discord/logout?next=`, sitekey, routes, status };
+  const L = { ...t, lang, path, sprite: `/design/nwebos-icons.svg?v=${AV}`, idx: searchIndex(lang), home: href(lang, "/"), login: `/auth/discord/login?next=`, logoutUrl: `/auth/discord/logout?next=`, sitekey, routes, status };
   return `<!doctype html>
 <html lang="${lang}" class="no-js nwebos"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(t.desc)}"><link rel="canonical" href="${alt(lang)}">
 <link rel="alternate" hreflang="${lang}" href="${alt(lang)}"><link rel="alternate" hreflang="${other}" href="${alt(other)}">
 <meta name="theme-color" content="#2463d6"><link rel="icon" href="/favicon.ico">
 <script src="/design/summer-theme.js?v=${AV}"></script><link rel="preload" href="/design/fonts/pixelify-sans-latin-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script><script src="/design/nwebos-apps.js?v=${AV}" defer></script></head><body>
+<link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-polish.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script><script src="/design/nwebos-apps.js?v=${AV}" defer></script></head><body>
 <a class="skip" href="#apps">${t.skip}</a>
 <div id="boot" class="scr" hidden><div class="bootin"><div class="blogo">${ic("cat", 72)}<span><b>Nweb</b>OS</span></div><small>${t.edition}</small><div class="bbar"><i></i><i></i><i></i></div><p>${t.boot}</p></div><span class="bcopy">© {{Y}} Nils Weberruß</span></div>
 <div id="login" class="scr" hidden role="dialog" aria-modal="true" aria-label="NwebOS"><div class="lgtop"></div><div class="lgmid"><div class="lgl">${ic("cat", 64)}<b><span>Nweb</span>OS</b><p>${t.loginHint}</p></div>
@@ -196,7 +196,7 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
 <div class="tray"><nav class="lang" data-lang="${lang}" aria-label="${t.lang}"><a href="${esc(href("de", path))}" hreflang="de" lang="de"${lang === "de" ? ' aria-current="true"' : ""}>DE</a><a href="${esc(href("en", path))}" hreflang="en" lang="en"${lang === "en" ? ' aria-current="true"' : ""}>EN</a></nav>
 
 <button id="thm" type="button" aria-label="${t.theme}" aria-pressed="false"><i></i></button><button id="snd" type="button" aria-pressed="true" aria-label="${t.sound}"><svg viewBox="0 0 12 12" width="14" height="14" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="4" width="3" height="4" fill="#fff"/><rect x="4" y="3" width="1" height="6" fill="#fff"/><rect x="5" y="2" width="1" height="8" fill="#fff"/><rect class="w1" x="8" y="4" width="1" height="4" fill="#fff"/><rect class="w2" x="10" y="3" width="1" height="6" fill="#fff"/><rect class="mx" x="7" y="3" width="5" height="1" fill="#ff8a6b" transform="rotate(45 9 6)"/></svg></button><time id="clock"></time></div>
-<nav class="mbar"><button type="button" data-home aria-label="${t.home}">${ic("cat", 22)}</button><span id="mtitle">NwebOS</span><time id="mclock"></time></nav></footer></div>
+<nav class="mbar" aria-label="NwebOS"><button type="button" data-home aria-label="${t.home}">${ic("cat", 22)}</button><span id="mtitle">NwebOS</span><button type="button" class="msrch" data-msearch aria-label="${t.search}">${ic2("search")}</button><time id="mclock"></time></nav></footer></div>
 <main id="apps">${sections}</main>${tpl}
 <script type="application/json" id="os-l">${JSON.stringify(L).replace(/</g, "\\u003c")}</script>
 <noscript><p class="nojs-note">${t.nojs}</p></noscript>
