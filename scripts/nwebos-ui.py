@@ -241,8 +241,11 @@ with sync_playwright() as p:
     shot(pg, "games-mines-1280.png")
     pg.locator(".tbb").first.click(); pg.wait_for_timeout(300)
     # keyboard: arrows move, Enter reveals, F flags
-    pg.locator(".g-mines .c[tabindex='0']").focus(); pg.keyboard.press("ArrowRight"); pg.keyboard.press("F")
-    assert pg.locator(".g-mines .c.f").count() == 2, "keyboard flag"
+    pg.locator(".g-mines .c[tabindex='0']").focus(); pg.keyboard.press("ArrowRight")
+    assert pg.evaluate("document.activeElement && document.activeElement.classList.contains('c')"), "arrows move the focus"
+    nf = pg.locator(".g-mines .c.f").count()
+    pg.locator(".g-mines .c:not(.o):not(.f)").first.focus(); pg.keyboard.press("F")   # a closed cell (the arrow can land on an open one)
+    assert pg.locator(".g-mines .c.f").count() == nf + 1, "keyboard flag"
     # play to the end (a loss or a win), then the stats are stored
     for i in range(81):
         if pg.locator(".g-mines .face.dead, .g-mines .face.cool").count(): break
