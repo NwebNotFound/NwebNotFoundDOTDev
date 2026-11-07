@@ -120,3 +120,13 @@ a.xpbtn[href*="/auth/discord"],.say .xpbtn{background:#5865f2;color:#fff}
 .post blockquote p{margin:0}
 [data-theme=summer-night] .post blockquote{background:#2a3260;border-color:var(--edge);box-shadow:3px 3px 0 #05070f;color:var(--txt)}
 [data-theme=summer-night] .lead{color:var(--mut2)}
+/* (10/15) search fields without the browser's own look (iOS drew the home search as its grey pill: Nils 07.11.) */
+.hsearch input,.smsearch input,.bsearch input,#smq,#hq{-webkit-appearance:none;appearance:none;background:#fff;color:#1b2238;background-clip:padding-box}
+.hsearch input::placeholder,.smsearch input::placeholder,.bsearch input::placeholder{color:#6b7184;opacity:1}
+.hsearch input::-webkit-search-decoration,.smsearch input::-webkit-search-decoration,.bsearch input::-webkit-search-decoration{-webkit-appearance:none}
+.hsearch input::-webkit-search-cancel-button,.smsearch input::-webkit-search-cancel-button,.bsearch input::-webkit-search-cancel-button{-webkit-appearance:none;width:16px;height:16px;background:var(--ink);-webkit-mask:linear-gradient(45deg,transparent 43%,#000 43%,#000 57%,transparent 57%),linear-gradient(-45deg,transparent 43%,#000 43%,#000 57%,transparent 57%);cursor:pointer}
+[data-theme=summer-night] .hsearch .results,[data-theme=summer-night] .smsearch+.results{background:#2a3260;border-color:var(--edge)}
+[data-theme=summer-night] .results button{color:#eef0ff}[data-theme=summer-night] .results small{color:var(--mut2)}
+/* (14) night: dark pixel icons on the desktop and the home screen get a thin light outline (Pixelminen was dark on dark) */
+[data-theme=summer-night] .dicon svg,[data-theme=summer-night] .dicon img{filter:drop-shadow(1px 0 0 rgba(233,231,243,.9)) drop-shadow(-1px 0 0 rgba(233,231,243,.9)) drop-shadow(0 1px 0 rgba(233,231,243,.9)) drop-shadow(0 -1px 0 rgba(233,231,243,.9))}
+[data-theme=summer-night] .dicon,[data-theme=summer-night] .dicon span{color:#fff}   /* icon labels stay white (the night link colour hit them) */

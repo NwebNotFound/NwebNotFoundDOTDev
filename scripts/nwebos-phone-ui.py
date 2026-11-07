@@ -78,10 +78,21 @@ with sync_playwright() as p:
     # blog: zero category counts hidden
     pg.goto(f"https://{H}/blog", wait_until="load"); pg.locator(".win.focus .cats").wait_for()
     assert all(not e.is_visible() for e in pg.locator(".win.focus .cats em.zero").all())
+    # home search: no browser look (iOS drew a grey pill), white field in the family (Nils 07.11.)
+    pg.goto(f"https://{H}/", wait_until="load")
+    look = pg.evaluate("(() => { const cs = getComputedStyle(document.querySelector('#hq')); return [cs.appearance || cs.webkitAppearance, cs.backgroundColor, cs.borderTopWidth]; })()")
+    assert look[0] == "none" and look[1] == "rgb(255, 255, 255)" and look[2] == "2px", look
+    pg.goto(f"https://{H}/blog", wait_until="load")
     # bottom bar: search goes home and focuses the search field
     pg.locator("[data-msearch]").click(); pg.wait_for_timeout(200)
     assert pg.evaluate("document.activeElement && document.activeElement.id") == "hq" and pg.locator(".win:not(.min)").count() == 0
     c.unroute_all(behavior="ignoreErrors"); c.close()
+    if SHOTS:   # night home with a search and its results (the screen of Nils' screenshot)
+        c = ctx_for(br, 375, True); pg = c.new_page(); pg.goto(f"https://{H}/", wait_until="load")
+        pg.locator("#hq").fill("gast"); pg.locator("#hres button").first.wait_for(); pg.wait_for_timeout(300)
+        pg.screenshot(path=os.path.join(SHOTS, "phone-search-night-375.png")); pg.locator("#hq").fill(""); pg.wait_for_timeout(200)
+        pg.screenshot(path=os.path.join(SHOTS, "phone-home-icons-night-375.png"))
+        c.unroute_all(behavior="ignoreErrors"); c.close()
     assert not errs, errs
     print("PASS 375: Musik icons + empty state, title-bar icons, guestbook Discord button, zero counts hidden, bottom-bar search")
     br.close()
