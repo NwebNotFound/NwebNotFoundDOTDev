@@ -464,7 +464,7 @@ async function siteProfile(req, env) {
   return html(sitePage({ lang, bare: "/profile", title: "Profil · NwebNotFound", desc: "Dein Profil", body, head }), 200, { "cache-control": "private, no-store" });
 }
 
-// Owner deletes their own data: guestbook entries and sessions. POST from the site itself only.
+// Owner deletes their own data: guestbook entries, blog reading progress and reactions, sessions. POST from the site itself only.
 async function profileDelete(req, env) {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (req.headers.get("origin") !== `https://${MAIN}`) return json({ error: "forbidden" }, 403);
@@ -476,6 +476,9 @@ async function profileDelete(req, env) {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM entries WHERE discord_id = ?").bind(u.id),
     env.DB.prepare("DELETE FROM sessions WHERE discord_id = ?").bind(u.id),
+    // reading progress and reactions from the NwebOS blog/reader (Gatekeeper #115)
+    env.DB.prepare("DELETE FROM blog_reads WHERE discord_id = ?").bind(String(u.id)),
+    env.DB.prepare("DELETE FROM blog_reactions WHERE discord_id = ?").bind(String(u.id)),
   ]);
   return json({ ok: true }, 200, { "set-cookie": sessCookie("", 0) });
 }
@@ -821,7 +824,7 @@ async function mcIngest(req, env) {
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
-let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound }));
+let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, chapterExists: (s, n) => osSeries("de").some((se) => se.slug === s && se.chapters.some((c) => c.n === n)) }));
 let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);

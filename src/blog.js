@@ -118,7 +118,10 @@ export function localized(row, lang) {
 const LIST_COLS = "id, length(body_de) AS body_len, slug, status, category, tags, title_de, summary_de, title_en, summary_en, CASE WHEN length(trim(coalesce(body_en, ''))) > 0 THEN 'x' ELSE '' END AS body_en, published_at, updated_at";
 const fmtDate = (ms, lang) => (ms ? new Date(ms).toLocaleDateString(lang === "en" ? "en-GB" : "de-DE", { timeZone: "Europe/Berlin", dateStyle: "medium" }) : "");
 
-export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound }) {
+/** Most reading-progress rows one user can have (every post and chapter they open; Gatekeeper #115). */
+export const READS_CAP = 500;
+
+export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, chapterExists = () => false }) {
   const SITE = `https://${MAIN}`;
   // ---- admin check (fails closed) ----
   async function admin(req, env) {
@@ -422,10 +425,19 @@ ${["de", "en"].map((l) => `<fieldset data-lang="${l}"${l === "en" ? " hidden" : 
       if (had) await env.DB.prepare("DELETE FROM blog_reactions WHERE post_id=? AND discord_id=? AND kind=?").bind(row.id, String(u.id), kind).run();
       else await env.DB.prepare("INSERT OR IGNORE INTO blog_reactions (post_id, discord_id, kind, created_at) VALUES (?, ?, ?, ?)").bind(row.id, String(u.id), kind, Date.now()).run();
       const rx = await reactions(env, row.id, u.id);
-      return json({ ok: true, on: !had, counts: { heart: rx.heart, star: rx.star, sun: rx.sun } });
+      // `on` from the stored state: before migration 0017 an INSERT OR IGNORE of "sun" is dropped by the CHECK
+      return json({ ok: true, on: rx.mine.has(kind), counts: { heart: rx.heart, star: rx.star, sun: rx.sun } });
     }
     const key = String(r.body?.key || ""), pct = Math.round(Number(r.body?.pct));
     if (!/^(?:blog:[a-z0-9-]{1,80}|writing:[a-z0-9-]{1,80}:\d{1,3})$/.test(key) || !(pct >= 0 && pct <= 100)) return deny(400, "invalid");
+    // only for something that exists: a published post or a chapter in content/ (no free-form keys)
+    if (key.startsWith("blog:")) { const row = await bySlug(env, key.slice(5)); if (!row || row.status !== "published") return deny(404, "not_found"); }
+    else { const [, s, n] = key.split(":"); if (!chapterExists(s, Number(n))) return deny(404, "not_found"); }
+    const known = await env.DB.prepare("SELECT 1 FROM blog_reads WHERE discord_id = ? AND post_id = ?").bind(String(u.id), key).first();
+    if (!known) {
+      const c = await env.DB.prepare("SELECT COUNT(*) AS n FROM blog_reads WHERE discord_id = ?").bind(String(u.id)).first();
+      if ((c?.n || 0) >= READS_CAP) return deny(429, "too_many_reads");
+    }
     await env.DB.prepare("INSERT INTO blog_reads (discord_id, post_id, pct, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(discord_id, post_id) DO UPDATE SET pct = MAX(pct, excluded.pct), updated_at = excluded.updated_at").bind(String(u.id), key, pct, Date.now()).run();
     return json({ ok: true });
   }

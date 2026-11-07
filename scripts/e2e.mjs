@@ -1211,6 +1211,10 @@ try {
     await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
     const adm = await b("/blog/admin", { cookie: c1, os: true });
     ok(adm.s === 200 && !adm.t.includes('class="no-js nwebos"'), "NwebOS: Blog-Editor bleibt vorerst die eigene Seite (Admin)", String(adm.s));
+    // A draft with a preview link for the NwebOS deep-link check (the ?preview= token must survive the boot).
+    const dr = await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: MO, body: { slug: "nwebos-entwurf", title_de: "NwebOS Entwurf", body_de: "## Teil\n\nEntwurfstext." } });
+    process.env.NWEBOS_PREVIEW = `/blog/nwebos-entwurf?preview=${dr.j?.preview_token || ""}`;
+    ok(dr.s === 201, "Blog: Entwurf mit Vorschau-Link für NwebOS", String(dr.s));
     // Two published posts for the NwebOS blog windows below (scripts/nwebos-apps-ui.py).
     for (const p of [
       { slug: "vip-welten", title_de: "VIP-Welten direkt von der Website starten", summary_de: "Welt anlegen, starten, Freunde einladen.", category: "server", tags: ["vip", "minecraft"], body_de: "## Start\n\nText." },
@@ -1251,6 +1255,22 @@ try {
     const kept = sqlRows(`SELECT pct FROM blog_reads WHERE post_id = 'blog:vip-welten'`)[0]?.pct;
     ok(p1.s === 200 && p2.s === 200 && pg0.s === 401 && pbad.s === 400 && Number(kept) === 60, "Lesefortschritt: nur angemeldet, höchster Wert bleibt, falscher Schlüssel 400", `${p1.s} ${p2.s} ${pg0.s} ${pbad.s} ${kept}`);
     sql(`DELETE FROM blog_reads WHERE post_id = 'blog:vip-welten'`);
+    // Gatekeeper #115: progress only for things that exist, and a per-user cap.
+    const pNo = await pr({ cookie: c1, body: { key: "blog:gibt-es-nicht", pct: 10 } }), pDraft = await pr({ cookie: c1, body: { key: "blog:e2e-beitrag", pct: 10 } }), pCh = await pr({ cookie: c1, body: { key: "writing:gibt-es-nicht:1", pct: 10 } });
+    sql(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 500) INSERT INTO blog_reads (discord_id, post_id, pct, updated_at) SELECT '${D1}', 'blog:cap-' || i, 1, 0 FROM n`);
+    const pCap = await pr({ cookie: c1, body: { key: "blog:vip-welten", pct: 10 } });
+    sql(`DELETE FROM blog_reads WHERE post_id LIKE 'blog:cap-%'`);
+    const rows = Number(sqlRows(`SELECT COUNT(*) AS n FROM blog_reads WHERE discord_id = '${D1}'`)[0]?.n);
+    ok(pNo.s === 404 && pDraft.s === 404 && pCh.s === 404 && pCap.s === 429 && rows === 0, "Lesefortschritt: nur für veröffentlichte Beiträge/vorhandene Kapitel, höchstens 500 Einträge pro Person", `${pNo.s} ${pDraft.s} ${pCh.s} ${pCap.s} ${rows}`);
+    // "Meine Daten löschen" also removes reading progress and reactions (real throwaway session).
+    const DX = "100000000000000088";
+    sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('sdx','${DX}','leser','Leser',datetime('now','+1 day'))`);
+    const cdx = await cookieFor("sdx");
+    const xr = await pr({ cookie: cdx, body: { key: "blog:vip-welten", pct: 50 } }), xx = await rx({ cookie: cdx, body: { slug: "vip-welten", kind: "heart" } });
+    const before = Number(sqlRows(`SELECT (SELECT COUNT(*) FROM blog_reads WHERE discord_id = '${DX}') + (SELECT COUNT(*) FROM blog_reactions WHERE discord_id = '${DX}') AS n`)[0]?.n);
+    const del = await req("/api/profile/delete", { method: "POST", testHost: MH, origin: "https://" + MH, cookie: cdx, body: { confirm: "delete" } });
+    const after = Number(sqlRows(`SELECT (SELECT COUNT(*) FROM blog_reads WHERE discord_id = '${DX}') + (SELECT COUNT(*) FROM blog_reactions WHERE discord_id = '${DX}') + (SELECT COUNT(*) FROM sessions WHERE discord_id = '${DX}') AS n`)[0]?.n);
+    ok(xr.s === 200 && xx.s === 200 && before === 2 && del.s === 200 && after === 0, "Profil löschen: auch Lesefortschritt und Reaktionen weg", `${xr.s} ${xx.s} ${before} ${del.s} ${after}`);
   }
   try { execSync(`python3 scripts/nwebos-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS im Browser fehlgeschlagen"); }
   try { execSync(`python3 scripts/nwebos-apps-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS-Apps im Browser fehlgeschlagen"); }

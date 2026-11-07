@@ -24,7 +24,7 @@
   var APPS = {}; $$("#apps .app").forEach(function (s) { APPS[s.dataset.app] = s; });
   var DEF = { about: [150, 40], portfolio: [330, 70], guestbook: [790, 24], dlg: [480, 220] };
   var ROUTES = {}; (L.routes || []).forEach(function (r) { ROUTES[r[0]] = r[1]; });
-  var bare = function (pathname) { var p = pathname.replace(/^\/en(?=\/|$)/, "") || "/"; return p.replace(/\/$/, "") || "/"; };
+  var bare = function (pathname) { var p = pathname.replace(/^\/(de|en)(?=\/|$)/, "") || "/"; return p.replace(/\/$/, "") || "/"; };
   /* an address the shell can open as a window (the server renders it): no assets, APIs, auth or the old editor */
   var osPath = function (u) { var p = bare(u.pathname); return u.origin === location.origin && !/\.[a-z0-9]{2,5}$/i.test(p) && !/^\/(api|auth|design|mc|vendor|bundle|downloads|content-assets|mc-icon|mc-head|mc-skin)(\/|$)/.test(p) && !/^\/blog\/admin(\/|$)/.test(p); };
   var open = new Map(), z = 10, seq = 0, me = null;
@@ -45,8 +45,9 @@
 
   var title = function (k) { var a = APPS[k]; return a ? a.dataset[lang === "en" ? "titleEn" : "titleDe"] : (open.get(k) && open.get(k).title) || ""; };
   var icon16 = function (k) { var t = $("#ic-" + k); return t ? t.innerHTML : ""; };
-  var pathOf = function (k) { var p = k && APPS[k] ? APPS[k].dataset.path : "/"; return lang === "en" ? (p === "/" ? "/en" : "/en" + p) : p; };
-  var appOf = function (pathname) { var p = pathname.replace(/^\/en(?=\/|$)/, "") || "/"; p = p.replace(/\/$/, "") || "/"; var hit = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === p) hit = k; }); return hit; };
+  /* a window's address; `data-q` keeps the query of the address it was opened on (a draft's ?preview= token) */
+  var pathOf = function (k) { var p = k && APPS[k] ? APPS[k].dataset.path : "/", q = k && APPS[k] ? APPS[k].dataset.q || "" : ""; return (lang === "en" ? (p === "/" ? "/en" : "/en" + p) : p) + q; };
+  var appOf = function (pathname) { var p = pathname.replace(/^\/(de|en)(?=\/|$)/, "") || "/"; p = p.replace(/\/$/, "") || "/"; var hit = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === p) hit = k; }); return hit; };
   var push = function (k) { if (k && APPS[k] && !APPS[k].dataset.path) return; var p = pathOf(k); if (location.pathname !== p) history.pushState({ k: k || "" }, "", p); document.title = (k ? title(k) + " · " : "") + "NwebOS"; };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
 
@@ -357,7 +358,9 @@
   });
 
   setUser();
-  var deep = appOf(location.pathname), atDesk = bare(location.pathname) === "/";   /* before restored windows change the address */
+  var deep = appOf(location.pathname);
+  if (deep && /[?&]preview=/.test(location.search)) APPS[deep].dataset.q = location.search;
+  var atDesk = bare(location.pathname) === "/";   /* before restored windows change the address */
   var firstVisit = !store.get("booted");
   // restore the saved windows quietly (no sound, no animation), the deep-linked app goes on top
   var restoring = [];
@@ -365,7 +368,7 @@
   if (deep) openWin(deep, { noPush: true, quiet: open.has(deep) });
   /* windows restored from their address arrive later: the deep-linked window stays on top */
   if (deep && restoring.length) Promise.all(restoring).then(function () { if (open.has(deep)) { focus(deep, false); open.get(deep).el.focus({ preventScroll: true }); } });
-  else { var top = topWindow(); if (top) history.replaceState({ k: top }, "", pathOf(top)); }
+  else if (!deep) { var top = topWindow(); if (top) history.replaceState({ k: top }, "", pathOf(top)); }   /* a deep link keeps its address as typed */
   // Boot and login: first visit to the desktop (/) only; login again after "Abmelden". A direct visit to a window's
   // address (deep link, also the 404 window) opens it at once and counts as seen, so the boot does not play later
   // (Planner 07.11.). Reduced motion skips the boot.

@@ -70,7 +70,7 @@
     if ((b = t.closest("[data-trash-restore]"))) { var c = $("[data-trash-count]", b.closest(".trw")), keep = c.textContent; c.textContent = T("Die bleiben lieber hier. 😺", "They'd rather stay. 😺"); setTimeout(function () { c.textContent = keep; }, 1800); return; }
     if ((b = t.closest("[data-focus-search]"))) { if (win) $(".wb.x", win).click(); setTimeout(function () { var st = $("#startb"); if (st && $("#startm").hidden) st.click(); var q = $("#smq") || $("#hq"); if (q) q.focus(); }, 30); return; }
     if ((b = t.closest("[data-pf-delete]"))) {
-      if (!confirm(T("Wirklich alle deine Gästebuch-Einträge und Sitzungen löschen?", "Really delete all your guestbook entries and sessions?"))) return;
+      if (!confirm(T("Wirklich alle deine Gästebuch-Einträge, deinen Lesefortschritt, deine Reaktionen und Sitzungen löschen?", "Really delete all your guestbook entries, reading progress, reactions and sessions?"))) return;
       post("/api/profile/delete", { confirm: "delete" }).then(function (r) { if (r.s === 200) location.href = EN ? "/en" : "/"; });
       return;
     }

@@ -136,6 +136,23 @@ with sync_playwright() as p:
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS search: start menu (blog post opens, wiki new tab, no hit) and phone home")
 
+    # Deep links (Gatekeeper #115): /de/… opens its window; a draft's ?preview= token stays in the address after the boot.
+    c = ctx_for(br, 1280)
+    pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+    for p in ("/de/blog", "/de/blog/eine-navigation-fuer-zwei-seiten"):
+        pg.goto(f"https://{H}{p}", wait_until="load")
+        pg.locator(".win.focus .bl, .win.focus .rd .post h1").first.wait_for(timeout=10000)
+    prev = os.environ.get("NWEBOS_PREVIEW", "")
+    if prev:
+        r = pg.goto(f"https://{H}{prev}", wait_until="load")
+        pg.locator(".win.focus .rd .post h1").wait_for(timeout=10000)
+        pg.wait_for_timeout(300)
+        assert r.status == 200 and "preview=" in urlsplit(pg.url).query, ("preview token kept", pg.url)
+        r = pg.reload(wait_until="load")
+        assert r.status == 200 and pg.locator(".win.focus .rd .post h1").inner_text() == "NwebOS Entwurf", "reload of the preview address still shows the draft"
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS deep links: /de/blog, /de/blog/<slug>" + (", draft preview keeps its token" if prev else " (no NWEBOS_PREVIEW: preview check skipped)"))
+
     # Guest profile: private, sign-in prompt, no data.
     c = ctx_for(br, 1280)
     pg = c.new_page()
