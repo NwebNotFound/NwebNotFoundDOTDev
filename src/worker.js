@@ -18,6 +18,8 @@ import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
 import { hubPage, hubPageExists, navReady, sitePage } from "./hub.js";
 import { siteProfileBody } from "./profile.js";
+import { nwebosPage, nwebosChoice, nwebosApp } from "./nwebos.js";
+import { makeBlog } from "./blog.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
@@ -840,6 +842,7 @@ async function mcIngest(req, env) {
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
+let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound }));
 let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
@@ -1017,11 +1020,14 @@ async function assetOrNotFound(req, env, mc) {
   return notFound(mc, req);
 }
 
+// Latest guestbook entries (Discord avatar per rule 10), for the API and the server-rendered NwebOS window.
+async function guestEntries(env) {
+  const { results } = await env.DB.prepare("SELECT name, message, created_at, discord_id, avatar FROM entries ORDER BY id DESC LIMIT 50").all();
+  return results.map(r => ({ name: r.name, message: r.message, created_at: r.created_at, avatar: r.discord_id ? avatarUrl(r.discord_id, r.avatar) : null }));
+}
+
 async function guestbookApi(req, env) {
-  if (req.method === "GET") {
-    const { results } = await env.DB.prepare("SELECT name, message, created_at, discord_id, avatar FROM entries ORDER BY id DESC LIMIT 50").all();
-    return json({ entries: results.map(r => ({ name: r.name, message: r.message, created_at: r.created_at, avatar: r.discord_id ? avatarUrl(r.discord_id, r.avatar) : null })) });
-  }
+  if (req.method === "GET") return json({ entries: await guestEntries(env) });
   if (req.method === "POST") {
     if (!authReady(env)) return json({ error: "Discord-Login ist bald verfügbar" }, 503);
     const user = await getUser(req, env); if (!user) return json({ error: "Bitte zuerst mit Discord anmelden" }, 401);
@@ -1124,6 +1130,7 @@ async function route(req, env, ctx) {
     }
     if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden, Idee oder Sonstiges einreichen", css: MC_CSS, nav: mNav.replace(/href="\//g, `href="https://${MCD}/`), footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
     if (p === "/api/guestbook") return guestbookApi(req, env);
+    if (p === "/api/blog" || p.startsWith("/api/blog/")) { const r = await BLOG().api(p, req, env, url); if (r) return r; }
     // ---- Feeds (Creative Hub, phase 3b) ----
     // Vor dem Sprach-Redirect: /de/writing/feed.xml und /writing/feed.xml liefern denselben Feed (ein
     // Feed trägt die Sprache seines Inhalts, nicht die der Oberfläche). Vorgerendert, kein Markdown
@@ -1135,6 +1142,26 @@ async function route(req, env, ctx) {
     // entstehen. Ein Sprachpräfix vor einer Hub-fremden Route fällt auf den Pfad ohne Präfix zurück
     // (301), damit z. B. /en/guestbook nicht in einem 404 endet.
     const pre = splitLang(p);
+    // NwebOS (src/nwebos.js) is the default on its paths; ?nwebos=0 / ?nwebos=1 opt out / back in (cookie) and come
+    // back to the clean URL. Opted out, or on a path without an NwebOS app yet, the current page is served.
+    {
+      const os = nwebosChoice(url, cookies(req), true);
+      if (os.setCookie && req.method === "GET") { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
+      const app = os.on ? nwebosApp(pre.path) : null;
+      if (app !== null) {
+        const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
+        const entries = await guestEntries(env).catch(() => []);
+        const res = html(nwebosPage({ lang, app, entries, sitekey: SITEKEY }), 200, { "cache-control": "no-store", vary: "cookie, accept-language" });
+        if (pre.lang) res.headers.append("set-cookie", langCookie(pre.lang));
+        return res;
+      }
+    }
+    // Blog (D1-backed, src/blog.js): before the hub, whose /blog is only the coming-soon page.
+    if (pre.path === "/blog" || pre.path.startsWith("/blog/")) {
+      const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
+      const r = await BLOG().page(pre.path, req, env, url, lang);
+      if (r) return r;
+    }
     // The redirect also remembers the language, so the DE/EN switch of the German-only pages stays on
     // the same page and the nav there follows the choice. 302 + no-store: a cached 301 would skip the
     // Worker on the next switch and never set the cookie again.

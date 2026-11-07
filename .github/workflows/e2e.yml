@@ -30,6 +30,8 @@ jobs:
         run: node scripts/asset-cache-check.mjs
       - name: Kontrast-Gate (WCAG AA)
         run: node scripts/contrast-check.mjs
+      - name: Summer-CSS-Scope-Check
+        run: node scripts/summer-scope-check.mjs
       - name: Skin-Lookup gegen echte lokale D1
         run: node scripts/skin-sql.mjs
       - name: e2e

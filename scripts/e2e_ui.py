@@ -533,7 +533,7 @@ with sync_playwright() as p:
                     if "/mc-head/" not in u and "/mc-icon/" not in u: raise  # nav icons may still be in flight at close
                 return
             r.continue_()
-        ctx = br.new_context(viewport={"width": 1280, "height": 800}); pg = ctx.new_page(); pg.route("**/*", route_p)
+        ctx = br.new_context(viewport={"width": 1280, "height": 800}); ctx.add_cookies([{"name": "nnf_os", "value": "0", "domain": P, "path": "/", "secure": True}]); pg = ctx.new_page(); pg.route("**/*", route_p)
         pg.goto("https://" + P + "/portfolio", wait_until="domcontentloaded", timeout=45000); pg.locator("#umb img").wait_for(timeout=10000)
         info = pg.evaluate("""() => { const img = document.querySelector('#umb img'); const name = document.querySelector('#umb .u-name'); return { src: img ? img.src : '', attr: img ? img.getAttribute('onerror') : 'missing', xss: window.__xss || 0, name: name ? name.textContent : '', imgs: document.querySelectorAll('#umb img').length }; }""")
         ctx.close(); return info

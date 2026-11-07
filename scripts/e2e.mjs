@@ -15,6 +15,8 @@ import "./epub-unit.mjs";
 import "./worker-robust-unit.mjs";
 import "./dos-unit.mjs";
 import "./queue-unit.mjs";
+import "./nwebos-unit.mjs";
+import "./blog-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { hubPage } from "../src/hub.js";
@@ -41,11 +43,14 @@ const sql = (q) => execSync(`npx wrangler d1 execute DB --local --persist-to ${P
 const sqlRows = (q) => JSON.parse(sql(q))[0].results;
 const b64u = (b) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 async function cookieFor(sid) { const k = await C.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return "nnf_session=" + encodeURIComponent(sid + "." + b64u(await C.subtle.sign("HMAC", k, new TextEncoder().encode(sid)))); }
-const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1", headers = {}, host = HOST, testHost } = {}) => {
+// Main-site requests run opted out of NwebOS (nnf_os=0) unless `os: true`: the checks below test the current pages,
+// which stay reachable via ?nwebos=0 and for paths without an NwebOS app; NwebOS itself is checked in its own block.
+const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1", headers = {}, host = HOST, testHost, os = false } = {}) => {
   const h = { host, "cf-connecting-ip": ip, ...headers };
   if (testHost) h["x-nnf-test-host"] = testHost;
   if (body) h["content-type"] = "application/json";
   if (token) h["x-ingest-token"] = token;
+  if (testHost === "nwebnotfound.dev" && !os && !/(^|;\s*)nnf_os=/.test(cookie || "")) cookie = cookie ? cookie + "; nnf_os=0" : "nnf_os=0";
   if (cookie) h.cookie = cookie;
   if (origin) h.origin = origin;
   const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
@@ -790,8 +795,10 @@ try {
     const kf = [...css.matchAll(/@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g)];
     const slow = kf.filter((m) => [...m[2].matchAll(/([a-z-]+)\s*:/g)].some((p) => !["transform", "opacity"].includes(p[1]))).map((m) => m[1]);
     ok(kf.length > 20 && slow.length === 0, "Keyframes animieren nur transform/opacity (kein box-shadow etc. pro Frame)", slow.join(","));
-    const gb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev" } }).then((r) => r.text());
+    const gb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev", cookie: "nnf_os=0" } }).then((r) => r.text());   // the current page (opted out)
     ok(!/<script[^>]+turnstile\/v0\/api\.js/.test(gb) && /render=explicit/.test(gb), "Gästebuch: Turnstile erst beim Formular (kein api.js im Kopf)");
+    const osGb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev" } }).then((r) => r.text());
+    ok(osGb.includes('class="no-js nwebos"') && !/<script[^>]+turnstile\/v0\/api\.js/.test(osGb) && /render=explicit/.test(fs.readFileSync(ROOT + "public/design/nwebos.js", "utf8")), "NwebOS-Gästebuch: Turnstile erst beim Formular (nwebos.js, kein api.js im Kopf)");
     const mi = await fetch(BASE + "/markt/diamond", { headers: { host: HOST } }).then((r) => r.text());
     ok(!/<script[^>]+turnstile\/v0\/api\.js/.test(mi), "Markt-Item: kein Turnstile-Skript beim Laden");
     const FONTS = ["pixelify-sans-latin-400", "pixelify-sans-latin-700", "nunito-latin-400", "nunito-latin-700"];
@@ -1196,6 +1203,51 @@ try {
   }
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Rot', '$.team_color', '#FF5555', '$.team_color_code', '&c', '$.last_seen', '2026-10-31T23:05:00Z', '$.online', json('false')) WHERE mc_uuid = '${U1}'`);
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Grün', '$.team_color', 'red;x', '$.team_color_hex', '#55ff55', '$.online', 1) WHERE mc_uuid = '${U2}'`);
+  // Blog (src/blog.js) over HTTP against the real local D1: admin-only is enforced server-side
+  // (c1 = Nils, verified link + rank admin; c2 = Seller, no admin), drafts stay private.
+  {
+    // The VIP tests above end with an empty mc_player_ranks: make Nils admin for the blog checks and
+    // the browser editor test below, then remove the row again.
+    const blogAdminUuid = sqlRows(`SELECT mc_uuid FROM mc_links WHERE discord_id = '${D1}' AND verified = 1`)[0]?.mc_uuid;
+    sql(`INSERT OR REPLACE INTO mc_player_ranks (uuid, name, rank, color, weight, updated_at) VALUES ('${String(blogAdminUuid || "").replace(/-/g, "")}', 'Nils', 'admin', 'c', 100, 0)`);
+    const MH = "nwebnotfound.dev", MO = "https://" + MH, b = (path, o = {}) => req(path, { testHost: MH, ...o });
+    ok((await b("/api/blog/admin/posts")).s === 401 && (await b("/api/blog/admin/posts", { cookie: c2 })).s === 403, "Blog-Admin: ohne Login 401, Nicht-Admin 403");
+    ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c2, origin: MO, body: { title_de: "x" } })).s === 403 && (await b("/blog/admin", { cookie: c2 })).s === 404, "Blog: Nicht-Admin kann nichts anlegen, Editor 404");
+    ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: "https://evil.example", body: { title_de: "x" } })).s === 403, "Blog: fremde Origin → 403");
+    const cr = await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: MO, body: { title_de: "E2E Beitrag", category: "server", tags: ["e2e"] } });
+    ok(cr.s === 201 && cr.j?.slug === "e2e-beitrag", "Blog: Admin legt Entwurf an", cr.s + " " + cr.t.slice(0, 200));
+    ok((await b("/blog/e2e-beitrag")).s === 404, "Blog: Entwurf öffentlich unsichtbar");
+    const sv = await b(`/api/blog/admin/posts/${cr.j?.id}`, { method: "PUT", cookie: c1, origin: MO, body: { base: cr.j?.updated_at, body_de: "## Teil\n\n<script>alert(1)</script>" } });
+    const pb = await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "published", base: sv.j?.updated_at } });
+    const pg = await b("/blog/e2e-beitrag"), ls = await b("/api/blog?q=e2e");
+    ok(sv.s === 200 && pb.s === 200 && pg.s === 200 && pg.t.includes('<h2 id="h-teil">Teil</h2>') && !pg.t.includes("<script>alert(1)") && ls.j?.posts?.length === 1, "Blog: speichern, veröffentlichen, Seite sanitisiert, Suche findet Tag", `${sv.s} ${pb.s} ${pg.s}`);
+    const rss = await b("/blog/feed.xml");
+    ok(rss.s === 200 && /application\/rss\+xml/.test(rss.h.get("content-type") || "") && rss.t.includes("<title>E2E Beitrag</title>"), "Blog: RSS-Feed");
+    // #110/#111: self-referencing canonical + hreflang per language on the index, English category strings on /en/blog.
+    const bd = await b("/blog"), be = await b("/en/blog"), bp = await b("/en/blog/e2e-beitrag");
+    const can = (t) => (/<link rel="canonical" href="([^"]+)"/.exec(t) || [])[1], hl = (t) => [...t.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"/g)].map((m) => m[1] + " " + m[2]).sort().join("|");
+    ok(can(bd.t) === "https://nwebnotfound.dev/blog" && can(be.t) === "https://nwebnotfound.dev/en/blog" && hl(bd.t) === hl(be.t) && hl(be.t) === ["de https://nwebnotfound.dev/blog", "en https://nwebnotfound.dev/en/blog", "x-default https://nwebnotfound.dev/blog"].sort().join("|"), "Blog: canonical je Sprache selbstreferenzierend, hreflang de/en/x-default", `${can(bd.t)} ${can(be.t)} ${hl(be.t)}`);
+    ok(be.t.includes('aria-label="Categories"') && be.t.includes(">Build</a>") && !be.t.includes("Kategorien") && !be.t.includes(">Bauen</a>") && bd.t.includes('aria-label="Kategorien"') && bd.t.includes(">Bauen</a>"), "Blog: /en/blog hat englische Kategorien + aria-label, /blog deutsche");
+    ok(bp.s === 200 && can(bp.t) === "https://nwebnotfound.dev/blog/e2e-beitrag" && hl(bp.t) === "", "Blog: Beitrag nur auf Deutsch → canonical auf die deutsche URL, kein hreflang", `${bp.s} ${can(bp.t)}`);
+    await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
+  }
+  try { execSync(`python3 scripts/blog-editor-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Blog-Editor im Browser fehlgeschlagen"); }
+  sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");
+  // NwebOS (src/nwebos.js) is the default (Nils 07.11.); ?nwebos=0 opts out to the current pages, which stay for
+  // paths without an NwebOS app yet.
+  {
+    const MH = "nwebnotfound.dev", n = (path, o = {}) => req(path, { testHost: MH, os: true, ...o });
+    const home = await n("/"), de = await n("/de"), en = await n("/en"), gb = await n("/guestbook");
+    ok([home, de, en, gb].every((r) => r.s === 200 && r.t.includes('class="no-js nwebos"')) && gb.t.includes('id="app-guestbook"') && en.t.includes('<html lang="en" class="no-js nwebos">'), "NwebOS: Standard auf /, /de, /en und /guestbook (ohne Cookie)", [home, de, en, gb].map((r) => r.s).join(" "));
+    const out = await n("/about?nwebos=0"), back = await n("/about?nwebos=1", { cookie: "nnf_os=0" });
+    ok(out.s === 302 && out.h.get("location") === "/about" && /^nnf_os=0;.*Max-Age=31536000/.test(out.h.get("set-cookie") || "") && back.s === 302 && /^nnf_os=1;/.test(back.h.get("set-cookie") || ""), "NwebOS: ?nwebos=0 merkt das Opt-out, ?nwebos=1 holt zurück, beide zur sauberen URL", `${out.s} ${back.s}`);
+    const old = await n("/guestbook", { cookie: "nnf_os=0" }), oldHome = await n("/", { cookie: "nnf_os=0" });
+    ok(old.s === 200 && !old.t.includes("nwebos") && oldHome.s === 200 && !oldHome.t.includes('class="no-js nwebos"'), "NwebOS: mit Opt-out die bisherigen Seiten", `${old.s} ${oldHome.s}`);
+    const blog = await n("/blog"), prof = await n("/profile"), chl = await n("/changelog"), mc = await req("/");
+    ok(blog.s === 200 && !blog.t.includes('class="no-js nwebos"') && !prof.t.includes('class="no-js nwebos"') && !chl.t.includes('class="no-js nwebos"') && !mc.t.includes("nwebos"), "NwebOS: Blog, Profil, Changelog und mc.* unverändert", `${blog.s} ${prof.s} ${chl.s} ${mc.s}`);
+    ok(home.t.includes('class="dicon" href="/blog"') && !/class="dicon" href="\/blog" data-open/.test(home.t), "NwebOS: Blog-Icon öffnet die bisherige Seite, kein leeres Fenster");
+  }
+  try { execSync(`python3 scripts/nwebos-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS im Browser fehlgeschlagen"); }
   try { execSync(`python3 scripts/site-switch-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Logo-Seitenwechsel „Wohin?“ fehlgeschlagen"); }
   try { execSync(`python3 scripts/player3d-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ 3D-Viewer: Pause/Fortsetzen fehlgeschlagen"); }
   try { execSync(`python3 scripts/turnstile-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Turnstile-Challenge-Ablauf fehlgeschlagen"); }

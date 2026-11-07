@@ -26,6 +26,7 @@ with sync_playwright() as p:
         for surface, eligible in (("guest", False), ("guest", True), ("bank", False), ("bank", True)):
             host = "nwebnotfound.dev" if surface == "guest" else "mc.nwebnotfound.dev"
             context = browser.new_context(viewport={"width": width, "height": 900})
+            context.add_cookies([{"name": "nnf_os", "value": "0", "domain": "nwebnotfound.dev", "path": "/", "secure": True}])  # the current guestbook page (NwebOS has its own test)
             page = context.new_page()
             scripts, submissions = [], []
 
