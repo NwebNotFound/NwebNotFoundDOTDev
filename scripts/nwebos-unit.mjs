@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { nwebosPage, nwebosChoice, nwebosApp, nwebosRoute, OS_PATHS, APPS } from "../src/nwebos.js";
-import { blogList, blogPost, notfound, profile } from "../src/nwebos-apps.js";
+import { blogList, blogPost, notfound, profile, changelog } from "../src/nwebos-apps.js";
 import { buildSprite } from "./build-nwebos-icons.mjs";
 
 const U = (q = "") => new URL("https://nwebnotfound.dev/guestbook" + q);
@@ -58,3 +58,5 @@ const sprite = buildSprite(JSON.parse(fs.readFileSync(new URL("./nwebos-icons.js
 assert.equal(fs.readFileSync(new URL("../public/design/nwebos-icons.svg", import.meta.url), "utf8").replace(/\r\n/g, "\n"), sprite,   // a Windows checkout may have CRLF
   "public/design/nwebos-icons.svg is out of date: node scripts/build-nwebos-icons.mjs");
 console.log("nwebos-unit ok");
+// Neuigkeiten: one row per change, also when the mc changelog repeats a website change of that day (Design QA #115)
+{ const titles = [...changelog("de").matchAll(/<li data-t="[^"]+">.*?<b>([^<]+)<\/b>/g)].map((m) => m[1]); assert.ok(titles.length > 0 && new Set(titles).size === titles.length, "changelog rows unique: " + titles.join(" | ")); }
