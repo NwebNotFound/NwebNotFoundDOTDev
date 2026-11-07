@@ -130,3 +130,24 @@ a.xpbtn[href*="/auth/discord"],.say .xpbtn{background:#5865f2;color:#fff}
 /* (14) night: dark pixel icons on the desktop and the home screen get a thin light outline (Pixelminen was dark on dark) */
 [data-theme=summer-night] .dicon svg,[data-theme=summer-night] .dicon img{filter:drop-shadow(1px 0 0 rgba(233,231,243,.9)) drop-shadow(-1px 0 0 rgba(233,231,243,.9)) drop-shadow(0 1px 0 rgba(233,231,243,.9)) drop-shadow(0 -1px 0 rgba(233,231,243,.9))}
 [data-theme=summer-night] .dicon,[data-theme=summer-night] .dicon span{color:#fff}   /* icon labels stay white (the night link colour hit them) */
+/* (12) night, signed-in screens (Design QA #120): the profile paper goes dark with the text; the name sticker, the
+   guestbook paper and the marker highlights keep dark text on their light surfaces */
+[data-theme=summer-night] .pf{background:radial-gradient(circle at 1px 1px,#2a3260 1px,transparent 1.5px) 0 0/14px 14px,var(--pn);color:var(--txt)}
+[data-theme=summer-night] .pf h3,[data-theme=summer-night] .pft p{color:var(--txt)}
+[data-theme=summer-night] .utabs button{color:var(--mut2)}[data-theme=summer-night] .utabs button.on{color:#fff}
+[data-theme=summer-night] .tagst,[data-theme=summer-night] .tagst .nm,[data-theme=summer-night] .paper,[data-theme=summer-night] .paper *:not(a),[data-theme=summer-night] mark{color:#1b2238}
+[data-theme=summer-night] .sheet{background:radial-gradient(circle,#323c6a 1px,transparent 1.5px) 0 0/12px 12px,var(--pn2);border-color:var(--line);color:var(--txt)}
+/* guestbook signed in: light names and dates on the dark bubbles, the composer as a night field */
+[data-theme=summer-night] .msg b{color:#9ec1ff}[data-theme=summer-night] .msg time{color:var(--mut2)}
+[data-theme=summer-night] .gb-form textarea,[data-theme=summer-night] .gb-form input:not([type=hidden]){background:var(--pn2);color:var(--txt);border:2px solid var(--edge);border-radius:10px}
+.gb-form textarea{border-radius:10px}
+/* touch targets on phones: 40px hit areas for the small links and filters (Design QA #120) */
+@media (max-width:700px){
+ .clf button{min-height:40px;padding:0 14px}
+ .clh .rss,.cl2 a.rss{display:inline-flex;align-items:center;min-height:40px;padding:0 6px}
+ .props dd a{display:inline-flex;align-items:center;min-height:40px;min-width:40px;justify-content:center;padding:0 6px}
+ .toc summary{display:flex;align-items:center;min-height:40px}
+ .rx button{min-height:40px}
+}
+[data-theme=summer-night] .pf mark{background:#ffd23f;color:#1b2238;padding:0 3px;border-radius:2px}   /* night: the whole marker, not the half-height band (dark text on dark otherwise) */
+[data-theme=summer-night] .paper a,[data-theme=summer-night] .tagst a{color:#1c4fb8}   /* links on the light paper keep the day colour */

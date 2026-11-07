@@ -6,19 +6,23 @@ zero category counts hidden, the bottom-bar search goes home and focuses the sea
 Args: BASE [SHOTS_DIR]."""
 import os
 import sys
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from playwright.sync_api import sync_playwright
 
 BASE = sys.argv[1]
-SHOTS = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("E2E_SCREENS_DIR", "")
+COOKIE = sys.argv[2] if len(sys.argv) > 2 and "=" in sys.argv[2] else ""   # signed in (name=value) for the night profile/guestbook checks
+SHOTS = (sys.argv[3] if len(sys.argv) > 3 else sys.argv[2] if len(sys.argv) > 2 and "=" not in sys.argv[2] else "") or os.environ.get("E2E_SCREENS_DIR", "")
 H = "nwebnotfound.dev"
 GIF = bytes.fromhex("47494638396101000100800000ffd23f00000021f90401000000002c000000000100010000020144003b")
 PAGES = [("/music", "music"), ("/", "home"), ("/blog", "blog"), ("/profile", "profile"), ("/changelog", "changelog"), ("/writing", "writing"),
          ("/guestbook", "guestbook"), ("/about", "about"), ("/portfolio", "portfolio"), ("/trash", "trash"), ("/sommerfest", "404"), ("/pixelwand", "soon"), ("/blog/eine-navigation-fuer-zwei-seiten", "post")]
 
 
-def ctx_for(br, width, night):
+def ctx_for(br, width, night, cookie=""):
     c = br.new_context(viewport={"width": width, "height": 812 if width < 400 else 932}, device_scale_factor=2, has_touch=True, is_mobile=True)
+    if cookie:
+        n, v = cookie.split("=", 1)
+        c.add_cookies([{"name": n, "value": unquote(v), "domain": H, "path": "/", "secure": True, "httpOnly": True}])
     c.add_init_script("try{localStorage.setItem('nwebos.booted','1');localStorage.setItem('nwebos.user','gast');%s}catch(e){}" % ("localStorage.setItem('summer-theme','summer-night');" if night else ""))
 
     def route(r):
@@ -35,7 +39,7 @@ def ctx_for(br, width, night):
     return c
 
 
-SMALL = """() => [...document.querySelectorAll('.win.focus .wt .wb, .mbar button, .win.focus .mctl button, .win.focus .xpbtn, .win.focus .cats button')]
+SMALL = """() => [...document.querySelectorAll('.win.focus .wt .wb, .mbar button, .win.focus .mctl button, .win.focus .xpbtn, .win.focus .cats button, .win.focus .clf button, .win.focus .clh .rss, .win.focus .props dd a, .win.focus .toc summary, .win.focus .rx button')]
   .filter((b) => b.offsetParent).map((b) => [b.getAttribute('aria-label') || b.textContent.trim().slice(0, 20), Math.round(b.getBoundingClientRect().width), Math.round(b.getBoundingClientRect().height)])
   .filter(([, w, h]) => w < 40 || h < 36)"""
 
@@ -93,6 +97,26 @@ with sync_playwright() as p:
         pg.screenshot(path=os.path.join(SHOTS, "phone-search-night-375.png")); pg.locator("#hq").fill(""); pg.wait_for_timeout(200)
         pg.screenshot(path=os.path.join(SHOTS, "phone-home-icons-night-375.png"))
         c.unroute_all(behavior="ignoreErrors"); c.close()
+    # signed in, at night (Design QA #120): profile and guestbook texts keep >= 4.5:1 against what is behind them
+    CONTRAST = r"""(sels) => { const L = (c) => { const m = c.match(/[\d.]+/g).map(Number); const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); };
+      const bg = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; const a = (c.match(/[\d.]+/g) || [0, 0, 0, 0]).map(Number); if (c.startsWith("rgb(") || (a[3] || 0) > 0.5) return c; } return "rgb(255,255,255)"; };
+      const out = []; for (const s of sels) for (const el of document.querySelectorAll(s)) { if (!el.offsetParent) continue; const a = L(getComputedStyle(el).color), b = L(bg(el)); const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); if (r < 4.5) out.push([s, el.textContent.trim().slice(0, 30), r.toFixed(2)]); } return out; }"""
+    if COOKIE:
+        for width in (375, 390, 430):
+            c = ctx_for(br, width, True, COOKIE); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+            pg.goto(f"https://{H}/profile", wait_until="load"); pg.locator(".win.focus .pf").wait_for(); pg.wait_for_timeout(500)
+            low = pg.evaluate(CONTRAST, [".win.focus .tagst .nm", ".win.focus .pft p", ".win.focus .pft mark", ".win.focus .pf h3", ".win.focus .utabs button", ".win.focus .paper a"])
+            assert not low, ("profile night contrast", width, low)
+            if SHOTS: pg.screenshot(path=os.path.join(SHOTS, f"phone-profile-signedin-night-{width}.png"))
+            pg.goto(f"https://{H}/guestbook", wait_until="load"); pg.locator(".win.focus .msgs").wait_for(); pg.wait_for_timeout(400)
+            low = pg.evaluate(CONTRAST, [".win.focus .msg b", ".win.focus .msg time", ".win.focus .msg p"])
+            assert not low, ("guestbook night contrast", width, low)
+            ta = pg.locator(".win.focus .gb-form textarea")
+            if ta.count():
+                assert ta.evaluate("e => getComputedStyle(e).backgroundColor") != "rgb(255, 255, 255)", "composer is a night field"
+            if SHOTS: pg.screenshot(path=os.path.join(SHOTS, f"phone-guestbook-signedin-night-{width}.png"))
+            c.unroute_all(behavior="ignoreErrors"); c.close()
+        print("PASS 375/390/430 night signed in: profile and guestbook text contrast >= 4.5:1, night composer")
     assert not errs, errs
     print("PASS 375: Musik icons + empty state, title-bar icons, guestbook Discord button, zero counts hidden, bottom-bar search")
     br.close()
