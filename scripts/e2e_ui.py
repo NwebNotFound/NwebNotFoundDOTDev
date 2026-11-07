@@ -584,6 +584,7 @@ with sync_playwright() as p:
     ok(kg["src"].endswith(FB) and kg["xss"] == 0, "MC-Konto: ohne MC-Verkn?pfung Steve", kg)
     kn = konto("javascript:alert(1)", "Nils")
     ok(kn["xss"] == 0 and "/mc-head/Nils/" in kn["src"], "MC-Konto: gültiger MC-Name schlägt den Avatar", kn)
+    kpg.unroute_all(behavior="ignoreErrors")  # requests still in flight must not fail Browser.close()
     kctx.close()
     br.close()
 sys.exit(1 if fails else 0)
