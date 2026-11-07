@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End-to-End-Test gegen lokales `wrangler dev` + lokale D1 (frische DB unter .wrangler/e2e). Aufruf: node scripts/e2e.mjs
-import { spawn, execSync } from "node:child_process";
+import { spawn, spawnSync, execSync } from "node:child_process";
 import { webcrypto as C } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -19,6 +19,10 @@ import { CONTENT } from "../src/generated/content.js";
 import { hubPage } from "../src/hub.js";
 // `new URL(...).pathname` keeps the leading slash on Windows ("/C:/…"), which every fs call then
 // resolved to "C:\C:\…" — the suite could not start there. fileURLToPath gives the native path.
+// Every request in this file (req() and the direct ones): one retry when the dev server reset a reused keep-alive
+// socket ("fetch failed", ECONNRESET / UND_ERR_SOCKET, the #113/#115 CI flake); a reset there arrives before the
+// request is handled. Shadows the global fetch for this module only.
+const fetch = (url, opts) => globalThis.fetch(url, opts).catch((e) => { if (["ECONNRESET", "UND_ERR_SOCKET"].includes(e?.cause?.code)) return globalThis.fetch(url, opts); throw e; });
 const ROOT = fileURLToPath(new URL("..", import.meta.url)), PORT = +(process.env.E2E_PORT || 8799), BASE = `http://127.0.0.1:${PORT}`, HOST = "mc.nwebnotfound.dev", TOK = "e2e-token", SECRET = "e2e-secret";
 const PERSIST = ROOT + ".wrangler/e2e", DV = ROOT + ".dev.vars";
 // Windows: spawn("npx") is ENOENT and spawn("npx.cmd") throws EINVAL on Node >= 18.20 (the cmd.exe
@@ -31,13 +35,37 @@ const NPX = (() => {
   if (fs.existsSync(cli)) return { cmd: process.execPath, args: [cli], opts: {} };
   return { cmd: "npx", args: [], opts: { shell: true } };
 })();
+// Synchronous on purpose: it also runs in the "exit" handler, where an async spawn("taskkill") never ran, so a failed
+// or interrupted run left wrangler/workerd alive and .wrangler/e2e locked for the next one.
 const killTree = (child) => {
   if (!child || child.exitCode != null) return;
-  try { if (process.platform === "win32") spawn("taskkill", ["/F", "/T", "/PID", String(child.pid)], { stdio: "ignore" }); else process.kill(-child.pid); } catch { /* already gone */ }
+  try { if (process.platform === "win32") spawnSync("taskkill", ["/F", "/T", "/PID", String(child.pid)], { stdio: "ignore" }); else process.kill(-child.pid, "SIGKILL"); } catch { /* already gone */ }
 };
 let pass = 0, fail = 0; const ok = (c, m, extra = "") => { if (c) pass++; else fail++; console.log((c ? "  ✓ " : "  ✗ ") + m + (c ? "" : "  " + extra)); };
-const sql = (q) => execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --json --command ${JSON.stringify(q)}`, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] }).toString();
-const sqlRows = (q) => JSON.parse(sql(q))[0].results;
+// Fixture SQL goes straight to the local D1 file (node:sqlite; WAL, so the running dev server sees it at once).
+// Each `npx wrangler d1 execute` took 1-2 s and there are 120+ of them; the wrangler path stays as a fallback.
+let sqliteDb = null;
+const localDb = async () => {
+  if (sqliteDb !== null) return sqliteDb;
+  try {
+    const { DatabaseSync } = await import("node:sqlite");
+    const dir = path.join(PERSIST, "v3", "d1", "miniflare-D1DatabaseObject");
+    const file = fs.readdirSync(dir).find((f) => f.endsWith(".sqlite") && f !== "metadata.sqlite");
+    sqliteDb = file ? new DatabaseSync(path.join(dir, file)) : false;
+  } catch { sqliteDb = false; }
+  return sqliteDb;
+};
+const sqlCli = (q) => execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --json --command ${JSON.stringify(q)}`, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] }).toString();
+const sql = (q) => { if (sqliteDb) { sqliteDb.exec(q); return ""; } return sqlCli(q); };
+const sqlRows = (q) => (sqliteDb ? sqliteDb.prepare(q).all().map((r) => ({ ...r })) : JSON.parse(sqlCli(q))[0].results);
+// Browser checks (Playwright, python): skipped with E2E_BROWSER=0 (the fast CI job). Arguments as an array, no shell:
+// cmd.exe kept the single quotes around the cookie, so on Windows the scripts ran signed out.
+const BROWSER = process.env.E2E_BROWSER !== "0";
+const py = (label, script, ...args) => {
+  if (!BROWSER) return;
+  const r = spawnSync(process.env.PYTHON || "python3", [script, ...args], { cwd: ROOT, stdio: "inherit", env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
+  if (r.status === 0) pass++; else { fail++; console.log("  ✗ " + label); }
+};
 const b64u = (b) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 async function cookieFor(sid) { const k = await C.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return "nnf_session=" + encodeURIComponent(sid + "." + b64u(await C.subtle.sign("HMAC", k, new TextEncoder().encode(sid)))); }
 // Main-site requests run opted out of NwebOS (nnf_os=0) unless `os: true`: the checks below test the current pages,
@@ -60,10 +88,15 @@ const now = Date.now(), H = 3600, HR0 = Math.floor(now / 1000 / H) * H, RESET = 
   const bg = (css.match(/html:not\(\.mc\) \.pk-run \.pk-rk\{[^}]*background:(#[0-9a-f]{6})/i) || [])[1], cols = [...css.matchAll(/html:not\(\.mc\) \.pk-run \.pk-rk(?:\.p\d)?\{color:(#[0-9a-f]{6})/gi)].map((m) => m[1]);
   ok(bg && cols.length === 4 && cols.every((c) => CR(c, bg) >= 4.5), "Rang-Badges hell: Kontrast >= 4.5:1", JSON.stringify(cols.map((c) => [c, bg && CR(c, bg).toFixed(2)]))); }
 // --- Setup
+// A server already on the port would answer instead of ours (stale wrangler from another run): stop, don't test it.
+if (await globalThis.fetch(BASE + "/", { headers: { host: HOST }, signal: AbortSignal.timeout(1500) }).then(() => true, () => false)) {
+  console.log(`Port ${PORT} ist schon belegt (anderer wrangler dev?). Beenden oder E2E_PORT setzen.`); process.exit(2);
+}
 fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
 fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\nPRICE_RESET_AT=${RESET}\n`);
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
+console.log((await localDb()) ? "Fixture-SQL: node:sqlite direkt auf die lokale D1" : "Fixture-SQL: wrangler d1 execute (node:sqlite fehlt)");
 const wd = spawn(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", ...NPX.opts });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
 // Writing fixtures (phase 3a/3b): the committed src/generated/{content,feeds}.js carry Nils' real
@@ -74,7 +107,9 @@ const GENERATED = ["src/generated/content.js", "src/generated/feeds.js"].map((re
 const hadGenerated = GENERATED.map((file) => fs.existsSync(file));
 GENERATED.forEach((file, i) => { if (hadGenerated[i]) fs.copyFileSync(file, file + ".e2e-bak"); });
 const cleanup = () => { killTree(wd); fs.rmSync(DV, { force: true }); if (hadDV) fs.renameSync(DV + ".e2e-bak", DV); GENERATED.forEach((file, i) => { if (hadGenerated[i]) { try { fs.renameSync(file + ".e2e-bak", file); } catch {} } }); };
-process.on("exit", cleanup); process.on("SIGINT", () => process.exit(130));
+process.on("exit", () => { try { if (sqliteDb) sqliteDb.close(); } catch { /* closed */ } cleanup(); });
+for (const [sig, code] of [["SIGINT", 130], ["SIGTERM", 143], ["SIGHUP", 129], ["SIGBREAK", 149]]) process.on(sig, () => process.exit(code));
+process.on("uncaughtException", (e) => { console.log("Fehler:", e?.stack || e); process.exit(1); });
 execSync("node scripts/build-content.mjs --fixtures", { cwd: ROOT, stdio: "ignore" });
 for (let i = 0; i < 60; i++) { try { await fetch(BASE + "/", { headers: { host: HOST } }); break; } catch { await new Promise((r) => setTimeout(r, 500)); } }
 
@@ -1207,7 +1242,7 @@ try {
     ok(bp.s === 200 && can(bp.t) === "https://nwebnotfound.dev/blog/e2e-beitrag" && hl(bp.t) === "", "Blog: Beitrag nur auf Deutsch → canonical auf die deutsche URL, kein hreflang", `${bp.s} ${can(bp.t)}`);
     await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
   }
-  try { execSync(`python3 scripts/blog-editor-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Blog-Editor im Browser fehlgeschlagen"); }
+  py("Blog-Editor im Browser fehlgeschlagen", "scripts/blog-editor-ui.py", BASE, c1);
   sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");
   // NwebOS (src/nwebos.js) is the default (Nils 07.11.); ?nwebos=0 opts out to the current pages, which stay for
   // paths without an NwebOS app yet.
@@ -1223,11 +1258,11 @@ try {
     ok(blog.s === 200 && !blog.t.includes('class="no-js nwebos"') && !prof.t.includes('class="no-js nwebos"') && !chl.t.includes('class="no-js nwebos"') && !mc.t.includes("nwebos"), "NwebOS: Blog, Profil, Changelog und mc.* unverändert", `${blog.s} ${prof.s} ${chl.s} ${mc.s}`);
     ok(home.t.includes('class="dicon" href="/blog"') && !/class="dicon" href="\/blog" data-open/.test(home.t), "NwebOS: Blog-Icon öffnet die bisherige Seite, kein leeres Fenster");
   }
-  try { execSync(`python3 scripts/nwebos-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS im Browser fehlgeschlagen"); }
-  try { execSync(`python3 scripts/site-switch-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Logo-Seitenwechsel „Wohin?“ fehlgeschlagen"); }
-  try { execSync(`python3 scripts/player3d-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ 3D-Viewer: Pause/Fortsetzen fehlgeschlagen"); }
-  try { execSync(`python3 scripts/turnstile-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Turnstile-Challenge-Ablauf fehlgeschlagen"); }
-  try { execSync(`python3 scripts/e2e_ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ UI-Prüfung fehlgeschlagen"); }
+  py("NwebOS im Browser fehlgeschlagen", "scripts/nwebos-ui.py", BASE, c1);
+  py("Logo-Seitenwechsel „Wohin?“ fehlgeschlagen", "scripts/site-switch-ui.py", BASE);
+  py("3D-Viewer: Pause/Fortsetzen fehlgeschlagen", "scripts/player3d-ui.py", BASE);
+  py("Turnstile-Challenge-Ablauf fehlgeschlagen", "scripts/turnstile-ui.py", BASE);
+  py("UI-Prüfung fehlgeschlagen", "scripts/e2e_ui.py", BASE, c1);
 
 } catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }
 console.log(`\n${pass} bestanden, ${fail} fehlgeschlagen`);
