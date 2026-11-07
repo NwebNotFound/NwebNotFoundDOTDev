@@ -37,8 +37,10 @@ export const APPS = [
   { k: "writing", path: "/writing", de: "Texte", en: "Writing", href: "/writing" },
   { k: "guestbook", path: "/guestbook", de: "Gästebuch", en: "Guestbook", w: 460, h: 420, win: true },
   { k: "minecraft", path: "", de: "Minecraft-Server", en: "Minecraft server", href: `https://${MC_HOST}/` },
+  { k: "mines", path: "", de: "Pixelminen", en: "Pixel Mines", w: 300, h: 372, win: true, module: "/design/nwebos-games.js" },
+  { k: "five", path: "", de: "Fünf", en: "Five", w: 340, h: 560, win: true, module: "/design/nwebos-games.js" },
 ];
-export const OS_PATHS = ["/", ...APPS.filter((a) => a.win).map((a) => a.path)];
+export const OS_PATHS = ["/", ...APPS.filter((a) => a.win && a.path).map((a) => a.path)];   // path-less apps (the games) have no address
 
 const T = {
   de: {
@@ -124,7 +126,10 @@ export function nwebosPage({ lang = "de", app = "", entries = [], sitekey = "" }
   const cur = APPS.find((a) => a.k === app && a.win) || null;
   const title = cur ? `${cur[lang]} · NwebOS` : `NwebOS · ${lang === "en" ? "Nils' corner of the internet" : "Nils' Ecke im Internet"}`;
   const path = cur ? cur.path : "/";
-  const content = { about: about(lang), portfolio: portfolio(lang), guestbook: guestbook(lang, entries) };
+  const game = (de, en) => `<p class="nojs-g">${lang === "en" ? en : de}</p>`;
+  const content = { about: about(lang), portfolio: portfolio(lang), guestbook: guestbook(lang, entries),
+    mines: game("Pixelminen: ein kleines Minensuch-Spiel. Es braucht JavaScript.", "Pixel Mines: a small minesweeper game. It needs JavaScript."),
+    five: game("Fünf: errate das Wort mit fünf Buchstaben. Es braucht JavaScript.", "Five: guess the five-letter word. It needs JavaScript.") };
   const winApps = APPS.filter((a) => a.win);
   // The current app's section comes first, so a reader without JS (and a crawler) lands on it.
   const ordered = cur ? [cur, ...winApps.filter((a) => a !== cur)] : winApps;
