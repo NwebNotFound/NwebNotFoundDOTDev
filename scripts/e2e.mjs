@@ -12,6 +12,7 @@ import "./content-unit.mjs";
 import "./markdown-unit.mjs";
 import "./feed-unit.mjs";
 import "./epub-unit.mjs";
+import "./nwebos-unit.mjs";
 import "./blog-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
@@ -1173,6 +1174,16 @@ try {
   }
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Rot', '$.team_color', '#FF5555', '$.team_color_code', '&c', '$.last_seen', '2026-10-31T23:05:00Z', '$.online', json('false')) WHERE mc_uuid = '${U1}'`);
   sql(`UPDATE mc_player_stats SET stats = json_set(stats, '$.team', 'Grün', '$.team_color', 'red;x', '$.team_color_hex', '#55ff55', '$.online', 1) WHERE mc_uuid = '${U2}'`);
+  // NwebOS (src/nwebos.js), opt-in until the switch-over PR: without the cookie every path keeps its old page.
+  {
+    const MH = "nwebnotfound.dev", n = (path, o = {}) => req(path, { testHost: MH, ...o });
+    const off = await n("/guestbook"), on = await n("/guestbook", { cookie: "nnf_os=1" }), sw = await n("/guestbook?nwebos=1"), out = await n("/about?nwebos=0", { cookie: "nnf_os=1" });
+    ok(!off.t.includes('class="no-js nwebos"') && on.s === 200 && on.t.includes('class="no-js nwebos"') && on.t.includes('id="app-guestbook"'), "NwebOS: nur mit Opt-in, Gästebuch serverseitig im Fenster", `${off.s} ${on.s}`);
+    ok(sw.s === 302 && sw.h.get("location") === "/guestbook" && /nnf_os=1/.test(sw.h.get("set-cookie") || "") && out.s === 302 && /nnf_os=;.*Max-Age=0/.test(out.h.get("set-cookie") || ""), "NwebOS: ?nwebos=1/0 setzt/löscht das Cookie und kommt zur sauberen URL", `${sw.s} ${out.s}`);
+    const enAbout = await n("/en/about", { cookie: "nnf_os=1" }), blog = await n("/blog", { cookie: "nnf_os=1" });
+    ok(enAbout.s === 200 && enAbout.t.includes('<html lang="en" class="no-js nwebos">') && !blog.t.includes("nwebos"), "NwebOS: /en/about englisch, /blog bleibt die alte Seite", `${enAbout.s} ${blog.s}`);
+  }
+  try { execSync(`python3 scripts/nwebos-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS im Browser fehlgeschlagen"); }
   // Blog (src/blog.js) over HTTP against the real local D1: admin-only is enforced server-side
   // (c1 = Nils, verified link + rank admin; c2 = Seller, no admin), drafts stay private.
   {

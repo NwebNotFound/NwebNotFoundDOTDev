@@ -18,6 +18,7 @@ import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
 import { hubPage, hubPageExists, navReady, sitePage } from "./hub.js";
 import { siteProfileBody } from "./profile.js";
+import { nwebosPage, nwebosChoice, nwebosApp } from "./nwebos.js";
 import { makeBlog } from "./blog.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
@@ -990,11 +991,14 @@ async function assetOrNotFound(req, env, mc) {
   return notFound(mc, req);
 }
 
+// Latest guestbook entries (Discord avatar per rule 10), for the API and the server-rendered NwebOS window.
+async function guestEntries(env) {
+  const { results } = await env.DB.prepare("SELECT name, message, created_at, discord_id, avatar FROM entries ORDER BY id DESC LIMIT 50").all();
+  return results.map(r => ({ name: r.name, message: r.message, created_at: r.created_at, avatar: r.discord_id ? avatarUrl(r.discord_id, r.avatar) : null }));
+}
+
 async function guestbookApi(req, env) {
-  if (req.method === "GET") {
-    const { results } = await env.DB.prepare("SELECT name, message, created_at, discord_id, avatar FROM entries ORDER BY id DESC LIMIT 50").all();
-    return json({ entries: results.map(r => ({ name: r.name, message: r.message, created_at: r.created_at, avatar: r.discord_id ? avatarUrl(r.discord_id, r.avatar) : null })) });
-  }
+  if (req.method === "GET") return json({ entries: await guestEntries(env) });
   if (req.method === "POST") {
     if (!authReady(env)) return json({ error: "Discord-Login ist bald verfügbar" }, 503);
     const user = await getUser(req, env); if (!user) return json({ error: "Bitte zuerst mit Discord anmelden" }, 401);
@@ -1101,6 +1105,20 @@ export default {
     // entstehen. Ein Sprachpräfix vor einer Hub-fremden Route fällt auf den Pfad ohne Präfix zurück
     // (301), damit z. B. /en/guestbook nicht in einem 404 endet.
     const pre = splitLang(p);
+    // NwebOS (src/nwebos.js), opt-in until the switch-over: ?nwebos=1 / ?nwebos=0 set or clear the cookie and
+    // come back to the clean URL; with the cookie, the OS paths serve the OS page instead of the old one.
+    {
+      const os = nwebosChoice(url, cookies(req));
+      if (os.setCookie && req.method === "GET") { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
+      const app = os.on ? nwebosApp(pre.path) : null;
+      if (app !== null) {
+        const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
+        const entries = await guestEntries(env).catch(() => []);
+        const res = html(nwebosPage({ lang, app, entries, sitekey: SITEKEY }), 200, { "cache-control": "no-store", vary: "cookie, accept-language" });
+        if (pre.lang) res.headers.append("set-cookie", langCookie(pre.lang));
+        return res;
+      }
+    }
     // Blog (D1-backed, src/blog.js): before the hub, whose /blog is only the coming-soon page.
     if (pre.path === "/blog" || pre.path.startsWith("/blog/")) {
       const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
