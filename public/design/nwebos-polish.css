@@ -151,3 +151,4 @@ a.xpbtn[href*="/auth/discord"],.say .xpbtn{background:#5865f2;color:#fff}
 }
 [data-theme=summer-night] .pf mark{background:#ffd23f;color:#1b2238;padding:0 3px;border-radius:2px}   /* night: the whole marker, not the half-height band (dark text on dark otherwise) */
 [data-theme=summer-night] .paper a,[data-theme=summer-night] .tagst a{color:#1c4fb8}   /* links on the light paper keep the day colour */
+.paper{background-color:#fff}   /* the lined paper is white under its gradient (also what contrast checks measure) */
