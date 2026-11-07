@@ -111,7 +111,7 @@ with sync_playwright() as p:
     pg.reload(wait_until="load")
     assert pg.locator("#login").is_visible() and pg.locator("#boot").is_hidden(), "after Abmelden: login, no boot"
     assert not errs, errs
-    c.close()
+    c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 1280 boot, login, windows on paths, back/forward, restore, esc, tray, logout")
 
     # Direct visit to an app path: no boot; signed in with Discord -> own tile; guestbook form with Turnstile.
@@ -131,7 +131,7 @@ with sync_playwright() as p:
     pg.wait_for_function("() => document.querySelector('.win .gb-st').textContent === 'Danke!'", timeout=15000)
     pg.wait_for_function("() => [...document.querySelectorAll('.win .msg p')].some(p => p.textContent === 'Hallo aus NwebOS')", timeout=10000)
     shot(pg, "guestbook-1280.png")
-    c.close()
+    c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 1280 direct visit, Discord tile, guestbook entry via Turnstile")
 
     # Phone: handheld home screen, an app opens full screen, the home button goes back.
@@ -150,7 +150,7 @@ with sync_playwright() as p:
     assert pg.locator(".win.min").count() == 1 and path(pg) == "/"
     pg.goto(f"https://{H}/guestbook", wait_until="load"); pg.wait_for_timeout(300)
     shot(pg, "phone-guestbook-375.png")
-    c.close()
+    c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 375 home screen, full-screen app, home button")
 
     # Without JS: all content is a readable page, the current app first.
@@ -162,6 +162,6 @@ with sync_playwright() as p:
     pg.goto(f"https://{H}/en/about", wait_until="load")
     assert pg.locator("main#apps h2").first.inner_text() == "About me" and "Hi, I'm Nils." in pg.inner_text("main")
     shot(pg, "nojs-1280.png")
-    c.close()
+    c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS no-JS readable, current app first, English")
     br.close()
