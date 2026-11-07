@@ -157,7 +157,9 @@
   var eggs = {
     logout: function () {
       store.set("loggedout", "1"); store.set("user", null);
-      if (me) { location.href = L.logoutUrl + encodeURIComponent(location.href); return; }   // real Discord session: sign out, come back to the login
+      /* real Discord session: sign out with a same-origin POST (a GET only shows the confirmation page, audit #88),
+         come back here to the login */
+      if (me) { var f = document.createElement("form"); f.method = "post"; f.action = L.logoutUrl + encodeURIComponent(location.href); f.hidden = true; document.body.appendChild(f); f.submit(); return; }
       showLogin();
     },
     shutdown: function () { var off = $("#off"); off.hidden = false; desk.hidden = true; off.onclick = function () { off.hidden = true; showDesk(); }; },

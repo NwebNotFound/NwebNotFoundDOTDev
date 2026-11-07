@@ -19,7 +19,7 @@ def ctx_for(br, width, cookie=False, js=True):
     c = br.new_context(viewport={"width": width, "height": 800 if width > 700 else 760}, java_script_enabled=js)
     # no nnf_os cookie: NwebOS is the default
     if cookie:
-        n, v = COOKIE.split("=", 1)
+        n, v = (cookie if isinstance(cookie, str) else COOKIE).split("=", 1)
         c.add_cookies([{"name": n, "value": unquote(v), "domain": H, "path": "/", "secure": True, "httpOnly": True}])
 
     def route(r):
@@ -133,6 +133,27 @@ with sync_playwright() as p:
     shot(pg, "guestbook-1280.png")
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 1280 direct visit, Discord tile, guestbook entry via Turnstile")
+
+    # Abmelden with a real Discord session (throwaway session from e2e): one click, a same-origin POST, the session is
+    # gone and NwebOS shows its login screen again (a GET would only show the "Abmelden?" confirmation page).
+    LO = os.environ.get("NWEBOS_LOGOUT_COOKIE", "")
+    if LO:
+        c = ctx_for(br, 1280, cookie=LO)
+        pg = c.new_page()
+        pg.goto(f"https://{H}/guestbook", wait_until="load")
+        pg.locator("[data-user=me]").click()
+        posts = []
+        pg.on("request", lambda r: posts.append(r.method) if "/auth/discord/logout" in r.url else None)
+        pg.locator("#startb").click()
+        with pg.expect_navigation(wait_until="load"):
+            pg.locator("[data-egg=logout]").click()
+        assert posts and posts[0] == "POST", posts
+        assert urlsplit(pg.url).netloc == H and pg.locator("#login").is_visible() and pg.locator("[data-login-me]").is_hidden(), "one click: logged out, NwebOS login"
+        assert pg.evaluate("fetch('/api/me', {credentials: 'include'}).then(r => r.json()).then(d => !d.user)"), "session ended"
+        c.unroute_all(behavior="ignoreErrors"); c.close()
+        print("PASS 1280 Abmelden with a real session: one POST, logged out, login screen")
+    else:
+        print("SKIP real-session logout (NWEBOS_LOGOUT_COOKIE not set)")
 
     # Phone: handheld home screen, an app opens full screen, the home button goes back.
     c = ctx_for(br, 375)

@@ -1247,7 +1247,10 @@ try {
     ok(blog.s === 200 && !blog.t.includes('class="no-js nwebos"') && !prof.t.includes('class="no-js nwebos"') && !chl.t.includes('class="no-js nwebos"') && !mc.t.includes("nwebos"), "NwebOS: Blog, Profil, Changelog und mc.* unverändert", `${blog.s} ${prof.s} ${chl.s} ${mc.s}`);
     ok(home.t.includes('class="dicon" href="/blog"') && !/class="dicon" href="\/blog" data-open/.test(home.t), "NwebOS: Blog-Icon öffnet die bisherige Seite, kein leeres Fenster");
   }
-  try { execSync(`python3 scripts/nwebos-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS im Browser fehlgeschlagen"); }
+  // a throwaway session for the NwebOS real-session logout check (c1 stays signed in for the tests after it)
+  sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('slo','100000000000000077','logout','Logout',datetime('now','+1 day'))`);
+  const clo = await cookieFor("slo");
+  try { execSync(`python3 scripts/nwebos-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit", env: { ...process.env, NWEBOS_LOGOUT_COOKIE: clo } }); pass++; } catch { fail++; console.log("  ✗ NwebOS im Browser fehlgeschlagen"); }
   try { execSync(`python3 scripts/site-switch-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Logo-Seitenwechsel „Wohin?“ fehlgeschlagen"); }
   try { execSync(`python3 scripts/player3d-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ 3D-Viewer: Pause/Fortsetzen fehlgeschlagen"); }
   try { execSync(`python3 scripts/turnstile-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Turnstile-Challenge-Ablauf fehlgeschlagen"); }
