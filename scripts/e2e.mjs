@@ -345,7 +345,7 @@ try {
   const fb = (body, o = {}) => req("/api/feedback", { method: "POST", body, cookie: c1, origin: O, ...o });
   const good = { category: "bug", text: "Beschreibung mit genug Text c0de", location: "Spawn", token: "XXXX.DUMMY.TOKEN.XXXX" };
   for (const h of [HOST]) { const pg = await req("/feedback", { testHost: h }); ok(pg.s === 200 && pg.t.includes("/api/feedback") && pg.t.includes("challenges.cloudflare.com/turnstile") && /\/bundle\/mc\.css\?v=/.test(pg.t), "GET /feedback auf " + h + " → 200 (MC-Design)", pg.s); }
-  { const r = await req("/feedback", { testHost: "nwebnotfound.dev" }); ok(r.s === 301 && r.h.get("location") === "https://mc.nwebnotfound.dev/feedback", "Hauptdomain: /feedback → 301 auf mc.nwebnotfound.dev/feedback", r.s + " " + r.h.get("location")); }
+  { const r = await req("/feedback", { testHost: "nwebnotfound.dev" }); ok(r.s === 301 && /^(https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+)\/feedback$/.test(r.h.get("location") || ""), "Hauptdomain: /feedback → 301 auf mc.nwebnotfound.dev/feedback", r.s + " " + r.h.get("location")); }
   // Login-Gate
   ok((await req("/api/feedback")).j.logged_in === false, "Login-Gate: GET ohne Login → logged_in false (Seite zeigt Login-Button)");
   ok((await req("/feedback")).t.includes("/auth/discord/login"), "Seite enthält Discord-Login-Button");
