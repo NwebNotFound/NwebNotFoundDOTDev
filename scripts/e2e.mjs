@@ -19,7 +19,7 @@ import "./nwebos-unit.mjs";
 import "./blog-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
-import { hubPage } from "../src/hub.js";
+import { writing as osWritingWin } from "../src/nwebos-apps.js";
 // `new URL(...).pathname` keeps the leading slash on Windows ("/C:/…"), which every fs call then
 // resolved to "C:\C:\…" — the suite could not start there. fileURLToPath gives the native path.
 // Every request in this file (req() and the direct ones): one retry when the dev server reset a reused keep-alive
@@ -673,13 +673,11 @@ try {
     // The committed index (no real content yet) must render the mascot empty state. `CONTENT` was
     // imported before the fixture build overwrote the file, so this is the committed state.
     const committed = CONTENT.writing.filter((w) => !w.draft && !w.archived).length;
-    if (committed === 0) {
-      const empty = hubPage("/writing", "de");
-      ok(empty.includes("sm-hammer") && empty.includes("sm-soon") && empty.includes("Texte kommt bald"), "Leerzustand /writing (committed build, kein Inhalt)");
-    } else {
-      ok(hubPage("/writing", "de").includes("sm-post-grid"), "Liste /writing mit Inhalt (committed build)");
+    if (committed === 0) {   // the Texte window's empty state (no real content yet)
+      const empty = osWritingWin("de", [], []);
+      ok(empty.includes("Der Roman entsteht gerade") && empty.includes("Noch keine Kurztexte."), "Leerzustand Texte-Fenster (committed build, kein Inhalt)");
     }
-    ok(!hubPage("/writing/does-not-exist", "de") && !hubPage("/writing/series/does-not-exist", "de"), "hubPage: unbekannter Slug/Serie → null");
+    ok((await hub("/writing/does-not-exist")).s === 404, "unbekannter Text → 404-Fenster");
 
     const list = await hub("/writing");
     // Texte window (NwebOS only since fix/nwebos-no-optout): the series with its chapters, short texts below; no
@@ -701,8 +699,13 @@ try {
     const arch0 = await hub("/writing/test-fixture-chapter-3"), arch = await hub("/writing/test-fixture-serie/3");
     ok(arch0.s === 302 && arch0.h.get("location") === "/writing/test-fixture-serie/3" && arch.s === 200 && arch.t.includes("wurde archiviert"), "archived: direkter Link führt zum Kapitel-Fenster + Hinweis", `${arch0.s} ${arch0.h.get("location")} ${arch.s}`);
 
+    // Planner 08.11.: shared series/tag links open the Texte window pre-filtered, with a clearable chip (one filter)
     const series = await hub("/writing/series/test-fixture-serie");
-    ok(series.s === 302 && series.h.get("location") === "/writing" && list.t.includes("Chapter three (archived)"), "Serienseite → 302 Texte-Fenster (Kapitelliste dort, inkl. archiviertem Kapitel)", series.s);
+    ok(series.s === 200 && series.t.includes('data-app="writing"') && series.t.includes('<p class="fchip" role="status"><span>Serie: Test Fixture Series</span><a href="/writing"') && series.t.includes("Chapter three (archived)") && !series.t.includes("TEST FIXTURE Hello world"), "Serien-Link → Texte-Fenster gefiltert auf die Serie, Chip zum Entfernen, inkl. archiviertem Kapitel", series.s);
+    ok((await hub("/writing/series/gibt-es-nicht")).s === 404, "unbekannte Serie → 404-Fenster");
+    const tagged = await hub("/writing?tag=fixtures"), notag = await hub("/writing?tag=kein-treffer");
+    ok(tagged.s === 200 && tagged.t.includes("<span>#fixtures</span>") && tagged.t.includes("TEST FIXTURE Hello world") && notag.t.includes("Nichts mit diesem Stichwort."), "?tag= → Texte-Fenster gefiltert, Chip; ohne Treffer erklärt", tagged.s);
+    ok((await hub("/writing?tag=%3Cscript%3E")).t.includes("<span>#&lt;script&gt;</span>"), "Tag im Chip ist escaped");
     const ch2 = await hub("/writing/test-fixture-serie/2");
     ok(ch2.s === 200 && ch2.t.includes('href="/writing/test-fixture-serie/1"') && ch2.t.includes('href="/writing/test-fixture-serie/3"'), "Kapitel: Vorheriges/Nächstes", ch2.s);
     { const r = await hub("/de/writing/test-fixture-chapter-2"); ok(r.s === 302 && r.h.get("location") === "/de/writing/test-fixture-serie/2", "/de/writing/<kapitel-slug> → 302 Kapitel-Fenster, Präfix bleibt", `${r.s} ${r.h.get("location")}`); }
@@ -761,6 +764,7 @@ try {
     const chapter = await hub("/writing/test-fixture-serie/2");
     ok(chapter.t.includes('href="/downloads/story-test-fixture-chapter-2.epub"') && chapter.t.includes("EPUB herunterladen"), "Kapitel-Fenster: EPUB-Download-Button", chapter.s);
     ok(chapter.t.includes('href="/downloads/series-test-fixture-serie.epub"'), "Kapitel: Serien-EPUB verlinkt");
+    ok(chapter.t.includes('<button type="button" class="xpbtn" data-rexp aria-haspopup="dialog">Herunterladen &amp; drucken</button>') || chapter.t.includes('data-rexp aria-haspopup="dialog">Herunterladen & drucken</button>'), "Kapitel: auf dem Handy ein Knopf für EPUB/Druck als Sheet");
     ok(chapter.t.includes("data-print") && chapter.t.includes('src="/design/nwebos-apps.js?v='), "Kapitel: Druck-Button, gedruckt wird aus dem externen nwebos-apps.js");
     ok(chapter.t.includes("© Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
     ok(!/onclick=/.test(chapter.t) && !/<script(?![^>]*\ssrc=)(?![^>]*type="application\/json")/i.test(chapter.t), "Kapitel: kein Inline-Handler, kein Inline-Skript (nur JSON-Daten)");
@@ -1283,7 +1287,7 @@ try {
     ok(/private/.test(prof.h.get("cache-control") || "") && prof.h.get("x-robots-tag") === "noindex" && !prof.t.includes("Weiterlesen") && profIn.t.includes("Nils"), "NwebOS: Profil privat (private, noindex), Gast ohne Daten");
     const other = await Promise.all(["/music", "/writing", "/trash", "/pixelwand", "/en/blog", "/de/blog"].map((p) => n(p)));
     const unk = await n("/sommerfest"), ws = await n("/writing/series/x"), w1 = await n("/writing/gibt-es-nicht"), feed = await n("/blog/feed.xml"), css = await n("/design/nwebos-apps.css");
-    ok(other.every((r) => r.s === 200 && osOn(r)) && unk.s === 404 && osOn(unk) && ws.s === 302 && ws.h.get("location") === "/writing" && w1.s === 404 && osOn(w1) && feed.s === 200 && !osOn(feed) && css.s === 200, "NwebOS: Musik, Texte, Papierkorb, Kommt bald, /de /en, 404-Fenster, alte /writing-Adressen, Feed und Assets unberührt", [...other, unk, ws, w1, feed, css].map((r) => r.s).join(" "));
+    ok(other.every((r) => r.s === 200 && osOn(r)) && unk.s === 404 && osOn(unk) && ws.s === 404 && osOn(ws) && w1.s === 404 && osOn(w1) && feed.s === 200 && !osOn(feed) && css.s === 200, "NwebOS: Musik, Texte, Papierkorb, Kommt bald, /de /en, 404-Fenster, alte /writing-Adressen, Feed und Assets unberührt", [...other, unk, ws, w1, feed, css].map((r) => r.s).join(" "));
     // Reactions and reading progress: only signed in, same-origin JSON; sun is a valid kind (migration 0017).
     const rx = (o) => req("/api/blog/react", { method: "POST", testHost: MH, origin: "https://" + MH, ...o });
     const g = await rx({ body: { slug: "vip-welten", kind: "heart" } }), ev = await rx({ cookie: c1, origin: "https://evil.example", body: { slug: "vip-welten", kind: "heart" } });

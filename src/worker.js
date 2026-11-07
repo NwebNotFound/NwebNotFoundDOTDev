@@ -16,8 +16,7 @@ import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.
 import { normInv, renderInventoryCard } from "./mc-inventory.js";
 import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
-import { hubPage, hubPageExists, navReady, sitePage } from "./hub.js";
-import { siteProfileBody } from "./profile.js";
+import { navReady, sitePage } from "./hub.js";
 import { nwebosPage, nwebosChoice, nwebosRoute } from "./nwebos.js";
 import { blogList, blogPost, changelog as osChangelog, writing as osWriting, chapter as osChapter, text as osText, profile as osProfile, notfound as osNotfound } from "./nwebos-apps.js";
 import { CONTENT } from "./generated/content.js";
@@ -249,59 +248,7 @@ const legacyNav = (h, req) => h.replace(/\{\{UNAV:([a-z]*):([^}]*)\}\}/, (_, cur
 const pFoot = `${GRASSLINE}<span class="brand brand--sm">${BRAND_PX}<span class="bname">NwebNotFound</span></span><nav class="pnl" aria-label="Links"><a href="/">Start</a><a href="/portfolio">Projekte</a><a href="/guestbook">Gästebuch</a><a href="https://${MCD}/">Minecraft</a></nav><p class="hint">© {{Y}} Nils Weberruß · Made with Cloudflare Workers · kein Tracking.</p>`;
 const portfolio = (o) => shell({ css: PORT_CSS + PORT_V2_CSS, footer: pFoot, themeColor: "#f4faff", ...o, head: `${THEME_BOOT}${o.head || ""}` });
 
-// Die frühere Startseite: seit Phase 2 unter /portfolio (der Hub besitzt `/`). Inhalte unverändert.
-const PORTFOLIO = portfolio({ title: "Projekte · Nils Weberruß", desc: "Informatik-Student an der TH Ulm. Web- und Server-Projekte.", nav: pNav("portfolio", "/portfolio"), body: `
-<section class="ph center" id="top"><div class="wrap">
-<p class="pk reveal">Informatik · TH Ulm</p>
-<h1 class="h1x reveal d1">Hi, ich bin Nils. <span class="grad">Ich baue Dinge fürs Web.</span></h1>
-<p class="lead reveal d2">Aka <b>NwebNotFound</b>. Ich studiere Informatik an der Technischen Hochschule Ulm und baue in meiner Freizeit Web- und Server-Projekte.</p>
-<p class="rowcta reveal d3"><a class="btn" href="#projekte">Projekte ansehen</a><a class="btn sec" href="/guestbook">Gästebuch</a></p>
-</div></section>
-<section id="projekte"><div class="wrap">
-<p class="pk reveal">Projekte</p><h2 class="h-l reveal d1">Was ich gebaut habe</h2><p class="lead reveal d1">Woran ich gerade arbeite.</p>
-<div class="pgrid">
-<a class="card pcard reveal" href="https://${MCD}/">
-<span class="pcover pcover--mc"><span class="ctr"><img class="px" alt="" width="64" height="64" loading="lazy" src="/mc-icon/v2/grass_block"></span></span>
-<span class="in"><span class="pchips"><span class="tag">Live</span></span><h3>Minecraft-Server</h3><p>Vanilla+ für Freunde: Velocity, Paper, Simple Voice Chat, eigene Economy und Discord-Anbindung. Läuft in Docker.</p><span class="more">Zum Server ›</span></span>
-</a>
-<div class="card pcard reveal d1">
-<span class="pcover pcover--lav"><span class="ctr"><svg class="px" width="70" height="70" viewBox="0 0 10 10" aria-hidden="true" focusable="false"><rect x="2" y="1" width="6" height="1" fill="#2c2170"/><rect x="1" y="2" width="8" height="6" fill="#2c2170"/><rect x="2" y="3" width="6" height="4" fill="#f1ecff"/><rect x="3" y="4" width="1" height="1" fill="#2c2170"/><rect x="6" y="4" width="1" height="1" fill="#2c2170"/><rect x="4" y="8" width="2" height="1" fill="#2c2170"/></svg></span></span>
-<span class="in"><span class="pchips"><span class="tag">Discord</span></span><h3>Discord-Bot</h3><p>Verknüpft Discord und Minecraft: Whitelist per /link, Status, Chat-Sync, Shop und Admin-Befehle.</p></span>
-</div>
-<a class="card pcard reveal d2" href="/guestbook">
-<span class="pcover"><span class="ctr"><svg class="px" width="76" height="76" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="2" y="1" width="3" height="3" fill="#1f2a44"/><rect x="11" y="1" width="3" height="3" fill="#1f2a44"/><rect x="1" y="3" width="14" height="11" fill="#1f2a44"/><rect x="2" y="4" width="12" height="9" fill="#fff7e6"/><rect x="5" y="7" width="2" height="2" fill="#1f2a44"/><rect x="9" y="7" width="2" height="2" fill="#1f2a44"/><rect x="7" y="10" width="2" height="1" fill="#1f2a44"/></svg></span></span>
-<span class="in"><span class="pchips"><span class="tag">Cloudflare</span></span><h3>Diese Website</h3><p>Ein einzelner Cloudflare Worker mit D1, Turnstile und Discord-Login. Schnell, ohne Framework.</p><span class="more">Gästebuch ausprobieren ›</span></span>
-</a>
-</div></div></section>
-<section class="ph center"><div class="wrap">
-<h2 class="h-l reveal">Sag Hallo.</h2><p class="lead reveal d1">Hinterlass eine Nachricht im Gästebuch. Anmelden geht mit Discord.</p>
-<p class="rowcta reveal d2"><a class="btn" href="/guestbook">Zum Gästebuch</a></p>
-</div></section>` });
-
-const GUEST = portfolio({ title: "Gästebuch · NwebNotFound", desc: "Hinterlass eine Nachricht.", nav: pNav("guestbook", "/guestbook"),
-  body: `
-<section class="ph center"><div class="wrap"><p class="pk reveal">Gästebuch</p><h1 class="h1x reveal d1">Sag Hallo!</h1><p class="lead reveal d2">Lass einen Gruß da. Zum Schreiben meldest du dich mit Discord an.</p></div></section>
-<section class="gb"><div class="wrap gbwrap">
-<div class="card form reveal" id="compose"><p class="mut" style="margin:0">Lade…</p></div>
-<div class="card form reveal d1" id="entries"><div id="list" class="mut">Lade Einträge…</div></div>
-</div></section>
-<script>
-// Turnstile loads only once the signed-in form is on screen (explicit render, never twice).
-const tsLoad=()=>window.__tsP||(window.__tsP=new Promise((res,rej)=>{if(window.turnstile)return res();const s=document.createElement('script');s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';s.async=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)}));
-const e=s=>String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const fmt=t=>{try{return new Date(t.replace(' ','T')+'Z').toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'})}catch(_){return t}};
-async function load(){const d=await(await fetch('/api/guestbook')).json();const L=document.getElementById('list');
-L.innerHTML=d.entries.length?d.entries.map(x=>'<div class="entry"><div class="av">'+(x.avatar?'<img alt="" src="'+e(x.avatar)+'" width="44" height="44">':e((x.name||'?')[0].toUpperCase()))+'</div><div class="bub"><div class="hd"><b>'+e(x.name)+'</b> <span class="mut" style="font-size:.8rem">'+e(fmt(x.created_at))+'</span></div><p>'+e(x.message)+'</p></div></div>').join(''):'Noch keine Einträge. Sei die/der Erste!';L.classList.remove('mut');}
-function compose(d){const C=document.getElementById('compose');const nx=encodeURIComponent(location.href);
-if(!d.user){C.innerHTML=d.available?'<h3 style="margin-bottom:.5rem">Eintrag schreiben</h3><p class="mut">Melde dich mit Discord an, dann erscheinen dein Name und dein Avatar beim Eintrag.</p><p style="margin-top:1.2rem"><a class="btn discord" href="/auth/discord/login?next='+nx+'">${DISCORD_SVG} Mit Discord anmelden</a></p>':'<h3 style="margin-bottom:.5rem">Eintrag schreiben</h3><p class="mut">Neue Einträge gehen bald per Discord-Login. Der Login ist gleich fertig eingerichtet.</p><p style="margin-top:1.2rem"><button class="btn discord" disabled>${DISCORD_SVG} Discord-Login <span class="hide-s">bald</span></button></p>';return;}
-C.innerHTML='<form id="f"><div style="display:flex;align-items:center;gap:.7rem;margin-bottom:1rem"><img alt="" src="'+e(d.user.avatar)+'" width="36" height="36" style="border-radius:50%"><b>'+e(d.user.name)+'</b></div><label for="m" class="mut" style="font-size:.85rem">Nachricht (max. 500 Zeichen)</label><textarea id="m" name="message" maxlength="500" rows="4" required></textarea><div class="cf-turnstile" data-sitekey="${SITEKEY}" data-theme="auto" style="margin-bottom:1rem"></div><button class="btn">Eintragen</button> <span id="st" class="mut" style="margin-left:.6rem"></span></form>';
-tsLoad().then(()=>{try{if(C.querySelector('.cf-turnstile')&&!C.querySelector('iframe'))turnstile.render(C.querySelector('.cf-turnstile'))}catch(_){}}).catch(()=>{});
-document.getElementById('f').onsubmit=async ev=>{ev.preventDefault();const st=document.getElementById('st');st.textContent='Sende…';const fd=new FormData(ev.target);
-const r=await fetch('/api/guestbook',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({message:fd.get('message'),token:fd.get('cf-turnstile-response')})});const j=await r.json().catch(()=>({}));
-st.textContent=r.ok?'Danke!':(j.error||'Fehler');if(r.ok)ev.target.reset();window.turnstile&&turnstile.reset();load();};}
-if(window.__me)compose(window.__me);else document.addEventListener('me',ev=>compose(ev.detail));
-load();
-</script>` });
+// The old portfolio home (/portfolio) and guestbook page (/guestbook) are NwebOS windows now (fix/nwebos-no-optout).
 
 /* ---------- Minecraft-Bereich ---------- */
 // (The hand-drawn pixel grass block that used to stand in for a block texture is gone: v2 renders
@@ -455,18 +402,6 @@ B.innerHTML=h;MC3D.scan(B);MCP.bindTabs(B);document.dispatchEvent(new CustomEven
 L.innerHTML=(P?'<p class="mut" style="margin:0 0 .5rem">'+P+' Stapel im Abholfach · im Spiel <code>/abholen</code></p>':'')+(O.length?'<ul class="pord">'+O.map(x=>{const g=S[x.stage]||S.pending;return '<li class="hl"><span class="ic"><img alt="" loading="lazy" src="/mc-icon/v2/'+encodeURIComponent(x.item)+'"></span><span><b>'+(+x.qty).toLocaleString('de-DE')+'× '+E((window.MC_DE&&MC_DE[x.item])||String(x.item).replace(/_/g,' ').replace(/\\b\\w/g,c=>c.toUpperCase()))+'</b> <span class="mut" style="font-size:.8rem">'+(x.order_type==='bank_buy'?'Bank':'Shop')+'</span></span><span class="tag '+g[1]+'">'+g[0]+'</span></li>'}).join('')+'</ul>':'<p class="mut" style="margin:0">Noch keine Bestellungen.</p>')}).catch(()=>{L.innerHTML='<p class="mut">Konnte Bestellungen nicht laden.</p>'})}})();
 </script>${PROFILE_DETAILS}`;
 const PROFILE_MC = () => shell({ title: "Profil · NwebNotFound MC", desc: "Dein Profil", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", body: PROFILE_BODY(true) });
-
-// Private site profile: only the signed-in owner; everyone else goes to the Discord login and comes back.
-async function siteProfile(req, env) {
-  const u = await getUser(req, env).catch(() => null);
-  if (!u) return redirect(`/auth/discord/login?next=${encodeURIComponent(`https://${MAIN}/profile`)}`);
-  const cnt = await env.DB.prepare("SELECT COUNT(*) AS n FROM entries WHERE discord_id = ?").bind(u.id).first().catch(() => null);
-  const { results: entries } = await env.DB.prepare("SELECT message, created_at FROM entries WHERE discord_id = ? ORDER BY id DESC LIMIT 3").bind(u.id).all().catch(() => ({ results: [] }));
-  const lang = pickLang(null, cookies(req)[LANG_COOKIE]);
-  const body = siteProfileBody({ user: u, gbCount: cnt?.n || 0, entries: entries || [], logoutHref: `/auth/discord/logout?next=${encodeURIComponent(`https://${MAIN}/`)}` });
-  const head = `<meta name="robots" content="noindex"><link rel="stylesheet" href="/design/profile.css?v=${AV}"><script src="/design/profile.js?v=${AV}" defer></script>`;
-  return html(sitePage({ lang, bare: "/profile", title: "Profil · NwebNotFound", desc: "Dein Profil", body, head }), 200, { "cache-control": "private, no-store" });
-}
 
 // Owner deletes their own data: guestbook entries, blog reading progress and reactions, sessions. POST from the site itself only.
 async function profileDelete(req, env) {
@@ -1043,8 +978,8 @@ function osSeries(lang) {
 /* Old Creative Hub addresses that have no window of their own: /writing/series/<s> is the Texte window,
    /writing/<chapter-slug> is its chapter window, any other /writing/<slug> the text window (drafts: 404 window). */
 function osLegacy(bare) {
-  const se = /^\/writing\/series\/([a-z0-9-]+)$/.exec(bare);
-  if (se) return { location: "/writing" };
+  const se = /^\/writing\/series\/([a-z0-9-]+)$/.exec(bare);   // a shared series link: the Texte window, filtered to it
+  if (se) return { route: chaptersOf(WRITING_ALL, se[1]).length ? { k: "writing", path: bare, filter: { series: se[1] } } : { k: "notfound", path: bare } };
   const one = /^\/writing\/([a-z0-9-]+)$/.exec(bare);
   if (!one) return null;
   const it = findWriting(WRITING_ALL, one[1]);   // archived stays reachable by its link, drafts never
@@ -1078,10 +1013,13 @@ async function osResponse(req, env, url, lang, route) {
       content.profile = osProfile(lang, { user: u, gbCount: cnt?.n || 0, entries: entries || [], reads });
     } else content.profile = osProfile(lang, null);
   } else if (k === "changelog") content.changelog = osChangelog(lang);
-  else if (k === "writing") content.writing = osWriting(lang, osSeries(lang), publishedWriting(WRITING_ALL).filter((w) => w.kind !== "story"));
+  else if (k === "writing") {
+    const tag = (url.searchParams.get("tag") || "").slice(0, 40);
+    content.writing = osWriting(lang, osSeries(lang), publishedWriting(WRITING_ALL).filter((w) => w.kind !== "story"), route.filter || (tag ? { tag } : {}));
+  }
   else if (k === "chapter") {
     const se = osSeries(lang).find((x) => x.slug === route.m[1]); const i = se ? se.chapters.findIndex((c) => String(c.n) === route.m[2]) : -1;
-    if (i >= 0) { const c = se.chapters[i]; content.chapter = osChapter(lang, se, { chapter: c.n, title: c.title }, c.item.html || "", se.chapters[i - 1], se.chapters[i + 1], { archived: !!c.item.archived, epub: epubPath(c.item.slug), seriesEpub: seriesEpubPath(se.slug) }); title = `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`; }
+    if (i >= 0) { const c = se.chapters[i]; content.chapter = osChapter(lang, se, { chapter: c.n, title: c.title }, c.item.html || "", se.chapters[i - 1], se.chapters[i + 1], { archived: !!c.item.archived, epub: epubPath(c.item.slug), seriesEpub: seriesEpubPath(se.slug), itemLang: c.item.lang }); title = `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`; }
     else k = "notfound";
   }
   else if (k === "text") { content.text = osText(lang, route.item, route.item.html || ""); title = route.item.title; }
@@ -1235,18 +1173,9 @@ async function route(req, env, ctx) {
       const r = await BLOG().page(pre.path, req, env, url, lang);
       if (r) return r;
     }
-    // The redirect also remembers the language, so the DE/EN switch of the German-only pages stays on
-    // the same page and the nav there follows the choice. 302 + no-store: a cached 301 would skip the
-    // Worker on the next switch and never set the cookie again.
-    if (pre.lang && !hubPageExists(pre.path)) return new Response(null, { status: 302, headers: { location: `https://${MAIN}${pre.path}`, "set-cookie": langCookie(pre.lang), "cache-control": "no-store" } });
-    if (hubPageExists(pre.path)) {
-      const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
-      const page = hubPage(pre.path, lang, { query: url.searchParams });
-      if (page) return html(page, 200, pre.lang ? { "set-cookie": langCookie(pre.lang), vary: "accept-language" } : { vary: "accept-language" });
-    }
-    if (p === "/portfolio") return html(legacyNav(PORTFOLIO, req));
-    if (p === "/guestbook") return html(legacyNav(GUEST, req));
-    if (p === "/profile") return siteProfile(req, env);
+    // A prefixed address without a window (an asset, an API, an old page): the bare address, remembering the language.
+    // 302 + no-store: a cached 301 would skip the Worker on the next switch and never set the cookie again.
+    if (pre.lang && (req.method === "GET" || req.method === "HEAD")) return new Response(null, { status: 302, headers: { location: `https://${MAIN}${pre.path}`, "set-cookie": langCookie(pre.lang), "cache-control": "no-store" } });
     if (p === "/minecraft" || p.startsWith("/minecraft/")) return Response.redirect(`https://${MCD}/`, 301);
     return assetOrNotFound(req, env, false);
 }
