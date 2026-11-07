@@ -4,7 +4,34 @@ on:
 permissions:
   contents: read
 jobs:
-  e2e:
+  # Fast gate (meant as the required check): unit checks, static gates and every HTTP check of scripts/e2e.mjs
+  # (NwebOS, blog, VIP, guestbook, mc pages) against wrangler dev + local D1. No browser, no Playwright install.
+  e2e-fast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install wrangler
+        run: npm i -g wrangler
+      - name: Icon-Referenzcheck
+        run: node scripts/icon-check.mjs
+      - name: Asset cache check
+        run: node scripts/asset-cache-check.mjs
+      - name: Kontrast-Gate (WCAG AA)
+        run: node scripts/contrast-check.mjs
+      - name: Summer-CSS-Scope-Check
+        run: node scripts/summer-scope-check.mjs
+      - name: e2e (HTTP, no browser)
+        env:
+          E2E_BROWSER: "0"
+        run: node scripts/e2e.mjs
+
+  # Full run: the same HTTP checks plus the Playwright browser checks (NwebOS, blog editor, Turnstile, UI at
+  # 390/1440) and the skin lookup against a real local D1.
+  e2e-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -24,17 +51,9 @@ jobs:
         run: pip install playwright==1.64.1 && python -m playwright install --with-deps chromium
       - name: Install wrangler
         run: npm i -g wrangler
-      - name: Icon-Referenzcheck
-        run: node scripts/icon-check.mjs
-      - name: Asset cache check
-        run: node scripts/asset-cache-check.mjs
-      - name: Kontrast-Gate (WCAG AA)
-        run: node scripts/contrast-check.mjs
-      - name: Summer-CSS-Scope-Check
-        run: node scripts/summer-scope-check.mjs
       - name: Skin-Lookup gegen echte lokale D1
         run: node scripts/skin-sql.mjs
-      - name: e2e
+      - name: e2e (HTTP + browser)
         env:
           E2E_SCREENS_DIR: ${{ runner.temp }}/screens/qa
         run: node scripts/e2e.mjs
