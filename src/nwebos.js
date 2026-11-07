@@ -124,7 +124,7 @@ function guestbook(lang, entries = []) {
     : `<p class="sys">${de ? "Noch keine Einträge. Sei die oder der Erste!" : "No entries yet. Be the first!"}</p>`;
   return `<div class="chat"><div class="buddy">${ic("guestbook", 40)}<span><b>${de ? "Gästebuch" : "Guestbook"}</b><small>${de ? `${n} ${n === 1 ? "Eintrag" : "Einträge"}` : `${n} ${n === 1 ? "entry" : "entries"}`}</small></span></div>
 <div class="msgs" data-gb-list>${msgs}</div>
-<div class="gb-form" data-gb-compose><p class="gb-st">${de ? "Zum Schreiben meldest du dich mit Discord an." : "Sign in with Discord to write."} <a href="/auth/discord/login?next=${encodeURIComponent(`https://${MAIN_HOST}${de ? "" : "/en"}/guestbook`)}">${de ? "Mit Discord anmelden" : "Sign in with Discord"}</a></p></div></div>`;
+<div class="gb-form" data-gb-compose><div class="say"><input placeholder="${de ? "Mit Discord anmelden, um zu schreiben" : "Sign in with Discord to write"}" disabled aria-label="${de ? "Nachricht" : "Message"}"><a class="xpbtn" href="/auth/discord/login?next=${encodeURIComponent(`https://${MAIN_HOST}${de ? "" : "/en"}/guestbook`)}">${de ? "Mit Discord anmelden" : "Sign in with Discord"}</a></div></div></div>`;
 }
 
 const href = (lang, path) => (lang === "en" ? (path === "/" ? "/en" : "/en" + path) : path);

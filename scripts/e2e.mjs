@@ -1206,6 +1206,17 @@ try {
     ok(be.t.includes('aria-label="Categories"') && be.t.includes(">Build</a>") && !be.t.includes("Kategorien") && !be.t.includes(">Bauen</a>") && bd.t.includes('aria-label="Kategorien"') && bd.t.includes(">Bauen</a>"), "Blog: /en/blog hat englische Kategorien + aria-label, /blog deutsche");
     ok(bp.s === 200 && can(bp.t) === "https://nwebnotfound.dev/blog/e2e-beitrag" && hl(bp.t) === "", "Blog: Beitrag nur auf Deutsch → canonical auf die deutsche URL, kein hreflang", `${bp.s} ${can(bp.t)}`);
     await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
+    const adm = await b("/blog/admin", { cookie: c1, os: true });
+    ok(adm.s === 200 && !adm.t.includes('class="no-js nwebos"'), "NwebOS: Blog-Editor bleibt vorerst die eigene Seite (Admin)", String(adm.s));
+    // Two published posts for the NwebOS blog windows below (scripts/nwebos-apps-ui.py).
+    for (const p of [
+      { slug: "vip-welten", title_de: "VIP-Welten direkt von der Website starten", summary_de: "Welt anlegen, starten, Freunde einladen.", category: "server", tags: ["vip", "minecraft"], body_de: "## Start\n\nText." },
+      { slug: "eine-navigation-fuer-zwei-seiten", title_de: "Eine Navigation für zwei Seiten", summary_de: "Wie Hauptseite und Server-Seite eine Leiste teilen.", category: "bauen", tags: ["navigation", "css"], body_de: "## Zwei Seiten, zwei Leisten\n\nText eins.\n\n## Eine Leiste für beide\n\n> Kurz gesagt: eine Leiste.\n\n- gleiche Reihenfolge\n- passendes Bild\n\n## Was schiefging\n\nMehr Text." },
+    ]) {
+      const c = await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: MO, body: p });
+      const s = await b(`/api/blog/admin/posts/${c.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "published", base: c.j?.updated_at } });
+      ok(c.s === 201 && s.s === 200, `Blog: Beitrag ${p.slug} für NwebOS veröffentlicht`, `${c.s} ${s.s}`);
+    }
   }
   try { execSync(`python3 scripts/blog-editor-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Blog-Editor im Browser fehlgeschlagen"); }
   sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");
@@ -1219,11 +1230,27 @@ try {
     ok(out.s === 302 && out.h.get("location") === "/about" && /^nnf_os=0;.*Max-Age=31536000/.test(out.h.get("set-cookie") || "") && back.s === 302 && /^nnf_os=1;/.test(back.h.get("set-cookie") || ""), "NwebOS: ?nwebos=0 merkt das Opt-out, ?nwebos=1 holt zurück, beide zur sauberen URL", `${out.s} ${back.s}`);
     const old = await n("/guestbook", { cookie: "nnf_os=0" }), oldHome = await n("/", { cookie: "nnf_os=0" });
     ok(old.s === 200 && !old.t.includes("nwebos") && oldHome.s === 200 && !oldHome.t.includes('class="no-js nwebos"'), "NwebOS: mit Opt-out die bisherigen Seiten", `${old.s} ${oldHome.s}`);
-    const blog = await n("/blog"), prof = await n("/profile"), chl = await n("/changelog"), mc = await req("/");
-    ok(blog.s === 200 && !blog.t.includes('class="no-js nwebos"') && !prof.t.includes('class="no-js nwebos"') && !chl.t.includes('class="no-js nwebos"') && !mc.t.includes("nwebos"), "NwebOS: Blog, Profil, Changelog und mc.* unverändert", `${blog.s} ${prof.s} ${chl.s} ${mc.s}`);
-    ok(home.t.includes('class="dicon" href="/blog"') && !/class="dicon" href="\/blog" data-open/.test(home.t), "NwebOS: Blog-Icon öffnet die bisherige Seite, kein leeres Fenster");
+    // #nwebos-apps: every main-site page is a window; HTTP status and caching stay honest.
+    const osOn = (r) => r.t.includes('class="no-js nwebos"');
+    const blog = await n("/blog"), post = await n("/blog/eine-navigation-fuer-zwei-seiten"), miss = await n("/blog/gibt-es-nicht"), prof = await n("/profile"), profIn = await n("/profile", { cookie: c1 }), chl = await n("/changelog"), mc = await req("/");
+    ok([blog, post, prof, chl].every((r) => r.s === 200 && osOn(r)) && blog.t.includes('id="app-blog"') && post.t.includes('id="app-blog-post"') && miss.s === 404 && osOn(miss) && miss.t.includes('id="app-notfound"') && !mc.t.includes("nwebos"), "NwebOS: Blog, Beitrag, Profil, Changelog als Fenster, unbekannter Beitrag = 404-Fenster, mc.* unverändert", `${blog.s} ${post.s} ${miss.s} ${prof.s} ${chl.s} ${mc.s}`);
+    ok(/private/.test(prof.h.get("cache-control") || "") && prof.h.get("x-robots-tag") === "noindex" && !prof.t.includes("Weiterlesen") && profIn.t.includes("Nils"), "NwebOS: Profil privat (private, noindex), Gast ohne Daten");
+    const other = await Promise.all(["/music", "/writing", "/trash", "/pixelwand", "/en/blog", "/de/blog"].map((p) => n(p)));
+    const unk = await n("/sommerfest"), ws = await n("/writing/series/x"), w1 = await n("/writing/gibt-es-nicht"), feed = await n("/blog/feed.xml"), css = await n("/design/nwebos-apps.css");
+    ok(other.every((r) => r.s === 200 && osOn(r)) && unk.s === 404 && osOn(unk) && ws.s === 302 && ws.h.get("location") === "/writing" && w1.s === 404 && osOn(w1) && feed.s === 200 && !osOn(feed) && css.s === 200, "NwebOS: Musik, Texte, Papierkorb, Kommt bald, /de /en, 404-Fenster, alte /writing-Adressen, Feed und Assets unberührt", [...other, unk, ws, w1, feed, css].map((r) => r.s).join(" "));
+    // Reactions and reading progress: only signed in, same-origin JSON; sun is a valid kind (migration 0017).
+    const rx = (o) => req("/api/blog/react", { method: "POST", testHost: MH, origin: "https://" + MH, ...o });
+    const g = await rx({ body: { slug: "vip-welten", kind: "heart" } }), ev = await rx({ cookie: c1, origin: "https://evil.example", body: { slug: "vip-welten", kind: "heart" } });
+    const on = await rx({ cookie: c1, body: { slug: "vip-welten", kind: "sun" } }), off = await rx({ cookie: c1, body: { slug: "vip-welten", kind: "sun" } }), bad = await rx({ cookie: c1, body: { slug: "vip-welten", kind: "poop" } });
+    ok(g.s === 401 && ev.s === 403 && on.s === 200 && on.j?.on === true && on.j?.counts?.sun === 1 && off.j?.on === false && off.j?.counts?.sun === 0 && bad.s === 400, "Blog-Reaktionen: Gast 401, fremde Origin 403, Sonne an/aus zählt, unbekannte Art 400", `${g.s} ${ev.s} ${on.s} ${off.s} ${bad.s}`);
+    const pr = (o) => req("/api/blog/progress", { method: "POST", testHost: MH, origin: "https://" + MH, ...o });
+    const p1 = await pr({ cookie: c1, body: { key: "blog:vip-welten", pct: 60 } }), p2 = await pr({ cookie: c1, body: { key: "blog:vip-welten", pct: 20 } }), pg0 = await pr({ body: { key: "blog:vip-welten", pct: 50 } }), pbad = await pr({ cookie: c1, body: { key: "x:y", pct: 50 } });
+    const kept = sqlRows(`SELECT pct FROM blog_reads WHERE post_id = 'blog:vip-welten'`)[0]?.pct;
+    ok(p1.s === 200 && p2.s === 200 && pg0.s === 401 && pbad.s === 400 && Number(kept) === 60, "Lesefortschritt: nur angemeldet, höchster Wert bleibt, falscher Schlüssel 400", `${p1.s} ${p2.s} ${pg0.s} ${pbad.s} ${kept}`);
+    sql(`DELETE FROM blog_reads WHERE post_id = 'blog:vip-welten'`);
   }
   try { execSync(`python3 scripts/nwebos-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS im Browser fehlgeschlagen"); }
+  try { execSync(`python3 scripts/nwebos-apps-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS-Apps im Browser fehlgeschlagen"); }
   try { execSync(`python3 scripts/site-switch-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Logo-Seitenwechsel „Wohin?“ fehlgeschlagen"); }
   try { execSync(`python3 scripts/player3d-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ 3D-Viewer: Pause/Fortsetzen fehlgeschlagen"); }
   try { execSync(`python3 scripts/turnstile-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Turnstile-Challenge-Ablauf fehlgeschlagen"); }

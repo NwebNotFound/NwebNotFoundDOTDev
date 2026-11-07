@@ -357,7 +357,7 @@
   });
 
   setUser();
-  var deep = appOf(location.pathname);
+  var deep = appOf(location.pathname), atDesk = bare(location.pathname) === "/";   /* before restored windows change the address */
   var firstVisit = !store.get("booted");
   // restore the saved windows quietly (no sound, no animation), the deep-linked app goes on top
   var restoring = [];
@@ -366,8 +366,11 @@
   /* windows restored from their address arrive later: the deep-linked window stays on top */
   if (deep && restoring.length) Promise.all(restoring).then(function () { if (open.has(deep)) { focus(deep, false); open.get(deep).el.focus({ preventScroll: true }); } });
   else { var top = topWindow(); if (top) history.replaceState({ k: top }, "", pathOf(top)); }
-  // Boot: first visit to the desktop only (a direct app visit and reduced motion skip it). Login: first visit and after "Abmelden".
-  if (firstVisit && !deep && !RM) boot();
+  // Boot and login: first visit to the desktop (/) only; login again after "Abmelden". A direct visit to a window's
+  // address (deep link, also the 404 window) opens it at once and counts as seen, so the boot does not play later
+  // (Planner 07.11.). Reduced motion skips the boot.
+  if (deep || !atDesk) { if (firstVisit) store.set("booted", "1"); showDesk(false); }
+  else if (firstVisit && !RM) boot();
   else if (firstVisit || store.get("loggedout")) { store.set("booted", "1"); showLogin(); }
   else showDesk(false);
 })();

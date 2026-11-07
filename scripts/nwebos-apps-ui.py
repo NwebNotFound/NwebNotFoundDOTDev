@@ -141,7 +141,10 @@ with sync_playwright() as p:
     pg = c.new_page()
     pg.goto(f"https://{H}/profile", wait_until="load")
     assert "Mit Discord anmelden" in pg.locator(".win.focus").inner_text() and pg.locator(".win.focus .bmk").count() == 0
+    pg.goto(f"https://{H}/guestbook", wait_until="load")
+    assert pg.locator(".win.focus .say input").is_disabled() and pg.locator(".win.focus .say a.xpbtn").get_attribute("href").startswith("/auth/discord/login"), "guest guestbook footer (mockup)"
+    shot(pg, "x-guestbook-guest-1280.png")
     c.unroute_all(behavior="ignoreErrors"); c.close()
     assert not errs, errs
-    print("PASS guest profile private")
+    print("PASS guest profile private, guest guestbook footer")
     br.close()
