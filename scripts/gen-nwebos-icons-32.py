@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds public/nwebos/icons-32.png: the NwebOS icon set as a horizontal 32x32 sprite strip.
+"""Builds public/design/nwebos-icons-32.png: the NwebOS icon set as a horizontal 32x32 sprite strip.
 
 Each 16x16 pixel icon of the mockup (mockups/nwebos/src/art.py) is scaled 2x with nearest-neighbour
 (crisp pixels, no smoothing). Cell n starts at x = 32 * n; the order is the ICONS order of art.py:
