@@ -5,9 +5,8 @@
 // sections in <main id="apps">. Without JS that main is the page (readable, indexable); with JS,
 // public/design/nwebos.js turns the sections into windows and opens the one for the current path.
 //
-// NwebOS is the default (Nils, 07.11.: "And nwebOS is default"). `?nwebos=0` opts out to the old site (cookie
-// nnf_os=0, a year), `?nwebos=1` opts back in. Paths without an NwebOS app yet (blog, profile, changelog, …) keep
-// their current pages; their desktop/start-menu icons link there.
+// NwebOS is the site (Nils, 07.11.: no old pages behind NwebOS): every page address is a window or the 404 window.
+// The old `?nwebos=0` opt-out is gone; a left-over link just goes to the clean address (nwebosChoice).
 import { AV } from "./asset-version.js";
 import { WIKI } from "./mc-hub.js";
 import { music, trash, soon, ic2 } from "./nwebos-apps.js";
@@ -49,6 +48,7 @@ export const EXTRA = [
   { k: "profile", icon: "profile", path: "/profile", de: "Mein Profil", en: "My profile", w: 740, h: 540, x: 260, y: 30, menu: "no" },
   { k: "changelog", icon: "changelog", path: "/changelog", de: "Neuigkeiten", en: "What's new", w: 560, h: 520, x: 420, y: 40, menu: "no" },
   { k: "chapter", icon: "book", re: /^\/writing\/([a-z0-9-]+)\/(\d{1,3})$/, de: "Kapitel", en: "Chapter", w: 640, h: 580, x: 340, y: 20, menu: "no" },
+  { k: "text", icon: "writing", de: "Text", en: "Text", w: 640, h: 580, x: 340, y: 20, menu: "no" },   // /writing/<slug> (not a chapter): routed by the worker
   { k: "soon", icon: "soon", path: "/pixelwand", de: "Pixelwand", en: "Pixel wall", w: 460, h: 250, x: 460, y: 200, menu: "no", inline: true },
   { k: "notfound", icon: "warn", de: "Nicht gefunden", en: "Not found", w: 470, h: 250, x: 420, y: 180, menu: "no" },
 ];
@@ -144,7 +144,7 @@ function searchIndex(lang) {
     ...WIKI.map((w) => ({ t: `Wiki: ${w.title}`, d: `${MC_HOST}/wiki · ${t.newTab}`, url: `${mc}/wiki/${w.slug}`, ic: "minecraft", kw: `wiki minecraft ${w.sum || ""}` })),
     { t: "GitHub · NwebNotFound", d: t.newTab, url: GITHUB, ic: "portfolio", kw: "github code" }];
 }
-export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries = [], sitekey = "", content: extra = {}, title: winTitle = "", status = 200 } = {}) {
+export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries = [], sitekey = "", content: extra = {}, title: winTitle = "", status = 200, oneLang = "" } = {}) {
   lang = lang === "en" ? "en" : "de";
   const t = T[lang];
   const cur = ALL.find((a) => a.k === app) || null;
@@ -174,8 +174,8 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
   const L = { ...t, lang, path, sprite: `/design/nwebos-icons.svg?v=${AV}`, idx: searchIndex(lang), home: href(lang, "/"), login: `/auth/discord/login?next=`, logoutUrl: `/auth/discord/logout?next=`, sitekey, routes, status };
   return `<!doctype html>
 <html lang="${lang}" class="no-js nwebos"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>${esc(title)}</title><meta name="description" content="${esc(t.desc)}"><link rel="canonical" href="${alt(lang)}">
-<link rel="alternate" hreflang="${lang}" href="${alt(lang)}"><link rel="alternate" hreflang="${other}" href="${alt(other)}">
+<title>${esc(title)}</title><meta name="description" content="${esc(t.desc)}"><link rel="canonical" href="${alt(oneLang || lang)}">
+${oneLang ? "" : `<link rel="alternate" hreflang="${lang}" href="${alt(lang)}"><link rel="alternate" hreflang="${other}" href="${alt(other)}"><link rel="alternate" hreflang="x-default" href="${alt("de")}">`}
 <meta name="theme-color" content="#2463d6"><link rel="icon" href="/favicon.ico">
 <script src="/design/summer-theme.js?v=${AV}"></script><link rel="preload" href="/design/fonts/pixelify-sans-latin-700.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-polish.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script><script src="/design/nwebos-apps.js?v=${AV}" defer></script></head><body>
@@ -203,13 +203,11 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
 </body></html>`;
 }
 
-/** OS on or off for this request: ?nwebos=1/0 switches and remembers it in the cookie; else cookie, else `defaultOn`. */
-export function nwebosChoice(url, cookies, defaultOn = false) {
+/** NwebOS is the only site (Nils 07.11.: no old pages behind NwebOS). A left-over `?nwebos=0|1` goes back to the clean
+    address and clears the old opt-out cookie; `on` is always true. */
+export function nwebosChoice(url) {
   const q = url.searchParams.get("nwebos");
-  if (q === "1") return { on: true, setCookie: `${OS_COOKIE}=1; Path=/; Max-Age=31536000; Secure; SameSite=Lax` };
-  if (q === "0") return { on: false, setCookie: `${OS_COOKIE}=0; Path=/; Max-Age=31536000; Secure; SameSite=Lax` };   // lasting opt-out
-  const c = cookies[OS_COOKIE];
-  return { on: c === "1" || (defaultOn && c !== "0"), setCookie: null };
+  return { on: true, setCookie: q === "0" || q === "1" ? `${OS_COOKIE}=; Path=/; Max-Age=0; Secure; SameSite=Lax` : null };
 }
 
 /**

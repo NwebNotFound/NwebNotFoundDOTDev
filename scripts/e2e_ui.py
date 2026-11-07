@@ -533,20 +533,23 @@ with sync_playwright() as p:
                     if "/mc-head/" not in u and "/mc-icon/" not in u: raise  # nav icons may still be in flight at close
                 return
             r.continue_()
-        ctx = br.new_context(viewport={"width": 1280, "height": 800}); ctx.add_cookies([{"name": "nnf_os", "value": "0", "domain": P, "path": "/", "secure": True}]); pg = ctx.new_page(); pg.route("**/*", route_p)
-        pg.goto("https://" + P + "/portfolio", wait_until="domcontentloaded", timeout=45000); pg.locator("#umb img").wait_for(timeout=10000)
-        info = pg.evaluate("""() => { const img = document.querySelector('#umb img'); const name = document.querySelector('#umb .u-name'); return { src: img ? img.src : '', attr: img ? img.getAttribute('onerror') : 'missing', xss: window.__xss || 0, name: name ? name.textContent : '', imgs: document.querySelectorAll('#umb img').length }; }""")
+        # main domain = NwebOS (fix/nwebos-no-optout): the account avatar is #smav (start menu) and the login tile
+        # [data-me-av]; both take only an https avatar, else the guest cat (a data: URL). The name is text.
+        ctx = br.new_context(viewport={"width": 1280, "height": 800}); ctx.add_init_script("try{localStorage.setItem('nwebos.booted','1');localStorage.setItem('nwebos.user','me')}catch(e){}"); pg = ctx.new_page(); pg.route("**/*", route_p)
+        pg.goto("https://" + P + "/portfolio", wait_until="domcontentloaded", timeout=45000)
+        pg.wait_for_function("() => (document.querySelector('#smav').getAttribute('src') || 'data:,') !== 'data:,'", timeout=10000); pg.wait_for_timeout(200)
+        info = pg.evaluate("""() => { const img = document.querySelector('#smav'), tile = document.querySelector('[data-me-av]'), nm = document.querySelector('[data-me-name]');
+          return { src: img.getAttribute('src'), tile: tile ? tile.getAttribute('src') : '', xss: window.__xss || 0, handlers: document.querySelectorAll('img[onerror]').length, name: nm ? nm.textContent : '' }; }""")
         ctx.unroute_all(behavior="ignoreErrors"); ctx.close(); return info
+    CAT = "data:image/svg+xml"
     bad = chip('"><img src=x onerror=window.__xss=1>')
-    ok(bad["xss"] == 0 and bad["attr"] is None and bad["src"].endswith(FBP) and bad["name"] == "Nils<img>" and bad["imgs"] == 1, "Portfolio-Chip: Avatar-Breakout bleibt Text, Fallback-Bild", bad)
+    ok(bad["xss"] == 0 and bad["handlers"] == 0 and bad["src"].startswith(CAT) and not bad["tile"].startswith("\"") and bad["name"] == "Nils<img>", "NwebOS-Konto: Avatar-Breakout bleibt wirkungslos, Name als Text, Gast-Katze", bad)
     js = chip("javascript:alert(1)")
-    ok(js["xss"] == 0 and js["attr"] is None and js["src"].endswith(FBP), "Portfolio-Chip: javascript-URL fällt auf Discord-Standard zurück", js)
+    ok(js["xss"] == 0 and js["src"].startswith(CAT) and not js["tile"].startswith("javascript"), "NwebOS-Konto: javascript-URL fällt auf die Gast-Katze zurück", js)
     http = chip("http://cdn.discordapp.com/embed/avatars/0.png")
-    ok(http["src"].endswith(FBP) and "http://cdn.discordapp.com" not in http["src"], "Portfolio-Chip: http-Avatar fällt auf Discord-Standard zurück", http)
+    ok(http["src"].startswith(CAT) and "http://" not in http["src"] + http["tile"], "NwebOS-Konto: http-Avatar fällt auf die Gast-Katze zurück", http)
     good = chip("https://cdn.discordapp.com/embed/avatars/0.png")
-    ok(good["src"].startswith("https://cdn.discordapp.com/") and good["attr"] is None and good["xss"] == 0, "Portfolio-Chip: https-Avatar bleibt gesetzt", good)
-    linked = chip("https://cdn.discordapp.com/embed/avatars/0.png", "Nils")
-    ok(linked["src"].startswith("https://cdn.discordapp.com/") and "/mc-head/" not in linked["src"], "Portfolio-Chip: verknuepfter MC-Name zeigt auf der Hauptdomain trotzdem den Discord-Avatar", linked)
+    ok(good["src"].startswith("https://cdn.discordapp.com/") and good["tile"].startswith("https://cdn.discordapp.com/") and good["xss"] == 0, "NwebOS-Konto: https-Avatar bleibt gesetzt", good)
     me = {"avatar": "", "mc_name": None}
     def route_k(r):
         u = r.request.url

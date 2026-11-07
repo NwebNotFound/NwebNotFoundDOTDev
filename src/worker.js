@@ -19,12 +19,13 @@ import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-p
 import { hubPage, hubPageExists, navReady, sitePage } from "./hub.js";
 import { siteProfileBody } from "./profile.js";
 import { nwebosPage, nwebosChoice, nwebosRoute } from "./nwebos.js";
-import { blogList, blogPost, changelog as osChangelog, writing as osWriting, chapter as osChapter, profile as osProfile, notfound as osNotfound } from "./nwebos-apps.js";
+import { blogList, blogPost, changelog as osChangelog, writing as osWriting, chapter as osChapter, text as osText, profile as osProfile, notfound as osNotfound } from "./nwebos-apps.js";
 import { CONTENT } from "./generated/content.js";
-import { publishedWriting, chaptersOf } from "./content.js";
+import { publishedWriting, chaptersOf, findWriting } from "./content.js";
 import { makeBlog } from "./blog.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
+import { epubPath, seriesEpubPath } from "./epub.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
 import { safeDecode } from "./safe-decode.js";
 import { verifyTurnstile } from "./turnstile.js";
@@ -1023,8 +1024,8 @@ async function assetOrNotFound(req, env, mc) {
     const ar = await env.ASSETS.fetch(req);
     if (ar.status !== 404) return ar;
   }
-  // Main site with NwebOS: an unknown page is the 404 window (real HTTP 404), unless opted out.
-  if (!mc && req.method === "GET" && nwebosChoice(new URL(req.url), cookies(req), true).on) {
+  // Main site: an unknown page is the 404 window (real HTTP 404).
+  if (!mc && req.method === "GET") {
     const url = new URL(req.url), pre = splitLang(url.pathname.replace(/\/$/, "") || "/");
     const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
     return osResponse(req, env, url, lang, { k: "notfound", path: pre.path });
@@ -1040,25 +1041,25 @@ function osSeries(lang) {
   return slugs.map((s) => { const ch = chaptersOf(WRITING_ALL, s); return { slug: s, title: ch[0]?.seriesTitle || s, chapters: ch.map((c) => ({ n: c.chapter, title: c.title, slug: c.slug, item: c })) }; });
 }
 /* Old Creative Hub addresses that have no window of their own: /writing/series/<s> is the Texte window,
-   /writing/<slug> is its chapter window (or the 404 window). 302, not 301: with ?nwebos=0 the old pages still
-   answer at these addresses until the opt-out goes away. */
+   /writing/<chapter-slug> is its chapter window, any other /writing/<slug> the text window (drafts: 404 window). */
 function osLegacy(bare) {
   const se = /^\/writing\/series\/([a-z0-9-]+)$/.exec(bare);
   if (se) return { location: "/writing" };
   const one = /^\/writing\/([a-z0-9-]+)$/.exec(bare);
   if (!one) return null;
-  const it = publishedWriting(WRITING_ALL).find((w) => w.slug === one[1]);
+  const it = findWriting(WRITING_ALL, one[1]);   // archived stays reachable by its link, drafts never
   if (it && it.kind === "story" && it.series && it.chapter) return { location: `/writing/${it.series}/${it.chapter}` };
+  if (it) return { route: { k: "text", path: bare, item: it } };
   return { route: { k: "notfound", path: bare } };
 }
 async function osResponse(req, env, url, lang, route) {
   const de = lang !== "en";
-  let k = route.k, content = {}, title = "", status = 200, priv = false;
+  let k = route.k, content = {}, title = "", status = 200, priv = false, oneLang = "";
   const u = ["profile", "blog-post"].includes(k) ? await getUser(req, env).catch(() => null) : null;
   if (k === "blog") content.blog = blogList(lang, await BLOG().os.list(env, lang));
   else if (k === "blog-post") {
     const d = await BLOG().os.post(req, env, route.m[1], url.searchParams.get("preview"), lang).catch(() => null);
-    if (d) { content["blog-post"] = blogPost(lang, d.post, d.rx, { signedIn: d.signedIn, older: d.older, newer: d.newer, preview: d.priv }); title = d.post.title; priv = d.priv; }
+    if (d) { content["blog-post"] = blogPost(lang, d.post, d.rx, { signedIn: d.signedIn, older: d.older, newer: d.newer, preview: d.priv }); title = d.post.title; priv = d.priv; if (!d.post.has_en) oneLang = "de"; }
     else k = "notfound";
   } else if (k === "profile") {
     priv = true;
@@ -1077,15 +1078,16 @@ async function osResponse(req, env, url, lang, route) {
       content.profile = osProfile(lang, { user: u, gbCount: cnt?.n || 0, entries: entries || [], reads });
     } else content.profile = osProfile(lang, null);
   } else if (k === "changelog") content.changelog = osChangelog(lang);
-  else if (k === "writing") content.writing = osWriting(lang, osSeries(lang), publishedWriting(WRITING_ALL).filter((w) => w.kind === "blog" && false));
+  else if (k === "writing") content.writing = osWriting(lang, osSeries(lang), publishedWriting(WRITING_ALL).filter((w) => w.kind !== "story"));
   else if (k === "chapter") {
     const se = osSeries(lang).find((x) => x.slug === route.m[1]); const i = se ? se.chapters.findIndex((c) => String(c.n) === route.m[2]) : -1;
-    if (i >= 0) { const c = se.chapters[i]; content.chapter = osChapter(lang, se, { chapter: c.n, title: c.title }, c.item.html || "", se.chapters[i - 1], se.chapters[i + 1]); title = `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`; }
+    if (i >= 0) { const c = se.chapters[i]; content.chapter = osChapter(lang, se, { chapter: c.n, title: c.title }, c.item.html || "", se.chapters[i - 1], se.chapters[i + 1], { archived: !!c.item.archived, epub: epubPath(c.item.slug), seriesEpub: seriesEpubPath(se.slug) }); title = `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`; }
     else k = "notfound";
   }
+  else if (k === "text") { content.text = osText(lang, route.item, route.item.html || ""); title = route.item.title; }
   if (k === "notfound") { content.notfound = osNotfound(lang, route.path); status = 404; }
   const entries = await guestEntries(env).catch(() => []);
-  const page = nwebosPage({ lang, app: k, path: route.path, entries, sitekey: SITEKEY, content, title, status });
+  const page = nwebosPage({ lang, app: k, path: route.path, entries, sitekey: SITEKEY, content, title, status, oneLang });
   return html(page, status, { "cache-control": priv ? "private, no-store" : "no-store", vary: "cookie, accept-language", ...(priv ? { "x-robots-tag": "noindex" } : {}) });
 }
 
@@ -1211,19 +1213,20 @@ async function route(req, env, ctx) {
     // entstehen. Ein Sprachpräfix vor einer Hub-fremden Route fällt auf den Pfad ohne Präfix zurück
     // (301), damit z. B. /en/guestbook nicht in einem 404 endet.
     const pre = splitLang(p);
-    // NwebOS (src/nwebos.js) is the default on its paths; ?nwebos=0 / ?nwebos=1 opt out / back in (cookie) and come
-    // back to the clean URL. Opted out, or on a path without an NwebOS app yet, the current page is served.
-    {
-      const os = nwebosChoice(url, cookies(req), true);
-      if (os.setCookie && req.method === "GET") { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
-      const old = os.on && req.method === "GET" ? osLegacy(pre.path) : null;
+    // NwebOS (src/nwebos.js) is the site (Nils 07.11.: no old pages behind NwebOS). Every page address is a window or
+    // the 404 window; a left-over ?nwebos=0|1 goes back to the clean URL and clears the old opt-out cookie. HEAD
+    // answers like GET without a body.
+    if (req.method === "GET" || req.method === "HEAD") {
+      const os = nwebosChoice(url);
+      if (os.setCookie) { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
+      const old = osLegacy(pre.path);
       if (old && old.location) return new Response(null, { status: 302, headers: { location: (pre.lang ? "/" + pre.lang : "") + old.location + url.search, "cache-control": "no-store" } });
-      const route = old ? old.route : os.on && req.method === "GET" ? nwebosRoute(pre.path) : null;
+      const route = old ? old.route : nwebosRoute(pre.path);
       if (route) {
         const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
         const res = await osResponse(req, env, url, lang, route);
         if (pre.lang) res.headers.append("set-cookie", langCookie(pre.lang));
-        return res;
+        return req.method === "HEAD" ? new Response(null, res) : res;
       }
     }
     // Blog (D1-backed, src/blog.js): before the hub, whose /blog is only the coming-soon page.

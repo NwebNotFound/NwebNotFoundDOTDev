@@ -9,12 +9,11 @@ import { blogList, blogPost, notfound, profile, changelog, music } from "../src/
 import { buildSprite } from "./build-nwebos-icons.mjs";
 
 const U = (q = "") => new URL("https://nwebnotfound.dev/guestbook" + q);
-assert.deepEqual(nwebosChoice(U(), {}), { on: false, setCookie: null }, "off without the cookie");
-assert.equal(nwebosChoice(U(), { nnf_os: "1" }).on, true);
-assert.match(nwebosChoice(U("?nwebos=1"), {}).setCookie, /^nnf_os=1; Path=\/; Max-Age=\d+; Secure; SameSite=Lax$/);
-assert.match(nwebosChoice(U("?nwebos=0"), { nnf_os: "1" }).setCookie, /^nnf_os=0; Path=\/; Max-Age=31536000;/, "opt-out is remembered, not just cleared");
-assert.equal(nwebosChoice(U(), {}, true).on, true, "default-on (switch-over PR) unless opted out");
-assert.equal(nwebosChoice(U(), { nnf_os: "0" }, true).on, false);
+assert.deepEqual(nwebosChoice(U()), { on: true, setCookie: null }, "NwebOS is the only site");
+assert.equal(nwebosChoice(U()).on, true);
+assert.match(nwebosChoice(U("?nwebos=0")).setCookie, /^nnf_os=; Path=\/; Max-Age=0; Secure; SameSite=Lax$/, "a left-over opt-out link clears the old cookie");
+assert.equal(nwebosChoice(U("?nwebos=0")).on, true, "?nwebos=0 no longer opts out");
+assert.match(nwebosChoice(U("?nwebos=1")).setCookie, /Max-Age=0/);
 assert.deepEqual(OS_PATHS, ["/", "/about", "/portfolio", "/blog", "/music", "/writing", "/guestbook", "/trash", "/profile", "/changelog", "/pixelwand"]);
 assert.equal(nwebosApp("/"), ""); assert.equal(nwebosApp("/guestbook"), "guestbook"); assert.equal(nwebosApp("/blog"), "blog");
 // every main-site page is a window: posts and chapters by pattern; the editor, feeds and unknown paths are not

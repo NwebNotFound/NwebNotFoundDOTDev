@@ -212,3 +212,11 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
  .hsearch input{height:40px;border-radius:20px;padding:0 16px;font-size:14px;border:2px solid #fff;box-shadow:0 2px 0 rgba(0,0,0,.2)}
  .hsearch .results{position:absolute;left:0;right:0;top:46px;z-index:5;border:2px solid #1c4fb8;border-radius:8px}
 }
+/* chapter window: download + print + rights (ported from the old chapter page), the archived note, print just the page */
+.rexp{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 4px;padding:12px 0 0;border-top:1px dashed var(--line,#d7d3c0)}.rexp .hint,.rexp .rights{flex:1 1 100%;margin:0;font-size:12px;color:var(--mut2,#5b6170)}
+.page .arch{margin:0 0 14px;padding:8px 12px;border:2px solid #e69a00;border-radius:10px;background:#fff3c2;color:#1b2238;font-size:13px}
+@media print{
+ #desk>:not(#wins),#wins>:not(.win.focus),.task,.mbar,#boot,#login,#off,.wt,.rbar,.prog,.rexp,.pn2,.toast,.shx,.shbd{display:none!important}
+ html,body,#desk,#wins,.win.focus,.win.focus .wc,.rscroll{position:static!important;inset:auto!important;width:auto!important;height:auto!important;overflow:visible!important;transform:none!important;background:#fff!important;box-shadow:none!important;border:0!important}
+ .page{max-width:none;color:#000}
+}

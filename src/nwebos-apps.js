@@ -137,13 +137,28 @@ export function writing(lang, series = [], shorts = []) {
   const sh = shorts.length ? `<ul class="dash">${shorts.map((x) => `<li><a href="${href(lang, "/writing/" + x.slug)}"><b>${esc(x.title)}</b></a></li>`).join("")}</ul>` : `<p class="empty">${de ? "Noch keine Kurztexte." : "No short texts yet."}</p>`;
   return `<div class="lib">${head}<h3>${de ? "Kurztexte" : "Short texts"}</h3>${sh}</div>`;
 }
-export function chapter(lang, ser, item, html, prev, next) {
+/* A text from Texte that is not a chapter (/writing/<slug>): the chapter reader without series navigation. item: the
+   content index entry ({ title, date, lang, archived, readingMinutes, tags }). Written in another language than the
+   window: a note says so. */
+export function text(lang, item, html) {
+  const de = lang !== "en", other = item.lang && item.lang !== lang;
+  return `<div class="rd rbook" data-read="writing:${esc(item.slug)}"><div class="rbar"><a class="tbtn" href="${href(lang, "/writing")}" data-open="writing">‹ ${de ? "Bibliothek" : "Library"}</a><span class="rtitle">${esc(item.title)}</span><span class="sp"></span>
+<button type="button" class="tbtn" data-fs="-1" aria-label="${de ? "Schrift kleiner" : "Smaller text"}">A−</button><button type="button" class="tbtn" data-fs="1" aria-label="${de ? "Schrift größer" : "Larger text"}">A+</button></div>
+<div class="prog" aria-hidden="true"><i></i></div><div class="rscroll"><article class="page"${item.lang ? ` lang="${esc(item.lang)}"` : ""}><p class="kap">${item.date ? `<time datetime="${esc(item.date)}">${esc(item.date.split("-").reverse().join("."))}</time> · ` : ""}${Number(item.readingMinutes) || 1} ${de ? "Min. Lesezeit" : "min read"}</p><h1>${esc(item.title)}</h1>
+${item.archived ? `<p class="arch" role="note">${de ? "Dieser Text wurde archiviert. Er bleibt über den direkten Link lesbar, wird aber nicht mehr in der Übersicht geführt." : "This text has been archived. It stays readable through the direct link but is no longer listed."}</p>` : ""}${other ? `<p class="arch" role="note" lang="${lang}">${de ? (item.lang === "en" ? "Original auf Englisch." : "Original in einer anderen Sprache.") : item.lang === "de" ? "Original in German." : "Original in another language."}</p>` : ""}<div class="drop">${html}</div></article></div></div>`;
+}
+
+/* x (from the old chapter page, now that it is gone): { archived, epub, seriesEpub } — download + print + rights, and the
+   archived note. An archived chapter is not exported. Print runs window.print() from nwebos-apps.js (no inline handler). */
+export function chapter(lang, ser, item, html, prev, next, x = {}) {
   const de = lang !== "en";
   const total = ser.chapters.length;
   const link = (c) => href(lang, `/writing/${ser.slug}/${c.n}`);
   return `<div class="rd rbook" data-read="writing:${esc(ser.slug)}:${item.chapter}"><div class="rbar"><a class="tbtn" href="${href(lang, "/writing")}" data-open="writing">‹ ${de ? "Bibliothek" : "Library"}</a><span class="rtitle">${esc(ser.title)} · ${de ? "Kapitel" : "Chapter"} ${item.chapter} ${de ? "von" : "of"} ${total}</span><span class="sp"></span>
 <button type="button" class="tbtn" data-fs="-1" aria-label="${de ? "Schrift kleiner" : "Smaller text"}">A−</button><button type="button" class="tbtn" data-fs="1" aria-label="${de ? "Schrift größer" : "Larger text"}">A+</button><button type="button" class="tbtn" data-paper aria-pressed="false" aria-label="${de ? "Nachtpapier" : "Night paper"}">${ic("star", 14)}</button></div>
-<div class="prog" aria-hidden="true"><i></i></div><div class="rscroll"><article class="page"><p class="kap">${de ? "Kapitel" : "Chapter"} ${item.chapter}</p><h1>${esc(item.title)}</h1><div class="drop">${html}</div>
+<div class="prog" aria-hidden="true"><i></i></div><div class="rscroll"><article class="page"><p class="kap">${de ? "Kapitel" : "Chapter"} ${item.chapter}</p><h1>${esc(item.title)}</h1>${x.archived ? `<p class="arch" role="note">${de ? "Dieses Kapitel wurde archiviert. Es bleibt über den direkten Link lesbar, wird aber nicht mehr in der Übersicht geführt." : "This chapter has been archived. It stays readable through the direct link but is no longer listed."}</p>` : ""}<div class="drop">${html}</div>
+${x.epub && !x.archived ? `<aside class="rexp" aria-label="${de ? "Herunterladen und drucken" : "Download and print"}"><a class="xpbtn" href="${esc(x.epub)}" download>${de ? "EPUB herunterladen" : "Download EPUB"}</a>${x.seriesEpub ? `<a class="xpbtn" href="${esc(x.seriesEpub)}" download>${de ? "Ganze Serie als EPUB" : "Whole series as EPUB"}</a>` : ""}<button type="button" class="xpbtn" data-print>${de ? "Als PDF drucken" : "Print as PDF"}</button>
+<p class="hint">${de ? "Drucken öffnet den Druckdialog – dort „Als PDF speichern“ wählen." : "Print opens the print dialog – choose “Save as PDF” there."}</p><p class="rights">${de ? "© Nils, nur zum persönlichen Lesen." : "© Nils, personal reading only."}</p></aside>` : ""}
 <nav class="pn2">${prev ? `<a href="${link(prev)}"><small>‹ ${de ? "Kapitel" : "Chapter"} ${prev.n}</small>${esc(prev.title)}</a>` : "<span></span>"}${next ? `<a href="${link(next)}"><small>${de ? "Kapitel" : "Chapter"} ${next.n} ›</small>${esc(next.title)}</a>` : `<span><small>${de ? "Nächstes Kapitel" : "Next chapter"} ›</small>${de ? "in Arbeit" : "in progress"}</span>`}</nav></article></div></div>`;
 }
 

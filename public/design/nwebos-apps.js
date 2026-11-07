@@ -60,6 +60,7 @@
     if ((b = t.closest("[data-fs]"))) { var rd = b.closest(".rd"), cur = parseFloat(getComputedStyle(rd).getPropertyValue("--fs")) || 14; rd.style.setProperty("--fs", Math.max(12, Math.min(20, cur + +b.dataset.fs)) + "px"); return; }
     if ((b = t.closest("[data-paper]"))) { var rd2 = b.closest(".rd"), on2 = rd2.classList.toggle("npaper"); b.setAttribute("aria-pressed", String(on2)); return; }
     if ((b = t.closest("[data-jump]"))) { e.preventDefault(); var rd3 = b.closest(".rd"), h = rd3.querySelector("#" + CSS.escape(b.dataset.jump)), sc = $(".rscroll", rd3); if (h) sc.scrollTo({ top: h.offsetTop - sc.offsetTop - 8, behavior: RM ? "auto" : "smooth" }); return; }
+    if ((b = t.closest("[data-print]"))) { window.print(); return; }   /* chapter window: print the page (print CSS shows only it) */
     if ((b = t.closest("[data-copy]"))) { if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).catch(function () {}); var o = b.textContent; b.textContent = T("Kopiert ✓", "Copied ✓"); setTimeout(function () { b.textContent = o; }, 1400); return; }
     if ((b = t.closest(".mctl [aria-disabled=true]"))) return;   /* no tracks yet: the controls do nothing */
     if ((b = t.closest(".mctl [data-toggle]"))) { b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); return; }
