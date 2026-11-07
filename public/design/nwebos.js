@@ -69,7 +69,7 @@
   /* ---------- window state in localStorage ---------- */
   function save() {
     var list = [];
-    open.forEach(function (o, k) { if (!APPS[k] || k === "notfound") return; list.push({ k: k, p: APPS[k].dataset.path || "", x: parseFloat(o.el.style.getPropertyValue("--x")) || 0, y: parseFloat(o.el.style.getPropertyValue("--y")) || 0, w: o.el.offsetWidth || parseFloat(o.el.style.width), h: o.el.offsetHeight || parseFloat(o.el.style.height), min: o.el.classList.contains("min"), max: o.el.classList.contains("max"), z: +o.el.style.zIndex || 0 }); });
+    open.forEach(function (o, k) { if (!APPS[k] || k === "notfound" || k === "blog-edit") return;   /* the editor is admin-only: never restored (Gatekeeper #119) */ list.push({ k: k, p: APPS[k].dataset.path || "", x: parseFloat(o.el.style.getPropertyValue("--x")) || 0, y: parseFloat(o.el.style.getPropertyValue("--y")) || 0, w: o.el.offsetWidth || parseFloat(o.el.style.width), h: o.el.offsetHeight || parseFloat(o.el.style.height), min: o.el.classList.contains("min"), max: o.el.classList.contains("max"), z: +o.el.style.zIndex || 0 }); });
     store.set("wins", JSON.stringify(list));
   }
   function saved() { try { return JSON.parse(store.get("wins") || "[]").filter(function (w) { return w && w.k && (APPS[w.k] || w.p); }); } catch (e) { return []; } }
@@ -85,7 +85,7 @@
     return (pending[key] = fetch(u.pathname + u.search, { credentials: "include", headers: { accept: "text/html" } }).then(function (r) { return r.text(); }).then(function (txt) {
       delete pending[key];
       var doc = new DOMParser().parseFromString(txt, "text/html"), sec = doc.querySelector("#apps .app");
-      if (!sec || !doc.documentElement.classList.contains("nwebos")) { location.href = u.href; return null; }
+      if (!sec || !doc.documentElement.classList.contains("nwebos")) { if (!opt.restore) location.href = u.href; return null; }   /* a restored window that isn't there any more is dropped */
       var k = sec.dataset.app, old = APPS[k], tpl = doc.getElementById("ic-" + k);
       if (tpl && !document.getElementById("ic-" + k)) document.body.appendChild(document.importNode(tpl, true));
       sec = document.importNode(sec, true);
@@ -93,13 +93,15 @@
       APPS[k] = sec;
       var o = open.get(k);
       if (o) {   /* same window, new content */
-        var wc = $(".wc", o.el); wc.replaceChildren(); [].slice.call(sec.cloneNode(true).childNodes).forEach(function (n) { if (!(n.classList && n.classList.contains("nojs-h"))) wc.appendChild(n); });
+        var wc = $(".wc", o.el);
+        if (sec.dataset.module) { if (MODS[k] && MODS[k].unmount) { try { MODS[k].unmount(wc); } catch (e) {} } mount(k, o.el); }   /* module: unmount (it keeps unsent text), mount again on the new section */
+        else { wc.replaceChildren(); [].slice.call(sec.cloneNode(true).childNodes).forEach(function (n) { if (!(n.classList && n.classList.contains("nojs-h"))) wc.appendChild(n); }); }
         $(".tt", o.el).textContent = title(k); $("span", o.btn).textContent = title(k); o.el.setAttribute("aria-label", title(k));
         document.dispatchEvent(new CustomEvent("nwebos:content", { detail: o.el }));
         restore(k); focus(k, !opt.noPush);
       } else openWin(k, opt);
       return k;
-    }).catch(function () { delete pending[key]; location.href = u.href; return null; }));
+    }).catch(function () { delete pending[key]; if (!opt.restore) location.href = u.href; return null; }));
   }
 
   /* ---------- windows ---------- */
@@ -366,7 +368,7 @@
   var firstVisit = !store.get("booted");
   // restore the saved windows quietly (no sound, no animation), the deep-linked app goes on top
   var restoring = [];
-  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { var o = { quiet: true, noPush: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
+  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { if (w.k === "blog-edit") return; var o = { quiet: true, noPush: true, restore: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
   if (deep) openWin(deep, { noPush: true, quiet: open.has(deep) });
   /* windows restored from their address arrive later: the deep-linked window stays on top */
   if (deep && restoring.length) Promise.all(restoring).then(function () { if (open.has(deep)) { focus(deep, false); open.get(deep).el.focus({ preventScroll: true }); } });

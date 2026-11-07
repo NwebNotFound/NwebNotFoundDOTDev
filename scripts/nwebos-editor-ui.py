@@ -115,7 +115,46 @@ with sync_playwright() as p:
     # list tab
     win.locator('[data-ep="l"]').click()
     assert win.locator("[data-rows] tr", has_text="Editor im Fenster").locator(".pill").inner_text() == "Veröffentlicht"
+    other = win.locator("[data-rows] [data-edit]:not([data-edit='%s'])" % pid).first.get_attribute("data-edit")
+
+    # Gatekeeper #119 (2): a failed save keeps the post open; Bearbeiten and + Neuer Beitrag wait for it
+    win.locator('[data-ep="w"]').click()
+    pg.route("**/api/blog/admin/posts/%s" % pid, lambda r: r.abort() if r.request.method == "PUT" else r.fallback())
+    win.locator("[name=body]").fill("## Erster Teil\n\nOffline geschrieben.")
+    pg.wait_for_function("() => /offline/.test(document.querySelector('[data-as]').textContent)", timeout=10000)
+    win.locator('[data-ep="l"]').click(); win.locator("[data-rows] [data-edit='%s']" % other).click()
+    pg.wait_for_function("() => /Erst speichern/.test(document.querySelector('[data-as]').textContent)", timeout=10000)
+    assert urlsplit(pg.url).path.endswith(pid), "still on the unsaved post"
+    win.locator("[data-new]").click(); pg.wait_for_timeout(600)
+    assert urlsplit(pg.url).path.endswith(pid), "+ Neuer Beitrag waits for the unsaved text"
+    # (3) closing the window keeps the unsent text; the next open offers it back
+    win.locator(".wb.x").click()
+    pg.unroute("**/api/blog/admin/posts/%s" % pid)
+    pg.goto(f"https://{H}/blog/admin/{pid}", wait_until="load")
+    win = pg.locator('.win[aria-label="Blog-Editor"]'); win.locator("[data-draft]").wait_for(state="visible", timeout=10000)
+    win.locator("[data-draft-restore]").click()
+    # the draft was written on tab 1's old base (tab 2 saved since): restoring must not overwrite silently -> 409 banner
+    win.locator("[data-conflict]").wait_for(state="visible", timeout=10000)
+    assert win.locator("[name=body]").input_value().endswith("Offline geschrieben.")
+    win.locator("[data-keep]").click()
+    pg.wait_for_function("() => document.querySelector('[name=body]').value.includes('Offline geschrieben') && /Automatisch gespeichert/.test(document.querySelector('[data-as]').textContent)", timeout=10000)
+    assert win.locator("[data-draft]").is_hidden()
+    # (4) another post's address in the same window: the module mounts again (no JS placeholder, no dead editor)
+    pg.evaluate("(id) => { const a = document.createElement('a'); a.href = '/blog/admin/' + id; a.id = 'gotoB'; document.querySelector('#desk').appendChild(a); }", other)
+    pg.locator("#gotoB").dispatch_event("click")
+    pg.wait_for_function("(id) => location.pathname.endsWith(id) && document.querySelector('.win[aria-label=\"Blog-Editor\"] [name=body]') && !/braucht JavaScript/.test(document.querySelector('.win[aria-label=\"Blog-Editor\"] .wc').textContent)", arg=other, timeout=10000)
+    pg.locator('.win[aria-label="Blog-Editor"] [name=body]').wait_for(state="visible", timeout=10000)
+    assert pg.locator('.win[aria-label="Blog-Editor"]').count() == 1 and "/" + other in urlsplit(pg.url).path
     c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS editor: failed save blocks Bearbeiten/Neu, unsent text survives the close, another post's address remounts the editor")
+
+    # (1) signed out with a saved editor window: the desktop stays, no trip to the Discord login
+    c = ctx_for(br, 1280); pg = c.new_page()
+    pg.add_init_script("localStorage.setItem('nwebos.wins', JSON.stringify([{k:'blog-edit',p:'/blog/admin/%s',x:100,y:40,w:900,h:560,z:5}]))" % pid)
+    pg.goto(f"https://{H}/", wait_until="load"); pg.wait_for_timeout(1500)
+    assert urlsplit(pg.url).netloc == H and urlsplit(pg.url).path == "/" and pg.locator("#desk").is_visible() and pg.locator('.win[aria-label="Blog-Editor"]').count() == 0, pg.url
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS editor: a saved editor window is never restored (signed out: desktop, not the login)")
 
     # phone: full-screen window, Text/Vorschau switch
     c = ctx_for(br, 375, ADMIN); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
