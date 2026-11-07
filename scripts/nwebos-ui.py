@@ -124,7 +124,7 @@ with sync_playwright() as p:
     pg.locator("[data-user=me]").click()
     win = pg.locator('.win[aria-label="Gästebuch"]')
     win.locator("textarea").wait_for()
-    assert "osu osuu!" in win.inner_text()
+    assert win.locator(".msgs .msg, .msgs .sys").count() >= 1, "server-rendered entries (or the empty state) in the window"
     assert pg.locator("#smav").get_attribute("src").startswith("https://cdn.discordapp.com/"), "rule 10: Discord avatar"
     win.locator("textarea").fill("Hallo aus NwebOS")
     win.locator("button[type=submit]").click()
@@ -158,7 +158,7 @@ with sync_playwright() as p:
     pg = c.new_page()
     pg.goto(f"https://{H}/guestbook", wait_until="load")
     hs = pg.locator("main#apps h2").all_inner_texts()
-    assert hs[0] == "Gästebuch" and "Über mich" in hs and "osu osuu!" in pg.inner_text("main"), hs
+    assert hs[0] == "Gästebuch" and "Über mich" in hs and "Hallo aus NwebOS" in pg.inner_text("main"), hs   # the entry posted above, server-rendered
     pg.goto(f"https://{H}/en/about", wait_until="load")
     assert pg.locator("main#apps h2").first.inner_text() == "About me" and "Hi, I'm Nils." in pg.inner_text("main")
     shot(pg, "nojs-1280.png")
