@@ -230,3 +230,5 @@
 .tp .subb{margin:0 0 8px}
 @media (pointer:fine){.shx .ios{display:none}}
 @media (max-width:700px){.subb{position:relative}.subb::after{content:"";position:absolute;inset:-4px 0}}
+/* row 56: the quick-sheet account card is one link (profile v3 mockup) */
+.qs a.acct{display:flex;align-items:center;gap:12px;min-height:56px;color:var(--txt);text-decoration:none}.qs a.acct em{margin-left:auto;font-style:normal;font-size:22px;color:var(--mut2)}

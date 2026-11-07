@@ -395,13 +395,13 @@
   function quickSheet() {
     var en = lang === "en", useMe = me && store.get("user") !== "gast", n = night(), path = bare(location.pathname);
     var av = useMe && /^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV;
-    var acct = useMe ? '<div class="acct"><img alt="" src="' + escH(av) + '"><span><b>' + escH(me.name) + "</b><small>" + (en ? "signed in with Discord" : "über Discord angemeldet") + '</small></span><a class="xpbtn" href="' + (en ? "/en" : "") + '/profile" data-qprofile>' + (en ? "My profile" : "Mein Profil") + "</a></div>"
-      : '<div class="acct"><img alt="" src="' + escH(GUEST_AV) + '"><span><b>' + escH(L.guest) + "</b><small>" + (en ? "Sign in for guestbook and profile" : "Anmelden für Gästebuch und Profil") + '</small></span><a class="xpbtn discord" href="' + escH(L.login + encodeURIComponent(location.href)) + '">Discord</a></div>';
+    /* phone audit row 56 / profile v3: the whole account card is the link — "Mein Profil ›" or "Anmelden ›" */
+    var acct = useMe ? '<a class="acct" href="' + (en ? "/en" : "") + '/profile" data-qopen><img alt="" src="' + escH(av) + '"><span><b>' + (en ? "My profile" : "Mein Profil") + "</b><small>" + escH(me.name) + " · " + (en ? "games, badges, settings" : "Spiele, Abzeichen, Einstellungen") + "</small></span><em>›</em></a>"
+      : '<a class="acct" href="' + escH(L.login + encodeURIComponent(location.origin + (en ? "/en" : "") + "/profile")) + '"><img alt="" src="' + escH(GUEST_AV) + '"><span><b>' + (en ? "Sign in" : "Anmelden") + "</b><small>" + (en ? "with Discord · for profile and guestbook" : "mit Discord · für Profil und Gästebuch") + "</small></span><em>›</em></a>";
     var s = sheet({ cls: "qs", label: en ? "Quick menu" : "Schnellmenü", html: acct +
       '<div class="tiles"><button type="button" class="tile2" data-qtheme aria-pressed="' + n + '"><span>' + (n ? (en ? "Night" : "Nacht") : (en ? "Day" : "Tag")) + "<small>" + (en ? "Tap to switch" : "Tippen zum Wechseln") + '</small></span></button>' +
       '<button type="button" class="tile2" data-qsound aria-pressed="' + (!muted) + '"><span>' + (muted ? (en ? "Sound off" : "Ton aus") : (en ? "Sound on" : "Ton an")) + "<small>" + (en ? "Clicks and start jingle" : "Klicks und Start-Jingle") + "</small></span></button>" +
       '<div class="seg3"><span>' + (en ? "Language" : "Sprache") + '</span><a href="' + escH(path) + '" hreflang="de"' + (en ? "" : ' aria-current="true"') + '>Deutsch</a><a href="' + escH("/en" + (path === "/" ? "" : path)) + '" hreflang="en"' + (en ? ' aria-current="true"' : "") + ">English</a></div></div>" +
-      '<ul class="rows"><li><a href="' + (en ? "/en" : "") + '/profile" data-qopen data-qprofile-row>' + icon16("profile") + (en ? "My profile" : "Mein Profil") + "<em>›</em></a></li>" +   /* Planner 08.11.: a normal tap opens the profile */
       '<li><a href="' + (en ? "/en" : "") + '/changelog" data-qopen>'  + icon16("changelog") + (en ? "What's new" : "Neuigkeiten") + "<em>›</em></a></li>" +
       '<li><button type="button" data-qabout>' + icon16("about") + (en ? "About NwebOS" : "Über NwebOS") + "<em>›</em></button></li>" +
       '<li><a href="https://github.com/NwebNotFound" rel="noopener" target="_blank">' + icon16("portfolio") + "GitHub<em>↗</em></a></li></ul>" +

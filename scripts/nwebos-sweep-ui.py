@@ -83,13 +83,12 @@ with sync_playwright() as p:
     pg.keyboard.press("Escape"); pg.wait_for_timeout(150)
     assert pg.locator(".shx").count() == 0 and pg.locator(".shbd").count() == 0, "A2: Esc closes the sheet"
     assert pg.evaluate("document.activeElement && document.activeElement.hasAttribute('data-quick')"), "A2: focus returns to the opener"
-    # Planner 08.11.: "Mein Profil" is the first row; a normal tap opens the profile window
+    # row 56: the account card is the link; signed out it is "Anmelden" (Discord login back to the profile)
     qb.click(); qs.wait_for()
-    first = qs.locator(".rows li a").first
-    assert first.inner_text().startswith("Mein Profil"), first.inner_text()
-    first.click(); pg.locator('.win.focus[data-app="profile"], .win.focus #app-profile, .win.focus .pf').first.wait_for(timeout=10000)
-    assert urlsplit(pg.url).path == "/profile" and pg.locator(".shx").count() == 0, pg.url
-    print("PASS 375 A2 quick sheet: theme toggle, Esc, focus return, Mein Profil first and opens the profile")
+    card = qs.locator("a.acct")
+    assert card.inner_text().startswith("Anmelden") and card.get_attribute("href").startswith("/auth/discord/login?next=") and "profile" in card.get_attribute("href"), card.get_attribute("href")
+    pg.keyboard.press("Escape")
+    print("PASS 375 A2 quick sheet: theme toggle, Esc, focus return, account card = Anmelden link")
 
     # A3 trash: a danger sheet, cancel keeps the items
     open_win(pg, "/trash")
@@ -173,6 +172,12 @@ with sync_playwright() as p:
         assert pg.locator(".shx").count() == 0 and urlsplit(pg.url).path == "/profile", "A3: Behalten keeps the profile"
         me = pg.evaluate("fetch('/api/me').then(r => r.json())")
         assert me.get("user"), "still signed in after Behalten"
+        # row 56 signed in: a tap on the account card opens the profile window
+        open_win(pg, "/")
+        pg.locator("[data-quick]").click(); card = pg.locator(".shx.qs a.acct"); card.wait_for()
+        assert card.inner_text().startswith("Mein Profil"), card.inner_text()
+        card.click(); pg.locator(".win.focus .pf").first.wait_for(timeout=10000)
+        assert urlsplit(pg.url).path == "/profile" and pg.locator(".shx").count() == 0, pg.url
         # A2 signed in: the quick sheet shows the account and Abmelden opens the logout sheet (cancel)
         pg.locator("[data-quick]").click(); pg.locator(".shx.qs [data-qlogout]").click()
         lo = pg.locator(".shx.ask"); lo.wait_for()
