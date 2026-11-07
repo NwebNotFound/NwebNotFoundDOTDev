@@ -344,8 +344,8 @@ try {
   console.log("6d) Feedback");
   const fb = (body, o = {}) => req("/api/feedback", { method: "POST", body, cookie: c1, origin: O, ...o });
   const good = { category: "bug", text: "Beschreibung mit genug Text c0de", location: "Spawn", token: "XXXX.DUMMY.TOKEN.XXXX" };
-  for (const h of [HOST, "nwebnotfound.dev"]) { const pg = await req("/feedback", { testHost: h }); ok(pg.s === 200 && pg.t.includes("/api/feedback") && pg.t.includes("challenges.cloudflare.com/turnstile") && /\/bundle\/mc\.css\?v=/.test(pg.t), "GET /feedback auf " + h + " → 200 (MC-Design)", pg.s); }
-  ok((await req("/feedback", { testHost: "nwebnotfound.dev" })).t.includes('href="https://mc.nwebnotfound.dev/markt"'), "Hauptdomain: MC-Navigation absolut");
+  for (const h of [HOST]) { const pg = await req("/feedback", { testHost: h }); ok(pg.s === 200 && pg.t.includes("/api/feedback") && pg.t.includes("challenges.cloudflare.com/turnstile") && /\/bundle\/mc\.css\?v=/.test(pg.t), "GET /feedback auf " + h + " → 200 (MC-Design)", pg.s); }
+  { const r = await req("/feedback", { testHost: "nwebnotfound.dev" }); ok(r.s === 301 && r.h.get("location") === "https://mc.nwebnotfound.dev/feedback", "Hauptdomain: /feedback → 301 auf mc.nwebnotfound.dev/feedback", r.s + " " + r.h.get("location")); }
   // Login-Gate
   ok((await req("/api/feedback")).j.logged_in === false, "Login-Gate: GET ohne Login → logged_in false (Seite zeigt Login-Button)");
   ok((await req("/feedback")).t.includes("/auth/discord/login"), "Seite enthält Discord-Login-Button");
@@ -1024,9 +1024,11 @@ try {
       const ck = await cookieFor("slo"), has = () => sqlRows("SELECT id FROM sessions WHERE id = 'slo'").length === 1, NX = "?next=" + encodeURIComponent("https://mc.nwebnotfound.dev/vip");
       const g = await req("/auth/discord/logout" + NX, { cookie: ck, testHost: "nwebnotfound.dev" });
       ok(g.s === 200 && /<form method="post" action="\/auth\/discord\/logout\?next=/.test(g.t) && has(), "GET-Logout meldet nicht ab, zeigt POST-Formular", g.s);
+      ok(!g.t.includes("{{"), "Logout-Seite ohne unersetzte {{…}}-Marker");
       const ev = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://evil.example", testHost: "nwebnotfound.dev" });
       const no = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, testHost: "nwebnotfound.dev" });
       ok(ev.s === 403 && no.s === 403 && has(), "POST-Logout mit fremder/ohne Origin → 403, Session bleibt", ev.s + "/" + no.s);
+      ok(!ev.t.includes("{{"), "Abmelden-fehlgeschlagen-Seite ohne {{…}}-Marker");
       const po = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://mc.nwebnotfound.dev", testHost: "nwebnotfound.dev" });
       ok(po.s === 303 && /^(https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+)\/vip$/.test(po.h.get("location") || "") && /nnf_session=;.*Max-Age=0/.test(po.h.get("set-cookie") || "") && !has(), "POST-Logout von mc. → 303, Cookie gelöscht, Session weg", po.s + " " + po.h.get("location"));
       // The shared nav (#73) carries the handler in its external script (CSP: no inline handler).
