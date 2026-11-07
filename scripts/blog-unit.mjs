@@ -15,6 +15,8 @@ assert.deepEqual(cleanPost({ tags: ["Redstone", "redstone ", "Server  Bau"] }).p
 assert.ok(cleanPost({ tags: ['a"b'] }).error, "quotes in tags rejected");
 assert.ok(cleanPost({ tags: new Array(9).fill("x") }).error, "max 8 tags");
 assert.ok(cleanPost({ slug: "Bad Slug" }).error && cleanPost({ slug: "-x" }).error && !cleanPost({ slug: "gut-1" }).error);
+assert.match(cleanPost({ slug: "admin" }).error, /reserved/, "editor route can't be a slug (Gatekeeper #106)");
+assert.equal(publishProblem({ title_de: "T", body_de: "b", slug: "admin", category: "bauen" }), "slug invalid");
 assert.ok(cleanPost({ category: "spam" }).error && !cleanPost({ category: "musik" }).error);
 assert.ok(cleanPost({ title_de: "x".repeat(141) }).error && cleanPost({ body_de: 5 }).error && cleanPost([]).error);
 assert.deepEqual(Object.keys(cleanPost({ title_de: "T", evil: 1, status: "published", preview_token: "x" }).post), ["title_de"], "unknown fields are dropped");
@@ -74,6 +76,11 @@ if (sqlite) {
   assert.equal((await call("POST", "/api/blog/admin/posts", { u: "a", body: "title_de=x", ct: "application/x-www-form-urlencoded" })).s, 415, "form posts rejected");
   assert.equal((await page("/blog/admin", "a")).s, 200);
 
+  // Reserved slugs: explicit "admin" refused, a post titled "Admin" gets admin-1, /blog/admin stays the editor.
+  assert.equal((await call("POST", "/api/blog/admin/posts", { u: "a", body: { title_de: "x", slug: "admin" } })).s, 400);
+  const adm = await call("POST", "/api/blog/admin/posts", { u: "a", body: { title_de: "Admin" } });
+  assert.equal(adm.j.slug, "admin-1");
+  assert.equal((await call("PUT", `/api/blog/admin/posts/${adm.j.id}`, { u: "a", body: { base: adm.j.updated_at, slug: "admin" } })).s, 400);
   // Create a draft, autosave, conflict from a stale tab.
   const c = await call("POST", "/api/blog/admin/posts", { u: "a", body: { title_de: "Mein Haus <b>", category: "bauen", tags: ["holz"] } });
   assert.equal(c.s, 201); assert.equal(c.j.slug, "mein-haus-b");

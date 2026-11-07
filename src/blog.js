@@ -17,6 +17,9 @@ export const CATEGORIES = ["bauen", "server", "musik", "notizen"];
 export const STATUSES = ["draft", "published", "withdrawn"];
 export const LIMITS = { slug: 80, title: 140, summary: 400, body: 100_000, tags: 8, tag: 32, query: 60, request: 300_000 };
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
+// Slugs that are routes of their own under /blog/ (editor, feed); a post may never take them.
+export const RESERVED_SLUGS = ["admin", "feed", "feed-xml", "rss"];
+const slugOk = (x) => SLUG.test(x) && !RESERVED_SLUGS.includes(x);
 const ID = /^[0-9a-f-]{36}$/;
 const TOKEN = /^[A-Za-z0-9_-]{20,64}$/;
 const CAT_LABEL = { bauen: "Bauen", server: "Server", musik: "Musik", notizen: "Notizen" };
@@ -50,6 +53,7 @@ export function cleanPost(b) {
   if ("slug" in b) {
     const s = String(b.slug ?? "").trim().toLowerCase();
     if (!SLUG.test(s)) return { error: "slug: a-z, 0-9 and -, 1-80 characters" };
+    if (RESERVED_SLUGS.includes(s)) return { error: `slug: "${s}" is reserved` };
     out.slug = s;
   }
   if ("category" in b) {
@@ -73,7 +77,7 @@ export function cleanPost(b) {
 export function publishProblem(p) {
   if (!p.title_de) return "title_de missing";
   if (!p.body_de || !p.body_de.trim()) return "body_de missing";
-  if (!SLUG.test(p.slug || "")) return "slug invalid";
+  if (!slugOk(p.slug || "")) return "slug invalid";
   if (!CATEGORIES.includes(p.category)) return "category invalid";
   return null;
 }
@@ -174,6 +178,7 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
     const p = c.post;
     const title = p.title_de || "";
     let slug = p.slug || slugify(title) || "entwurf-" + now().toString(36);
+    if (RESERVED_SLUGS.includes(slug)) slug = (slug + "-1").slice(0, LIMITS.slug);   // a post titled "Admin" gets admin-1
     const id = crypto.randomUUID(), t = now(), token = rand(24);
     try {
       await env.DB.prepare("INSERT INTO blog_posts (id, slug, status, category, tags, title_de, summary_de, body_de, title_en, summary_en, body_en, preview_token, author_id, created_at, updated_at) VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")

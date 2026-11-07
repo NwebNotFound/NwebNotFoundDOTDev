@@ -120,7 +120,7 @@
           else if (r.s === 409) { base = null; say("Konflikt: Der Beitrag wurde woanders geändert. Seite neu laden, Status nicht geändert."); }
           else say("Status nicht geändert: " + (r.j.error || r.s));
         });
-      }, done);
+      }).catch(function () { say("Status nicht geändert (offline?)"); }).then(done, done);   // buttons never stay disabled
     });
   });
   $("[data-rotate]").addEventListener("click", function () {

@@ -71,6 +71,13 @@ with sync_playwright() as p:
     assert "Letzter Satz kurz vor dem Klick." in pub.inner_text("main"), "publish raced the pending save"
     pub.goto(f"https://{H}/blog?q=test", wait_until="load")
     assert pub.locator('a[href="/blog/ui-testbeitrag"]').count() == 1, "search by tag finds it"
+    # A status request that fails on the network: message shown, buttons usable again (Gatekeeper #106).
+    pg.route("**/status", lambda r: r.abort())
+    pg.get_by_role("button", name="Zurückziehen").click()
+    pg.wait_for_function("() => document.querySelector('[data-blog-state]').textContent.includes('offline')", timeout=10000)
+    assert pg.evaluate("[...document.querySelectorAll('[data-set-status]')].every(b => !b.disabled)"), "status buttons stuck disabled"
+    assert pg.locator("[data-blog-status]").inner_text() == "published"
+    pg.unroute("**/status")
     # Withdraw again so later checks see an unchanged blog.
     pg.get_by_role("button", name="Zurückziehen").click()
     pg.wait_for_function("() => document.querySelector('[data-blog-status]').textContent === 'withdrawn'", timeout=10000)
