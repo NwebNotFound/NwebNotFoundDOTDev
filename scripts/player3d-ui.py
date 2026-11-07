@@ -71,7 +71,7 @@ with sync_playwright() as p:
             assert 5 <= on <= 40, f"visible viewer draws {on}/s, expected live and capped at 30 fps"
             # Off-screen: the viewer stops drawing.
             page.evaluate("document.body.insertAdjacentHTML('beforeend','<div style=\"height:4000px\"></div>');scrollTo(0,document.body.scrollHeight)")
-            page.wait_for_function("document.querySelector('.pf-hd .m3d').getBoundingClientRect().bottom<0")
+            page.wait_for_function("() => document.querySelector('.pf-hd .m3d').getBoundingClientRect().bottom < 0")
             page.wait_for_timeout(300); page.evaluate("__draws=0"); page.wait_for_timeout(1000)
             off = page.evaluate("__draws")
             assert off == 0, f"off-screen viewer still draws {off}/s"

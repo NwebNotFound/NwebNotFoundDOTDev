@@ -76,12 +76,12 @@ with sync_playwright() as p:
                 if surface == "guest":
                     page.locator("#m").fill("A mock challenge submission")
                     page.locator("#f button:not([type=button])").click()
-                    page.wait_for_function("document.querySelector('#st').textContent==='Danke!'")
+                    page.wait_for_function("() => document.querySelector('#st').textContent === 'Danke!'")
                     assert submissions == [{"message": "A mock challenge submission", "token": TOKEN}]
                 else:
                     page.locator("#bba").fill("3")
                     page.locator("#bbb").click()
-                    page.wait_for_function("document.querySelector('#bbm').textContent.includes('Kauf gesendet')")
+                    page.wait_for_function("() => document.querySelector('#bbm').textContent.includes('Kauf gesendet')")
                     assert len(submissions) == 1
                     body = submissions[0]
                     assert body["turnstile"] == TOKEN and body["type"] == "bank_buy" and body["item"] == "diamond" and body["amount"] == 3
