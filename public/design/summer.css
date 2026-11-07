@@ -2351,8 +2351,8 @@
 }
 
 /* Off-screen hero (summer-parallax.js): decorative loops pause, scroll-driven layers keep going. */
-[data-sm-parallax].is-off *:not(.sm-parallax),
-[data-sm-parallax].is-off *::after {
+.sm-scene[data-sm-parallax].is-off *:not(.sm-parallax),
+.sm-scene[data-sm-parallax].is-off *::after {
   animation-play-state: paused;
 }
 
