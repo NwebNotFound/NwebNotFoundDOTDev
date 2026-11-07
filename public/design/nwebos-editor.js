@@ -23,15 +23,15 @@
     return '<div class="ed"><div class="edtop"><nav class="tabs" aria-label="Editor"><button type="button" data-ep="w" class="on">Schreiben</button><button type="button" data-ep="l">Beiträge <em data-count>0</em></button></nav><span class="sp"></span>' +
       '<span class="as" data-as aria-live="polite"></span><button type="button" class="xpbtn" data-plink disabled>Vorschau-Link</button><button type="button" class="xpbtn go" data-publish disabled>Veröffentlichen</button></div>' +
       '<p class="conflict" data-draft hidden>Ungespeicherter Text vom <b data-draft-at></b> ist noch da. <button type="button" class="lnk" data-draft-restore>Wiederherstellen</button> oder <button type="button" class="lnk" data-draft-drop>verwerfen</button>.</p><p class="conflict" data-conflict hidden>In einem anderen Tab wurde dieser Beitrag geändert. <button type="button" class="lnk" data-reload>Neu laden</button> oder <button type="button" class="lnk" data-keep>meine Fassung behalten</button>.</p>' +
-      '<section class="edw" data-panel-ed="w"><p class="hint" data-empty>Wähle unter „Beiträge“ einen Beitrag oder lege einen neuen an.</p><div data-form hidden><div class="meta"><input class="ttl" name="title" aria-label="Titel" maxlength="140" placeholder="Titel">' +
+      '<section class="edw" data-panel-ed="w"><p class="hint" data-empty>Wähle unter „Beiträge“ einen Beitrag oder lege einen neuen an.</p><div data-form data-view="md" hidden><div class="meta"><input class="ttl" name="title" aria-label="Titel" maxlength="140" placeholder="Titel">' +
       '<label>Adresse <span class="slug">/blog/<input name="slug" aria-label="Slug" maxlength="80"></span></label><label>Kategorie <select name="category" aria-label="Kategorie">' + CATS.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + "</option>"; }).join("") + "</select></label>" +
       '<span class="tagsin" data-tags><input placeholder="Tag + Enter" aria-label="Tag hinzufügen" maxlength="30" data-tagin></span><span class="seg" role="group" aria-label="Sprache"><button type="button" class="on" data-lang="de" aria-pressed="true">DE</button><button type="button" data-lang="en" aria-pressed="false">EN <small>optional</small></button></span><span class="pill" data-pill></span>' +
-      '<label class="sum">Kurzbeschreibung <input name="summary" maxlength="300" aria-label="Kurzbeschreibung"></label></div>' +
+      '<button type="button" class="xpbtn mplink" data-plink disabled>Vorschau-Link kopieren</button><label class="sum">Kurzbeschreibung <input name="summary" maxlength="300" aria-label="Kurzbeschreibung"></label></div>' +
       '<div class="tool" role="toolbar" aria-label="Formatieren">' + TOOLS.map(function (t, i) { return '<button type="button" data-md-ins="' + i + '" title="' + esc(t[1]) + '">' + t[2] + "</button>"; }).join("") +
-      '<span class="sp"></span><span class="segm" role="group" aria-label="Ansicht"><button type="button" class="on" data-edv="md">Text</button><button type="button" data-edv="pv">Vorschau</button></span></div>' +
+      '<span class="sp"></span><span class="segm" role="group" aria-label="Ansicht"><button type="button" class="on" data-edv="md">Text</button><button type="button" data-edv="pv">Vorschau</button><button type="button" data-edv="meta">Details</button></span></div>' +
       '<div class="split" data-edview="md"><textarea class="md" name="body" aria-label="Markdown" spellcheck="true"></textarea><div class="pv post" data-pv aria-label="Vorschau"></div></div>' +
-      '<div class="edbar" role="group" aria-label="Status und Veröffentlichen"><span class="pill" data-pill></span><button type="button" class="xpbtn" data-plink disabled>Vorschau-Link</button><button type="button" class="xpbtn go" data-publish disabled>Veröffentlichen</button></div><p class="edfoot"><span data-wc></span><span>Markdown · Bilder nur aus /content-assets/ · Strg+S speichert sofort<button type="button" class="lnk" data-status="draft" hidden> · Zurück zu Entwurf</button><button type="button" class="lnk" data-status="withdrawn" hidden> · Zurückziehen</button><button type="button" class="lnk" data-rotate> · Neuer Vorschau-Link</button></span></p></div></section>' +
-      '<section class="edl" data-panel-ed="l" hidden><p class="btns"><button type="button" class="xpbtn go" data-new>+ Neuer Beitrag</button></p><table class="xtbl"><thead><tr><th>Titel</th><th>Status</th><th>Kategorie</th><th>Geändert</th><th></th></tr></thead><tbody data-rows></tbody></table>' +
+      '<div class="edbar" role="group" aria-label="Status und Veröffentlichen"><span class="pill" data-pill></span><button type="button" class="xpbtn" data-savenow>Entwurf speichern</button><button type="button" class="xpbtn go" data-publish disabled>Veröffentlichen</button></div><p class="edfoot"><span data-wc></span><span>Markdown · Bilder nur aus /content-assets/ · Strg+S speichert sofort<button type="button" class="lnk" data-status="draft" hidden> · Zurück zu Entwurf</button><button type="button" class="lnk" data-status="withdrawn" hidden> · Zurückziehen</button><button type="button" class="lnk" data-rotate> · Neuer Vorschau-Link</button></span></p></div></section>' +
+      '<section class="edl" data-panel-ed="l" hidden><p class="btns"><button type="button" class="xpbtn go" data-new>+ Neuer Beitrag</button></p><nav class="seg lfil" aria-label="Filter">' + [["", "Alle"], ["draft", "Entwürfe"], ["published", "Veröffentlicht"], ["withdrawn", "Zurückgezogen"]].map(function (f, i) { return '<button type="button" data-lf="' + f[0] + '"' + (i ? '' : ' class="on"') + ' aria-pressed="' + (i ? 'false' : 'true') + '">' + f[1] + ' <em data-lc="' + f[0] + '">0</em></button>'; }).join("") + '</nav><label class="bsearch lsearch"><input type="search" data-ls placeholder="Titel oder Tag …" aria-label="Beiträge nach Titel oder Tag suchen"></label><table class="xtbl"><thead><tr><th>Titel</th><th>Status</th><th>Kategorie</th><th>Geändert</th><th></th></tr></thead><tbody data-rows></tbody></table>' +
       '<p class="hint">Nur für dich sichtbar (Admin). Entwürfe sieht sonst nur, wer den Vorschau-Link hat.</p></section></div>';
   }
 
@@ -132,15 +132,21 @@
       return call("GET", "/posts").then(function (r) {
         if (!alive()) return;
         if (r.s !== 200) { say("Fehler: " + (r.j.error || r.s)); return; }
-        $("[data-count]").textContent = r.j.posts.length;
-        var tb = $("[data-rows]"); tb.replaceChildren();
-        r.j.posts.forEach(function (p) {
+        st.posts = r.j.posts; $("[data-count]").textContent = r.j.posts.length; drawRows();
+      });
+    }
+    /* Beiträge: filter by status, search title or tag, per row the status action that applies (feat-blog-editor) */
+    function drawRows() {
+      var on = $(".lfil .on"), f = on ? on.dataset.lf : "", q = ($("[data-ls]").value || "").trim().toLowerCase(), posts = st.posts || [];
+      $$("[data-lc]").forEach(function (e) { var k = e.dataset.lc; e.textContent = posts.filter(function (p) { return !k || p.status === k; }).length; });
+      var tb = $("[data-rows]"); tb.replaceChildren();
+      posts.filter(function (p) { return (!f || p.status === f) && (!q || ((p.title_de || "") + " " + (p.tags || []).join(" ") + " " + p.slug).toLowerCase().indexOf(q) >= 0); }).forEach(function (p) {
           var x = ST[p.status] || ST.draft, tr = document.createElement("tr");
-          tr.innerHTML = "<td><b></b></td><td><span class=\"pill " + x[0] + "\">" + x[1] + "</span></td><td>" + esc((CATS.filter(function (c) { return c[0] === p.category; })[0] || [0, p.category])[1]) + "</td><td>" + esc(when(p.updated_at)) + '</td><td><button type="button" class="lnk" data-edit="' + esc(p.id) + '">Bearbeiten</button></td>';
+          tr.innerHTML = "<td><b></b></td><td><span class=\"pill " + x[0] + "\">" + x[1] + "</span></td><td>" + esc((CATS.filter(function (c) { return c[0] === p.category; })[0] || [0, p.category])[1]) + "</td><td>" + esc(when(p.updated_at)) + '</td><td class="acts"><button type="button" class="xpbtn" data-edit="' + esc(p.id) + '">Bearbeiten</button>' + (p.status === "published" ? '<button type="button" class="xpbtn" data-row-status="withdrawn" data-id="' + esc(p.id) + '" data-base="' + esc(p.updated_at) + '">Zurückziehen</button>' : p.status === "withdrawn" ? '<button type="button" class="xpbtn" data-row-status="published" data-id="' + esc(p.id) + '" data-base="' + esc(p.updated_at) + '">Veröffentlichen</button>' : "") + '</td>';
           tr.querySelector("b").textContent = p.title_de || "(ohne Titel)";
           tb.appendChild(tr);
         });
-      });
+      if (!tb.children.length) { var e = document.createElement("tr"); e.innerHTML = '<td colspan="5" class="hint">Keine passenden Beiträge.</td>'; tb.appendChild(e); }
     }
     function setStatus(status) {
       var btns = $$("[data-publish], [data-status]"); btns.forEach(function (b) { b.disabled = true; });
@@ -157,6 +163,18 @@
 
     el.addEventListener("click", function (e) {
       var b = e.target.closest("button"); if (!b || !el.contains(b)) return;
+      if (b.dataset.lf != null) { $$(".lfil button").forEach(function (x) { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); drawRows(); return; }
+      if (b.dataset.rowStatus) {   // the open post goes through setStatus (flush + base); another one uses its list base
+        if (b.dataset.id === st.id) { setStatus(b.dataset.rowStatus); return; }
+        b.disabled = true;
+        call("POST", "/posts/" + b.dataset.id + "/status", { status: b.dataset.rowStatus, base: +b.dataset.base }).then(function (r) {
+          b.disabled = false;
+          if (r.s === 200) { say("Status: " + (ST[r.j.status] || ST.draft)[1]); list(); }
+          else { say(r.s === 409 ? "Status nicht geändert: der Beitrag wurde inzwischen geändert, Liste neu geladen." : "Status nicht geändert – nochmal versuchen."); if (r.s === 409) list(); }
+        }, function () { b.disabled = false; say("Status nicht geändert (offline?)"); });
+        return;
+      }
+      if (b.hasAttribute("data-savenow")) { flush().then(function (ok) { say(ok ? "✓ Gespeichert · " + hm(new Date()) : "Nicht gespeichert (Konflikt oder offline)"); }); return; }
       if (b.dataset.ep) { pane(b.dataset.ep); if (b.dataset.ep === "l") list(); return; }
       if (b.dataset.edit) { if (b.dataset.edit === st.id) { pane("w"); return; } leave().then(function (ok) { if (ok) load(b.dataset.edit); }); return; }
       if (b.hasAttribute("data-new")) {
@@ -170,7 +188,7 @@
         var ta = field("body"), ins = TOOLS[+b.dataset.mdIns][0], s0 = ta.selectionStart, s1 = ta.selectionEnd;
         ta.setRangeText(ins, s0, s1, "end"); ta.focus(); wc(); changed(); preview(); return;
       }
-      if (b.dataset.edv) { $$("[data-edv]").forEach(function (x) { x.classList.toggle("on", x === b); }); $("[data-edview]").dataset.edview = b.dataset.edv; return; }
+      if (b.dataset.edv) { $$("[data-edv]").forEach(function (x) { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); $("[data-form]").dataset.view = b.dataset.edv; $("[data-edview]").dataset.edview = b.dataset.edv === "pv" ? "pv" : "md"; return; }
       if (b.hasAttribute("data-plink")) {
         var url = location.origin + "/blog/" + encodeURIComponent(st.post.slug) + "?preview=" + encodeURIComponent(st.post.preview_token || "");
         if (navigator.clipboard) navigator.clipboard.writeText(url).catch(function () {});
@@ -194,6 +212,7 @@
       }
     });
     el.addEventListener("input", function (e) {
+      if (e.target.matches("[data-ls]")) { drawRows(); return; }
       if (e.target.matches("[data-tagin]")) return;
       if (e.target.name === "body") { wc(); preview(); }
       if (e.target.name) changed();

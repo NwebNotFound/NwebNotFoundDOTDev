@@ -126,6 +126,18 @@ with sync_playwright() as p:
     win.locator('[data-ep="l"]').click()
     assert win.locator("[data-rows] tr", has_text="Editor im Fenster").locator(".pill").inner_text() == "Veröffentlicht"
     other = win.locator("[data-rows] [data-edit]:not([data-edit='%s'])" % pid).first.get_attribute("data-edit")
+    # list (feat-blog-editor): status filter with counts, title/tag search, Zurückziehen on a published row
+    pg.goto(f"https://{H}/blog/admin/{pid}", wait_until="load")   # fresh base (tab 2 saved meanwhile)
+    win = pg.locator('.win[aria-label="Blog-Editor"]'); win.locator("[name=body]").wait_for(state="visible"); win.locator('[data-ep="l"]').click()
+    win.locator('.lfil [data-lf="published"]').click()
+    assert all(x.inner_text() == "Veröffentlicht" for x in win.locator("[data-rows] .pill").all()) and int(win.locator('[data-lc="published"]').inner_text()) >= 1
+    win.locator("[data-ls]").fill("nwebos")   # the tag of this test's post
+    assert win.locator("[data-rows] tr", has_text="Editor im Fenster").count() == 1 and win.locator("[data-rows] tr").count() == 1
+    win.locator("[data-rows] tr", has_text="Editor im Fenster").locator('[data-row-status="withdrawn"]').click()
+    pg.wait_for_function("() => /Zurückgezogen/.test(document.querySelector('[data-pill]').textContent)", timeout=10000)
+    win.locator('[data-ep="l"]').click(); win.locator("[data-ls]").fill(""); win.locator('.lfil [data-lf=""]').click()
+    win.locator("[data-rows] tr", has_text="Editor im Fenster").locator('[data-row-status="published"]').click()
+    pg.wait_for_function("() => /Veröffentlicht/.test(document.querySelector('[data-pill]').textContent)", timeout=10000)
     # a failed create says so readably and the button stays usable (Design QA #119 1b)
     pg.route("**/api/blog/admin/posts", lambda r: r.fulfill(status=500, body='{"error":"x"}') if r.request.method == "POST" else r.fallback())
     win.locator("[data-new]").click()
@@ -149,10 +161,11 @@ with sync_playwright() as p:
     pg.goto(f"https://{H}/blog/admin/{pid}", wait_until="load")
     win = pg.locator('.win[aria-label="Blog-Editor"]'); win.locator("[data-draft]").wait_for(state="visible", timeout=10000)
     win.locator("[data-draft-restore]").click()
-    # the draft was written on tab 1's old base (tab 2 saved since): restoring must not overwrite silently -> 409 banner
-    win.locator("[data-conflict]").wait_for(state="visible", timeout=10000)
+    # the draft saves on the base it was written on: unchanged post -> saved; changed meanwhile -> 409 banner, keep on purpose
     assert win.locator("[name=body]").input_value().endswith("Offline geschrieben.")
-    win.locator("[data-keep]").click()
+    pg.wait_for_function("() => !document.querySelector('[data-conflict]').hidden || /Automatisch gespeichert/.test(document.querySelector('[data-as]').textContent)", timeout=10000)
+    if win.locator("[data-conflict]").is_visible():
+        win.locator("[data-keep]").click()
     pg.wait_for_function("() => document.querySelector('[name=body]').value.includes('Offline geschrieben') && /Automatisch gespeichert/.test(document.querySelector('[data-as]').textContent)", timeout=10000)
     assert win.locator("[data-draft]").is_hidden()
     # (4) another post's address in the same window: the module mounts again (no JS placeholder, no dead editor)
@@ -184,12 +197,18 @@ with sync_playwright() as p:
             assert bar.is_visible() and bar.locator("[data-publish]").is_visible() and win.locator(".edtop [data-publish]").is_hidden(), "actions in the bottom bar"
             wb = pg.locator(".win.focus").bounding_box(); bb = bar.bounding_box()
             assert abs((bb["y"] + bb["height"]) - (wb["y"] + wb["height"])) <= 8, ("bar sits at the bottom of the window", bb, wb)
-            for sel in ("[name=title]", "[name=slug]", "[name=category]", "[name=summary]"):
-                fb = win.locator(sel).bounding_box(); assert fb["height"] >= 40 and fb["width"] >= width * 0.5, (sel, fb)
-            tw = win.locator("[name=title]").bounding_box()["width"]; assert tw >= width - 40, ("title full width", tw)
-            assert win.locator(".meta .seg [data-lang]").count() == 2
+            # Schreiben: title + text; the bar offers Entwurf speichern + Veröffentlichen (feat-blog-editor phone)
+            tw = win.locator("[name=title]").bounding_box(); assert tw["height"] >= 40 and tw["width"] >= width - 40, ("title full width", tw)
+            assert win.locator("[name=category]").is_hidden() and bar.locator("[data-savenow]").is_visible()
             name = f"editor-{'night' if night else 'day'}-{width}"
             shot(pg, name + ".png")
+            # Details: address, category, tags, language, summary, preview link
+            win.locator('[data-edv="meta"]').click()
+            for sel in ("[name=slug]", "[name=category]", "[name=summary]"):
+                fb = win.locator(sel).bounding_box(); assert fb["height"] >= 40 and fb["width"] >= width * 0.5, (sel, fb)
+            assert win.locator(".meta .seg [data-lang]").count() == 2 and win.locator(".mplink").is_visible() and win.locator("[name=body]").is_hidden() and win.locator("[name=title]").is_hidden()
+            assert pg.evaluate("document.documentElement.scrollWidth") <= width
+            shot(pg, name + "-details.png")
             win.locator('[data-edv="pv"]').click()
             assert win.locator("[data-pv]").is_visible() and win.locator("[name=body]").is_hidden(), "phone: preview instead of text"
             shot(pg, name + "-preview.png")
