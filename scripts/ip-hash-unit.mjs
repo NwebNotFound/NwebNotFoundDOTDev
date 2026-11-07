@@ -81,7 +81,7 @@ assert.equal((await trade.route("/api/mc-bid", mkReq("/api/mc-bid", { auction_id
 assert.equal((await trade.route("/api/mc-shop-order", mkReq("/api/mc-shop-order", { listing_id: "L1", qty: 2 }), envA, new URL("http://x/api/mc-shop-order"))).status, 202, "Order akzeptiert");
 assert.equal((await vip.route("/api/mc-vip/worlds/" + U1 + "/members", mkReq("/api/mc-vip/worlds/" + U1 + "/members", { name: "Friend1" }), envA, new URL("http://x/api/mc-vip/worlds/" + U1 + "/members"))).status, 202, "VIP-invite akzeptiert");
 
-const inserts = a.calls.filter((c) => /INSERT INTO (mc_bids_pending|mc_shop_orders_pending|mc_vip_commands)/.test(c.sql));
+const inserts = a.calls.filter((c) => /INSERT (OR IGNORE )?INTO (mc_bids_pending|mc_shop_orders_pending|mc_vip_commands)/.test(c.sql));
 assert.ok(inserts.length >= 3, "drei INSERTs erfasst (bid/order/vip): " + inserts.length);
 for (const c of inserts) {
   assert.ok(!c.params.includes(IP), "Klartext-IP darf nicht als Parameter gebunden werden: " + c.sql);

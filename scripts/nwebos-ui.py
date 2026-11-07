@@ -3,6 +3,7 @@
 Boot only on the first desktop visit, login, desktop, windows on real paths with Back/Forward, windows
 restored from localStorage, Esc, phone home screen, no-JS reading, guestbook with Discord session and a
 mocked Turnstile widget. Args: BASE COOKIE(name=value, a signed-in session) [SHOTS_DIR]."""
+import json
 import os
 import sys
 from urllib.parse import unquote, urlsplit
@@ -19,7 +20,7 @@ def ctx_for(br, width, cookie=False, js=True):
     c = br.new_context(viewport={"width": width, "height": 800 if width > 700 else 760}, java_script_enabled=js)
     # no nnf_os cookie: NwebOS is the default
     if cookie:
-        n, v = COOKIE.split("=", 1)
+        n, v = (cookie if isinstance(cookie, str) else COOKIE).split("=", 1)
         c.add_cookies([{"name": n, "value": unquote(v), "domain": H, "path": "/", "secure": True, "httpOnly": True}])
 
     def route(r):
@@ -36,7 +37,16 @@ def ctx_for(br, width, cookie=False, js=True):
         h = {k: v for k, v in r.request.all_headers().items() if not k.startswith(":")}
         h["host"] = "mc.nwebnotfound.dev"  # wrangler dev rewrites Origin unless Host is the --local-upstream host
         h["x-nnf-test-host"] = H
-        r.fulfill(response=r.fetch(url=BASE + u.path + ("?" + u.query if u.query else ""), headers=h, max_redirects=0))
+        resp = r.fetch(url=BASE + u.path + ("?" + u.query if u.query else ""), headers=h, max_redirects=0)
+        loc = resp.headers.get("location", "")
+        if r.request.is_navigation_request() and 300 <= resp.status < 400 and loc:
+            # Chromium follows a redirect of a fulfilled response WITHOUT routing it (it went to the live site, behind
+            # Cloudflare's challenge, on CI): answer with a page that navigates itself, so the next request is routed.
+            hd = {k: v for k, v in resp.headers.items() if k.lower() == "set-cookie"}
+            hd["content-type"] = "text/html"
+            r.fulfill(status=200, headers=hd, body="<script>location.replace(%s)</script>" % json.dumps(loc))
+            return
+        r.fulfill(response=resp)
 
     c.route("**/*", route)
     return c
@@ -142,6 +152,35 @@ with sync_playwright() as p:
     assert pg.locator("#boot").is_hidden() and pg.locator("#login").is_hidden(), "phone: deep link to a post opens it directly"
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 1280 deep link without boot/login, seen afterwards, Discord avatar, guestbook entry via Turnstile; 375 post deep link")
+
+    # Abmelden with a real Discord session (throwaway session from e2e): one click, a same-origin POST, the session is
+    # gone and NwebOS shows its login screen again (a GET would only show the "Abmelden?" confirmation page).
+    LO = os.environ.get("NWEBOS_LOGOUT_COOKIE", "")
+    if LO:
+        c = ctx_for(br, 1280, cookie=LO)
+        pg = c.new_page()
+        pg.goto(f"https://{H}/guestbook", wait_until="load")   # deep link: window directly, no login (#115)
+        pg.locator("#desk").wait_for(state="visible")
+        pg.wait_for_function("() => (document.querySelector('#smav').getAttribute('src') || '').startsWith('https://cdn.discordapp.com/')", timeout=10000)   # /api/me answered
+        posts = []
+        nexts = []
+        pg.on("request", lambda r: (posts.append(r.method), nexts.append(r.url)) if "/auth/discord/logout" in r.url else None)
+        pg.locator("#startb").click()
+        with pg.expect_navigation(wait_until="load"):
+            pg.locator("[data-egg=logout]").click()
+        assert posts and posts[0] == "POST", posts
+        diag = lambda: (pg.url, pg.title(), pg.evaluate("[!!document.querySelector('#login:not([hidden])'), !!document.querySelector('[data-login-me]:not([hidden])'), document.documentElement.className]"))
+        # back to the desktop address (restored windows may then show their own address again)
+        assert unquote(nexts[0]).endswith("next=https://nwebnotfound.dev/") and urlsplit(pg.url).netloc == H, ("logout goes to /", nexts, diag())
+        try: pg.locator("#login").wait_for(state="visible", timeout=10000)
+        except Exception: raise AssertionError(("login screen after Abmelden", diag()))
+        me = pg.evaluate("fetch('/api/me', {credentials: 'include'}).then(r => r.json())")
+        assert not me.get("user"), ("session ended", me)
+        pg.wait_for_function("() => document.querySelector('[data-login-me]').hidden", timeout=10000)
+        c.unroute_all(behavior="ignoreErrors"); c.close()
+        print("PASS 1280 Abmelden with a real session: one POST, logged out, login screen")
+    else:
+        print("SKIP real-session logout (NWEBOS_LOGOUT_COOKIE not set)")
 
     # Phone: handheld home screen, an app opens full screen, the home button goes back.
     c = ctx_for(br, 375)

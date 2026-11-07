@@ -27,4 +27,11 @@ inp.addEventListener('input',()=>{sel=-1;draw()});inp.addEventListener('keydown'
 document.addEventListener('click',e=>{if(!box.contains(e.target)&&e.target!==inp)close()})}
 const HASCH=x=>!x.reset_new&&(!!x.hist_pct||(+x.trades_24h||0)>0||Math.abs(+x.change_24h_pct||0)>0.004);const PX=x=>HASCH(x)?PCT(x.change_24h_pct):x.reset_new?'<span class="mut" title="Neue Preise seit dem Preis-Reset, noch keine 24h-Änderung">neu</span>':'<span class="mut">—</span>';
 const LOCK='<span class="nb" title="Nicht bei der Bank kaufbar">nur Verkauf</span>';const BUYP=x=>x.buy_locked?(x.sell_locked||!(+x.sell_price>0)?'<span class="nb" title="Bei der Bank weder kauf- noch verkaufbar">nicht handelbar</span>':LOCK):CP(x.buy_price);
-return{RMARK,SCORE,E,NM,NF,CP,C2,LEFT,LOC,BIG,ICO,PCT,PX,HASCH,LOCK,BUYP,spark,get,post,search}})();
+// Turnstile for web shop buys and bids (Nils, 06.11.: same as bank_buy). One widget per page in
+// a container OUTSIDE the re-rendered list (#ts[data-sitekey]); api.js loads only when a form is
+// shown (render=explicit). token() is the current response, reset() after every submit.
+const CAPTCHA=(()=>{let wid=null,p=null;const host=()=>document.getElementById('ts');
+const load=()=>p||(p=new Promise((res,rej)=>{if(window.turnstile)return res();const s=document.createElement('script');s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';s.async=true;s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)}));
+return{show(){const h=host();if(!h||wid!==null)return;h.hidden=false;load().then(()=>{if(wid===null)wid=turnstile.render(h,{sitekey:h.dataset.sitekey,theme:'dark',size:'flexible'})}).catch(()=>{})},
+token(){try{return wid===null?'':(turnstile.getResponse(wid)||'')}catch(_){return ''}},reset(){try{if(wid!==null)turnstile.reset(wid)}catch(_){}}}})();
+return{RMARK,SCORE,E,NM,NF,CP,C2,LEFT,LOC,BIG,ICO,PCT,PX,HASCH,LOCK,BUYP,spark,get,post,search,CAPTCHA}})();
