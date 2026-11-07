@@ -505,7 +505,7 @@ with sync_playwright() as p:
         pg.unroute("**/api/mc-pvp**"); pg.unroute("**/api/mc-parkour"); pg.unroute("**/api/mc-market/flint"); pg.unroute("**/api/mc-market/nether_star")
         errs = [e for e in errs if e.strip() != "Event"]
         ok(not errs, f"{w}px keine Konsolen-/JS-Fehler", errs[:3])
-        ctx.close()
+        ctx.unroute_all(behavior="ignoreErrors"); ctx.close()   # pending route fetches must not hit the next context
         ctx = br.new_context(viewport={"width": w, "height": 900}); pg = ctx.new_page(); pg.route("**/*", route)
         pg.goto("https://" + H + "/vip", wait_until="domcontentloaded", timeout=45000); pg.locator("#vip .vip-ranks").wait_for(timeout=10000); vt = pg.inner_text("#vip")
         ok("Mit Discord anmelden" in vt and "Vorteile" in vt and "VIP" in vt and "MVP" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 1, f"{w}px VIP anonym: Ränge und Login, kein Panel", vt[:240])
@@ -514,7 +514,7 @@ with sync_playwright() as p:
         pg.goto("https://" + H + "/spieler/Nils", wait_until="domcontentloaded", timeout=45000); pg.wait_for_timeout(400); t = pg.inner_text("body")
         pg.locator(".pf-kpi").wait_for(timeout=10000); t = pg.inner_text("body"); ok(pg.locator(".pf-kpi .pf-tile").count() >= 1 and "nur für Mitspieler" in t, f"{w}px Spielerseite anonym: Details gesperrt", t[:300])
         ok(pg.evaluate("document.documentElement.scrollWidth-innerWidth") <= 0, f"{w}px anonym: kein horizontales Scrollen")
-        pg.screenshot(path=f"{SH}/local-spieler-nils-anon-{w}.png", full_page=True); ctx.close()
+        pg.screenshot(path=f"{SH}/local-spieler-nils-anon-{w}.png", full_page=True); ctx.unroute_all(behavior="ignoreErrors"); ctx.close()
     P = "nwebnotfound.dev"; FB = "/mc-head/MHF_Steve/64?v=5"; FBP = "https://cdn.discordapp.com/embed/avatars/0.png"  # Hauptdomain: nur Discord, nie MC-Kopf
     GIF = bytes.fromhex("47494638396101000100800000ffffff00000021f90401000000002c000000000100010000020144003b")
     def chip(avatar, mc_name=None):
@@ -536,7 +536,7 @@ with sync_playwright() as p:
         ctx = br.new_context(viewport={"width": 1280, "height": 800}); ctx.add_cookies([{"name": "nnf_os", "value": "0", "domain": P, "path": "/", "secure": True}]); pg = ctx.new_page(); pg.route("**/*", route_p)
         pg.goto("https://" + P + "/portfolio", wait_until="domcontentloaded", timeout=45000); pg.locator("#umb img").wait_for(timeout=10000)
         info = pg.evaluate("""() => { const img = document.querySelector('#umb img'); const name = document.querySelector('#umb .u-name'); return { src: img ? img.src : '', attr: img ? img.getAttribute('onerror') : 'missing', xss: window.__xss || 0, name: name ? name.textContent : '', imgs: document.querySelectorAll('#umb img').length }; }""")
-        ctx.close(); return info
+        ctx.unroute_all(behavior="ignoreErrors"); ctx.close(); return info
     bad = chip('"><img src=x onerror=window.__xss=1>')
     ok(bad["xss"] == 0 and bad["attr"] is None and bad["src"].endswith(FBP) and bad["name"] == "Nils<img>" and bad["imgs"] == 1, "Portfolio-Chip: Avatar-Breakout bleibt Text, Fallback-Bild", bad)
     js = chip("javascript:alert(1)")

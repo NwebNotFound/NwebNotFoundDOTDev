@@ -53,6 +53,15 @@ for (const page of [gb, en, home]) {
 const js = fs.readFileSync(new URL("../public/design/nwebos.js", import.meta.url), "utf8"), css = fs.readFileSync(new URL("../public/design/nwebos.css", import.meta.url), "utf8");
 assert.ok(!/<canvas|getContext\(|requestAnimationFrame|addEventListener\("(scroll|resize)"/.test(js), "perf budget: no canvas, no rAF loop, no scroll/resize listeners");
 assert.ok(!/microsoft|windows xp|tahoma\.ttf|segoe.*\.woff/i.test(css) && !/url\((?!\/design\/|\/mc-icon\/)/.test(css), "only our own assets in CSS");
+// The games hook: both sections carry the module URL, no-JS fallback text, and their icons exist in the sprite.
+for (const k of ["mines", "five"]) {
+  assert.ok(home.includes(`id="app-${k}" data-app="${k}" data-path="" data-module="/design/nwebos-games.js?v=`), k + " section carries data-module");
+  assert.ok(fs.readFileSync(new URL("../public/design/nwebos-icons.svg", import.meta.url), "utf8").includes(`id="i-${k}"`), k + " icon in the sprite");
+}
+assert.ok(home.includes("Pixelminen") && home.includes("nojs-g") && nwebosPage({ lang: "en" }).includes("Pixel Mines"), "game windows have names and no-JS text in both languages");
+assert.ok(["Pixelminen", "Fünf"].every((n) => idx.some((r) => r.t === n && r.k)) && JSON.parse(/<script type="application\/json" id="os-l">(.*?)<\/script>/.exec(nwebosPage({ lang: "en" }))[1]).idx.some((r) => r.t === "Pixel Mines" && r.k === "mines"), "games are in the search index");
+const gjs = fs.readFileSync(new URL("../public/design/nwebos-games.js", import.meta.url), "utf8");
+assert.ok(!/<canvas|getContext\(|requestAnimationFrame|addEventListener\("(scroll|resize)"/.test(gjs) && /NwebOS\.register\("mines"/.test(gjs) && /NwebOS\.register\("five"/.test(gjs), "games: registered, no canvas/rAF");
 // The committed sprite matches its source.
 const sprite = buildSprite(JSON.parse(fs.readFileSync(new URL("./nwebos-icons.json", import.meta.url), "utf8")));
 assert.equal(fs.readFileSync(new URL("../public/design/nwebos-icons.svg", import.meta.url), "utf8").replace(/\r\n/g, "\n"), sprite,   // a Windows checkout may have CRLF
