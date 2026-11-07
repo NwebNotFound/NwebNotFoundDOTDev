@@ -11,7 +11,7 @@ const U = (q = "") => new URL("https://nwebnotfound.dev/guestbook" + q);
 assert.deepEqual(nwebosChoice(U(), {}), { on: false, setCookie: null }, "off without the cookie");
 assert.equal(nwebosChoice(U(), { nnf_os: "1" }).on, true);
 assert.match(nwebosChoice(U("?nwebos=1"), {}).setCookie, /^nnf_os=1; Path=\/; Max-Age=\d+; Secure; SameSite=Lax$/);
-assert.match(nwebosChoice(U("?nwebos=0"), { nnf_os: "1" }).setCookie, /Max-Age=0/);
+assert.match(nwebosChoice(U("?nwebos=0"), { nnf_os: "1" }).setCookie, /^nnf_os=0; Path=\/; Max-Age=31536000;/, "opt-out is remembered, not just cleared");
 assert.equal(nwebosChoice(U(), {}, true).on, true, "default-on (switch-over PR) unless opted out");
 assert.equal(nwebosChoice(U(), { nnf_os: "0" }, true).on, false);
 assert.deepEqual(OS_PATHS, ["/", "/about", "/portfolio", "/guestbook"]);
@@ -39,5 +39,6 @@ assert.ok(!/<canvas|getContext\(|requestAnimationFrame|addEventListener\("(scrol
 assert.ok(!/microsoft|windows xp|tahoma\.ttf|segoe.*\.woff/i.test(css) && !/url\((?!\/design\/|\/mc-icon\/)/.test(css), "only our own assets in CSS");
 // The committed sprite matches its source.
 const sprite = buildSprite(JSON.parse(fs.readFileSync(new URL("./nwebos-icons.json", import.meta.url), "utf8")));
-assert.equal(fs.readFileSync(new URL("../public/design/nwebos-icons.svg", import.meta.url), "utf8"), sprite, "public/design/nwebos-icons.svg is out of date: node scripts/build-nwebos-icons.mjs");
+assert.equal(fs.readFileSync(new URL("../public/design/nwebos-icons.svg", import.meta.url), "utf8").replace(/\r\n/g, "\n"), sprite,   // a Windows checkout may have CRLF
+  "public/design/nwebos-icons.svg is out of date: node scripts/build-nwebos-icons.mjs");
 console.log("nwebos-unit ok");

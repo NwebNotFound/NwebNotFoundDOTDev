@@ -20,6 +20,7 @@ with sync_playwright() as p:
     for width in (375, 1280):
         for site, (host, path, here, other) in SITES.items():
             context = browser.new_context(viewport={"width": width, "height": 800})
+            context.add_cookies([{"name": "nnf_os", "value": "0", "domain": "nwebnotfound.dev", "path": "/", "secure": True}])  # current nav (NwebOS has its own test)
             page = context.new_page()
 
             def intercept(route):

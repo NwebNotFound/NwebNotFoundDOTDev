@@ -5,8 +5,9 @@
 // sections in <main id="apps">. Without JS that main is the page (readable, indexable); with JS,
 // public/design/nwebos.js turns the sections into windows and opens the one for the current path.
 //
-// Until the switch-over PR the OS is opt-in: `?nwebos=1` sets the cookie nnf_os=1, `?nwebos=0` clears it.
-// Without it every path keeps its old page.
+// NwebOS is the default (Nils, 07.11.: "And nwebOS is default"). `?nwebos=0` opts out to the old site (cookie
+// nnf_os=0, a year), `?nwebos=1` opts back in. Paths without an NwebOS app yet (blog, profile, changelog, …) keep
+// their current pages; their desktop/start-menu icons link there.
 import { AV } from "./asset-version.js";
 
 export const MAIN_HOST = "nwebnotfound.dev";
@@ -162,11 +163,11 @@ export function nwebosPage({ lang = "de", app = "", entries = [], sitekey = "" }
 </body></html>`;
 }
 
-/** OS on or off for this request: ?nwebos=1/0 switches (and sets/clears the cookie), else the cookie decides. */
+/** OS on or off for this request: ?nwebos=1/0 switches and remembers it in the cookie; else cookie, else `defaultOn`. */
 export function nwebosChoice(url, cookies, defaultOn = false) {
   const q = url.searchParams.get("nwebos");
   if (q === "1") return { on: true, setCookie: `${OS_COOKIE}=1; Path=/; Max-Age=31536000; Secure; SameSite=Lax` };
-  if (q === "0") return { on: false, setCookie: `${OS_COOKIE}=; Path=/; Max-Age=0; Secure; SameSite=Lax` };
+  if (q === "0") return { on: false, setCookie: `${OS_COOKIE}=0; Path=/; Max-Age=31536000; Secure; SameSite=Lax` };   // lasting opt-out
   const c = cookies[OS_COOKIE];
   return { on: c === "1" || (defaultOn && c !== "0"), setCookie: null };
 }

@@ -40,11 +40,14 @@ const sql = (q) => execSync(`npx wrangler d1 execute DB --local --persist-to ${P
 const sqlRows = (q) => JSON.parse(sql(q))[0].results;
 const b64u = (b) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 async function cookieFor(sid) { const k = await C.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return "nnf_session=" + encodeURIComponent(sid + "." + b64u(await C.subtle.sign("HMAC", k, new TextEncoder().encode(sid)))); }
-const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1", headers = {}, host = HOST, testHost } = {}) => {
+// Main-site requests run opted out of NwebOS (nnf_os=0) unless `os: true`: the checks below test the current pages,
+// which stay reachable via ?nwebos=0 and for paths without an NwebOS app; NwebOS itself is checked in its own block.
+const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1", headers = {}, host = HOST, testHost, os = false } = {}) => {
   const h = { host, "cf-connecting-ip": ip, ...headers };
   if (testHost) h["x-nnf-test-host"] = testHost;
   if (body) h["content-type"] = "application/json";
   if (token) h["x-ingest-token"] = token;
+  if (testHost === "nwebnotfound.dev" && !os && !/(^|;\s*)nnf_os=/.test(cookie || "")) cookie = cookie ? cookie + "; nnf_os=0" : "nnf_os=0";
   if (cookie) h.cookie = cookie;
   if (origin) h.origin = origin;
   const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
@@ -1204,14 +1207,19 @@ try {
   }
   try { execSync(`python3 scripts/blog-editor-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Blog-Editor im Browser fehlgeschlagen"); }
   sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");
-  // NwebOS (src/nwebos.js), opt-in until the switch-over PR: without the cookie every path keeps its old page.
+  // NwebOS (src/nwebos.js) is the default (Nils 07.11.); ?nwebos=0 opts out to the current pages, which stay for
+  // paths without an NwebOS app yet.
   {
-    const MH = "nwebnotfound.dev", n = (path, o = {}) => req(path, { testHost: MH, ...o });
-    const off = await n("/guestbook"), on = await n("/guestbook", { cookie: "nnf_os=1" }), sw = await n("/guestbook?nwebos=1"), out = await n("/about?nwebos=0", { cookie: "nnf_os=1" });
-    ok(!off.t.includes('class="no-js nwebos"') && on.s === 200 && on.t.includes('class="no-js nwebos"') && on.t.includes('id="app-guestbook"'), "NwebOS: nur mit Opt-in, Gästebuch serverseitig im Fenster", `${off.s} ${on.s}`);
-    ok(sw.s === 302 && sw.h.get("location") === "/guestbook" && /nnf_os=1/.test(sw.h.get("set-cookie") || "") && out.s === 302 && /nnf_os=;.*Max-Age=0/.test(out.h.get("set-cookie") || ""), "NwebOS: ?nwebos=1/0 setzt/löscht das Cookie und kommt zur sauberen URL", `${sw.s} ${out.s}`);
-    const enAbout = await n("/en/about", { cookie: "nnf_os=1" }), blog = await n("/blog", { cookie: "nnf_os=1" });
-    ok(enAbout.s === 200 && enAbout.t.includes('<html lang="en" class="no-js nwebos">') && !blog.t.includes("nwebos"), "NwebOS: /en/about englisch, /blog bleibt die alte Seite", `${enAbout.s} ${blog.s}`);
+    const MH = "nwebnotfound.dev", n = (path, o = {}) => req(path, { testHost: MH, os: true, ...o });
+    const home = await n("/"), de = await n("/de"), en = await n("/en"), gb = await n("/guestbook");
+    ok([home, de, en, gb].every((r) => r.s === 200 && r.t.includes('class="no-js nwebos"')) && gb.t.includes('id="app-guestbook"') && en.t.includes('<html lang="en" class="no-js nwebos">'), "NwebOS: Standard auf /, /de, /en und /guestbook (ohne Cookie)", [home, de, en, gb].map((r) => r.s).join(" "));
+    const out = await n("/about?nwebos=0"), back = await n("/about?nwebos=1", { cookie: "nnf_os=0" });
+    ok(out.s === 302 && out.h.get("location") === "/about" && /^nnf_os=0;.*Max-Age=31536000/.test(out.h.get("set-cookie") || "") && back.s === 302 && /^nnf_os=1;/.test(back.h.get("set-cookie") || ""), "NwebOS: ?nwebos=0 merkt das Opt-out, ?nwebos=1 holt zurück, beide zur sauberen URL", `${out.s} ${back.s}`);
+    const old = await n("/guestbook", { cookie: "nnf_os=0" }), oldHome = await n("/", { cookie: "nnf_os=0" });
+    ok(old.s === 200 && !old.t.includes("nwebos") && oldHome.s === 200 && !oldHome.t.includes('class="no-js nwebos"'), "NwebOS: mit Opt-out die bisherigen Seiten", `${old.s} ${oldHome.s}`);
+    const blog = await n("/blog"), prof = await n("/profile"), chl = await n("/changelog"), mc = await req("/");
+    ok(blog.s === 200 && !blog.t.includes('class="no-js nwebos"') && !prof.t.includes('class="no-js nwebos"') && !chl.t.includes('class="no-js nwebos"') && !mc.t.includes("nwebos"), "NwebOS: Blog, Profil, Changelog und mc.* unverändert", `${blog.s} ${prof.s} ${chl.s} ${mc.s}`);
+    ok(home.t.includes('class="dicon" href="/blog"') && !/class="dicon" href="\/blog" data-open/.test(home.t), "NwebOS: Blog-Icon öffnet die bisherige Seite, kein leeres Fenster");
   }
   try { execSync(`python3 scripts/nwebos-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ NwebOS im Browser fehlgeschlagen"); }
   try { execSync(`python3 scripts/site-switch-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Logo-Seitenwechsel „Wohin?“ fehlgeschlagen"); }

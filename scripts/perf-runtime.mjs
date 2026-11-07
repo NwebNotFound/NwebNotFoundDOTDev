@@ -47,8 +47,9 @@ for (const width of [375, 1280]) {
   for (const [site, path] of PAGES) {
     const mobile = width === 375;
     const ctx = await browser.newContext({ viewport: { width, height: mobile ? 812 : 900 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: mobile ? 2 : 1, extraHTTPHeaders: { "x-nnf-test-host": HOST[site], ...(process.env.PERF_COOKIE ? { cookie: process.env.PERF_COOKIE } : {}) } });
-    // PERF_COOKIE=nnf_os=1 measures the NwebOS pages (opt-in until the switch-over); booted/user set = straight to the desktop
-    if (process.env.PERF_COOKIE) await ctx.addInitScript(() => { try { localStorage.setItem("nwebos.booted", "1"); localStorage.setItem("nwebos.user", "gast"); } catch (e) {} });
+    // Main pages are NwebOS by default (PERF_COOKIE=nnf_os=0 measures the old pages); booted/user set = straight to the desktop
+    const os = site === "main" && !/nnf_os=0/.test(process.env.PERF_COOKIE || "");
+    if (os) await ctx.addInitScript(() => { try { localStorage.setItem("nwebos.booted", "1"); localStorage.setItem("nwebos.user", "gast"); } catch (e) {} });
     await ctx.addInitScript(INIT);
     const page = await ctx.newPage();
     const cdp = await ctx.newCDPSession(page);
@@ -65,7 +66,7 @@ for (const width of [375, 1280]) {
     });
     await page.evaluate(() => { window.scrollTo(0, 0); window.__perf.events = []; });
     await page.waitForTimeout(300);
-    const toggle = process.env.PERF_COOKIE ? (mobile ? "[data-home]" : "#startb") : mobile ? "[data-unav] .u-burger, [data-unav] button[aria-controls]" : "[data-unav] .u-gbtn, [data-unav] button[aria-controls]";
+    const toggle = os ? (mobile ? "[data-home]" : "#startb") : mobile ? "[data-unav] .u-burger, [data-unav] button[aria-controls]" : "[data-unav] .u-gbtn, [data-unav] button[aria-controls]";
     const btn = page.locator(toggle).first();
     let inp = null;
     if (await btn.count()) {
