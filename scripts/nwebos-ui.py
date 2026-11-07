@@ -220,6 +220,76 @@ with sync_playwright() as p:
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 375 home screen, full-screen app, home button")
 
+    # Games (docs/nwebos-modules.md): both open from the desktop and the start menu, one move works, stats persist, no timer while minimised.
+    c = ctx_for(br, 1280)
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(f"https://{H}/", wait_until="load")
+    pg.locator("#boot").click(); pg.locator("[data-user=gast]").click()
+    pg.locator('.dicon[data-open="mines"]').dblclick()
+    pg.wait_for_selector(".g-mines .mngrid .c")
+    assert pg.locator(".g-mines .mngrid .c").count() == 81 and path(pg) == "/", "mines mounted, no own address"
+    pg.locator(".g-mines .c").nth(40).click()   # the first click is always safe
+    assert pg.locator(".g-mines .c.o").count() >= 1 and pg.locator(".g-mines .face.dead").count() == 0 and pg.locator(".g-mines .c.m").count() == 0, "first click is safe"
+    pg.locator(".g-mines .c").nth(0).click(button="right")
+    assert pg.locator(".g-mines .c").nth(0).get_attribute("class").find("f") >= 0 and pg.locator("[data-m]").inner_text() in ("009", "010"), "flag"
+    pg.wait_for_timeout(1300); t1 = pg.locator("[data-t]").inner_text(); assert t1 != "000", "timer runs while playing"
+    pg.locator('.win.focus .mn').click(); pg.wait_for_timeout(2300)
+    assert pg.locator("[data-t]").inner_text() == t1, "no timer tick while minimised"
+    shot(pg, "games-mines-1280.png")
+    pg.locator(".tbb").first.click(); pg.wait_for_timeout(300)
+    # keyboard: arrows move, Enter reveals, F flags
+    pg.locator(".g-mines .c[tabindex='0']").focus(); pg.keyboard.press("ArrowRight"); pg.keyboard.press("F")
+    assert pg.locator(".g-mines .c.f").count() == 2, "keyboard flag"
+    # play to the end (a loss or a win), then the stats are stored
+    for i in range(81):
+        if pg.locator(".g-mines .face.dead, .g-mines .face.cool").count(): break
+        pg.locator(".g-mines .c").nth(i).click()
+    assert pg.locator(".g-mines .face.dead, .g-mines .face.cool").count() == 1
+    assert '"played":1' in (pg.evaluate("Object.keys(localStorage).filter(k => /mines[.]stats$/.test(k)).map(k => localStorage[k]).join()") or ""), "mines stats persisted"
+    pg.locator(".g-mines .face").click(); assert pg.locator(".g-mines .c.o").count() == 0, "new game"
+    pg.locator('.win.focus .x').click(); pg.wait_for_timeout(400)
+    # Fünf from the start menu: type a word with the keyboard, the row is rated, Backspace works.
+    pg.locator("#startb").click(); pg.locator('#startm [data-open="five"]').click()
+    pg.wait_for_selector(".g-five .fvgrid .ft")
+    pg.locator(".win.focus").focus()
+    pg.keyboard.type("abcd"); pg.keyboard.press("Backspace"); pg.keyboard.type("de")
+    assert pg.locator(".g-five .fr").first.inner_text().replace(chr(10), "") == "ABCDE", pg.locator(".g-five .fr").first.inner_text()
+    pg.keyboard.press("Enter"); pg.wait_for_timeout(600)
+    assert pg.locator(".g-five .fr").first.locator(".t, .o, .s").count() == 5, "row rated"
+    shot(pg, "games-five-1280.png")
+    pg.locator(".g-five [data-v=en]").click(); assert pg.locator(".g-five .kb [data-k=Y]").count() == 1 and pg.locator(".g-five .fvnew").inner_text() == "New word", "language switch"
+    # Fit: Fünf's content stays inside its frame; an on-screen key tap keeps Enter on the window.
+    assert pg.evaluate("(() => { const w = document.querySelector('.g-five'); return w.scrollHeight <= w.clientHeight + 1; })()"), "five content fits its frame"
+    pg.locator(".g-five .kb [data-k=A]").click()
+    assert pg.evaluate("document.activeElement === document.querySelector('.win.focus')"), "focus returns to the window after an on-screen key (Enter submits)"
+    # Search finds both games (start menu), then opens them.
+    pg.locator('.win.focus .x').click(); pg.wait_for_timeout(300)
+    pg.locator("#startb").click()
+    for q, k in (("pixel", "mines"), ("minen", "mines"), ("fünf", "five"), ("five", "five")):
+        pg.fill("#smq", q); assert pg.locator("#smres button").count() >= 1, ("search finds", q)
+    pg.fill("#smq", "pixelminen"); pg.keyboard.press("Enter"); pg.wait_for_selector(".g-mines .mngrid .c")
+    assert pg.evaluate("(() => { const w = document.querySelector('.g-mines'); return w.scrollHeight <= w.clientHeight + 1; })()"), "mines content fits its frame"
+    assert pg.locator(".win.focus").bounding_box()["x"] > 130, "mines opens clear of the icon column"
+    assert not errs, errs
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 1280 games: Pixelminen + Fünf open, play, keyboard, stats, no timer while minimised")
+
+    # Phone: both games open from the home screen and fit.
+    c = ctx_for(br, 375)
+    pg = c.new_page()
+    pg.goto(f"https://{H}/", wait_until="load")
+    pg.locator("#boot").click(); pg.locator("[data-user=gast]").click()
+    for k, sel in (("mines", ".g-mines .mngrid"), ("five", ".g-five .kb")):
+        pg.locator(f'.dicon[data-open="{k}"]').click(); pg.wait_for_selector(sel)
+        assert pg.evaluate("document.documentElement.scrollWidth") <= 375 and pg.locator(".win.focus").bounding_box()["width"] == 375, k
+        assert pg.locator(sel).bounding_box()["x"] >= 0 and pg.locator(sel).bounding_box()["x"] + pg.locator(sel).bounding_box()["width"] <= 375, k + " fits"
+        shot(pg, f"phone-{k}-375.png")
+        pg.locator("[data-home]").click(); pg.wait_for_timeout(300)
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 375 games open from the home screen and fit")
+
     # Without JS: all content is a readable page, the current app first.
     c = ctx_for(br, 1280, js=False)
     pg = c.new_page()
