@@ -224,7 +224,7 @@
       });
       var mid = $(".smmid", sm); if (list.id === "smres" && mid) mid.hidden = !list.hidden;
     };
-    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else openUrl(r.p); inp.value = ""; draw(); if (after) after(); };
+    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else if (r.k) openWin(r.k); else openUrl(r.p); inp.value = ""; draw(); if (after) after(); };
     inp.addEventListener("focus", function () { loadBlog().then(function () { if (inp.value.trim()) draw(); }); });
     inp.addEventListener("input", function () { sel = 0; draw(); });
     inp.addEventListener("keydown", function (e) {
@@ -252,7 +252,9 @@
   var eggs = {
     logout: function () {
       store.set("loggedout", "1"); store.set("user", null);
-      if (me) { location.href = L.logoutUrl + encodeURIComponent(location.href); return; }   // real Discord session: sign out, come back to the login
+      /* real Discord session: sign out with a same-origin POST (a GET only shows the confirmation page, audit #88),
+         back to the desktop address, where the login screen shows (a window address opens its window directly) */
+      if (me) { var f = document.createElement("form"); f.method = "post"; f.action = L.logoutUrl + encodeURIComponent(location.origin + (L.home || "/")); f.hidden = true; document.body.appendChild(f); f.submit(); return; }
       showLogin();
     },
     shutdown: function () { var off = $("#off"); off.hidden = false; desk.hidden = true; off.onclick = function () { off.hidden = true; showDesk(); }; },

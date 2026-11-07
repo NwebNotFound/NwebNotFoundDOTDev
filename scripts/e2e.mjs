@@ -12,6 +12,9 @@ import "./content-unit.mjs";
 import "./markdown-unit.mjs";
 import "./feed-unit.mjs";
 import "./epub-unit.mjs";
+import "./worker-robust-unit.mjs";
+import "./dos-unit.mjs";
+import "./queue-unit.mjs";
 import "./nwebos-unit.mjs";
 import "./blog-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
@@ -80,6 +83,7 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   if (origin) h.origin = origin;
   const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
 };
+const TS_OK = "XXXX.DUMMY.TOKEN.XXXX"; // Turnstile test secret: every token passes
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
 const now = Date.now(), H = 3600, HR0 = Math.floor(now / 1000 / H) * H, RESET = new Date((HR0 - 28 * H) * 1000).toISOString();
 
@@ -96,6 +100,7 @@ fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
 fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\nPRICE_RESET_AT=${RESET}\n`);
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
+{ let okS = true; try { execSync(`bash scripts/schema-check.sh --local --persist-to ${PERSIST}`, { cwd: ROOT, stdio: "ignore" }); } catch { okS = false; } ok(okS, "schema.sql erfüllt scripts/schema-check.sh (deploy.sh-Vorabprüfung)"); }
 console.log((await localDb()) ? "Fixture-SQL: node:sqlite direkt auf die lokale D1" : "Fixture-SQL: wrangler d1 execute (node:sqlite fehlt)");
 const wd = spawn(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", ...NPX.opts });
 let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
@@ -209,32 +214,36 @@ try {
   ok(A.a1.created_at === Math.floor(now / 1000) * 1000, "created_at Sekunden → ms");
   const d2 = (await req("/api/mc-auctions/a2")).j.auction; ok(d2.bids.length === 2 && d2.bids[0].name === "Seller" && d2.bids[1].name === "99999999…", "Gebotsverlauf mit Namen / Kurz-UUID", JSON.stringify(d2.bids));
   ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, origin: O })).s === 401, "Gebot ohne Session → 401");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1, origin: "https://evil.example" })).s === 403, "falscher Origin → 403");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1 })).s === 403, "kein Origin → 403");
-  let r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 4999 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5000, "unter min_price → 409");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000, bidder_uuid: U2 }, cookie: c1, origin: O }); ok(r.s === 202, "Gebot = min_price → 202", r.t);
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 5000 }, cookie: c1, origin: "https://evil.example" })).s === 403, "falscher Origin → 403");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 5000 }, cookie: c1 })).s === 403, "kein Origin → 403");
+  // Nils, 06.11.: Turnstile is required for every web buy and bid, like bank_buy (audit #88).
+  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1, origin: O })).s === 403, "Gebot ohne Turnstile-Token → 403");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1 }, cookie: c1, origin: O })).s === 403, "Shop-Kauf ohne Turnstile-Token → 403");
+  ok((await req("/api/mc-bid", { method: "POST", token: TOK, body: { discord_id: D2, auction_id: "a4", amount: 1 } })).s !== 403, "Bot-Gebot braucht keinen Turnstile-Token (Ingest-Token)");
+  let r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 4999 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5000, "unter min_price → 409");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 5000, bidder_uuid: U2 }, cookie: c1, origin: O }); ok(r.s === 202, "Gebot = min_price → 202", r.t);
   const bidId = r.j?.request_id;
   ok(sqlRows(`SELECT bidder_uuid FROM mc_bids_pending WHERE id='${bidId}'`)[0]?.bidder_uuid === U1, "bidder_uuid serverseitig aus mc_links (Client-UUID ignoriert)");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 5000 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5001, "eigenes offenes Gebot hebt Minimum");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a2", amount: 21499 }, cookie: c1, origin: O })).s === 409, "a2 21499 < min_next_bid → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a2", amount: 21500 }, cookie: c1, origin: O })).s === 202, "a2 21500 → 202");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a3", amount: 20999 }, cookie: c1, origin: O })).s === 409, "a3 20999 → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a4", amount: 500 }, cookie: c1, origin: O })).s === 403, "eigene Auktion → 403");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a5", amount: 500 }, cookie: c1, origin: O })).s === 409, "beendete Auktion → 409");
-  ok((await req("/api/mc-bid", { method: "POST", body: { auction_id: "a1", amount: 50.5 }, cookie: c1, origin: O })).s === 400, "Kommabetrag → 400");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 5000 }, cookie: c1, origin: O }); ok(r.s === 409 && r.j.min_next === 5001, "eigenes offenes Gebot hebt Minimum");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a2", amount: 21499 }, cookie: c1, origin: O })).s === 409, "a2 21499 < min_next_bid → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a2", amount: 21500 }, cookie: c1, origin: O })).s === 202, "a2 21500 → 202");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a3", amount: 20999 }, cookie: c1, origin: O })).s === 409, "a3 20999 → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a4", amount: 500 }, cookie: c1, origin: O })).s === 403, "eigene Auktion → 403");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a5", amount: 500 }, cookie: c1, origin: O })).s === 409, "beendete Auktion → 409");
+  ok((await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a1", amount: 50.5 }, cookie: c1, origin: O })).s === 400, "Kommabetrag → 400");
 
   console.log("5) Shop-Bestellungen");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 11 }, cookie: c1, origin: O })).s === 409, "Menge > Lager → 409");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L2", qty: 1 }, cookie: c1, origin: O })).s === 404, "Angebot mit Preis null wird verworfen → 404");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L3", qty: 1 }, cookie: c1, origin: O })).s === 403, "eigener Shop → 403");
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 2 }, cookie: c1, origin: O }); ok(r.s === 202 && r.j.total === 3000, "Bestellung per listing_id → 202, total 3000", r.t);
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L1", qty: 11 }, cookie: c1, origin: O })).s === 409, "Menge > Lager → 409");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L2", qty: 1 }, cookie: c1, origin: O })).s === 404, "Angebot mit Preis null wird verworfen → 404");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L3", qty: 1 }, cookie: c1, origin: O })).s === 403, "eigener Shop → 403");
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L1", qty: 2 }, cookie: c1, origin: O }); ok(r.s === 202 && r.j.total === 3000, "Bestellung per listing_id → 202, total 3000", r.t);
   const ordId = r.j?.request_id;
   { const row = sqlRows(`SELECT type, shop_id, listing_id FROM mc_shop_orders_pending WHERE id='${ordId}'`)[0]; ok(row && row.type === "shop" && row.shop_id === "s1" && row.listing_id === "L1" && /^[0-9a-f-]{36}$/.test(ordId), "Shop-Order unverändert: type shop, shop_id/listing_id gesetzt, request_id serverseitig", JSON.stringify(row)); }
   { const pz = (await req("/api/mc-shop-orders/pending", { token: TOK })).j.items.find((x) => x.request_id === ordId || x.id === ordId); ok(pz && pz.type === "shop" && pz.shop_id === "s1", "Shop-Order in /pending wie bisher (+type)", JSON.stringify(pz)); }
-  r = await req("/api/mc-shop-order", { method: "POST", body: { shop_id: "s1", item: "diamond", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 202, "Legacy shop_id+item → 202 (4. Aktion)");
-  r = await req("/api/mc-bid", { method: "POST", body: { auction_id: "a3", amount: 21000 }, cookie: c1, origin: O }); ok(r.s === 202, "a3 21000 → 202 (5. Aktion)", r.t);
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 429, "6. Aktion in 1 min → 429 Rate-Limit", r.s);
-  r = await req("/api/mc-shop-order", { method: "POST", body: { listing_id: "L1", qty: 1 }, cookie: c2, origin: O, ip: "10.0.0.1" }); ok(r.s === 403, "anderer User, eigener Shop → 403 (nicht vom Limit des ersten Users betroffen)", r.s);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, shop_id: "s1", item: "diamond", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 202, "Legacy shop_id+item → 202 (4. Aktion)");
+  r = await req("/api/mc-bid", { method: "POST", body: { turnstile: TS_OK, auction_id: "a3", amount: 21000 }, cookie: c1, origin: O }); ok(r.s === 202, "a3 21000 → 202 (5. Aktion)", r.t);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L1", qty: 1 }, cookie: c1, origin: O }); ok(r.s === 429, "6. Aktion in 1 min → 429 Rate-Limit", r.s);
+  r = await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, listing_id: "L1", qty: 1 }, cookie: c2, origin: O, ip: "10.0.0.1" }); ok(r.s === 403, "anderer User, eigener Shop → 403 (nicht vom Limit des ersten Users betroffen)", r.s);
 
   console.log("6) Bot: pending + ack");
   ok((await req("/api/mc-bids/pending")).s === 401, "pending ohne Token → 401");
@@ -378,7 +387,8 @@ try {
   ok((await req("/api/mc-ingest", { method: "POST", token: TOK, body: { links: [{ discord_id: D9, mc_name: "Buyer", mc_uuid: U9, has_role: true, verified: true }] } })).s === 200, "Link für Käufer");
   const pend0 = (await req("/api/mc-shop-orders/pending", { token: TOK })).j.items;
   ok(pend0.every((x) => x.type === "shop"), "pending (alt, ohne ?types) liefert nur type=shop", JSON.stringify(pend0.map((x) => x.type)));
-  const BB = (body, o = {}) => req("/api/mc-shop-order", { method: "POST", body: { type: "bank_buy", ...body }, cookie: c9, origin: O, ip: "10.0.0.33", ...o });
+  const BB = (body, o = {}) => req("/api/mc-shop-order", { method: "POST", body: { type: "bank_buy", turnstile: "XXXX.DUMMY.TOKEN.XXXX", ...body }, cookie: c9, origin: O, ip: "10.0.0.33", ...o });
+  ok((await BB({ item: "diamond", amount: 1, turnstile: undefined })).s === 403, "bank_buy Website ohne Turnstile-Token → 403");
   ok((await BB({ item: "diamond", amount: 1 }, { cookie: undefined })).s === 401, "bank_buy ohne Login → 401");
   ok((await BB({ item: "diamond", amount: 1 }, { origin: "https://evil.example" })).s === 403, "bank_buy fremde Origin → 403");
   ok((await BB({ item: "diamond", amount: 0 })).s === 400, "bank_buy Menge 0 → 400");
@@ -388,7 +398,7 @@ try {
   ok((await BB({ item: "unobtainium", amount: 1 })).s === 404, "bank_buy unbekanntes Item → 404");
   ok((await BB({ item: "elytra", amount: 1 })).s === 409, "bank_buy gesperrtes Item → 409");
   ok((await BB({ item: "diamond", amount: 1, mc_uuid: U1 })).s === 403, "bank_buy fremde mc_uuid → 403");
-  ok((await req("/api/mc-shop-order", { method: "POST", body: { type: "kaputt", item: "diamond", qty: 1 }, cookie: c9, origin: O, ip: "10.0.0.33" })).s === 400, "unbekannter type → 400");
+  ok((await req("/api/mc-shop-order", { method: "POST", body: { turnstile: TS_OK, type: "kaputt", item: "diamond", qty: 1 }, cookie: c9, origin: O, ip: "10.0.0.33" })).s === 400, "unbekannter type → 400");
   const RID1 = "web-" + "a".repeat(20);
   r = await BB({ item: "diamond", amount: 3, mc_uuid: U9, request_id: RID1 }); ok(r.s === 202 && r.j.request_id === RID1 && r.j.unit_price === 1100 && r.j.total === 3300 && r.j.type === "bank_buy", "bank_buy Website → 202, Preis aus Markt (11 CP = 1100 Cent)", r.t);
   r = await BB({ item: "diamond", amount: 3, request_id: RID1 }); ok(r.s === 200 && r.j.duplicate === true, "gleiche request_id → idempotent 200, keine zweite Zeile", r.t);
@@ -849,7 +859,8 @@ try {
       ok(pv.status === 200 && links.length >= 3 && links.every((l) => l.endsWith(`?v=${AV}`)) && !/immutable/.test(pv.headers.get("cache-control") || ""), "Design-Vorschau: statisches HTML bekommt ?v=AV, HTML selbst revalidiert", links.join(" ")); }
     ok(/loading="lazy"/.test(html.match(/<img[^>]*\/mc-icon\/v2\/grass_block[^>]*>/)?.[0] || ""), "Nav-Icons laden lazy");
   }
-  { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy-report-only") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && !r.headers.get("content-security-policy"), "CSP Report-Only gesetzt (nicht erzwingend)", c); }
+  { const r = await fetch(BASE + "/", { headers: { host: HOST } }); const c = r.headers.get("content-security-policy") || ""; ok(/challenges\.cloudflare\.com/.test(c) && /mc-heads\.net/.test(c) && /cdn\.discordapp\.com/.test(c) && /form-action 'self' https:\/\/nwebnotfound\.dev (https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+) /.test(c) && !r.headers.get("content-security-policy-report-only"), "CSP wird erzwungen (inkl. form-action für den Logout-POST)", c);
+    ok(r.headers.get("strict-transport-security") === "max-age=31536000; includeSubDomains", "HSTS gesetzt", r.headers.get("strict-transport-security")); }
   console.log("E) economy_daily");
   { const ED = (rows) => req("/api/mc-ingest", { method: "POST", token: TOK, body: { economy_daily: rows } });
     const e0 = await req("/api/mc-economy"); ok(e0.s === 200 && Array.isArray(e0.j?.days) && e0.j.days.length === 0, "Economy-API leer → days []", e0.t);
@@ -1008,6 +1019,19 @@ try {
       const vipLoc = (loc) => { try { const u = new URL(loc); return u.pathname === "/vip" && (u.hostname === "mc.nwebnotfound.dev" || u.hostname === "127.0.0.1") && !loc.includes("evil"); } catch { return false; } };
       ok(vipLoc(rel) && vipLoc(abs), "relativer und absoluter next auf /vip ist erlaubt", JSON.stringify({ rel, abs }));
       ok((await bye("https://nwebnotfound.dev.evil.com/vip")) === "https://nwebnotfound.dev/", "Host muss nwebnotfound.dev oder Subdomain davon sein"); }
+    { // Logout nur per POST mit eigener Origin (CSRF, #83)
+      sql(`INSERT INTO sessions (id, discord_id, username, expires_at) VALUES ('slo', '100000000000000001', 'Nils', datetime('now', '+1 day'))`);
+      const ck = await cookieFor("slo"), has = () => sqlRows("SELECT id FROM sessions WHERE id = 'slo'").length === 1, NX = "?next=" + encodeURIComponent("https://mc.nwebnotfound.dev/vip");
+      const g = await req("/auth/discord/logout" + NX, { cookie: ck, testHost: "nwebnotfound.dev" });
+      ok(g.s === 200 && /<form method="post" action="\/auth\/discord\/logout\?next=/.test(g.t) && has(), "GET-Logout meldet nicht ab, zeigt POST-Formular", g.s);
+      const ev = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://evil.example", testHost: "nwebnotfound.dev" });
+      const no = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, testHost: "nwebnotfound.dev" });
+      ok(ev.s === 403 && no.s === 403 && has(), "POST-Logout mit fremder/ohne Origin → 403, Session bleibt", ev.s + "/" + no.s);
+      const po = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://mc.nwebnotfound.dev", testHost: "nwebnotfound.dev" });
+      ok(po.s === 303 && /^(https:\/\/mc\.nwebnotfound\.dev|http:\/\/127\.0\.0\.1:\d+)\/vip$/.test(po.h.get("location") || "") && /nnf_session=;.*Max-Age=0/.test(po.h.get("set-cookie") || "") && !has(), "POST-Logout von mc. → 303, Cookie gelöscht, Session weg", po.s + " " + po.h.get("location"));
+      // The shared nav (#73) carries the handler in its external script (CSP: no inline handler).
+      const pg = await req("/", { cookie: ck }); const unavJs = fs.readFileSync(ROOT + "public/design/unav.js", "utf8");
+      ok(/<script src="\/design\/unav\.js\?v=/.test(pg.t) && unavJs.includes(`closest('a[href*="/auth/discord/logout"]')`) && unavJs.includes('f.method = "post"'), "Konto-Menü: Abmelden-Link sendet POST-Formular (unav.js)"); }
   }
   // Ingest: null bleibt NULL (nicht 0), online pro Spieler wird gespeichert (Dict- und View-Form)
   { const nm = sqlRows(`SELECT mc_name FROM mc_links WHERE mc_uuid = '${U1}'`)[0]?.mc_name, bak = sqlRows(`SELECT stats, updated_at FROM mc_player_stats WHERE mc_uuid = '${U1}'`)[0];
@@ -1304,6 +1328,10 @@ try {
     const after = Number(sqlRows(`SELECT (SELECT COUNT(*) FROM blog_reads WHERE discord_id = '${DX}') + (SELECT COUNT(*) FROM blog_reactions WHERE discord_id = '${DX}') + (SELECT COUNT(*) FROM sessions WHERE discord_id = '${DX}') AS n`)[0]?.n);
     ok(xr.s === 200 && xx.s === 200 && before === 2 && del.s === 200 && after === 0, "Profil löschen: auch Lesefortschritt und Reaktionen weg", `${xr.s} ${xx.s} ${before} ${del.s} ${after}`);
   }
+  // a throwaway session for the NwebOS real-session logout check (c1 stays signed in for the tests after it)
+  sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('slo','100000000000000077','logout','Logout',datetime('now','+1 day'))`);
+  const clo = await cookieFor("slo");
+  process.env.NWEBOS_LOGOUT_COOKIE = clo;   // py() hands process.env to the browser scripts
   py("NwebOS im Browser fehlgeschlagen", "scripts/nwebos-ui.py", BASE, c1);
   py("NwebOS-Apps im Browser fehlgeschlagen", "scripts/nwebos-apps-ui.py", BASE, c1);
   py("Logo-Seitenwechsel „Wohin?“ fehlgeschlagen", "scripts/site-switch-ui.py", BASE);
