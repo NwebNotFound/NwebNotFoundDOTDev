@@ -10,7 +10,7 @@
       mines: "Pixelminen", grid: "Spielfeld 9 mal 9", cell: "Feld", row: "Reihe", col: "Spalte", hidden: "verdeckt", flag: "Flagge", mine: "Mine", near: "Minen nebenan", empty: "leer",
       newGame: "Neues Spiel", flagMode: "Flaggen-Modus", help: "Aufdecken: Klick oder Enter · Flagge: Rechtsklick, ⚑ oder F · Pfeiltasten bewegen",
       won: "Gewonnen!", lost: "Boom! Nochmal?", stats: function (p, w, b) { return "Siege " + w + " von " + p + (b ? " · Bestzeit " + b + " s" : ""); },
-      newWord: "Neues Wort", start: "Errate das Wort mit 5 Buchstaben", five: "Bitte fünf Buchstaben", got: "Geschafft!", was: "Das Wort war ",
+      newWord: "Neues Wort", start: "Errate das Wort mit 5 Buchstaben", five: "Bitte fünf Buchstaben", bad: "Kein gültiges Wort", loading: "Wörter laden …", got: "Geschafft!", was: "Das Wort war ",
       right: "richtig", other: "anderer Platz", no: "nicht drin", enter: "Eingabe", back: "Löschen", lang: "Sprache", letter: "Buchstabe", empty5: "leer",
       fstats: function (p, w, s, b) { return "Gespielt " + p + " · Gewonnen " + w + " · Serie " + s + " (Best " + b + ")"; }
     },
@@ -18,7 +18,7 @@
       mines: "Pixel Mines", grid: "Board 9 by 9", cell: "Cell", row: "row", col: "column", hidden: "hidden", flag: "flag", mine: "mine", near: "mines nearby", empty: "empty",
       newGame: "New game", flagMode: "Flag mode", help: "Reveal: click or Enter · Flag: right-click, ⚑ or F · arrow keys move",
       won: "You won!", lost: "Boom! Again?", stats: function (p, w, b) { return "Wins " + w + " of " + p + (b ? " · best " + b + " s" : ""); },
-      newWord: "New word", start: "Guess the 5-letter word", five: "Five letters, please", got: "Got it!", was: "The word was ",
+      newWord: "New word", start: "Guess the 5-letter word", five: "Five letters, please", bad: "Not in word list", loading: "Loading words …", got: "Got it!", was: "The word was ",
       right: "right", other: "wrong place", no: "not in word", enter: "Enter", back: "Delete", lang: "Language", letter: "letter", empty5: "empty",
       fstats: function (p, w, s, b) { return "Played " + p + " · Won " + w + " · Streak " + s + " (best " + b + ")"; }
     }
@@ -28,6 +28,22 @@
     en: ["PIXEL", "CLOUD", "LIGHT", "NIGHT", "STONE", "BLOCK", "MUSIC", "HEART", "PLANT", "BEACH", "TRAIN", "OCEAN", "CANDY", "SUGAR", "LEMON", "TOWER", "RIVER", "SMILE", "DREAM", "GHOST", "QUEST", "SWORD", "PIANO", "TIGER", "MAGIC", "STORM", "FROST", "GRASS", "BREAD", "HONEY"]
   };
 
+  /* Fünf word lists (public/design/fuenf-words-<lang>.txt): [solutions] = the words to guess, [allowed] = extra valid
+     guesses. Loaded once per language, on first use. Offline (fetch fails): the small built-in list, every guess counts. */
+  var DICT = {};
+  function dict(L) {
+    if (!DICT[L]) DICT[L] = fetch("/design/fuenf-words-" + L + ".txt?v=" + ver).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (txt) {
+      var sec = "", sol = [], ok = new Set();
+      txt.split("\n").forEach(function (line) {
+        line = line.trim(); if (!line || line[0] === "#") return;
+        if (line[0] === "[") { sec = line; return; }
+        line.split(/\s+/).forEach(function (w) { if (w.length !== 5) return; ok.add(w); if (sec === "[solutions]") sol.push(w); });
+      });
+      if (!sol.length) throw new Error("empty");
+      return { sol: sol, ok: ok };
+    }).catch(function () { DICT[L] = null; return null; });
+    return DICT[L];
+  }
   function css() {
     if (document.getElementById("nwebos-games-css")) return;
     var l = document.createElement("link");
@@ -142,39 +158,47 @@
       '<span class="fvmsg" role="status" aria-live="polite"></span><button type="button" class="fvnew"></button></div><div class="fvgrid"></div><div class="kb"></div>' +
       '<p class="fvhelp"><i class="lg t"></i><span data-h1></span><i class="lg o"></i><span data-h2></span><i class="lg s"></i><span data-h3></span></p><p class="mnstat"></p></div>';
     var G = el.querySelector(".fvgrid"), K = el.querySelector(".kb"), msg = el.querySelector(".fvmsg"), sl = el.querySelector(".mnstat");
-    var day = Math.floor(Date.now() / 864e5);
+    var day = Math.floor(Date.now() / 864e5), words = null, gen = 0;   // words: null = loading, false = offline (no check), else { sol, ok }
+    function say(s, bad) { msg.textContent = s; msg.classList.toggle("err", !!bad); }
+    function nope(s) { say(s, true); var r = G.children[row]; r.classList.remove("shake"); void r.offsetWidth; r.classList.add("shake"); setTimeout(function () { r.classList.remove("shake"); }, 400); }
     function showStats() { var s = load(ctx, "stats", {}); sl.textContent = S[L].fstats(s.played || 0, s.won || 0, s.streak || 0, s.best || 0); }
     function tile(y, x) { return G.children[y].children[x]; }
     function tlabel(y, x) { var v = grid[y][x]; return S[L].letter + " " + (x + 1) + (v ? ": " + v : ", " + S[L].empty5); }
     function start(shift) {
-      t = S[L]; var list = WORDS[L]; ans = list[(day + (shift || 0) + (L === "en" ? 3 : 0)) % list.length]; row = 0; col = 0; done = false;
+      t = S[L]; row = 0; col = 0; done = false; words = null; var my = ++gen, pick = function (list) { return list[(day + (shift || 0) + (L === "en" ? 3 : 0)) % list.length]; };
+      ans = pick(WORDS[L]);
+      dict(L).then(function (d) { if (my !== gen) return; words = d || false; if (d && !row) ans = pick(d.sol);   /* nothing rated yet: the real list decides */ });
       grid = []; for (var y = 0; y < 6; y++) grid.push(["", "", "", "", ""]);
       G.innerHTML = ""; for (y = 0; y < 6; y++) { var r = document.createElement("div"); r.className = "fr"; for (var x = 0; x < 5; x++) { var s = document.createElement("span"); s.className = "ft"; s.setAttribute("role", "img"); r.appendChild(s); } G.appendChild(r); }
       for (y = 0; y < 6; y++) for (x = 0; x < 5; x++) tile(y, x).setAttribute("aria-label", tlabel(y, x));
-      var rows = L === "en" ? ["QWERTYUIOP", "ASDFGHJKL", "↵ZXCVBNM⌫"] : ["QWERTZUIOP", "ASDFGHJKL", "↵YXCVBNM⌫"];
+      var rows = L === "en" ? ["QWERTYUIOP", "ASDFGHJKL", "↵ZXCVBNM⌫"] : (matchMedia("(max-width:700px)").matches ? ["QWERTZUIOP", "ASDFGHJKL", "↵YXCVBNM⌫", "ÄÖÜ"] : ["QWERTZUIOPÜ", "ASDFGHJKLÖÄ", "↵YXCVBNM⌫"])   /* phone: umlauts in their own row, 10 keys a row at most (#124 QA) */;
       K.innerHTML = rows.map(function (r) { return "<div>" + r.split("").map(function (k) { var w = k === "↵" || k === "⌫"; return '<button type="button" data-k="' + k + '"' + (w ? ' class="wide" aria-label="' + (k === "↵" ? t.enter : t.back) + '"' : "") + ">" + k + "</button>"; }).join("") + "</div>"; }).join("");
       kmark = {}; [].forEach.call(el.querySelectorAll("[data-v]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.v === L)); b.classList.toggle("on", b.dataset.v === L); });
-      el.querySelector(".fvnew").textContent = t.newWord; msg.textContent = t.start;
+      el.querySelector(".fvnew").textContent = t.newWord; say(t.start);
       el.querySelector("[data-h1]").textContent = t.right; el.querySelector("[data-h2]").textContent = t.other; el.querySelector("[data-h3]").textContent = t.no; showStats();
     }
     function key(k) {
       if (done) return;
       if (k === "⌫" || k === "BACKSPACE") { if (col) { col--; grid[row][col] = ""; var b = tile(row, col); b.textContent = ""; b.classList.remove("in"); b.setAttribute("aria-label", tlabel(row, col)); } return; }
       if (k === "↵" || k === "ENTER") return submit();
-      if (/^[A-Z]$/.test(k) && col < 5) { grid[row][col] = k; var c = tile(row, col); c.textContent = k; c.classList.add("in"); c.setAttribute("aria-label", tlabel(row, col)); col++; ctx.sound.click(); }
+      if ((L === "de" ? /^[A-ZÄÖÜ]$/ : /^[A-Z]$/).test(k) && col < 5) { grid[row][col] = k; var c = tile(row, col); c.textContent = k; c.classList.add("in"); c.setAttribute("aria-label", tlabel(row, col)); col++; ctx.sound.click(); }
     }
     function end(good) {
       done = true;
       var s = load(ctx, "stats", {}); s.played = (s.played || 0) + 1;
       if (good) { s.won = (s.won || 0) + 1; s.streak = (s.streak || 0) + 1; if (s.streak > (s.best || 0)) s.best = s.streak; } else s.streak = 0;
       ctx.store.set("stats", JSON.stringify(s)); showStats();
-      msg.textContent = good ? t.got : t.was + ans;
+      say(good ? t.got : t.was + ans);
       if (good) { ctx.sound.tone(660, 0, .12, "square", .08); ctx.sound.tone(880, .12, .12, "square", .08); ctx.sound.tone(1175, .24, .2, "square", .08); }
     }
     function submit() {
       if (done) return;
-      if (col < 5) { msg.textContent = t.five; var r = G.children[row]; r.classList.add("shake"); setTimeout(function () { r.classList.remove("shake"); }, 400); return; }
-      var g = grid[row], a = ans.split(""), res = ["s", "s", "s", "s", "s"], i;
+      if (col < 5) return nope(t.five);
+      if (words === null) { say(t.loading); var my = gen; dict(L).then(function () { if (my === gen && !done) submit(); }); return; }   // first Enter before the list arrived
+      var g = grid[row], i;
+      if (words && !words.ok.has(g.join(""))) return nope(t.bad);   // not a word: the row stays, nothing is used up
+      var a = ans.split(""), res = ["s", "s", "s", "s", "s"];
+      say("");
       for (i = 0; i < 5; i++) if (g[i] === a[i]) { res[i] = "t"; a[i] = null; }
       for (i = 0; i < 5; i++) if (res[i] !== "t") { var j = a.indexOf(g[i]); if (j > -1) { res[i] = "o"; a[j] = null; } }
       for (i = 0; i < 5; i++) {
@@ -190,11 +214,11 @@
       if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest("input,textarea")) return;
       var k = e.key.toUpperCase(), onBtn = e.target.closest && e.target.closest("button");
       if ((k === "ENTER" || e.key === " ") && onBtn) return;   // a focused button keeps its own Enter/Space
-      if (/^[A-Z]$/.test(k) || k === "ENTER" || k === "BACKSPACE") { e.preventDefault(); key(k); }
+      if (/^[A-ZÄÖÜ]$/.test(k) || k === "ENTER" || k === "BACKSPACE") { e.preventDefault(); key(k); }
     }
     K.addEventListener("click", function (e) { var b = e.target.closest("[data-k]"); if (b) { key(b.dataset.k); win.focus({ preventScroll: true }); } });
     win.addEventListener("keydown", onkey);
-    el.querySelector(".seg2").onclick = function (e) { var b = e.target.closest("button"); if (b) { L = b.dataset.v; start(); win.focus({ preventScroll: true }); } };
+    el.querySelector(".seg2").onclick = function (e) { var b = e.target.closest("button"); if (b && b.dataset.v !== L) { L = b.dataset.v; start(); } win.focus({ preventScroll: true }); };
     el.querySelector(".fvnew").onclick = function () { start(1 + Math.floor(Math.random() * 29)); win.focus({ preventScroll: true }); };   // typing + Enter work right away
     fiveOff.set(el, function () { win.removeEventListener("keydown", onkey); });
     start();
