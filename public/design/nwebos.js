@@ -35,7 +35,8 @@
 
   /* ---------- phone audit A3: one bottom sheet for dialogs, confirms and the quick menu; A4: toasts ---------- */
   var sheetOpener = null;
-  function closeSheet() { $$(".shbd,.shx").forEach(function (e) { e.remove(); }); if (sheetOpener && sheetOpener.focus) { try { sheetOpener.focus({ preventScroll: true }); } catch (e) {} } sheetOpener = null; }
+  var sheetKeys = null;
+  function closeSheet() { if (sheetKeys) { document.removeEventListener("keydown", sheetKeys, true); sheetKeys = null; } $$(".shbd,.shx").forEach(function (e) { e.remove(); }); if (sheetOpener && sheetOpener.focus) { try { sheetOpener.focus({ preventScroll: true }); } catch (e) {} } sheetOpener = null; }
   /* opts: { html, cls, label } ; [data-x] buttons close it; returns the sheet element */
   function sheet(opts) {
     $$(".shbd,.shx").forEach(function (e) { e.remove(); });
@@ -45,10 +46,19 @@
     s.innerHTML = '<i class="grab" aria-hidden="true"></i>' + opts.html;
     document.body.append(bd, s);
     s.addEventListener("click", function (e) { if (e.target.closest("[data-x]")) closeSheet(); });
-    s.addEventListener("keydown", function (e) {
+    /* Esc and Tab while the sheet is open, wherever focus is (a click on its text drops focus to <body>): one
+       document listener in the capture phase, so the page's own Esc never closes the window behind (#123 review) */
+    s.tabIndex = -1;
+    if (sheetKeys) document.removeEventListener("keydown", sheetKeys, true);
+    sheetKeys = function (e) {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSheet(); return; }
-      if (e.key === "Tab") { var f = $$("button,a[href],input,select,textarea", s).filter(function (x) { return !x.disabled && x.offsetParent; }); if (!f.length) return; var a = f[0], z = f[f.length - 1]; if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); } }
-    });
+      if (e.key !== "Tab") return;
+      var f = $$("button,a[href],input,select,textarea", s).filter(function (x) { return !x.disabled && x.offsetParent; }); if (!f.length) { e.preventDefault(); s.focus(); return; }
+      var a = f[0], z = f[f.length - 1], cur = document.activeElement;
+      if (!s.contains(cur)) { e.preventDefault(); (e.shiftKey ? z : a).focus(); return; }   /* focus had left: back inside */
+      if (e.shiftKey && cur === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && cur === z) { e.preventDefault(); a.focus(); }
+    };
+    document.addEventListener("keydown", sheetKeys, true);
     /* swipe down on the grab area closes it */
     var y0 = null; s.addEventListener("touchstart", function (e) { y0 = s.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
     s.addEventListener("touchend", function (e) { if (y0 !== null && e.changedTouches[0].clientY - y0 > 70) closeSheet(); y0 = null; }, { passive: true });
@@ -205,7 +215,7 @@
     var d = opt.pos || DEF[k] || (src && src.dataset.x ? [+src.dataset.x, +src.dataset.y] : [120 + 30 * (seq % 8), 60 + 24 * (seq % 8)]); seq++;
     if (src && src.dataset.menu === "no") opt.menu = false;
     var p = clampPos(d[0], d[1], w, h);
-    el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = h + "px";
+    el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = Math.min(h, innerHeight - 46) + "px";   /* short laptop screens: the window fits above the taskbar, its content scrolls */
     var ico = opt.icon || icon16(k), tt = esc(opt.title || title(k));
     el.innerHTML = '<header class="wt"><button type="button" class="wb back" aria-label="' + esc(L.back) + '"><span class="wbt">‹</span>' + ic2("back") + '</button>' + ico + '<span class="tt">' + tt + '</span>' +
       '<button type="button" class="wb mn" aria-label="' + esc(L.minimize) + '">–</button><button type="button" class="wb mx" aria-label="' + esc(L.maximize) + '">□</button><button type="button" class="wb x" aria-label="' + esc(L.close) + '"><span class="wbt">×</span>' + ic2("close") + '</button></header>' + (opt.menu === false ? '' : '<nav class="wm" aria-hidden="true">' + (L.menu || []).map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</nav>') + '<div class="wc"></div><span class="wr" aria-hidden="true"></span>';
@@ -528,6 +538,7 @@
     if (!open.size) { var d = $(".dicon"); if (d) d.focus({ preventScroll: true }); }
   }
   addEventListener("popstate", function () {
+    if ($(".shx")) closeSheet();   /* Back on a phone: the sheet goes with it, never left over the next window */
     var k = appOf(location.pathname);
     if (k) { openWin(k, { noPush: true }); return; }
     if (bare(location.pathname) !== "/") { openUrl(location.href, { noPush: true }); return; }

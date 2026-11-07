@@ -186,5 +186,40 @@ with sync_playwright() as p:
         c.unroute_all(behavior="ignoreErrors"); c.close()
         print("PASS 375 signed in: guestbook counter, profile delete sheet (kept), logout sheet (cancelled)")
 
+    # #123 review round 1
+    # (2) short laptop screen: the bigger Fünf window fits above the taskbar, its keyboard reachable by scrolling
+    c = ctx_for(br, 1280); pg = c.new_page(); pg.set_viewport_size({"width": 1280, "height": 720}); pg.on("pageerror", lambda e: errs.append(str(e)))
+    open_win(pg, "/")
+    pg.locator("#startb").click(); pg.locator('#startm [data-open="five"]').click(); pg.wait_for_selector(".g-five .kb button")
+    wb = pg.locator(".win.focus").bounding_box()
+    assert wb["y"] + wb["height"] <= 720 - 36 + 1, ("Fünf window under the taskbar at 1280x720", wb)
+    pg.locator('.g-five .kb [data-k="↵"]').scroll_into_view_if_needed(); kb = pg.locator('.g-five .kb [data-k="↵"]').bounding_box()
+    assert kb["y"] + kb["height"] <= 720 - 36 + 1, ("Enter key reachable", kb)
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 1280x720: Fünf fits above the taskbar, its keyboard is reachable")
+    if COOKIE:
+        # (1) a click on the sheet's text, then Esc: only the sheet closes, the window behind stays; Tab stays inside
+        c = ctx_for(br, 1280, cookie=COOKIE); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+        open_win(pg, "/profile")
+        for i in range(pg.locator(".win.focus .utabs button").count()):
+            if pg.locator(".win.focus .utabs button").nth(i).inner_text().strip() == "Einstellungen":
+                pg.locator(".win.focus .utabs button").nth(i).click(); break
+        pg.locator(".win.focus [data-pf-delete]").click(); ask = pg.locator(".shx.ask"); ask.wait_for()
+        ask.locator("h2").click(); pg.keyboard.press("Tab")
+        assert pg.evaluate("document.querySelector('.shx').contains(document.activeElement)"), "Tab after a click on the text stays in the sheet"
+        ask.locator("p").first.click(); pg.keyboard.press("Escape"); pg.wait_for_timeout(200)
+        assert pg.locator(".shx").count() == 0 and pg.locator('.win:not(.min)[aria-label="Mein Profil"], .win:not(.min) .pf').count() >= 1, "Esc closes the sheet only, the Profil window stays"
+        c.unroute_all(behavior="ignoreErrors"); c.close()
+        # (3) phone: Back with the sheet open closes the sheet
+        c = ctx_for(br, 375, cookie=COOKIE); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+        open_win(pg, "/guestbook"); open_win(pg, "/profile")
+        for i in range(pg.locator(".win.focus .utabs button").count()):
+            if pg.locator(".win.focus .utabs button").nth(i).inner_text().strip() == "Einstellungen":
+                pg.locator(".win.focus .utabs button").nth(i).click(); break
+        pg.locator(".win.focus [data-pf-delete]").click(); pg.locator(".shx.ask").wait_for()
+        pg.go_back(); pg.wait_for_timeout(400)
+        assert pg.locator(".shx").count() == 0 and pg.locator(".shbd").count() == 0, "Back closes the sheet"
+        c.unroute_all(behavior="ignoreErrors"); c.close()
+        print("PASS sheet: click on text + Esc closes only the sheet, Tab stays inside, Back closes it on the phone")
     assert not errs, errs
     br.close()
