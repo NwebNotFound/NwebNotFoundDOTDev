@@ -53,7 +53,10 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   if (testHost === "nwebnotfound.dev" && !os && !/(^|;\s*)nnf_os=/.test(cookie || "")) cookie = cookie ? cookie + "; nnf_os=0" : "nnf_os=0";
   if (cookie) h.cookie = cookie;
   if (origin) h.origin = origin;
-  const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
+  // One retry when the dev server reset a reused keep-alive socket (idle while `wrangler d1 execute` runs); a reset
+  // there arrives before the request is handled.
+  const go = () => fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" });
+  const r = await go().catch((e) => { if (["ECONNRESET", "UND_ERR_SOCKET"].includes(e?.cause?.code)) return go(); throw e; }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
 };
 const TS_OK = "XXXX.DUMMY.TOKEN.XXXX"; // Turnstile test secret: every token passes
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
