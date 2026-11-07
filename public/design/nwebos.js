@@ -177,7 +177,7 @@
   /* Phone: an open app covers the home screen, so its icons leave the Tab order (inert) until the app is minimized or closed. Home stays reachable. */
   function syncInert() { var ic = $(".dicons"); if (ic) ic.inert = !!(PHONE() && topWindow()); }
   new MutationObserver(syncInert).observe(wins, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
-  addEventListener("resize", syncInert);
+  matchMedia("(max-width:700px)").addEventListener("change", syncInert);   /* breakpoint only, no resize listener (perf budget) */
 
   /* ---------- keyboard ---------- */
   document.addEventListener("keydown", function (e) {
