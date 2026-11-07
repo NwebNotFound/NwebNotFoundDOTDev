@@ -11,9 +11,9 @@
   function post(url, body) { return fetch(url, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { s: r.status, j: j }; }); }); }
 
   function filter(bl) {
-    var cat = ($(".cats .on", bl) || {}).dataset ? $(".cats .on", bl).dataset.cat : "", tagB = $(".tagc .on", bl), tag = tagB ? tagB.dataset.tag : "", q = (($("[data-bq]", bl) || {}).value || "").trim().toLowerCase();
+    var cat = ($(".cats .on", bl) || {}).dataset ? $(".cats .on", bl).dataset.cat : "", tagB = $(".tagc .on", bl), tag = tagB ? tagB.dataset.tag : "", monB = $(".arch .on", bl), mon = monB ? monB.dataset.month : "", q = (($("[data-bq]", bl) || {}).value || "").trim().toLowerCase();
     var n = 0;
-    $$("[data-q]", bl).forEach(function (it) { var ok = (!cat || it.dataset.cat === cat) && (!tag || it.dataset.q.indexOf(tag) >= 0) && (!q || it.dataset.q.indexOf(q) >= 0); it.hidden = !ok; if (ok) n++; });
+    $$("[data-q]", bl).forEach(function (it) { var ok = (!cat || it.dataset.cat === cat) && (!mon || it.dataset.m === mon) && (!tag || it.dataset.q.indexOf(tag) >= 0) && (!q || it.dataset.q.indexOf(q) >= 0); it.hidden = !ok; if (ok) n++; });
     var nh = $(".nohit", bl); if (nh) nh.hidden = n > 0;
   }
   // reader: progress bar (CSS scroll timeline where supported, else this passive listener), TOC, saved progress
@@ -24,7 +24,7 @@
     var upd = function () {
       var max = sc.scrollHeight - sc.clientHeight, p = max > 0 ? Math.min(1, sc.scrollTop / max) : 0;
       if (!CSS_PROGRESS && bar) bar.style.setProperty("--p", p);
-      if (toc.length) { var cur = toc[0]; toc.forEach(function (b) { var h = rd.querySelector("#" + CSS.escape(b.dataset.jump)); if (h && h.offsetTop - sc.offsetTop - 40 <= sc.scrollTop) cur = b; }); toc.forEach(function (b) { b.classList.toggle("on", b === cur); }); }
+      if (toc.length) { var cur = toc[0]; toc.forEach(function (b) { var h = rd.querySelector("#" + CSS.escape(b.dataset.jump)); if (h && h.offsetTop - sc.offsetTop - 40 <= sc.scrollTop) cur = b; }); if (max > 0 && sc.scrollTop >= max - 2) cur = toc[toc.length - 1];   /* at the end: the last section, even when it can't reach the top */ toc.forEach(function (b) { b.classList.toggle("on", b === cur); }); }
       var pct = Math.round(p * 100);
       if (k && window.__me && window.__me.user && pct >= sent + 10) { best = Math.max(best, pct); clearTimeout(sendT); sendT = setTimeout(function () { sent = best; post("/api/blog/progress", { key: k, pct: best }); }, 2500); }
     };
@@ -45,7 +45,8 @@
     }
     if ((b = t.closest(".cats [data-cat]"))) { var bl = b.closest(".bl"); $$(".cats button", bl).forEach(function (x) { x.classList.toggle("on", x === b); }); filter(bl); return; }
     if ((b = t.closest(".tagc [data-tag]"))) { var bl2 = b.closest(".bl"), on = !b.classList.contains("on"); $$(".tagc button", bl2).forEach(function (x) { x.classList.remove("on"); }); b.classList.toggle("on", on); filter(bl2); return; }
-    if ((b = t.closest("[data-clear]"))) { var bl3 = b.closest(".bl"); $("[data-bq]", bl3).value = ""; $$(".tagc .on", bl3).forEach(function (x) { x.classList.remove("on"); }); $(".cats [data-cat='']", bl3).click(); return; }
+    if ((b = t.closest(".arch [data-month]"))) { var bl4 = b.closest(".bl"), on4 = !b.classList.contains("on"); $$(".arch button", bl4).forEach(function (x) { x.classList.remove("on"); x.setAttribute("aria-pressed", "false"); }); b.classList.toggle("on", on4); b.setAttribute("aria-pressed", String(on4)); filter(bl4); return; }
+    if ((b = t.closest("[data-clear]"))) { var bl3 = b.closest(".bl"); $("[data-bq]", bl3).value = ""; $$(".tagc .on, .arch .on", bl3).forEach(function (x) { x.classList.remove("on"); x.removeAttribute("aria-pressed"); }); $(".cats [data-cat='']", bl3).click(); return; }
     if ((b = t.closest("[data-react]"))) {
       var grp2 = b.closest("[data-rx]");
       post("/api/blog/react", { slug: grp2.dataset.rx, kind: b.dataset.react }).then(function (r) {
