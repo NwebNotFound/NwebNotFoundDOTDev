@@ -148,8 +148,13 @@ with sync_playwright() as p:
         with pg.expect_navigation(wait_until="load"):
             pg.locator("[data-egg=logout]").click()
         assert posts and posts[0] == "POST", posts
-        assert urlsplit(pg.url).netloc == H and pg.locator("#login").is_visible() and pg.locator("[data-login-me]").is_hidden(), "one click: logged out, NwebOS login"
-        assert pg.evaluate("fetch('/api/me', {credentials: 'include'}).then(r => r.json()).then(d => !d.user)"), "session ended"
+        diag = lambda: (pg.url, pg.title(), pg.evaluate("[!!document.querySelector('#login:not([hidden])'), !!document.querySelector('[data-login-me]:not([hidden])'), document.documentElement.className]"))
+        assert urlsplit(pg.url).netloc == H, diag()
+        try: pg.locator("#login").wait_for(state="visible", timeout=10000)
+        except Exception: raise AssertionError(("login screen after Abmelden", diag()))
+        me = pg.evaluate("fetch('/api/me', {credentials: 'include'}).then(r => r.json())")
+        assert not me.get("user"), ("session ended", me)
+        pg.wait_for_function("() => document.querySelector('[data-login-me]').hidden", timeout=10000)
         c.unroute_all(behavior="ignoreErrors"); c.close()
         print("PASS 1280 Abmelden with a real session: one POST, logged out, login screen")
     else:
