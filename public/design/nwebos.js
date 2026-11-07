@@ -174,6 +174,10 @@
     d.addEventListener("dblclick", function () { if (d.dataset.open) openWin(d.dataset.open); else location.href = d.href; });
   });
   $("[data-home]").onclick = function () { var t = topWindow(); if (t) minimize(t); };
+  /* Phone: an open app covers the home screen, so its icons leave the Tab order (inert) until the app is minimized or closed. Home stays reachable. */
+  function syncInert() { var ic = $(".dicons"); if (ic) ic.inert = !!(PHONE() && topWindow()); }
+  new MutationObserver(syncInert).observe(wins, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+  addEventListener("resize", syncInert);
 
   /* ---------- keyboard ---------- */
   document.addEventListener("keydown", function (e) {

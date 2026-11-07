@@ -150,6 +150,16 @@ with sync_playwright() as p:
     assert pg.locator(".win.min").count() == 1 and path(pg) == "/"
     pg.goto(f"https://{H}/guestbook", wait_until="load"); pg.wait_for_timeout(300)
     shot(pg, "phone-guestbook-375.png")
+    # Keyboard: while the app covers the home screen, Tab never lands on a covered home icon; Home stays reachable and restores them.
+    pg.wait_for_selector(".win.focus")
+    assert pg.evaluate("document.querySelector('.dicons').inert === true"), "home icons are inert behind the open app"
+    seen = []
+    for _ in range(25):
+        pg.keyboard.press("Tab"); seen.append(pg.evaluate("document.activeElement.className + '|' + (document.activeElement.closest('.dicons') ? 'ICON' : '')"))
+    assert not any("ICON" in x for x in seen), seen
+    pg.focus("[data-home]"); pg.keyboard.press("Enter"); pg.wait_for_timeout(300)
+    assert pg.evaluate("document.querySelector('.dicons').inert === false"), "icons are back after Home"
+    pg.keyboard.press("Tab"); pg.focus(".dicon"); assert pg.evaluate("document.activeElement.classList.contains('dicon')"), "an icon takes focus again"
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 375 home screen, full-screen app, home button")
 
