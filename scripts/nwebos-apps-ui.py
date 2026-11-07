@@ -73,10 +73,16 @@ with sync_playwright() as p:
     pg.locator('.win.focus .cats [data-cat="server"]').click()
     assert pg.locator(".win.focus [data-q]:visible").count() == 1
     pg.locator('.win.focus .cats [data-cat=""]').click()
+    mb = pg.locator(".win.focus .arch [data-month]").first
+    n_m = int(mb.locator("em").inner_text()); mb.click()
+    assert mb.get_attribute("aria-pressed") == "true" and pg.locator(".win.focus [data-q]:visible").count() == n_m, "archive month filters in place"
+    mb.click(); assert pg.locator(".win.focus [data-q]:visible").count() == pg.locator(".win.focus [data-q]").count()
     pg.locator('.win.focus a[href="/blog/eine-navigation-fuer-zwei-seiten"]').first.click()
     pg.locator(".win.focus .rd .post h1").wait_for()
     assert urlsplit(pg.url).path == "/blog/eine-navigation-fuer-zwei-seiten" and pg.evaluate("window.__marker") == 1, "opened without a page load"
     assert pg.locator(".win.focus .toc li").count() >= 2 and pg.locator(".win.focus .post h2[id]").count() >= 2
+    pg.evaluate("document.querySelector('.win.focus .rscroll').scrollTop = 1e6"); pg.wait_for_timeout(300)
+    assert pg.evaluate("(() => { const l = [...document.querySelectorAll('.win.focus .toc a')]; return l[l.length - 1].classList.contains('on'); })()"), "TOC marks the last section at the end"
     # guest reaction: refused (needs Discord), count unchanged
     before = pg.locator('.win.focus [data-react="heart"] em').inner_text()
     pg.locator('.win.focus [data-react="heart"]').click(); pg.wait_for_timeout(500)

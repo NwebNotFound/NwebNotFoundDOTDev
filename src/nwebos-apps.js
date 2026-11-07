@@ -25,19 +25,20 @@ export function blogList(lang, posts = []) {
   const de = lang !== "en";
   const tags = [...new Set(posts.flatMap((p) => p.tags))].slice(0, 12);
   const months = new Map();
-  for (const p of posts) { const b = berlin(p.published_at); const key = `${b.y}-${String(b.m).padStart(2, "0")}`; months.set(key, (months.get(key) || 0) + 1); }
+  const mk = (p) => { const b = berlin(p.published_at); return `${b.y}-${String(b.m).padStart(2, "0")}`; };
+  for (const p of posts) months.set(mk(p), (months.get(mk(p)) || 0) + 1);
   const q = (p) => esc(`${p.title} ${p.tags.join(" ")}`.toLowerCase());
   const link = (p) => href(lang, "/blog/" + p.slug);
   const [feat, ...rest] = posts;
-  const featHtml = feat ? `<article class="feat" data-cat="${esc(feat.category)}" data-q="${q(feat)}"><a class="cover" href="${link(feat)}" aria-label="${esc(feat.title)} ${de ? "lesen" : "read"}"><span class="sky"></span>${ic("blog", 64)}<i class="new">${de ? "Neu" : "New"}</i></a>
+  const featHtml = feat ? `<article class="feat" data-cat="${esc(feat.category)}" data-m="${mk(feat)}" data-q="${q(feat)}"><a class="cover" href="${link(feat)}" aria-label="${esc(feat.title)} ${de ? "lesen" : "read"}"><span class="sky"></span>${ic("blog", 64)}<i class="new">${de ? "Neu" : "New"}</i></a>
 <div class="fbody">${chip(feat.category, lang)}<h3><a href="${link(feat)}">${esc(feat.title)}</a></h3><p>${esc(feat.summary)}</p><p class="meta">${dateLong(feat.published_at)} · ${minutes(feat.body_len)} ${de ? "Min. Lesezeit" : "min read"} · ${rxc(feat.hearts)}</p></div></article>` : "";
-  const rows = rest.map((p) => { const b = berlin(p.published_at); return `<li data-cat="${esc(p.category)}" data-q="${q(p)}"><a href="${link(p)}"><span class="dblk"><b>${b.d}</b>${MONTHS[de ? "de" : "en"][b.m - 1]}</span><span class="bt">${chip(p.category, lang)}<b>${esc(p.title)}</b><small>${esc(p.summary)}</small></span><span class="bm">${minutes(p.body_len)} Min.<br>${rxc(p.hearts)}</span></a></li>`; }).join("");
+  const rows = rest.map((p) => { const b = berlin(p.published_at); return `<li data-cat="${esc(p.category)}" data-m="${mk(p)}" data-q="${q(p)}"><a href="${link(p)}"><span class="dblk"><b>${b.d}</b>${MONTHS[de ? "de" : "en"][b.m - 1]}</span><span class="bt">${chip(p.category, lang)}<b>${esc(p.title)}</b><small>${esc(p.summary)}</small></span><span class="bm">${minutes(p.body_len)} Min.<br>${rxc(p.hearts)}</span></a></li>`; }).join("");
   const empty = de ? "Noch keine Beiträge. Der erste kommt bald." : "No posts yet. The first one is coming soon.";
   return `<div class="bl"><aside class="tasks bl-side" aria-label="Filter">
 <div class="tp"><b>${de ? "Suchen" : "Search"}</b><form class="bsearch" role="search" action="${href(lang, "/blog")}"><input type="search" name="q" data-bq placeholder="${de ? "Titel oder Tags …" : "Title or tags …"}" aria-label="${de ? "Titel oder Tags suchen" : "Search title or tags"}"><kbd>/</kbd></form></div>
 <div class="tp"><b>${de ? "Kategorien" : "Categories"}</b><nav class="cats" aria-label="${de ? "Kategorien" : "Categories"}"><button type="button" class="on" data-cat="">${de ? "Alle" : "All"} <em>${posts.length}</em></button>${CATS.map(([k]) => `<button type="button" data-cat="${k}">${esc(catName(k, lang))} <em>${posts.filter((p) => p.category === k).length}</em></button>`).join("")}</nav></div>
 ${tags.length ? `<details class="tp more" open><summary><b>Tags</b></summary><span class="tagc">${tags.map((t) => `<button type="button" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</span></details>` : ""}
-${months.size ? `<details class="tp more" open><summary><b>${de ? "Archiv" : "Archive"}</b></summary><span class="arch">${[...months].map(([k, n]) => `<span>${MONTHS_LONG[de ? "de" : "en"][+k.slice(5) - 1]} ${k.slice(0, 4)} <em>${n}</em></span>`).join("")}</span></details>` : ""}
+${months.size ? `<details class="tp more" open><summary><b>${de ? "Archiv" : "Archive"}</b></summary><span class="arch">${[...months].map(([k, n]) => `<button type="button" data-month="${k}" aria-pressed="false">${MONTHS_LONG[de ? "de" : "en"][+k.slice(5) - 1]} ${k.slice(0, 4)} <em>${n}</em></button>`).join("")}</span></details>` : ""}
 <div class="tp"><a href="/blog/feed.xml" class="rss">${ic("blog", 14)} RSS-Feed</a><span>${de ? "Den Roman findest du unter" : "The novel lives in"} <a href="${href(lang, "/writing")}" data-open="writing">${de ? "Texte" : "Writing"}</a>.</span></div></aside>
 <div class="bl-main"><p class="bl-h"><b>${de ? "Notizen vom Bauen." : "Notes from building."}</b> <span>${posts.length} ${de ? (posts.length === 1 ? "Beitrag" : "Beiträge") : posts.length === 1 ? "post" : "posts"}</span></p>
 ${posts.length ? featHtml + `<ul class="bposts">${rows}</ul><p class="empty nohit" hidden>${de ? "Keine passenden Beiträge." : "No matching posts."} <button type="button" class="lnk" data-clear>${de ? "Filter zurücksetzen" : "Reset filters"}</button></p>` : `<p class="empty">${empty}</p>`}</div></div>`;
@@ -78,7 +79,9 @@ const TN = { website: ["Website", "Website"], server: ["Server", "Server"], blog
 export function changelog(lang, today = new Date()) {
   const de = lang !== "en";
   const groups = new Map();
-  const add = (iso, t, title, text) => { if (!groups.has(iso)) groups.set(iso, []); groups.get(iso).push({ t, title, text }); };
+  // one row per change: the mc changelog repeats some website changes of the same day (Design QA #115)
+  const key = (x) => String(x).toLowerCase().replace(/[^a-z0-9äöüß]+/g, " ").trim();
+  const add = (iso, t, title, text) => { if (!groups.has(iso)) groups.set(iso, []); const g = groups.get(iso); if (g.some((x) => key(x.title) === key(title))) return; g.push({ t, title, text }); };
   for (const [iso, t, tde, ten, xde, xen] of SITE_LOG) add(iso, t, de ? tde : ten, de ? xde : xen);
   const year = today.getUTCFullYear();
   for (const e of latestEntries(24, undefined, lang)) {
