@@ -160,6 +160,15 @@ with sync_playwright() as p:
     pg.focus("[data-home]"); pg.keyboard.press("Enter"); pg.wait_for_timeout(300)
     assert pg.evaluate("document.querySelector('.dicons').inert === false"), "icons are back after Home"
     pg.keyboard.press("Tab"); pg.focus(".dicon"); assert pg.evaluate("document.activeElement.classList.contains('dicon')"), "an icon takes focus again"
+    # Closing the last visible app (Close button, then Escape) hands focus to a home icon, never to BODY.
+    for how in ("close", "escape"):
+        pg.locator(".win.min").evaluate_all("els => els.forEach(e => e.querySelector('.x').click())"); pg.wait_for_timeout(400)
+        pg.locator('.dicon[data-open="portfolio"]').click(); pg.wait_for_selector(".win.focus")
+        assert pg.evaluate("document.querySelector('.dicons').inert === true")
+        if how == "close": pg.locator(".win.focus .x").click()
+        else: pg.keyboard.press("Escape")
+        pg.wait_for_timeout(400)
+        assert pg.evaluate("document.querySelector('.dicons').inert === false and !!document.activeElement.closest('.dicons')".replace(" and ", " && ")), (how, pg.evaluate("document.activeElement.tagName + '.' + document.activeElement.className"))
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 375 home screen, full-screen app, home button")
 

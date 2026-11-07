@@ -132,6 +132,7 @@
     var o = open.get(k); if (!o) return; open.delete(k); o.btn.remove(); sound.close();
     var done = function () { o.el.remove(); };
     if (RM) done(); else { o.el.classList.add("closing"); after(o.el, done); }
+    syncInert();   /* before focus moves: an inert icon list cannot take it */
     var t = topWindow(); if (t) { focus(t, false); open.get(t).el.focus({ preventScroll: true }); } else { $("#mtitle").textContent = "NwebOS"; var di = $(".dicon"); if (di) di.focus({ preventScroll: true }); }
     if (!fromHistory) history.replaceState({ k: t && APPS[t] ? t : "" }, "", pathOf(t && APPS[t] ? t : ""));
     document.title = (t && APPS[t] ? title(t) + " · " : "") + "NwebOS";
