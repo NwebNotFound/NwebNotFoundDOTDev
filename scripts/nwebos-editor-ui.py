@@ -14,9 +14,9 @@ H = "nwebnotfound.dev"
 SHOTS = os.environ.get("E2E_SCREENS_DIR", "")
 
 
-def ctx_for(br, width, cookie=""):
-    c = br.new_context(viewport={"width": width, "height": 800 if width > 700 else 760})
-    c.add_init_script("try{localStorage.setItem('nwebos.booted','1');localStorage.setItem('nwebos.user','gast')}catch(e){}")
+def ctx_for(br, width, cookie="", night=False):
+    c = br.new_context(viewport={"width": width, "height": 800 if width > 700 else (932 if width > 400 else 812)}, has_touch=width < 700)
+    c.add_init_script("try{localStorage.setItem('nwebos.booted','1');localStorage.setItem('nwebos.user','gast');%s}catch(e){}" % ("localStorage.setItem('summer-theme','summer-night');" if night else ""))
     if cookie:
         n, v = cookie.split("=", 1)
         c.add_cookies([{"name": n, "value": unquote(v), "domain": H, "path": "/", "secure": True, "httpOnly": True}])
@@ -87,7 +87,7 @@ with sync_playwright() as p:
     assert "#nwebos" in win.locator("[data-tags]").inner_text()
     assert "Wörter" in win.locator("[data-wc]").inner_text()
     shot(pg, "editor-1280.png")
-    win.locator("[data-publish]").click()
+    win.locator(".edtop [data-publish]").click()
     pg.wait_for_function("() => document.querySelector('[data-pill]').textContent === 'Veröffentlicht'", timeout=10000)
     assert win.locator("[data-status=draft]").is_visible() and win.locator("[data-status=withdrawn]").is_visible(), "published: back to draft / withdraw"
     # the published post is the reader window
@@ -172,15 +172,28 @@ with sync_playwright() as p:
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS editor: a saved editor window is never restored (signed out: desktop, not the login)")
 
-    # phone: full-screen window, Text/Vorschau switch
-    c = ctx_for(br, 375, ADMIN); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(f"https://{H}/blog/admin/{pid}", wait_until="load")
-    win = pg.locator('.win[aria-label="Blog-Editor"]'); win.locator("[name=body]").wait_for(state="visible")
-    assert pg.locator(".win.focus").bounding_box()["width"] == 375 and pg.evaluate("document.documentElement.scrollWidth") <= 375
-    win.locator('[data-edv="pv"]').click()
-    assert win.locator("[data-pv]").is_visible() and win.locator("[name=body]").is_hidden(), "phone: preview instead of text"
-    shot(pg, "x-editor-preview-375.png")
-    c.unroute_all(behavior="ignoreErrors"); c.close()
+    # phone (Planner 07.11.): one column, full-width fields, Text/Vorschau tabs, status + Veröffentlichen in a sticky
+    # bottom bar, DE/EN segmented, no horizontal scroll; 375 and 430, day and night
+    for width in (375, 430):
+        for night in (False, True):
+            c = ctx_for(br, width, ADMIN, night); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+            pg.goto(f"https://{H}/blog/admin/{pid}", wait_until="load")
+            win = pg.locator('.win[aria-label="Blog-Editor"]'); win.locator("[name=body]").wait_for(state="visible")
+            assert pg.locator(".win.focus").bounding_box()["width"] == width and pg.evaluate("document.documentElement.scrollWidth") <= width, "no horizontal scroll"
+            bar = win.locator(".edbar")
+            assert bar.is_visible() and bar.locator("[data-publish]").is_visible() and win.locator(".edtop [data-publish]").is_hidden(), "actions in the bottom bar"
+            wb = pg.locator(".win.focus").bounding_box(); bb = bar.bounding_box()
+            assert abs((bb["y"] + bb["height"]) - (wb["y"] + wb["height"])) <= 8, ("bar sits at the bottom of the window", bb, wb)
+            for sel in ("[name=title]", "[name=slug]", "[name=category]", "[name=summary]"):
+                fb = win.locator(sel).bounding_box(); assert fb["height"] >= 40 and fb["width"] >= width * 0.5, (sel, fb)
+            tw = win.locator("[name=title]").bounding_box()["width"]; assert tw >= width - 40, ("title full width", tw)
+            assert win.locator(".meta .seg [data-lang]").count() == 2
+            name = f"editor-{'night' if night else 'day'}-{width}"
+            shot(pg, name + ".png")
+            win.locator('[data-edv="pv"]').click()
+            assert win.locator("[data-pv]").is_visible() and win.locator("[name=body]").is_hidden(), "phone: preview instead of text"
+            shot(pg, name + "-preview.png")
+            c.unroute_all(behavior="ignoreErrors"); c.close()
     assert not errs, errs
-    print("PASS editor 375: full-screen, Text/Vorschau switch")
+    print("PASS editor 375/430 day+night: one column, full-width fields, bottom action bar, Text/Vorschau tabs, no horizontal scroll")
     br.close()

@@ -30,7 +30,7 @@
       '<div class="tool" role="toolbar" aria-label="Formatieren">' + TOOLS.map(function (t, i) { return '<button type="button" data-md-ins="' + i + '" title="' + esc(t[1]) + '">' + t[2] + "</button>"; }).join("") +
       '<span class="sp"></span><span class="segm" role="group" aria-label="Ansicht"><button type="button" class="on" data-edv="md">Text</button><button type="button" data-edv="pv">Vorschau</button></span></div>' +
       '<div class="split" data-edview="md"><textarea class="md" name="body" aria-label="Markdown" spellcheck="true"></textarea><div class="pv post" data-pv aria-label="Vorschau"></div></div>' +
-      '<p class="edfoot"><span data-wc></span><span>Markdown · Bilder nur aus /content-assets/ · Strg+S speichert sofort<button type="button" class="lnk" data-status="draft" hidden> · Zurück zu Entwurf</button><button type="button" class="lnk" data-status="withdrawn" hidden> · Zurückziehen</button><button type="button" class="lnk" data-rotate> · Neuer Vorschau-Link</button></span></p></div></section>' +
+      '<div class="edbar" role="group" aria-label="Status und Veröffentlichen"><span class="pill" data-pill></span><button type="button" class="xpbtn" data-plink disabled>Vorschau-Link</button><button type="button" class="xpbtn go" data-publish disabled>Veröffentlichen</button></div><p class="edfoot"><span data-wc></span><span>Markdown · Bilder nur aus /content-assets/ · Strg+S speichert sofort<button type="button" class="lnk" data-status="draft" hidden> · Zurück zu Entwurf</button><button type="button" class="lnk" data-status="withdrawn" hidden> · Zurückziehen</button><button type="button" class="lnk" data-rotate> · Neuer Vorschau-Link</button></span></p></div></section>' +
       '<section class="edl" data-panel-ed="l" hidden><p class="btns"><button type="button" class="xpbtn go" data-new>+ Neuer Beitrag</button></p><table class="xtbl"><thead><tr><th>Titel</th><th>Status</th><th>Kategorie</th><th>Geändert</th><th></th></tr></thead><tbody data-rows></tbody></table>' +
       '<p class="hint">Nur für dich sichtbar (Admin). Entwürfe sieht sonst nur, wer den Vorschau-Link hat.</p></section></div>';
   }
@@ -53,7 +53,9 @@
     function pill(status) {
       // only the status changes that apply: a draft can be published, a published post withdrawn or taken back to draft
       $("[data-status='draft']").hidden = status === "draft"; $("[data-status='withdrawn']").hidden = status !== "published";
-      var p = $("[data-pill]"), x = ST[status] || ST.draft; p.className = "pill " + x[0]; p.textContent = x[1]; $("[data-publish]").textContent = status === "published" ? "Veröffentlicht ✓" : "Veröffentlichen"; }
+      var x = ST[status] || ST.draft;
+      $$("[data-pill]").forEach(function (p) { p.className = "pill " + x[0]; p.textContent = x[1]; });
+      $$("[data-publish]").forEach(function (b) { b.textContent = status === "published" ? "Veröffentlicht ✓" : "Veröffentlichen"; }); }
     function drawTags() {
       $$(".tagsin > span").forEach(function (n) { n.remove(); });
       var inp = $("[data-tagin]");
@@ -121,7 +123,7 @@
         if (r.s !== 200) { say("Fehler: " + (r.j.error || r.s)); return; }
         st.id = id; st.post = r.j; st.base = r.j.updated_at; st.tags = (r.j.tags || []).slice(); st.lang = "de"; st.dirty = false; st.keep = null; conflict(false);
         field("slug").value = r.j.slug || ""; field("category").value = r.j.category || "notizen"; drawTags(); pill(r.j.status); showLang();
-        $("[data-form]").hidden = false; $("[data-empty]").hidden = true; $("[data-plink]").disabled = false; $("[data-publish]").disabled = false;
+        $("[data-form]").hidden = false; $("[data-empty]").hidden = true; $$("[data-plink], [data-publish]").forEach(function (b) { b.disabled = false; });
         say("✓ Gespeichert · " + when(r.j.updated_at)); setAddress(id); pane("w");
         var d = readDraft(id); if (d && d.body) { $("[data-draft-at]").textContent = when(d.at); $("[data-draft]").hidden = false; }
       });

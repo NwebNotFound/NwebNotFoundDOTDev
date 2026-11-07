@@ -216,3 +216,25 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
 .meta .sum{flex-basis:100%;display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--mut)}.meta .sum input{flex:1;min-width:0;padding:3px 6px;border:1px solid #7f9db9;font:12px var(--f)}
 .edw>[data-form]{display:flex;flex-direction:column;flex:1;min-height:0}.edw>[data-form][hidden]{display:none}
 .meta .ttl{padding:4px 6px;border:1px solid transparent;font:700 20px var(--f);background:none}.meta .ttl:focus{border-color:#7f9db9;background:#fff}
+/* editor on phones (Planner 07.11., Nils' screenshot of the #106 page): one column, full-width fields in the NwebOS
+   control family (mockups/nwebos/phone-polish: 2px edge, radius 10, 44px), Text/Vorschau as tabs, status and
+   Veröffentlichen in a sticky bottom bar above the safe area. Tokens from nwebos-polish.css, day fallbacks. */
+.edbar{display:none}
+@media (max-width:700px){
+ .edw{overflow:auto}.edw>[data-form]{flex:none;min-height:100%}
+ .ed .edtop [data-plink],.ed .edtop [data-publish]{display:none}
+ .meta{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:10px;padding:12px}.meta .sum{flex-basis:auto}
+ .meta>label,.meta .sum{display:flex;flex-direction:column;align-items:stretch;gap:4px;font-size:13px;color:var(--mut2,#5b6170)}
+ .meta input,.meta select,.meta .ttl{width:100%;min-height:44px;padding:0 12px;border:2px solid var(--edge,#1b2238);border-radius:10px;font:16px var(--f);background:var(--pn,#fff);color:var(--txt,#1b1f2a)}
+ .meta .ttl{font:700 20px var(--f)}.meta .ttl:focus,.meta input:focus,.meta select:focus{outline:3px solid #ffd23f;outline-offset:1px}
+ .slug{display:flex;align-items:center;gap:2px}.slug input{flex:1;width:auto}
+ .tagsin{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:44px;padding:6px 8px;border:2px solid var(--edge,#1b2238);border-radius:10px;background:var(--pn,#fff)}.tagsin input{flex:1;min-width:90px;min-height:30px;border:0!important;padding:0 4px}
+ .meta .seg{align-self:flex-start;border:2px solid var(--edge,#1b2238);border-radius:10px}.meta .seg button{min-height:40px;padding:0 18px;font:700 14px var(--f)}
+ .meta>*{flex-shrink:0}.meta .pill{display:none}   /* the status pill lives in the bottom bar on phones */
+ .meta .sum input{flex:none;width:100%;min-height:44px;padding:0 12px;border:2px solid var(--edge,#1b2238);border-radius:10px;font:16px var(--f);background:var(--pn,#fff);color:var(--txt,#1b1f2a)}
+ .tool{gap:4px;padding:6px 8px}.tool>button{min-width:40px;min-height:40px}.segm button{min-height:40px;padding:0 14px}
+ .split{min-height:55vh}.md{font-size:16px}.pv{padding:12px 14px}
+ .edfoot{flex-wrap:wrap;gap:4px 8px;padding:8px 12px}
+ .edbar{display:flex;order:10;position:sticky;bottom:0;z-index:2;align-items:center;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:2px solid var(--edge,#1b2238);background:var(--pn2,#f6f4ec)}
+ .edbar .xpbtn{flex:1;min-height:44px}.edbar .pill{flex:none}
+}

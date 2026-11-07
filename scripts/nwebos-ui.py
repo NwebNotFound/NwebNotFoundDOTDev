@@ -232,8 +232,9 @@ with sync_playwright() as p:
     assert pg.locator(".g-mines .mngrid .c").count() == 81 and path(pg) == "/", "mines mounted, no own address"
     pg.locator(".g-mines .c").nth(40).click()   # the first click is always safe
     assert pg.locator(".g-mines .c.o").count() >= 1 and pg.locator(".g-mines .face.dead").count() == 0 and pg.locator(".g-mines .c.m").count() == 0, "first click is safe"
-    pg.locator(".g-mines .c").nth(0).click(button="right")
-    assert pg.locator(".g-mines .c").nth(0).get_attribute("class").find("f") >= 0 and pg.locator("[data-m]").inner_text() in ("009", "010"), "flag"
+    closed = pg.locator(".g-mines .c:not(.o)").first   # the first click can flood-open cell 0: flag a closed one
+    closed.click(button="right")
+    assert "f" in (closed.get_attribute("class") or "").split() and pg.locator("[data-m]").inner_text() in ("009", "010"), "flag"
     pg.wait_for_timeout(1300); t1 = pg.locator("[data-t]").inner_text(); assert t1 != "000", "timer runs while playing"
     pg.locator('.win.focus .mn').click(); pg.wait_for_timeout(2300)
     assert pg.locator("[data-t]").inner_text() == t1, "no timer tick while minimised"
