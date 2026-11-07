@@ -86,8 +86,11 @@ with sync_playwright() as p:
     assert post.locator(".post h1").inner_text() == "UI Testbeitrag"
     assert post.locator(".toc li").count() == 2 and post.locator("img[src=x]").count() == 0
     assert "Letzter Satz kurz vor dem Klick." in post.inner_text(), "publish raced the pending save"
-    pub.goto(f"https://{H}/blog?q=test", wait_until="load")
-    assert pub.locator('a[href="/blog/ui-testbeitrag"]').count() == 1, "search by tag finds it"
+    # the blog window filters in place: the tag search keeps exactly this post (card or row) visible
+    pub.goto(f"https://{H}/blog", wait_until="load")
+    pub.locator(".win.focus [data-bq]").fill("test")
+    hits = pub.locator(".win.focus [data-q]:visible")
+    assert hits.count() == 1 and hits.locator('a[href="/blog/ui-testbeitrag"]').count() >= 1, "search by tag finds it"
     # A status request that fails on the network: message shown, buttons usable again (Gatekeeper #106).
     pg.route("**/status", lambda r: r.abort())
     pg.get_by_role("button", name="Zurückziehen").click()
