@@ -26,7 +26,7 @@
   var ROUTES = {}; (L.routes || []).forEach(function (r) { ROUTES[r[0]] = r[1]; });
   var bare = function (pathname) { var p = pathname.replace(/^\/(de|en)(?=\/|$)/, "") || "/"; return p.replace(/\/$/, "") || "/"; };
   /* an address the shell can open as a window (the server renders it): no assets, APIs, auth or the old editor */
-  var osPath = function (u) { var p = bare(u.pathname); return u.origin === location.origin && !/\.[a-z0-9]{2,5}$/i.test(p) && !/^\/(api|auth|design|mc|vendor|bundle|downloads|content-assets|mc-icon|mc-head|mc-skin)(\/|$)/.test(p) && !/^\/blog\/admin(\/|$)/.test(p); };
+  var osPath = function (u) { var p = bare(u.pathname); return u.origin === location.origin && !/\.[a-z0-9]{2,5}$/i.test(p) && !/^\/(api|auth|design|mc|vendor|bundle|downloads|content-assets|mc-icon|mc-head|mc-skin)(\/|$)/.test(p) && !/\/feed\.xml$/.test(p); };
   var open = new Map(), z = 10, seq = 0, me = null;
   /* App modules (docs/nwebos-modules.md): NwebOS.register(key, { mount(content, ctx), unmount?(content) }).
      A section with data-module loads that script on the first open; the window is mounted once it registered. */

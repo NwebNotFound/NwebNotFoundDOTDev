@@ -15,7 +15,9 @@ with sync_playwright() as p:
     chrome = "/usr/bin/google-chrome"  # CI container; elsewhere Playwright's own Chromium
     br = p.chromium.launch(executable_path=chrome) if os.path.exists(chrome) else p.chromium.launch()
     ctx = br.new_context(viewport={"width": 1280, "height": 900})
-    ctx.add_cookies([{"name": name, "value": unquote(val), "domain": H, "path": "/", "secure": True, "httpOnly": True}])
+    ctx.add_cookies([{"name": name, "value": unquote(val), "domain": H, "path": "/", "secure": True, "httpOnly": True},
+                     # the #106 editor page, reachable opted out of NwebOS until the opt-out goes; the window: nwebos-editor-ui.py
+                     {"name": "nnf_os", "value": "0", "domain": H, "path": "/", "secure": True}])
 
     def route(r):
         u = urlsplit(r.request.url)
@@ -79,7 +81,9 @@ with sync_playwright() as p:
     pg.fill("[name=body_de]", "## Erster Teil\n\nText mit <img src=x onerror=alert(1)>\n\n## Zweiter Teil\n\nLetzter Satz kurz vor dem Klick.")
     pg.get_by_role("button", name="Veröffentlichen").click()
     pg.wait_for_function("() => document.querySelector('[data-blog-status]').textContent === 'published'", timeout=10000)
-    pub = ctx.new_page()
+    pctx = br.new_context(viewport={"width": 1280, "height": 900})   # a reader: NwebOS on (no opt-out cookie)
+    pctx.route("**/*", route)
+    pub = pctx.new_page()
     pub.goto(f"https://{H}/blog/ui-testbeitrag", wait_until="load")
     # the public post is the NwebOS reader window (src/nwebos-apps.js)
     post = pub.locator("#app-blog-post")
@@ -91,6 +95,7 @@ with sync_playwright() as p:
     pub.locator(".win.focus [data-bq]").fill("test")
     hits = pub.locator(".win.focus [data-q]:visible")
     assert hits.count() == 1 and hits.locator('a[href="/blog/ui-testbeitrag"]').count() >= 1, "search by tag finds it"
+    pctx.unroute_all(behavior="ignoreErrors"); pctx.close()
     # A status request that fails on the network: message shown, buttons usable again (Gatekeeper #106).
     pg.route("**/status", lambda r: r.abort())
     pg.get_by_role("button", name="Zurückziehen").click()

@@ -1055,7 +1055,13 @@ async function osResponse(req, env, url, lang, route) {
   const de = lang !== "en";
   let k = route.k, content = {}, title = "", status = 200, priv = false;
   const u = ["profile", "blog-post"].includes(k) ? await getUser(req, env).catch(() => null) : null;
-  if (k === "blog") content.blog = blogList(lang, await BLOG().os.list(env, lang));
+  if (k === "blog-edit") {
+    // admin only (server-side, as the #106 page): guests sign in first, everyone else gets the 404 window
+    const a = await BLOG().admin(req, env).catch(() => ({ err: 500 }));
+    if (a.err === 401) return new Response(null, { status: 302, headers: { location: `/auth/discord/login?next=${encodeURIComponent("https://" + MAIN + route.path)}`, "cache-control": "no-store" } });
+    if (a.err) k = "notfound";
+    else { priv = true; content["blog-edit"] = `<p>${de ? "Der Editor braucht JavaScript." : "The editor needs JavaScript."}</p>`; }
+  } else if (k === "blog") content.blog = blogList(lang, await BLOG().os.list(env, lang));
   else if (k === "blog-post") {
     const d = await BLOG().os.post(req, env, route.m[1], url.searchParams.get("preview"), lang).catch(() => null);
     if (d) { content["blog-post"] = blogPost(lang, d.post, d.rx, { signedIn: d.signedIn, older: d.older, newer: d.newer, preview: d.priv }); title = d.post.title; priv = d.priv; }
