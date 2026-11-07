@@ -25,6 +25,17 @@ npx wrangler deploy
 npx wrangler d1 execute <DB-NAME> --remote --file=schema.sql
 ```
 
+## D1-Migrationen (Produktion)
+Neue Tabellen und Spalten liegen als Datei in `migrations/NNNN_name.sql` und stehen ebenfalls in `schema.sql` (frische e2e-DB).
+
+- **Additive Migrationen** (`CREATE TABLE IF NOT EXISTS`, neue Spalte/Index) spielt der CF Deployer selbst ein, **vor** `bash scripts/deploy.sh`. Niemand muss auf Nils warten.
+- **Zerstörerische Migrationen** (`DROP`, Tabelle neu aufbauen, Daten umschreiben) nur mit ausdrücklichem Ja von Nils.
+- In Produktion gibt es noch keine `d1_migrations`-Tabelle. `wrangler d1 migrations apply` würde deshalb **alle** Migrationen noch einmal ausführen und darf gegen Produktion **nie** laufen. Solange der Eintrag fehlt, nur die neue Datei einspielen:
+  ```bash
+  npx wrangler d1 execute nwebnotfound-guestbook --remote --file migrations/<NNNN>_<name>.sql
+  ```
+  Ergebnis prüfen, zum Beispiel mit `npx wrangler d1 execute nwebnotfound-guestbook --remote --command "SELECT name FROM sqlite_master WHERE type='table'"`.
+
 ## Secrets
 Das Turnstile-Secret liegt **nicht** im Repo. Setzen mit:
 ```bash
