@@ -44,6 +44,8 @@
   }
 
   var title = function (k) { var a = APPS[k]; return a ? a.dataset[lang === "en" ? "titleEn" : "titleDe"] : (open.get(k) && open.get(k).title) || ""; };
+  /* control icons (pixel, currentColor) from the sprite: the phone title bar and bottom bar (phone polish 4/5) */
+  var ic2 = function (k) { return '<svg class="ic2" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><use href="' + (L.sprite || "/design/nwebos-icons.svg") + '#i-c-' + k + '"/></svg>'; };
   var icon16 = function (k) { var t = $("#ic-" + k); return t ? t.innerHTML : ""; };
   /* a window's address; `data-q` keeps the query of the address it was opened on (a draft's ?preview= token) */
   var pathOf = function (k) { var p = k && APPS[k] ? APPS[k].dataset.path : "/", q = k && APPS[k] ? APPS[k].dataset.q || "" : ""; return (lang === "en" ? (p === "/" ? "/en" : "/en" + p) : p) + q; };
@@ -124,8 +126,8 @@
     var p = clampPos(d[0], d[1], w, h);
     el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = h + "px";
     var ico = opt.icon || icon16(k), tt = esc(opt.title || title(k));
-    el.innerHTML = '<header class="wt"><button type="button" class="wb back" aria-label="' + esc(L.back) + '">‹</button>' + ico + '<span class="tt">' + tt + '</span>' +
-      '<button type="button" class="wb mn" aria-label="' + esc(L.minimize) + '">–</button><button type="button" class="wb mx" aria-label="' + esc(L.maximize) + '">□</button><button type="button" class="wb x" aria-label="' + esc(L.close) + '">×</button></header>' + (opt.menu === false ? '' : '<nav class="wm" aria-hidden="true">' + (L.menu || []).map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</nav>') + '<div class="wc"></div><span class="wr" aria-hidden="true"></span>';
+    el.innerHTML = '<header class="wt"><button type="button" class="wb back" aria-label="' + esc(L.back) + '"><span class="wbt">‹</span>' + ic2("back") + '</button>' + ico + '<span class="tt">' + tt + '</span>' +
+      '<button type="button" class="wb mn" aria-label="' + esc(L.minimize) + '">–</button><button type="button" class="wb mx" aria-label="' + esc(L.maximize) + '">□</button><button type="button" class="wb x" aria-label="' + esc(L.close) + '"><span class="wbt">×</span>' + ic2("close") + '</button></header>' + (opt.menu === false ? '' : '<nav class="wm" aria-hidden="true">' + (L.menu || []).map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</nav>') + '<div class="wc"></div><span class="wr" aria-hidden="true"></span>';
     var wc = $(".wc", el);
     if (src) [].slice.call(src.cloneNode(true).childNodes).forEach(function (n) { if (!(n.classList && n.classList.contains("nojs-h"))) wc.appendChild(n); });
     else wc.innerHTML = opt.html || "";
@@ -272,6 +274,8 @@
     d.addEventListener("dblclick", function () { if (d.dataset.open) { if (APPS[d.dataset.open]) openWin(d.dataset.open); else openUrl(d.href); } else location.href = d.href; });
   });
   $("[data-home]").onclick = function () { var t = topWindow(); if (t) minimize(t); };
+  /* phone bottom bar: search goes to the home screen and focuses its search field (phone polish 5) */
+  var ms = $("[data-msearch]"); if (ms) ms.onclick = function () { open.forEach(function (o, key) { if (!o.el.classList.contains("min")) minimize(key); }); setTimeout(function () { var q = $("#hq"); if (q) q.focus(); }, 60); };
   /* Phone: an open app covers the home screen, so its icons leave the Tab order (inert) until the app is minimized or closed. Home stays reachable. */
   function syncInert() { var ic = $(".dicons"); if (ic) ic.inert = !!(PHONE() && topWindow()); }
   new MutationObserver(syncInert).observe(wins, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });

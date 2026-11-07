@@ -1,0 +1,122 @@
+/* NwebOS phone polish (mockups/nwebos/phone-polish, notes.md): one control family, one slider, pixel control icons
+   (i-c-* in nwebos-icons.svg), night content panes. Loaded after nwebos.css + nwebos-apps.css; numbers = notes.md fixes. */
+:root{--srch:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2016%2016%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%224%22%20y%3D%222%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%225%22%20y%3D%222%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%226%22%20y%3D%222%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%227%22%20y%3D%222%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%228%22%20y%3D%222%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%224%22%20y%3D%223%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%228%22%20y%3D%223%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%229%22%20y%3D%223%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%222%22%20y%3D%224%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%223%22%20y%3D%224%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%229%22%20y%3D%224%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2210%22%20y%3D%224%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%222%22%20y%3D%225%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2210%22%20y%3D%225%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2210%22%20y%3D%226%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%222%22%20y%3D%227%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2210%22%20y%3D%227%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%222%22%20y%3D%228%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%223%22%20y%3D%228%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%229%22%20y%3D%228%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2210%22%20y%3D%228%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%223%22%20y%3D%229%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%224%22%20y%3D%229%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%228%22%20y%3D%229%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%229%22%20y%3D%229%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2210%22%20y%3D%229%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%224%22%20y%3D%2210%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%225%22%20y%3D%2210%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%226%22%20y%3D%2210%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%227%22%20y%3D%2210%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%228%22%20y%3D%2210%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2210%22%20y%3D%2210%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2211%22%20y%3D%2210%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2212%22%20y%3D%2210%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2211%22%20y%3D%2211%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2212%22%20y%3D%2211%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2213%22%20y%3D%2211%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2212%22%20y%3D%2212%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2213%22%20y%3D%2212%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2214%22%20y%3D%2212%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2213%22%20y%3D%2213%22%20width%3D%221%22%20height%3D%221%22/%3E%3Crect%20x%3D%2214%22%20y%3D%2213%22%20width%3D%221%22%20height%3D%221%22/%3E%3C/svg%3E")}
+:root{--ink:#1b2238;--edge:#1b2238;--c-h:44px;--c-r:10px;--c-sh:0 3px 0 var(--ink);--c-bg:#fff;--c-fg:var(--ink);--c-on:#7a5fd6;--c-go:#3a9a33;--c-red:#d9452f;
+ --pn:#fff;--pn2:#f6f4ec;--line:#d9d5c3;--txt:#1b1f2a;--mut2:#5b6170}
+[data-theme=summer-night]{--edge:#7480c4;--c-sh:0 3px 0 #05070f;--c-bg:#2a3260;--c-fg:#eef0ff;--pn:#171d38;--pn2:#202848;--line:#323c6a;--txt:#e9e7f3;--mut2:#a9afcc}
+.ic2{width:20px;height:20px;flex:none;image-rendering:pixelated;shape-rendering:crispEdges}
+/* (4) title bar: the desktop keeps its glyphs, the phone shows the pixel icons */
+.wt .wb .ic2{display:none}
+@media (max-width:700px){.wt .wb .wbt{display:none}.wt .wb .ic2{display:block}}
+/* (5) the phone search button lives in the bottom bar only */
+.mbar .msrch{display:none}
+@media (max-width:700px){.mbar .msrch{display:grid}}
+/* (1) button family: .xpbtn, form buttons, player, chips, seg — all the same flat pixel button */
+.xpbtn,.say .xpbtn,.say button,.sug button,.sug a,.mctl button,.tbtn,.trw .tp .lnk.btnish{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border:2px solid var(--edge);border-radius:var(--c-r);background:var(--c-bg);color:var(--c-fg);font:700 13px var(--f);text-decoration:none;box-shadow:var(--c-sh);cursor:pointer;transition:transform .08s,box-shadow .08s}
+.xpbtn:active,.say .xpbtn:active,.sug button:active,.sug a:active,.mctl button:active,.tbtn:active{transform:translateY(3px);box-shadow:0 0 0 var(--ink)}
+.xpbtn.go{background:var(--c-go);color:#fff;border-color:var(--ink)}.xpbtn.danger{background:var(--c-red);color:#fff}
+.xpbtn:focus-visible,.mctl button:focus-visible,.wt .wb:focus-visible,.mbar button:focus-visible{outline:3px solid #ffd23f;outline-offset:2px}
+/* (2) one slider: pixel track + square thumb; fill comes from --v (0–100) set by polish.js / the app */
+input[type=range].seek,.mvol input,input[type=range].px{-webkit-appearance:none;appearance:none;height:22px;background:none;accent-color:auto;cursor:pointer;--v:0}
+input[type=range].seek::-webkit-slider-runnable-track,input[type=range].px::-webkit-slider-runnable-track,.mvol input::-webkit-slider-runnable-track{height:10px;border:2px solid var(--edge);border-radius:3px;background:linear-gradient(90deg,var(--c-on) calc(var(--v)*1%),var(--pn) 0)}
+input[type=range].seek::-webkit-slider-thumb,input[type=range].px::-webkit-slider-thumb,.mvol input::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;margin-top:-7px;border:2px solid var(--edge);border-radius:3px;background:#fff;box-shadow:0 2px 0 var(--ink)}
+input[type=range].seek::-moz-range-track,.mvol input::-moz-range-track{height:6px;border:2px solid var(--edge);border-radius:3px;background:var(--pn)}input[type=range].seek::-moz-range-progress{height:6px;background:var(--c-on)}
+input[type=range].seek::-moz-range-thumb,.mvol input::-moz-range-thumb{width:16px;height:16px;border:2px solid var(--edge);border-radius:3px;background:#fff}
+/* (3) Musik: compact LCD, real icons, equal controls */
+.mp{display:flex;flex-direction:column;gap:12px}
+.mlcd{padding:10px 12px 8px}.mlcd .row{font-size:10px}.msc{margin:6px 0 6px;font-size:16px}
+.viz{height:18px;gap:3px}.viz i{transform:scaleY(calc(var(--h)*.45));opacity:.55}.mp.on .viz i{opacity:.85}
+.mlcd .idle{display:block;margin-top:2px;font-size:10px;opacity:.75}
+.seek{width:100%;margin:0}
+.mctl{display:grid;grid-template-columns:repeat(2,44px) 60px repeat(2,44px);justify-content:center;align-items:center;gap:12px}
+.mctl button,.mctl button.sm{width:44px;height:44px;min-height:0;padding:0;border-radius:12px;font-size:0}
+.mctl .pp{width:60px;height:60px;border-radius:16px;background:var(--c-on);color:#fff;font-size:0}.mctl .pp .ic2{width:28px;height:28px}
+.mctl button[aria-pressed=true]:not(.pp){background:#e8e1ff;color:var(--c-on)}
+.mctl button[aria-disabled=true]:not(.pp){opacity:.6;cursor:default}
+.mvol{display:flex;grid-column:1/-1;justify-content:center;gap:10px;margin:0}.mvol input{width:180px}
+@media (pointer:coarse){.mvol{display:none}} /* iOS ignores volume on <audio>; the hardware buttons do it */
+.pl{margin:0;border:2px solid var(--edge);border-radius:var(--c-r);background:var(--pn)}.pl button{min-height:44px;color:var(--txt)}.pl li+li button{border-top:1px dashed var(--line);border-radius:0}
+.pl li.on button{border-radius:6px}.plh{margin:0 0 -6px;font:700 12px var(--f);color:var(--mut2)}
+/* (4) title bar on phones: small ghost icon buttons, no glossy squares */
+@media (max-width:700px){
+ .wt{height:52px;gap:8px;padding:0 6px;font-size:16px;filter:none}
+ .wt .wb,.wt .wb.x,.wt .wb.back{width:40px;height:40px;border:0;border-radius:12px;background:transparent;font-size:0;box-shadow:none;color:#fff}
+ .wt .wb:active{background:rgba(0,0,0,.18)}.wt .wb.x{margin-left:auto}.wt .wb.x:active{background:rgba(217,69,47,.6)}
+ .wt .wb .ic2{width:22px;height:22px}.wt>svg,.wt>img{width:20px;height:20px}
+ .wt .tt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ /* (5) bottom bar: home, search, clock; no duplicate title, no blob */
+ .task{height:calc(56px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}#wins{inset:0 0 calc(56px + env(safe-area-inset-bottom)) 0}
+ .mbar{height:56px;padding:0 10px;gap:8px}.mbar button,.mbar .msrch{display:grid;place-items:center;width:48px;height:40px;border:2px solid var(--edge);border-radius:12px;background:var(--start1);box-shadow:var(--c-sh);color:#fff}
+ .mbar .msrch{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.5);box-shadow:none}.mbar #mtitle{font-size:0}.mbar time{font:700 13px var(--f)}
+ /* (6) Explorer task panes become a plain toolbar on phones (blog filter, trash) */
+ .bl{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr}.bl>*{min-width:0}.bl .bl-side,.trw .tasks{background:var(--pn2);border-bottom:2px solid var(--edge);padding:10px 12px}
+ .bl-side .tp,.trw .tp{margin:0;background:none;border-radius:0}.bl-side .tp>b,.trw .tp>b{display:none}
+ .bsearch{padding:0 0 8px}.bsearch input{height:44px;padding:0 40px 0 12px;border:2px solid var(--edge);border-radius:var(--c-r);font-size:15px;background:var(--pn);color:var(--txt)}.bsearch kbd{display:none}
+ .bsearch::after{content:"";position:absolute;right:12px;top:12px;width:20px;height:20px;background:var(--ink);-webkit-mask:var(--srch) center/contain no-repeat;mask:var(--srch) center/contain no-repeat}
+ .cats{padding:0;gap:6px}.cats button{flex:none;align-items:center;min-height:36px;padding:0 14px;border:2px solid var(--edge);border-radius:18px;background:var(--pn);color:var(--txt);font:700 13px var(--f)}
+ .cats button.on{background:var(--ink);color:#fff}.cats em.zero{display:none}
+ .trw{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr}
+ .trw .tp{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.trw .tp .lnk{min-height:36px;padding:0 12px;border:2px solid var(--edge);border-radius:var(--c-r);background:var(--pn);color:var(--txt);font:700 13px var(--f);text-decoration:none;box-shadow:var(--c-sh)}
+ .trw .tp span{padding:0;font-size:12px;color:var(--mut2)}
+ /* (7) empty and info windows sit in the visual centre, not at the top of a white sheet */
+ .nf{justify-content:center;min-height:100%;padding:24px 20px 40px}.nf b{font-size:19px}.nf>svg{width:64px;height:64px}
+ .empty{padding:18px 16px;border:2px dashed var(--line);border-radius:var(--c-r);background:var(--pn2);color:var(--mut2);text-align:center;font-size:14px}
+ /* (8) Gästebuch: signed out = one full-width sign-in button, no disabled fake input */
+ .say:has(input:disabled){display:block}.say input:disabled{display:none}.say .xpbtn{width:100%;min-height:48px;background:#5865f2;color:#fff;font-size:15px}
+ .gb-form{padding:12px;border-top:2px solid var(--edge);background:var(--pn2)}
+ .msgs{padding:14px 12px}.msg{gap:10px}.msg img{width:36px;height:36px;border:2px solid var(--edge);border-radius:50%}.msg>div{flex:1;padding:8px 12px;border:2px solid var(--edge);border-radius:4px 14px 14px 14px;background:var(--pn)}
+ .buddy{padding:12px;border-bottom:2px solid var(--edge)}
+ /* (9) Projekte: status as a readable chip, flat segment bar */
+ .files .st{display:inline-block;width:max-content;align-self:flex-start;margin-top:4px;padding:1px 8px;border:2px solid currentColor;border-radius:9px;font:700 10px var(--px)}
+ .sbar i{border-radius:2px;background:var(--pn);border:1.5px solid var(--ink)}.sbar i.on{background:#5fbf4f}
+ /* (10) Home screen: search field in the same family; label contrast on clouds */
+ .hsearch input{height:48px;border:2px solid var(--edge);border-radius:14px;box-shadow:var(--c-sh);font-size:16px}
+ .dicon span{text-shadow:0 1px 0 #1b2238,1px 0 0 #1b2238,-1px 0 0 #1b2238,0 -1px 0 #1b2238;font-weight:700}
+ /* (11) reading size on phones */
+ .wc{font-size:15px}.post{--fs:16px}.page{font-size:17px}.rbar{min-height:48px;padding:4px 8px}.rbar .tbtn{min-height:36px;box-shadow:none;border-color:transparent;background:none;color:var(--txt)}
+ .xtbl td,.xtbl th{padding:10px 12px;font-size:14px}
+ .say,.btns{gap:8px}.btns .xpbtn{min-height:44px}
+}
+/* (12) night: content panes go dark too, not only the chrome */
+[data-theme=summer-night] .wc{background:var(--pn);color:var(--txt);border-color:#0b1020}
+[data-theme=summer-night] .nf,[data-theme=summer-night] .chat,[data-theme=summer-night] .msgs,[data-theme=summer-night] .lib,[data-theme=summer-night] .cl2,[data-theme=summer-night] .pad{background:var(--pn);color:var(--txt)}
+[data-theme=summer-night] .buddy,[data-theme=summer-night] .gb-form{background:var(--pn2);color:var(--txt)}
+[data-theme=summer-night] .msg>div{background:var(--pn2)}
+[data-theme=summer-night] .hint,[data-theme=summer-night] .meta,[data-theme=summer-night] small,[data-theme=summer-night] .files small{color:var(--mut2)}
+[data-theme=summer-night] .files b,[data-theme=summer-night] .tl ul li p,[data-theme=summer-night] .props dd,[data-theme=summer-night] .props dt{color:var(--txt)}
+[data-theme=summer-night] .xtbl th{background:var(--pn2);color:var(--txt);border-color:var(--line)}[data-theme=summer-night] .xtbl td{border-color:var(--line)}[data-theme=summer-night] .xtbl tr:hover td{background:var(--pn2)}
+[data-theme=summer-night] .tl{border-color:var(--line)}[data-theme=summer-night] .tl ul li{border-color:var(--line)}
+[data-theme=summer-night] .mp{background:var(--pn)}[data-theme=summer-night] .mlcd{background:linear-gradient(#1f3a2a,#14281c);color:#8fe36a;border-color:#0b1020}[data-theme=summer-night] .viz i{background:#8fe36a}
+[data-theme=summer-night] .seg button{background:var(--pn2);color:var(--txt)}[data-theme=summer-night] .seg button.on{background:var(--c-on);color:#fff}
+[data-theme=summer-night] .nf>svg,[data-theme=summer-night] .buddy svg{filter:drop-shadow(0 0 0 #fff)}
+[data-theme=summer-night] .bl-main,[data-theme=summer-night] .trm{background:var(--pn);color:var(--txt)}
+[data-theme=summer-night] .bkc{box-shadow:4px 4px 0 rgba(0,0,0,.4)}
+[data-theme=summer-night] a{color:#9ec1ff}[data-theme=summer-night] .xpbtn{color:var(--c-fg)}[data-theme=summer-night] .xpbtn.go{color:#fff}
+@media (prefers-reduced-motion:reduce){.xpbtn,.mctl button,.tbtn{transition:none}}
+[data-theme=summer-night] .ctag{color:#1b2238;border-color:#05070f}
+[data-theme=summer-night] .cats button.on{background:var(--c-on);border-color:var(--c-on)}
+/* (13) Discord sign-in is always the same blurple button */
+a.xpbtn[href*="/auth/discord"],.say .xpbtn{background:#5865f2;color:#fff}
+/* (14) night: pixel icons with dark outlines sit on a light tile so they stay readable */
+[data-theme=summer-night] .files svg,[data-theme=summer-night] .files img,[data-theme=summer-night] .xtbl td svg,[data-theme=summer-night] .nf>svg,[data-theme=summer-night] .buddy>svg,[data-theme=summer-night] .bkc svg{background:#e9e7f3;border-radius:6px;box-shadow:0 0 0 2px #05070f}
+[data-theme=summer-night] .xtbl td svg{padding:1px}
+/* (15) search results in the same family */
+@media (max-width:700px){.hsearch .results{margin-top:8px;border:2px solid var(--edge);border-radius:14px;background:var(--pn);box-shadow:var(--c-sh);overflow:hidden}
+ .results button{min-height:56px;padding:8px 14px;color:var(--txt);font-size:15px}.results button+button{border-top:1px dashed var(--line)}
+ .results button.on,.results button:hover{background:#e8e1ff;color:var(--ink)}[data-theme=summer-night] .results button.on{background:#2a3260;color:#fff}.results small{color:var(--mut2)}}
+/* (12) night, the parts live had no content for yet (posts, chapters, signed-in profile): cards, date blocks, reader */
+[data-theme=summer-night] .feat,[data-theme=summer-night] .react,[data-theme=summer-night] .toc,[data-theme=summer-night] .bmk button,[data-theme=summer-night] .bmk a,[data-theme=summer-night] .pn2>*{background:var(--pn2);border-color:var(--line);color:var(--txt)}
+[data-theme=summer-night] .dblk{background:var(--pn2);border-color:var(--edge);color:var(--txt)}
+[data-theme=summer-night] .rd,[data-theme=summer-night] .rscroll,[data-theme=summer-night] .bposts a:hover{background:var(--pn);color:var(--txt)}
+[data-theme=summer-night] .rbar{background:var(--pn2);border-color:var(--line);color:var(--txt)}
+[data-theme=summer-night] .rx button{background:var(--pn);color:var(--txt);border-color:var(--edge)}
+[data-theme=summer-night] .rx button[aria-pressed=true]{background:#3a3270}
+[data-theme=summer-night] .toc a.on{background:#2a3260;color:#fff}
+[data-theme=summer-night] .page:not(.npaper .page){background:var(--pn2);border-color:var(--line);color:var(--txt);box-shadow:none}
+/* Beitrag + Kapitel (notes.md): reactions keep their pill shape but take the family edge and shadow */
+.rx button{border:2px solid var(--edge);box-shadow:var(--c-sh)}
+/* reader content (mockups/nwebos/apps notes: "a callout box"; was missing): the > Hinweis box, day and night */
+.post blockquote{margin:14px 0;padding:10px 14px;border:2px solid var(--ink);border-radius:4px;background:#fff3c2;box-shadow:3px 3px 0 #ffd23f;color:#1b1f2a}
+.post blockquote p{margin:0}
+[data-theme=summer-night] .post blockquote{background:#2a3260;border-color:var(--edge);box-shadow:3px 3px 0 #05070f;color:var(--txt)}
+[data-theme=summer-night] .lead{color:var(--mut2)}

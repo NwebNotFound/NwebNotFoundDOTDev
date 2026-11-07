@@ -36,7 +36,7 @@ export function blogList(lang, posts = []) {
   const empty = de ? "Noch keine Beiträge. Der erste kommt bald." : "No posts yet. The first one is coming soon.";
   return `<div class="bl"><aside class="tasks bl-side" aria-label="Filter">
 <div class="tp"><b>${de ? "Suchen" : "Search"}</b><form class="bsearch" role="search" action="${href(lang, "/blog")}"><input type="search" name="q" data-bq placeholder="${de ? "Titel oder Tags …" : "Title or tags …"}" aria-label="${de ? "Titel oder Tags suchen" : "Search title or tags"}"><kbd>/</kbd></form></div>
-<div class="tp"><b>${de ? "Kategorien" : "Categories"}</b><nav class="cats" aria-label="${de ? "Kategorien" : "Categories"}"><button type="button" class="on" data-cat="">${de ? "Alle" : "All"} <em>${posts.length}</em></button>${CATS.map(([k]) => `<button type="button" data-cat="${k}">${esc(catName(k, lang))} <em>${posts.filter((p) => p.category === k).length}</em></button>`).join("")}</nav></div>
+<div class="tp"><b>${de ? "Kategorien" : "Categories"}</b><nav class="cats" aria-label="${de ? "Kategorien" : "Categories"}"><button type="button" class="on" data-cat="">${de ? "Alle" : "All"} <em>${posts.length}</em></button>${CATS.map(([k]) => `<button type="button" data-cat="${k}">${esc(catName(k, lang))} ${((n) => `<em${n === 0 ? ' class="zero"' : ""}>${n}</em>`)(posts.filter((p) => p.category === k).length)}</button>`).join("")}</nav></div>
 ${tags.length ? `<details class="tp more" open><summary><b>Tags</b></summary><span class="tagc">${tags.map((t) => `<button type="button" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</span></details>` : ""}
 ${months.size ? `<details class="tp more" open><summary><b>${de ? "Archiv" : "Archive"}</b></summary><span class="arch">${[...months].map(([k, n]) => `<button type="button" data-month="${k}" aria-pressed="false">${MONTHS_LONG[de ? "de" : "en"][+k.slice(5) - 1]} ${k.slice(0, 4)} <em>${n}</em></button>`).join("")}</span></details>` : ""}
 <div class="tp"><a href="/blog/feed.xml" class="rss">${ic("blog", 14)} RSS-Feed</a><span>${de ? "Den Roman findest du unter" : "The novel lives in"} <a href="${href(lang, "/writing")}" data-open="writing">${de ? "Texte" : "Writing"}</a>.</span></div></aside>
@@ -101,18 +101,28 @@ export function changelog(lang, today = new Date()) {
 
 // ---------------- Music ----------------
 // No tracks exist yet: example titles, labelled; the player plays nothing until real tracks exist.
-const TRACKS = [["Sommerloop #1", "01:24", "bald", "soon"], ["Hitzefrei", "02:10", "Idee", "idea"], ["Regen auf dem Zeltdach", "01:48", "Idee", "idea"]];
+// No real tracks exist yet (phone polish 3e): the player says so instead of showing made-up titles. Add real ones as
+// [title, "mm:ss"]; then the playlist and the controls switch on.
+const TRACKS = [];
+/** Control icons (pixel, currentColor; i-c-* in nwebos-icons.svg). */
+export const ic2 = (k) => `<svg class="ic2" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><use href="/design/nwebos-icons.svg?v=${AV}#i-c-${k}"/></svg>`;
 export function music(lang) {
   const de = lang !== "en";
   const bars = [0.5, 0.8, 0.6, 0.95, 0.7, 0.4, 0.85, 0.55, 0.75, 0.35, 0.65, 0.9, 0.45, 0.7, 0.5, 0.3];
-  return `<div class="mp" data-mp><div class="mlcd"><div class="row"><span>TRACK 01 · ${de ? "BEISPIEL" : "EXAMPLE"}</span><span data-time>00:00 / 01:24</span></div>
-<div class="msc"><span>SOMMERLOOP #1 · NILS · FL STUDIO ·&nbsp;</span><span>SOMMERLOOP #1 · NILS · FL STUDIO ·&nbsp;</span></div>
+  const none = TRACKS.length === 0, dis = none ? ' aria-disabled="true"' : "";
+  const t0 = TRACKS[0] || null;
+  const lcdRow = none ? `<span>${de ? "NOCH KEIN TRACK" : "NO TRACK YET"}</span><span data-time>--:-- / --:--</span>` : `<span>TRACK 01</span><span data-time>00:00 / ${esc(t0[1])}</span>`;
+  const ticker = none ? (de ? "ERSTER LOOP KOMMT BALD · FL STUDIO ·&nbsp;" : "FIRST LOOP COMING SOON · FL STUDIO ·&nbsp;") : `${esc(t0[0].toUpperCase())} · NILS · FL STUDIO ·&nbsp;`;
+  const list = none
+    ? `<p class="empty">${de ? "Noch keine Tracks. Sobald der erste Loop aus FL Studio fertig ist, spielt er hier." : "No tracks yet. Once the first loop from FL Studio is done, it plays here."}</p>`
+    : `<p class="plh">Playlist</p><ol class="pl">${TRACKS.map(([t, d], n) => `<li${n === 0 ? ' class="on"' : ""}><button type="button"><span class="n">${String(n + 1).padStart(2, "0")}</span><b>${esc(t)}</b><span>${esc(d)}</span></button></li>`).join("")}</ol>`;
+  return `<div class="mp" data-mp><div class="mlcd"><div class="row">${lcdRow}</div>
+<div class="msc"><span>${ticker}</span><span>${ticker}</span></div>
 <div class="viz" aria-hidden="true">${bars.map((h) => `<i style="--h:${h}"></i>`).join("")}</div></div>
-<input class="seek" type="range" min="0" max="84" value="0" aria-label="${de ? "Position" : "Position"}">
-<div class="mctl"><button type="button" aria-label="${de ? "Zufall" : "Shuffle"}" class="sm">⤮</button><button type="button" aria-label="${de ? "Zurück" : "Previous"}">◀◀</button><button type="button" class="pp" data-play aria-label="${de ? "Abspielen" : "Play"}" aria-pressed="false"><span class="i-play">▶</span><span class="i-pause">❚❚</span></button><button type="button" aria-label="${de ? "Weiter" : "Next"}">▶▶</button><button type="button" aria-label="${de ? "Wiederholen" : "Repeat"}" class="sm">↻</button>
-<label class="mvol">${ic("music", 14)}<input type="range" min="0" max="10" value="7" aria-label="${de ? "Lautstärke" : "Volume"}"></label></div>
-<ol class="pl">${TRACKS.map(([t, d, sde, sen], n) => `<li${n === 0 ? ' class="on"' : ""}><button type="button"><span class="n">${String(n + 1).padStart(2, "0")}</span><b>${esc(t)}</b><em class="st2">${de ? sde : sen}</em><span>${d}</span></button></li>`).join("")}</ol>
-<p class="hint">${de ? "Beispieltitel. Echte Tracks aus FL Studio kommen hierher, sobald sie fertig sind. Bis dahin spielt der Player nichts ab." : "Example titles. Real tracks from FL Studio land here once they're done. Until then the player plays nothing."}</p></div>`;
+<input class="seek" type="range" min="0" max="100" value="0" style="--v:0" aria-label="${de ? "Position" : "Position"}"${none ? " disabled" : ""}>
+<div class="mctl"><button type="button" class="sm" data-toggle aria-pressed="false" aria-label="${de ? "Zufall" : "Shuffle"}"${dis}>${ic2("shuffle")}</button><button type="button" aria-label="${de ? "Zurück" : "Previous"}"${dis}>${ic2("prev")}</button><button type="button" class="pp" data-play aria-label="${de ? "Abspielen" : "Play"}" aria-pressed="false"${dis}><span class="i-play">${ic2("play")}</span><span class="i-pause">${ic2("pause")}</span></button><button type="button" aria-label="${de ? "Weiter" : "Next"}"${dis}>${ic2("next")}</button><button type="button" class="sm" data-toggle aria-pressed="false" aria-label="${de ? "Wiederholen" : "Repeat"}"${dis}>${ic2("repeat")}</button>
+<label class="mvol">${ic("music", 14)}<input type="range" min="0" max="10" value="7" style="--v:70" aria-label="${de ? "Lautstärke" : "Volume"}"></label></div>
+${list}</div>`;
 }
 
 // ---------------- Writing library + chapter ----------------
@@ -164,7 +174,7 @@ export function soon(lang) {
 /** d: { user: { name, avatar }, gbCount, entries: [{ message, created_at }], reads: [{ title, kind, pct, href }] } or null for guests */
 export function profile(lang, d) {
   const de = lang !== "en";
-  if (!d) return `<div class="nf">${ic("profile", 48)}<div><b>${de ? "Dein Profil ist privat." : "Your profile is private."}</b><p>${de ? "Melde dich mit Discord an, dann siehst du hier deine Gästebuch-Einträge und was du gerade liest." : "Sign in with Discord to see your guestbook entries and what you're reading."}</p><p class="btns"><a class="xpbtn go" href="/auth/discord/login?next=${encodeURIComponent("https://nwebnotfound.dev" + href(lang, "/profile"))}">${de ? "Mit Discord anmelden" : "Sign in with Discord"}</a></p></div></div>`;
+  if (!d) return `<div class="nf">${ic("profile", 48)}<div><b>${de ? "Dein Profil ist privat." : "Your profile is private."}</b><p>${de ? "Melde dich mit Discord an, dann siehst du hier deine Gästebuch-Einträge und was du gerade liest." : "Sign in with Discord to see your guestbook entries and what you're reading."}</p><p class="btns"><a class="xpbtn discord" href="/auth/discord/login?next=${encodeURIComponent("https://nwebnotfound.dev" + href(lang, "/profile"))}">${de ? "Mit Discord anmelden" : "Sign in with Discord"}</a></p></div></div>`;
   const av = /^https:\/\//.test(d.user.avatar || "") ? `<img class="dav" src="${esc(d.user.avatar)}" width="40" height="40" alt="">` : ic("cat", 40, "ic dav");
   const n = d.gbCount, r = d.reads.length;
   const sentence = de ? `Du hast <mark>${n} ${n === 1 ? "Gruß" : "Grüße"}</mark> ins Gästebuch geschrieben und <mark>${r} ${r === 1 ? "Text" : "Texte"}</mark> angefangen zu lesen.` : `You wrote <mark>${n} ${n === 1 ? "greeting" : "greetings"}</mark> in the guestbook and started reading <mark>${r} ${r === 1 ? "text" : "texts"}</mark>.`;
