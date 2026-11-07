@@ -1188,12 +1188,12 @@ try {
     ok(cr.s === 201 && cr.j?.slug === "e2e-beitrag", "Blog: Admin legt Entwurf an", cr.s + " " + cr.t.slice(0, 200));
     ok((await b("/blog/e2e-beitrag")).s === 404, "Blog: Entwurf öffentlich unsichtbar");
     const sv = await b(`/api/blog/admin/posts/${cr.j?.id}`, { method: "PUT", cookie: c1, origin: MO, body: { base: cr.j?.updated_at, body_de: "## Teil\n\n<script>alert(1)</script>" } });
-    const pb = await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "published" } });
+    const pb = await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "published", base: sv.j?.updated_at } });
     const pg = await b("/blog/e2e-beitrag"), ls = await b("/api/blog?q=e2e");
     ok(sv.s === 200 && pb.s === 200 && pg.s === 200 && pg.t.includes('<h2 id="h-teil">Teil</h2>') && !pg.t.includes("<script>alert(1)") && ls.j?.posts?.length === 1, "Blog: speichern, veröffentlichen, Seite sanitisiert, Suche findet Tag", `${sv.s} ${pb.s} ${pg.s}`);
     const rss = await b("/blog/feed.xml");
     ok(rss.s === 200 && /application\/rss\+xml/.test(rss.h.get("content-type") || "") && rss.t.includes("<title>E2E Beitrag</title>"), "Blog: RSS-Feed");
-    await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn" } });
+    await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
   }
   try { execSync(`python3 scripts/blog-editor-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Blog-Editor im Browser fehlgeschlagen"); }
   sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");

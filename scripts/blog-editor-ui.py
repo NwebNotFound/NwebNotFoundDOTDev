@@ -51,13 +51,24 @@ with sync_playwright() as p:
     pg.wait_for_timeout(300)
     stale.fill("[name=summary_de]", "Alt")
     stale.wait_for_function("() => document.querySelector('[data-blog-state]').textContent.startsWith('Konflikt')", timeout=15000)
+    # The stale tab can't publish after its save was rejected (Gatekeeper #106 review).
+    stale.get_by_role("button", name="Veröffentlichen").click()
+    stale.wait_for_function("() => document.querySelector('[data-blog-state]').textContent.startsWith('Status nicht geändert')", timeout=10000)
+    anon = br.new_context()   # signed out: the admin would also see the draft
+    anon.route("**/*", route)
+    probe = anon.new_page()
+    assert probe.goto(f"https://{H}/blog/ui-testbeitrag", wait_until="load").status == 404, "stale tab published the post"
+    anon.unroute_all(behavior="ignoreErrors"); anon.close()
     stale.close()
+    # Typing and publishing at once: the status waits for the save, so the latest text goes live.
+    pg.fill("[name=body_de]", "## Erster Teil\n\nText mit <img src=x onerror=alert(1)>\n\n## Zweiter Teil\n\nLetzter Satz kurz vor dem Klick.")
     pg.get_by_role("button", name="Veröffentlichen").click()
     pg.wait_for_function("() => document.querySelector('[data-blog-status]').textContent === 'published'", timeout=10000)
     pub = ctx.new_page()
     pub.goto(f"https://{H}/blog/ui-testbeitrag", wait_until="load")
     assert pub.locator("main h1").inner_text() == "UI Testbeitrag"
     assert pub.locator(".blog-toc li").count() == 2 and pub.locator("main img[src=x]").count() == 0
+    assert "Letzter Satz kurz vor dem Klick." in pub.inner_text("main"), "publish raced the pending save"
     pub.goto(f"https://{H}/blog?q=test", wait_until="load")
     assert pub.locator('a[href="/blog/ui-testbeitrag"]').count() == 1, "search by tag finds it"
     # Withdraw again so later checks see an unchanged blog.

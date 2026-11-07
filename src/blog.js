@@ -211,13 +211,17 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
   }
   async function setStatus(req, env, id) {
     const r = await readJson(req); if (r.err) return deny(...r.err);
-    const status = r.body?.status;
+    const status = r.body?.status, base = Number(r.body?.base);
     if (!STATUSES.includes(status)) return deny(400, `status: one of ${STATUSES.join("|")}`);
+    // Like save(): only against the version the editor has, so a stale tab can't publish or withdraw.
+    if (!Number.isSafeInteger(base)) return deny(400, "base: updated_at expected");
     const cur = await env.DB.prepare("SELECT * FROM blog_posts WHERE id = ?").bind(id).first();
     if (!cur) return deny(404, "not_found");
+    if (cur.updated_at !== base) return json({ error: "conflict", updated_at: cur.updated_at }, 409);
     if (status === "published") { const prob = publishProblem(cur); if (prob) return deny(400, prob); }
-    const t = Math.max(now(), cur.updated_at + 1);
-    await env.DB.prepare("UPDATE blog_posts SET status = ?, published_at = CASE WHEN ? = 'published' THEN coalesce(published_at, ?) ELSE published_at END, updated_at = ? WHERE id = ?").bind(status, status, t, t, id).run();
+    const t = Math.max(now(), base + 1);
+    const res = await env.DB.prepare("UPDATE blog_posts SET status = ?, published_at = CASE WHEN ? = 'published' THEN coalesce(published_at, ?) ELSE published_at END, updated_at = ? WHERE id = ? AND updated_at = ?").bind(status, status, t, t, id, base).run();
+    if (!res?.meta?.changes) return json({ error: "conflict" }, 409);
     return json({ ok: true, status, updated_at: t });
   }
   async function rotateToken(env, id) {

@@ -36,7 +36,7 @@
   /* ---------- edit one post ---------- */
   var root = $("[data-blog-editor]");
   if (!root) return;
-  var id = root.getAttribute("data-blog-editor"), base = null, slug = "", token = "", lang = "de", timer = 0, ptimer = 0, dirty = false, saving = false;
+  var id = root.getAttribute("data-blog-editor"), base = null, slug = "", token = "", lang = "de", timer = 0, ptimer = 0, dirty = false;
   var F = ["slug", "category", "tags", "title_de", "summary_de", "body_de", "title_en", "summary_en", "body_en"];
   var field = function (n) { return root.querySelector("[name='" + n + "']"); };
   var statusEl = $("[data-blog-status]"), plink = $("[data-blog-preview-link]");
@@ -47,16 +47,27 @@
     return o;
   }
   function setLink() { plink.href = "/blog/" + encodeURIComponent(slug) + "?preview=" + encodeURIComponent(token); }
+  // save() resolves true only when the text it sent is stored. A call while a save is in flight waits
+  // for it (and saves again if more was typed) instead of resolving early.
+  var inflight = null;
   function save() {
-    if (saving || !dirty || base === null) return Promise.resolve();
-    saving = true; dirty = false; say("Speichert …");
+    if (inflight) return inflight.then(function () { return save(); });
+    if (base === null) return Promise.resolve(false);   // conflict: nothing may be written from this tab
+    if (!dirty) return Promise.resolve(true);
+    dirty = false; say("Speichert …");
     var body = payload();
-    return call("PUT", "/posts/" + id, body).then(function (r) {
-      saving = false;
-      if (r.s === 200) { base = r.j.updated_at; slug = body.slug; setLink(); say("Gespeichert " + new Date().toLocaleTimeString("de-DE")); if (dirty) schedule(); }
-      else if (r.s === 409 && r.j.error === "conflict") { base = null; say("Konflikt: Der Beitrag wurde woanders geändert. Seite neu laden (deine Änderung ist nicht gespeichert)."); }
-      else { dirty = true; say("Nicht gespeichert: " + (r.j.error || r.s)); }
-    }, function () { saving = false; dirty = true; say("Nicht gespeichert (offline?)"); });
+    inflight = call("PUT", "/posts/" + id, body).then(function (r) {
+      inflight = null;
+      if (r.s === 200) { base = r.j.updated_at; slug = body.slug; setLink(); say("Gespeichert " + new Date().toLocaleTimeString("de-DE")); if (dirty) schedule(); return true; }
+      if (r.s === 409 && r.j.error === "conflict") { base = null; say("Konflikt: Der Beitrag wurde woanders geändert. Seite neu laden (deine Änderung ist nicht gespeichert)."); return false; }
+      dirty = true; say("Nicht gespeichert: " + (r.j.error || r.s)); return false;
+    }, function () { inflight = null; dirty = true; say("Nicht gespeichert (offline?)"); return false; });
+    return inflight;
+  }
+  // Everything typed so far is stored (true), or something failed/conflicted (false).
+  function flush() {
+    clearTimeout(timer);
+    return save().then(function (ok) { return ok && (dirty || inflight) ? flush() : ok; });
   }
   function schedule() { clearTimeout(timer); timer = setTimeout(save, 1500); }
   function preview() {
@@ -84,7 +95,7 @@
   });
   root.addEventListener("input", function (e) { if (!e.target.name) return; dirty = true; schedule(); if (/^body_/.test(e.target.name)) preview(); });
   root.addEventListener("change", function (e) { if (e.target.name === "category") { dirty = true; schedule(); } });
-  window.addEventListener("beforeunload", function (e) { if (dirty || saving) { save(); e.preventDefault(); } });
+  window.addEventListener("beforeunload", function (e) { if (dirty || inflight) { save(); e.preventDefault(); } });
 
   [].forEach.call(root.querySelectorAll("[data-tab]"), function (b) {
     b.addEventListener("click", function () {
@@ -94,16 +105,22 @@
       preview();
     });
   });
-  [].forEach.call(root.querySelectorAll("[data-set-status]"), function (b) {
+  // A status change only after all edits are stored, and with `base`: the server refuses it (409) if
+  // another tab changed the post in between, so a stale tab can never publish or withdraw.
+  var statusBtns = [].slice.call(root.querySelectorAll("[data-set-status]"));
+  statusBtns.forEach(function (b) {
     b.addEventListener("click", function () {
-      clearTimeout(timer);
-      var go = function () {
-        call("POST", "/posts/" + id + "/status", { status: b.getAttribute("data-set-status") }).then(function (r) {
+      statusBtns.forEach(function (x) { x.disabled = true; });
+      var done = function () { statusBtns.forEach(function (x) { x.disabled = false; }); };
+      flush().then(function (ok) {
+        if (!ok) { done(); say("Status nicht geändert: erst muss alles gespeichert sein (siehe oben)."); return; }
+        return call("POST", "/posts/" + id + "/status", { status: b.getAttribute("data-set-status"), base: base }).then(function (r) {
+          done();
           if (r.s === 200) { base = r.j.updated_at; statusEl.textContent = r.j.status; say("Status: " + r.j.status); }
+          else if (r.s === 409) { base = null; say("Konflikt: Der Beitrag wurde woanders geändert. Seite neu laden, Status nicht geändert."); }
           else say("Status nicht geändert: " + (r.j.error || r.s));
         });
-      };
-      save().then(go); /* pending text first, so the status change sees the latest base */
+      }, done);
     });
   });
   $("[data-rotate]").addEventListener("click", function () {

@@ -95,10 +95,16 @@ if (sqlite) {
   assert.equal((await page(`/blog/mein-haus-b?preview=${tok}`)).s, 404, "old preview link revoked");
   assert.equal((await page(`/blog/mein-haus-b?preview=${rot.j.preview_token}`)).s, 200);
 
+  const baseOf = async (pid) => (await call("GET", `/api/blog/admin/posts/${pid}`, { u: "a" })).j.updated_at;
   // Publish rules, published list, search (title and tags; LIKE wildcards are literal), categories.
   const e = await call("POST", "/api/blog/admin/posts", { u: "a", body: { title_de: "" } });
-  assert.equal((await call("POST", `/api/blog/admin/posts/${e.j.id}/status`, { u: "a", body: { status: "published" } })).j.error, "title_de missing");
-  const pub = await call("POST", `/api/blog/admin/posts/${id}/status`, { u: "a", body: { status: "published" } });
+  assert.equal((await call("POST", `/api/blog/admin/posts/${e.j.id}/status`, { u: "a", body: { status: "published", base: await baseOf(e.j.id) } })).j.error, "title_de missing");
+  // Status changes need the editor's base: missing 400, stale 409 (a stale tab can't publish), status unchanged.
+  assert.equal((await call("POST", `/api/blog/admin/posts/${id}/status`, { u: "a", body: { status: "published" } })).s, 400);
+  const st = await call("POST", `/api/blog/admin/posts/${id}/status`, { u: "a", body: { status: "published", base: c.j.updated_at } });
+  assert.equal(st.s, 409); assert.equal(st.j.error, "conflict");
+  assert.equal((await call("GET", "/api/blog/post/mein-haus-b")).s, 404, "stale status request published nothing");
+  const pub = await call("POST", `/api/blog/admin/posts/${id}/status`, { u: "a", body: { status: "published", base: await baseOf(id) } });
   assert.equal(pub.s, 200);
   const list = await call("GET", "/api/blog");
   assert.deepEqual(list.j.posts.map((p) => p.slug), ["mein-haus-b"]);
@@ -117,10 +123,10 @@ if (sqlite) {
   assert.equal((await call("PUT", `/api/blog/admin/posts/${other.j.id}`, { u: "a", body: { base: other.j.updated_at, slug: "mein-haus-b" } })).s, 409);
   assert.equal((await call("POST", "/api/blog/admin/posts", { u: "a", body: { title_de: "x", slug: "zwei" } })).j.error, "slug_taken");
   // Withdrawn posts leave the public list; the admin still sees them.
-  await call("POST", `/api/blog/admin/posts/${id}/status`, { u: "a", body: { status: "withdrawn" } });
+  await call("POST", `/api/blog/admin/posts/${id}/status`, { u: "a", body: { status: "withdrawn", base: await baseOf(id) } });
   assert.equal((await call("GET", "/api/blog")).j.posts.length, 0);
   assert.equal((await call("GET", "/api/blog/post/mein-haus-b", { u: "a" })).s, 200);
-  await call("POST", `/api/blog/admin/posts/${id}/status`, { u: "a", body: { status: "published" } });
+  await call("POST", `/api/blog/admin/posts/${id}/status`, { u: "a", body: { status: "published", base: await baseOf(id) } });
   // RSS: well-formed enough, escaped title, sanitised body inside CDATA.
   const feed = await (await B.page("/blog/feed.xml", new Request("https://nwebnotfound.dev/blog/feed.xml"), env, new URL("https://nwebnotfound.dev/blog/feed.xml"), "de")).text();
   assert.ok(feed.startsWith("<?xml") && feed.includes("<title>Mein Haus &lt;b&gt;</title>") && feed.includes("https://nwebnotfound.dev/blog/mein-haus-b") && !feed.includes("<script>x"));
