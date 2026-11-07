@@ -185,6 +185,13 @@ with sync_playwright() as p:
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS editor: a saved editor window is never restored (signed out: desktop, not the login)")
 
+    # effective hit area (an absolute ::after overlay counts, tap rule (c)) and text contrast, as in nwebos-phone-ui.py
+    HIT = r"""(sels) => { const out = []; for (const s of sels) for (const el of document.querySelectorAll(s)) { if (!el.offsetParent) continue; const r = el.getBoundingClientRect(); let L = r.left, T = r.top, R = r.right, B = r.bottom;
+      const c = getComputedStyle(el, "::after"); if (c.content !== "none" && c.position === "absolute") { L += parseFloat(c.left) || 0; T += parseFloat(c.top) || 0; R -= parseFloat(c.right) || 0; B -= parseFloat(c.bottom) || 0; }
+      if (R - L < 40 || B - T < 40) out.push([s, (el.getAttribute("aria-label") || el.textContent).trim().slice(0, 20), Math.round(R - L) + "x" + Math.round(B - T)]); } return out; }"""
+    CONTRAST = r"""(sels) => { const L = (c) => { const m = c.match(/[\d.]+/g).map(Number); const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); };
+      const bg = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; const a = (c.match(/[\d.]+/g) || [0, 0, 0, 0]).map(Number); if (c.startsWith("rgb(") || (a[3] || 0) > 0.5) return c; } return "rgb(255,255,255)"; };
+      const out = []; for (const s of sels) for (const el of document.querySelectorAll(s)) { if (!el.offsetParent || !(el.textContent.trim() || el.value)) continue; const a = L(getComputedStyle(el).color), b = L(bg(el)); const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); if (r < 4.5) out.push([s, (el.textContent || el.value).trim().slice(0, 30), r.toFixed(2)]); } return out; }"""
     # phone (Planner 07.11.): one column, full-width fields, Text/Vorschau tabs, status + Veröffentlichen in a sticky
     # bottom bar, DE/EN segmented, no horizontal scroll; 375 and 430, day and night
     for width in (375, 430):
@@ -201,6 +208,16 @@ with sync_playwright() as p:
             tw = win.locator("[name=title]").bounding_box(); assert tw["height"] >= 40 and tw["width"] >= width - 40, ("title full width", tw)
             assert win.locator("[name=category]").is_hidden() and bar.locator("[data-savenow]").is_visible()
             name = f"editor-{'night' if night else 'day'}-{width}"
+            # Design QA #119 round 3: the bar's buttons stay on one line; the tabs are 40px; footer links have a separator
+            for bt in bar.locator(".xpbtn").all():
+                if bt.is_visible():
+                    assert bt.evaluate("e => { const r = document.createRange(); r.selectNodeContents(e); return r.getClientRects().length <= 1 && e.getBoundingClientRect().height <= 48; }"), ("bar button wraps", bt.inner_text(), width)
+            small = pg.evaluate(HIT, [".win.focus .tabs button", ".win.focus .wt .wb", ".win.focus .segm button"])
+            assert not small, ("tap targets below 40px", width, small)
+            if night:
+                low = pg.evaluate(CONTRAST, [".win.focus .tabs button", ".win.focus .as", ".win.focus .meta .ttl", ".win.focus [name=body]", ".win.focus .edfoot span", ".win.focus .segm button"])
+                assert not low, ("editor night contrast", width, low)
+                assert pg.evaluate("(() => { const m = getComputedStyle(document.querySelector('.win.focus [name=body]')).backgroundColor.match(/[0-9.]+/g).map(Number); return m[0] + m[1] + m[2] < 150; })()"), "night: the text field is dark"
             shot(pg, name + ".png")
             # Details: address, category, tags, language, summary, preview link
             win.locator('[data-edv="meta"]').click()
@@ -208,6 +225,11 @@ with sync_playwright() as p:
                 fb = win.locator(sel).bounding_box(); assert fb["height"] >= 40 and fb["width"] >= width * 0.5, (sel, fb)
             assert win.locator(".meta .seg [data-lang]").count() == 2 and win.locator(".mplink").is_visible() and win.locator("[name=body]").is_hidden() and win.locator("[name=title]").is_hidden()
             assert pg.evaluate("document.documentElement.scrollWidth") <= width
+            small = pg.evaluate(HIT, [".win.focus .tagsin input", ".win.focus .tagsin>span button", ".win.focus .meta .seg button", ".win.focus .mplink"])
+            assert not small, ("details tap targets below 40px", width, small)
+            if night:
+                low = pg.evaluate(CONTRAST, [".win.focus .meta>label", ".win.focus .meta input", ".win.focus .meta select", ".win.focus .tagsin>span", ".win.focus .sum"])
+                assert not low, ("details night contrast", width, low)
             shot(pg, name + "-details.png")
             win.locator('[data-edv="pv"]').click()
             assert win.locator("[data-pv]").is_visible() and win.locator("[name=body]").is_hidden(), "phone: preview instead of text"

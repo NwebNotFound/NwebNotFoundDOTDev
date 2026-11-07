@@ -266,3 +266,16 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
 [data-theme=summer-night] .meta .ttl{background:transparent;color:#fff}[data-theme=summer-night] .meta .ttl:focus{background:var(--pn2,#202848)}
 [data-theme=summer-night] .edbar{background:var(--pn2,#202848);border-color:var(--edge,#7480c4)}
 [data-theme=summer-night] .conflict{background:#4a3f12;color:#fff3c2}
+/* Design QA #119 round 3: footer separators as CSS (a leading space inside a button collapses), 40px tap areas,
+   one-line bottom bar, night status colours */
+.edfoot .lnk{margin-left:.4em}.edfoot .lnk::before{content:"· ";color:var(--mut)}
+@media (max-width:700px){
+ .tabs button{min-height:40px;padding:0 16px;font-size:14px}
+ .tagsin input{min-height:40px}
+ [data-form][data-view=meta] .mplink{min-height:40px}
+ .tagsin button{position:relative}.tagsin button::after{content:"";position:absolute;inset:-12px -14px}
+ .edbar{gap:6px}.edbar .xpbtn{flex:1 1 auto;min-width:0;padding:0 12px;white-space:nowrap}
+}
+[data-theme=summer-night] .as{color:#7fdc6a}[data-theme=summer-night] .as.saving{color:var(--mut2,#a9afcc)}
+[data-theme=summer-night] .tabs em{background:#323c6a;color:#e9e7f3}
+[data-theme=summer-night] .tagsin>span{background:#2a3260;color:#e9e7f3}
