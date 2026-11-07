@@ -258,8 +258,8 @@ with sync_playwright() as p:
     pg.locator("#startb").click(); pg.locator('#startm [data-open="five"]').click()
     pg.wait_for_selector(".g-five .fvgrid .ft")
     pg.locator(".win.focus").focus()
-    pg.keyboard.type("abcd"); pg.keyboard.press("Backspace"); pg.keyboard.type("de")
-    assert pg.locator(".g-five .fr").first.inner_text().replace(chr(10), "") == "ABCDE", pg.locator(".g-five .fr").first.inner_text()
+    pg.keyboard.type("habx"); pg.keyboard.press("Backspace"); pg.keyboard.type("en")   # a real word: Fünf checks guesses (fuenf-ui.py)
+    assert pg.locator(".g-five .fr").first.inner_text().replace(chr(10), "") == "HABEN", pg.locator(".g-five .fr").first.inner_text()
     pg.keyboard.press("Enter"); pg.wait_for_timeout(600)
     assert pg.locator(".g-five .fr").first.locator(".t, .o, .s").count() == 5, "row rated"
     shot(pg, "games-five-1280.png")
