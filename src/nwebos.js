@@ -161,7 +161,7 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
 <link rel="alternate" hreflang="${lang}" href="${alt(lang)}"><link rel="alternate" hreflang="${other}" href="${alt(other)}">
 <meta name="theme-color" content="#2463d6"><link rel="icon" href="/favicon.ico">
 <script src="/design/summer-theme.js?v=${AV}"></script><link rel="preload" href="/design/fonts/pixelify-sans-latin-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script></head><body>
+<link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script><script src="/design/nwebos-apps.js?v=${AV}" defer></script></head><body>
 <a class="skip" href="#apps">${t.skip}</a>
 <div id="boot" class="scr" hidden><div class="bootin"><div class="blogo">${ic("cat", 72)}<span><b>Nweb</b>OS</span></div><small>${t.edition}</small><div class="bbar"><i></i><i></i><i></i></div><p>${t.boot}</p></div><span class="bcopy">© {{Y}} Nils Weberruß</span></div>
 <div id="login" class="scr" hidden role="dialog" aria-modal="true" aria-label="NwebOS"><div class="lgtop"></div><div class="lgmid"><div class="lgl">${ic("cat", 64)}<b><span>Nweb</span>OS</b><p>${t.loginHint}</p></div>
@@ -171,8 +171,8 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
 <div class="lgbot"><span>NwebOS · ${t.edition}</span><span>${t.loginFoot}</span></div></div>
 <div id="off" class="scr" hidden><div class="offin">${ic("cat", 56)}<p>${t.offText}</p><small>${t.offSub}</small></div></div>
 <div id="desk" hidden><ul class="dicons" aria-label="${t.desktop}">${dicons}</ul><div id="wins"></div>
-<div id="startm" hidden role="menu" aria-label="${t.start}"><div class="smtop"><img id="smav" src="data:," width="44" height="44" alt=""><b id="smname">${t.guest}</b></div>
-<div class="smmid"><ul class="progs">${progs}</ul><ul class="side"><li><a href="${GITHUB}" rel="noopener"><span>GitHub</span></a></li><li><button type="button" data-egg="about-os"><span>${t.aboutOs}</span></button></li></ul></div>
+<div id="startm" hidden role="menu" aria-label="${t.start}"><div class="smtop" data-open="profile" title="${lang === "en" ? "My profile" : "Mein Profil"}"><img id="smav" src="data:," width="44" height="44" alt=""><b id="smname">${t.guest}</b></div>
+<div class="smmid"><ul class="progs">${progs}</ul><ul class="side"><li><a href="${href(lang, "/profile")}" data-open="profile">${ic("profile", 20)}<span>${lang === "en" ? "My profile" : "Mein Profil"}</span></a></li><li><a href="${href(lang, "/changelog")}" data-open="changelog">${ic("changelog", 20)}<span>${lang === "en" ? "What's new" : "Neuigkeiten"}</span></a></li><li><a href="${GITHUB}" rel="noopener"><span>GitHub</span></a></li><li><button type="button" data-egg="about-os"><span>${t.aboutOs}</span></button></li></ul></div>
 <div class="smbot"><button type="button" data-egg="logout">${t.logout}</button><button type="button" data-egg="shutdown" class="sd">${t.shutdown}</button></div></div>
 <footer class="task"><button id="startb" type="button" aria-expanded="false" aria-controls="startm" aria-label="${t.start}">${ic("cat", 22)}<span>NwebOS</span></button><div id="tbtns" role="tablist" aria-label="${t.openWins}"></div>
 <div class="tray"><nav class="lang" data-lang="${lang}" aria-label="${t.lang}"><a href="${esc(href("de", path))}" hreflang="de" lang="de"${lang === "de" ? ' aria-current="true"' : ""}>DE</a><a href="${esc(href("en", path))}" hreflang="en" lang="en"${lang === "en" ? ' aria-current="true"' : ""}>EN</a></nav>
