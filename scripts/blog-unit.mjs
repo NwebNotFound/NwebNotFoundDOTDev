@@ -69,12 +69,12 @@ if (sqlite) {
     assert.equal((await call("GET", "/api/blog/admin/posts", { u })).s, s, `list as ${u}`);
     assert.equal((await call("POST", "/api/blog/admin/posts", { u, body: { title_de: "x" } })).s, s, `create as ${u}`);
     assert.equal((await call("POST", "/api/blog/admin/render", { u, body: { md: "x" } })).s, s, `render as ${u}`);
-    assert.equal((await page("/blog/admin", u)).s, u ? 404 : 302, `editor page as ${u}`);
+    assert.equal((await page("/blog/admin", u)).s, 404, `no #106 editor page as ${u} (the editor is the NwebOS window, src/worker.js)`);
   }
   assert.equal((await call("POST", "/api/blog/admin/posts", { u: "a", body: { title_de: "x" }, origin: "https://evil.example" })).s, 403, "foreign origin");
   assert.equal((await call("POST", "/api/blog/admin/posts", { u: "a", body: { title_de: "x" }, origin: null })).s, 403, "no origin");
   assert.equal((await call("POST", "/api/blog/admin/posts", { u: "a", body: "title_de=x", ct: "application/x-www-form-urlencoded" })).s, 415, "form posts rejected");
-  assert.equal((await page("/blog/admin", "a")).s, 200);
+  assert.equal((await page("/blog/admin", "a")).s, 404, "no #106 editor page for the admin either");
 
   // Reserved slugs: explicit "admin" refused, a post titled "Admin" gets admin-1, /blog/admin stays the editor.
   assert.equal((await call("POST", "/api/blog/admin/posts", { u: "a", body: { title_de: "x", slug: "admin" } })).s, 400);
