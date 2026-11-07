@@ -22,6 +22,10 @@ const mcIcon = (size) => `<img src="/mc-icon/v2/grass_block" width="${size}" hei
 const icon = (k, size) => (k === "minecraft" ? mcIcon(size) : ic(k, size));
 
 /**
+ * App modules (docs/nwebos-modules.md): an app with `module: "/design/<file>.js"` gets an empty window whose
+ * content a client module fills in; its section holds the no-JS fallback. The shell loads the module on the first
+ * open and calls the `mount` it registered with `NwebOS.register(key, { mount, unmount })`. Used by the games.
+ *
  * Apps of the desktop. `path` = its own address; `win` = it opens as a window in this PR. The others
  * still lead to their current page (blog, music, writing) or the MC site until the apps PR.
  */
@@ -124,7 +128,7 @@ export function nwebosPage({ lang = "de", app = "", entries = [], sitekey = "" }
   const winApps = APPS.filter((a) => a.win);
   // The current app's section comes first, so a reader without JS (and a crawler) lands on it.
   const ordered = cur ? [cur, ...winApps.filter((a) => a !== cur)] : winApps;
-  const sections = ordered.map((a) => `<section class="app" id="app-${a.k}" data-app="${a.k}" data-path="${a.path}" data-title-de="${esc(a.de)}" data-title-en="${esc(a.en)}" data-w="${a.w}" data-h="${a.h}" aria-labelledby="h-${a.k}"><h2 class="nojs-h" id="h-${a.k}">${esc(a[lang])}</h2>${content[a.k]}</section>`).join("\n");
+  const sections = ordered.map((a) => `<section class="app" id="app-${a.k}" data-app="${a.k}" data-path="${a.path}"${a.module ? ` data-module="${esc(a.module)}?v=${AV}"` : ""} data-title-de="${esc(a.de)}" data-title-en="${esc(a.en)}" data-w="${a.w}" data-h="${a.h}" aria-labelledby="h-${a.k}"><h2 class="nojs-h" id="h-${a.k}">${esc(a[lang])}</h2>${content[a.k]}</section>`).join("\n");
   const iconHref = (a) => (a.win ? href(lang, a.path) : a.href.startsWith("/") ? href(lang, a.href) : a.href);
   const dicons = APPS.map((a) => `<li><a class="dicon" href="${esc(iconHref(a))}"${a.win ? ` data-open="${a.k}"` : ""} data-de="${esc(a.de)}" data-en="${esc(a.en)}">${icon(a.k, 40)}<span>${esc(a[lang])}</span></a></li>`).join("");
   const progs = APPS.map((a) => `<li><a href="${esc(iconHref(a))}"${a.win ? ` data-open="${a.k}"` : ""}>${icon(a.k, 24)}<span>${esc(a[lang])}</span></a></li>`).join("");

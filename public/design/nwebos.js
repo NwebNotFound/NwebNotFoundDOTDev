@@ -24,12 +24,26 @@
   var APPS = {}; $$("#apps .app").forEach(function (s) { APPS[s.dataset.app] = s; });
   var DEF = { about: [150, 40], portfolio: [330, 70], guestbook: [790, 24], dlg: [480, 220] };
   var open = new Map(), z = 10, seq = 0, me = null;
+  /* App modules (docs/nwebos-modules.md): NwebOS.register(key, { mount(content, ctx), unmount?(content) }).
+     A section with data-module loads that script on the first open; the window is mounted once it registered. */
+  var MODS = {}, loading = {}, waiting = {};
+  window.NwebOS = { register: function (key, mod) { MODS[key] = mod; (waiting[key] || []).forEach(function (f) { f(); }); delete waiting[key]; } };
+  function ctxFor(k, el) { return { key: k, lang: lang, window: el, sound: { click: function () { sound.click(); }, open: function () { sound.open(); }, close: function () { sound.close(); }, tone: tone },
+    store: { get: function (x) { return store.get(k + "." + x); }, set: function (x, v) { store.set(k + "." + x, v); } }, close: function () { close(k); } }; }
+  function mount(k, el) {
+    var src = APPS[k], url = src && src.dataset.module; if (!url) return;
+    var wc = $(".wc", el);
+    var go = function () { if (!open.has(k) || open.get(k).el !== el) return; try { wc.replaceChildren(); MODS[k].mount(wc, ctxFor(k, el)); } catch (e) { if (window.console) console.error("NwebOS module " + k, e); } };
+    if (MODS[k]) return go();
+    (waiting[k] = waiting[k] || []).push(go);
+    if (!loading[url]) { loading[url] = true; var s = document.createElement("script"); s.src = url; s.async = true; document.head.appendChild(s); }
+  }
 
   var title = function (k) { var a = APPS[k]; return a ? a.dataset[lang === "en" ? "titleEn" : "titleDe"] : (open.get(k) && open.get(k).title) || ""; };
   var icon16 = function (k) { var t = $("#ic-" + k); return t ? t.innerHTML : ""; };
   var pathOf = function (k) { var p = k && APPS[k] ? APPS[k].dataset.path : "/"; return lang === "en" ? (p === "/" ? "/en" : "/en" + p) : p; };
   var appOf = function (pathname) { var p = pathname.replace(/^\/en(?=\/|$)/, "") || "/"; p = p.replace(/\/$/, "") || "/"; var hit = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === p) hit = k; }); return hit; };
-  var push = function (k) { var p = pathOf(k); if (location.pathname !== p) history.pushState({ k: k || "" }, "", p); document.title = (k ? title(k) + " · " : "") + "NwebOS"; };
+  var push = function (k) { if (k && APPS[k] && !APPS[k].dataset.path) return; var p = pathOf(k); if (location.pathname !== p) history.pushState({ k: k || "" }, "", p); document.title = (k ? title(k) + " · " : "") + "NwebOS"; };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
 
   /* ---------- sound: tiny WebAudio synth, created on the first gesture only ---------- */
@@ -101,6 +115,7 @@
     if (!opt.min) focus(k, !opt.noPush);
     if (!opt.quiet && !opt.min) el.focus({ preventScroll: true });
     if (k === "guestbook") guestbook(el);
+    mount(k, el);
     save();
     return rec;
   }
@@ -130,6 +145,7 @@
   function restore(k) { var o = open.get(k); if (!o || !o.el.classList.contains("min")) return; toBtn(k); o.el.classList.remove("min"); if (!RM) o.el.classList.add("restoring"); save(); }
   function close(k, fromHistory) {
     var o = open.get(k); if (!o) return; open.delete(k); o.btn.remove(); sound.close();
+    if (MODS[k] && MODS[k].unmount) { try { MODS[k].unmount($(".wc", o.el)); } catch (e) {} }
     var done = function () { o.el.remove(); };
     if (RM) done(); else { o.el.classList.add("closing"); after(o.el, done); }
     syncInert();   /* before focus moves: an inert icon list cannot take it */
