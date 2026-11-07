@@ -81,9 +81,11 @@ with sync_playwright() as p:
     pg.wait_for_function("() => document.querySelector('[data-blog-status]').textContent === 'published'", timeout=10000)
     pub = ctx.new_page()
     pub.goto(f"https://{H}/blog/ui-testbeitrag", wait_until="load")
-    assert pub.locator("main h1").inner_text() == "UI Testbeitrag"
-    assert pub.locator(".blog-toc li").count() == 2 and pub.locator("main img[src=x]").count() == 0
-    assert "Letzter Satz kurz vor dem Klick." in pub.inner_text("main"), "publish raced the pending save"
+    # the public post is the NwebOS reader window (src/nwebos-apps.js)
+    post = pub.locator("#app-blog-post")
+    assert post.locator(".post h1").inner_text() == "UI Testbeitrag"
+    assert post.locator(".toc li").count() == 2 and post.locator("img[src=x]").count() == 0
+    assert "Letzter Satz kurz vor dem Klick." in post.inner_text(), "publish raced the pending save"
     pub.goto(f"https://{H}/blog?q=test", wait_until="load")
     assert pub.locator('a[href="/blog/ui-testbeitrag"]').count() == 1, "search by tag finds it"
     # A status request that fails on the network: message shown, buttons usable again (Gatekeeper #106).
