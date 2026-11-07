@@ -75,6 +75,8 @@ with sync_playwright() as p:
     # A2 quick sheet: theme toggles in place, Esc closes, focus goes back to the pill
     qb = pg.locator("[data-quick]"); qb.click()
     qs = pg.locator(".shx.qs"); qs.wait_for()
+    rows = qs.locator("ul.rows > li > a, ul.rows > li > button")
+    assert rows.count() == 3 and all(rows.nth(i).bounding_box()["height"] >= 48 for i in range(3)), "quick-sheet rows are a styled list (>= 48px each)"
     t0 = pg.evaluate("document.documentElement.dataset.theme || ''")
     qs.locator("[data-qtheme]").click(); pg.wait_for_timeout(150)
     assert pg.evaluate("document.documentElement.dataset.theme || ''") != t0, "A2: Tag/Nacht switches the theme"

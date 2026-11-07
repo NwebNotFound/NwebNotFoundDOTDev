@@ -44,7 +44,18 @@ PROBE = r"""(min) => {
      Designer's size, the tap area is larger and invisible) */
   const hit = (el) => { const r = el.getBoundingClientRect(); let L = r.left, T = r.top, R = r.right, B = r.bottom;
     for (const ps of ["::after", "::before"]) { const c = getComputedStyle(el, ps); if (c.content === "none" || c.content === "normal" || c.position !== "absolute") continue;
-      const px = (v) => (v.endsWith("px") ? parseFloat(v) : 0); L = Math.min(L, r.left + px(c.left)); T = Math.min(T, r.top + px(c.top)); R = Math.max(R, r.right - px(c.right)); B = Math.max(B, r.bottom - px(c.bottom)); }
+      /* left/top/right/bottom of an absolute pseudo count from the padding box (inside the border) */
+      const px = (v) => (v.endsWith("px") ? parseFloat(v) : 0), es = getComputedStyle(el), bl = px(es.borderLeftWidth), bt = px(es.borderTopWidth), br = px(es.borderRightWidth), bb = px(es.borderBottomWidth);
+      L = Math.min(L, r.left + bl + px(c.left)); T = Math.min(T, r.top + bt + px(c.top)); R = Math.max(R, r.right - br - px(c.right)); B = Math.max(B, r.bottom - bb - px(c.bottom)); }
+    /* verify each grown side with elementFromPoint (an overlay clipped by an overflow parent or covered by a neighbour
+       does not count); only inside the viewport, elsewhere the computed box stands */
+    const mx = (L + R) / 2, my = (T + B) / 2, inV = (x, y) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight;
+    const hits = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === el || el.contains(t)); };
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, onTop = inV(cx, cy) && hits(cx, cy);   // covered elements (a window behind) are not checked
+    if (onTop && T < r.top && inV(mx, T + 1) && !hits(mx, T + 1)) T = r.top;
+    if (onTop && B > r.bottom && inV(mx, B - 1) && !hits(mx, B - 1)) B = r.bottom;
+    if (onTop && L < r.left && inV(L + 1, my) && !hits(L + 1, my)) L = r.left;
+    if (onTop && R > r.right && inV(R - 1, my) && !hits(R - 1, my)) R = r.right;
     return { left: L, top: T, right: R, bottom: B, w: R - L, h: B - T }; };
   const targets = [];
   for (const el of document.querySelectorAll("button,a[href],input:not([type=hidden]),select,textarea,[role=button],summary")) {
@@ -105,6 +116,16 @@ with sync_playwright() as p:
                     pg.wait_for_timeout(500)
                     for kind, what, info in pg.evaluate(PROBE, MIN):
                         found.append((path, f"{who} {width} {'night' if night else 'day'}", kind, what, info))
+                    if path == "/":   # states that only exist after a tap: the quick sheet, the search with text
+                        where = f"{who} {width} {'night' if night else 'day'}"
+                        pg.locator("[data-quick]").click(); pg.locator(".shx.qs").wait_for(); pg.wait_for_timeout(300)
+                        for kind, what, info in pg.evaluate(PROBE, MIN):
+                            if kind == "tap" or kind == "ua-look": found.append(("/ (quick sheet)", where, kind, what, info))
+                        pg.keyboard.press("Escape"); pg.wait_for_timeout(200)
+                        pg.locator("#hq").fill("bl"); pg.wait_for_timeout(300)
+                        for kind, what, info in pg.evaluate(PROBE, MIN):
+                            if kind == "tap" and ("clr" in what or "Suche leeren" in info): found.append(("/ (search)", where, kind, what, info))
+                        pg.locator(".hsearch .cnl").click(); pg.wait_for_timeout(150)
                 c.unroute_all(behavior="ignoreErrors"); c.close()
     br.close()
     # one line per offender (deduplicated over day/night and widths where identical)

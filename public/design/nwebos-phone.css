@@ -196,8 +196,8 @@
    makes the tap area at least 44x44 (the guard in scripts/nwebos-guard-ui.py measures it) */
 @media (max-width:700px){
  .wt .wb,.mbar>button,.tp .cats button,.tp .lnk,.rbar .tbtn,.toc summary,.react .rx button,.clh .rss,.clf button,.sug a,.utabs button,.fbody h3 a,.ppl .lnk{position:relative}
- .wt .wb::after,.mbar>button::after,.tp .cats button::after,.tp .lnk::after,.rbar .tbtn::after,.toc summary::after,.react .rx button::after,.clh .rss::after,.clf button::after,.sug a::after,.utabs button::after,.fbody h3 a::after,.ppl .lnk::after{content:"";position:absolute;inset:-4px 0}
- .wt .wb::after{inset:-2px}
+ .wt .wb::after,.mbar>button::after,.tp .cats button::after,.tp .lnk::after,.rbar .tbtn::after,.toc summary::after,.react .rx button::after,.clh .rss::after,.clf button::after,.sug a::after,.utabs button::after,.fbody h3 a::after,.ppl .lnk::after{content:"";position:absolute;inset:-6px -2px}   /* inset counts from the padding box: -6 = 4px past a 2px border */
+ .wt .wb::after{inset:-4px}
  .utabs button::after{inset:-9px -9px}
  .chs a,.chs button{min-height:44px}   /* stacked rows: a real 44px row, no overlapping overlays */
  .fbody h3 a::after,.ppl .lnk::after{inset:-15px 0}
@@ -232,3 +232,31 @@
 @media (max-width:700px){.subb{position:relative}.subb::after{content:"";position:absolute;inset:-4px 0}}
 /* row 56: the quick-sheet account card is one link (profile v3 mockup) */
 .qs a.acct{display:flex;align-items:center;gap:12px;min-height:56px;color:var(--txt);text-decoration:none}.qs a.acct em{margin-left:auto;font-style:normal;font-size:22px;color:var(--mut2)}
+/* ---------- #123 Design QA r1b ---------- */
+/* 7: one darker primary green (white text >= 4.5:1, same as #119); chips with readable text; quick-sheet hints */
+:root{--c-go:#2b7a26}
+.chip.c-bauen{color:#1b2238}.chip.c-notizen{background:#2563c9}
+.qs .tile2[aria-pressed=true] small{color:#fff}
+/* 4: Über mich and Projekte at night */
+[data-theme=summer-night] .about h1{color:#9ec1ff}
+[data-theme=summer-night] .props dt{background:var(--pn2);color:var(--txt)}[data-theme=summer-night] .props dt,[data-theme=summer-night] .props dd{border-color:var(--line)}[data-theme=summer-night] .props{border-color:var(--line)}
+[data-theme=summer-night] .st.bald,[data-theme=summer-night] .st.Idee{color:#c3c8e0}[data-theme=summer-night] .st.neu{color:#ff9e80}[data-theme=summer-night] .st.live{color:#7fdc6a}
+[data-theme=summer-night] .bl-h span,[data-theme=summer-night] .crumb2,[data-theme=summer-night] .crumb2 a,[data-theme=summer-night] .tg,[data-theme=summer-night] .tg a,[data-theme=summer-night] .meta,[data-theme=summer-night] .bm{color:#c3c8e0}
+/* 5: real 44px tap areas where an overlay was clipped or missing (QA probed with elementFromPoint) */
+@media (max-width:700px){
+ .utabs button{min-height:44px}.utabs button::after{content:none}
+ .hsearch .clr{width:44px;height:44px;top:2px;right:2px}
+ .tp .lnk{display:inline-flex;align-items:center;min-height:44px}.tp .lnk::after{content:none}
+ .qs .seg3 a{min-height:44px}
+ .subb::after{inset:-6px -2px}
+ .soonw .lnk{display:inline-block;padding:15px 4px;margin:-15px -4px}
+}
+/* r1b-5 follow-up: overlays inside overflow containers were clipped (guard now checks with elementFromPoint).
+   Chip rows keep their 36px look and get padding room for the 4px overlay; single controls are simply 44px tall. */
+@media (max-width:700px){
+ .tp .cats,.clf{padding-block:5px;row-gap:10px}.tp .cats button,.clf button{position:relative}
+ .rbar .tbtn,.sug a,.subb,.trw .tp .lnk{min-height:44px}.rbar .tbtn::after,.sug a::after,.subb::after,.trw .tp .lnk::after{content:none}
+ .trw .tp .lnk{display:flex;align-items:center}
+ .utabs button{min-width:44px}
+ .ppl .lnk{display:inline-block;padding:14px 0;margin:-14px 0}.ppl .lnk::after{content:none}
+}
