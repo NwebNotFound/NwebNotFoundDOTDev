@@ -18,7 +18,10 @@ assert.deepEqual(OS_PATHS, ["/", "/about", "/portfolio", "/blog", "/music", "/wr
 assert.equal(nwebosApp("/"), ""); assert.equal(nwebosApp("/guestbook"), "guestbook"); assert.equal(nwebosApp("/blog"), "blog");
 // every main-site page is a window: posts and chapters by pattern; the editor, feeds and unknown paths are not
 assert.equal(nwebosRoute("/blog/eine-navigation").k, "blog-post"); assert.equal(nwebosRoute("/blog/eine-navigation").m[1], "eine-navigation");
-for (const p of ["/blog/admin", "/blog/feed", "/blog/-x", "/blog/a/b", "/sommerfest", "/writing/x", "/api/blog"]) assert.equal(nwebosRoute(p), null, p);
+for (const p of ["/blog/feed", "/blog/-x", "/blog/a/b", "/blog/admin/x", "/sommerfest", "/writing/x", "/api/blog"]) assert.equal(nwebosRoute(p), null, p);
+// the editor is a module window on /blog/admin and /blog/admin/<uuid> (admin is checked by the worker)
+assert.equal(nwebosRoute("/blog/admin").k, "blog-edit"); assert.equal(nwebosRoute("/blog/admin/12345678-1234-1234-1234-123456789012").m[1], "12345678-1234-1234-1234-123456789012");
+{ const ed = nwebosPage({ app: "blog-edit", path: "/blog/admin", content: { "blog-edit": "<p>JS</p>" } }); assert.ok(/id="app-blog-edit"[^>]*data-module="\/design\/nwebos-editor\.js\?v=/.test(ed) && !nwebosPage({}).includes("app-blog-edit") && !/data-open="blog-edit"/.test(nwebosPage({})), "editor: module window, only on its address, no desktop icon"); }
 assert.deepEqual([nwebosRoute("/writing/roman/3").k, nwebosRoute("/writing/roman/3").m[2]], ["chapter", "3"]);
 // dynamic windows only on their own address; 404 window keeps the status; search index without the blog
 const post = nwebosPage({ app: "blog-post", path: "/blog/x", title: "Ein <Titel>", content: { "blog-post": "<p>inhalt</p>" } });

@@ -212,6 +212,76 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
  .hsearch input{height:40px;border-radius:20px;padding:0 16px;font-size:14px;border:2px solid #fff;box-shadow:0 2px 0 rgba(0,0,0,.2)}
  .hsearch .results{position:absolute;left:0;right:0;top:46px;z-index:5;border:2px solid #1c4fb8;border-radius:8px}
 }
+/* editor: summary under the meta row (needed by the blog list; not in the mockup) */
+.meta .sum{flex-basis:100%;display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--mut)}.meta .sum input{flex:1;min-width:0;padding:3px 6px;border:1px solid #7f9db9;font:12px var(--f)}
+.edw>[data-form]{display:flex;flex-direction:column;flex:1;min-height:0}.edw>[data-form][hidden]{display:none}
+.meta .ttl{padding:4px 6px;border:1px solid transparent;font:700 20px var(--f);background:none}.meta .ttl:focus{border-color:#7f9db9;background:#fff}
+/* editor on phones (Planner 07.11., Nils' screenshot of the #106 page): one column, full-width fields in the NwebOS
+   control family (mockups/nwebos/phone-polish: 2px edge, radius 10, 44px), Text/Vorschau as tabs, status and
+   Veröffentlichen in a sticky bottom bar above the safe area. Tokens from nwebos-polish.css, day fallbacks. */
+.edbar{display:none}
+@media (max-width:700px){
+ .edw{overflow:auto}.edw>[data-form]{flex:none;min-height:100%}
+ .ed .edtop [data-plink],.ed .edtop [data-publish]{display:none}
+ .meta{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:10px;padding:12px}.meta .sum{flex-basis:auto}
+ .meta>label,.meta .sum{display:flex;flex-direction:column;align-items:stretch;gap:4px;font-size:13px;color:var(--mut2,#5b6170)}
+ .meta input,.meta select,.meta .ttl{width:100%;min-height:44px;padding:0 12px;border:2px solid var(--edge,#1b2238);border-radius:10px;font:16px var(--f);background:var(--pn,#fff);color:var(--txt,#1b1f2a)}
+ .meta .ttl{font:700 20px var(--f)}.meta .ttl:focus,.meta input:focus,.meta select:focus{outline:3px solid #ffd23f;outline-offset:1px}
+ .slug{display:flex;align-items:center;gap:2px}.slug input{flex:1;width:auto}
+ .tagsin{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:44px;padding:6px 8px;border:2px solid var(--edge,#1b2238);border-radius:10px;background:var(--pn,#fff)}.tagsin input{flex:1;min-width:90px;min-height:30px;border:0!important;padding:0 4px}
+ .meta .seg{align-self:flex-start;border:2px solid var(--edge,#1b2238);border-radius:10px}.meta .seg button{min-height:40px;padding:0 18px;font:700 14px var(--f)}
+ .meta>*{flex-shrink:0}.meta .pill{display:none}   /* the status pill lives in the bottom bar on phones */
+ .meta .sum input{flex:none;width:100%;min-height:44px;padding:0 12px;border:2px solid var(--edge,#1b2238);border-radius:10px;font:16px var(--f);background:var(--pn,#fff);color:var(--txt,#1b1f2a)}
+ .tool{gap:4px;padding:6px 8px}.tool>button{min-width:40px;min-height:40px}.segm button{min-height:40px;padding:0 14px}
+ .split{min-height:55vh}.md{font-size:16px}.pv{padding:12px 14px}
+ .edfoot{flex-wrap:wrap;gap:4px 8px;padding:8px 12px}
+ .edbar{display:flex;order:10;position:sticky;bottom:0;z-index:2;align-items:center;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:2px solid var(--edge,#1b2238);background:var(--pn2,#f6f4ec)}
+ .edbar .xpbtn{flex:1;min-height:44px}.edbar .pill{flex:none}
+}
+/* editor list (feat-blog-editor): status filter with counts, title/tag search, row actions */
+.edl .lfil{margin:0 12px 8px}.edl .lfil em{font-style:normal;opacity:.7}.edl .lsearch{display:block;margin:0 12px 10px}.edl .lsearch input{width:100%}
+.xtbl td.acts{display:flex;gap:6px;flex-wrap:wrap}
+.mplink{display:none}
+@media (max-width:700px){
+ /* three tabs: Schreiben (title + text), Vorschau, Details (address, category, tags, language, summary, preview link) */
+ [data-form][data-view=md] .meta>:not(.ttl),[data-form][data-view=pv] .meta,[data-form][data-view=meta] .split,[data-form][data-view=meta] .tool>button,[data-form][data-view=meta] .meta .ttl{display:none!important}
+ [data-form][data-view=meta] .mplink{display:inline-flex;align-self:flex-start}
+ [data-form][data-view=meta] .meta{flex:1}
+ .edl .lfil{display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100% - 24px)}.edl .lfil button{flex:none;min-height:40px;padding:0 12px}   /* Design QA r4: two rows at 375, every label readable */
+ .edl .lsearch input{min-height:44px}
+ .edl .xtbl thead{display:none}.edl .xtbl,.edl .xtbl tbody,.edl .xtbl tr,.edl .xtbl td{display:block;width:auto}
+ .edl .xtbl tr{display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:10px 12px;border-bottom:1px dashed var(--line,#d9d5c3)}
+ .edl .xtbl td{padding:0!important;border:0!important}.edl .xtbl td:nth-child(1){grid-column:1/-1;font-size:15px}
+ .edl .xtbl td.acts{grid-column:1/-1;justify-content:flex-end}.edl .xtbl td.acts .xpbtn{min-height:40px}
+}
+@media (max-width:700px){ .tool{order:-1} }   /* phone: the Schreiben · Vorschau · Details row on top (feat-blog-editor) */
+/* editor at night (phone-polish fix 12 tokens): panes, fields, toolbar, tabs */
+[data-theme=summer-night] .ed,[data-theme=summer-night] .edw,[data-theme=summer-night] .edl,[data-theme=summer-night] .meta,[data-theme=summer-night] .pv{background:var(--pn,#171d38);color:var(--txt,#e9e7f3)}
+[data-theme=summer-night] .edtop,[data-theme=summer-night] .tool,[data-theme=summer-night] .edfoot{background:var(--pn2,#202848);color:var(--txt,#e9e7f3);border-color:var(--line,#323c6a)}
+[data-theme=summer-night] .md{background:#11162b;color:#e9e7f3;border-color:var(--line,#323c6a)}
+[data-theme=summer-night] .tool>button{color:var(--txt,#e9e7f3)}[data-theme=summer-night] .tool>button:hover{background:#2a3260;border-color:var(--edge,#7480c4)}
+[data-theme=summer-night] .tabs button{background:var(--pn2,#202848);color:var(--mut2,#a9afcc);border-color:var(--line,#323c6a)}[data-theme=summer-night] .tabs button.on{background:var(--pn,#171d38);color:#fff}
+[data-theme=summer-night] .segm button{background:var(--pn2,#202848);color:var(--txt,#e9e7f3)}[data-theme=summer-night] .segm button.on{background:var(--c-on,#7a5fd6);color:#fff}
+[data-theme=summer-night] .meta input,[data-theme=summer-night] .meta select,[data-theme=summer-night] .tagsin,[data-theme=summer-night] .edl .lsearch input{background:var(--pn2,#202848);color:var(--txt,#e9e7f3);border-color:var(--edge,#7480c4)}
+[data-theme=summer-night] .meta .ttl{background:transparent;color:#fff}[data-theme=summer-night] .meta .ttl:focus{background:var(--pn2,#202848)}
+[data-theme=summer-night] .edbar{background:var(--pn2,#202848);border-color:var(--edge,#7480c4)}
+[data-theme=summer-night] .conflict{background:#4a3f12;color:#fff3c2}
+/* Design QA #119 round 3: footer separators as CSS (a leading space inside a button collapses), 40px tap areas,
+   one-line bottom bar, night status colours */
+.edfoot .lnk{margin-left:.4em}.edfoot .lnk::before{content:"· ";color:var(--mut)}
+@media (max-width:700px){
+ .tabs button{min-height:40px;padding:0 16px;font-size:14px}
+ .tagsin input{min-height:40px}
+ [data-form][data-view=meta] .mplink{min-height:40px}
+ .tagsin button{position:relative}.tagsin button::after{content:"";position:absolute;inset:-12px -16px}
+ .edbar{gap:6px}.edbar .xpbtn{flex:1 1 auto;min-width:0;padding:0 12px;white-space:nowrap}
+}
+[data-theme=summer-night] .as{color:#7fdc6a}[data-theme=summer-night] .as.saving{color:var(--mut2,#a9afcc)}
+[data-theme=summer-night] .tabs em{background:#323c6a;color:#e9e7f3}
+[data-theme=summer-night] .tagsin>span{background:#2a3260;color:#e9e7f3}
+/* Design QA #119 r4: white on the editor's green buttons >= 4.5:1 (day and night); footer links readable at night */
+.ed .xpbtn.go,.edl .xpbtn.go{background:#2b7a26;border-color:#1b2238;color:#fff}
+[data-theme=summer-night] .edfoot .lnk{color:#9ec1ff}[data-theme=summer-night] .edfoot .lnk.danger{color:#ff8a80}
 /* chapter window: download + print + rights (ported from the old chapter page), the archived note, print just the page */
 .rexp{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 4px;padding:12px 0 0;border-top:1px dashed var(--line,#d7d3c0)}.rexp .hint,.rexp .rights{flex:1 1 100%;margin:0;font-size:12px;color:var(--mut2,#5b6170)}
 .page .arch{margin:0 0 14px;padding:8px 12px;border:2px solid #e69a00;border-radius:10px;background:#fff3c2;color:#1b2238;font-size:13px}

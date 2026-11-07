@@ -991,7 +991,13 @@ async function osResponse(req, env, url, lang, route) {
   const de = lang !== "en";
   let k = route.k, content = {}, title = "", status = 200, priv = false, oneLang = "";
   const u = ["profile", "blog-post"].includes(k) ? await getUser(req, env).catch(() => null) : null;
-  if (k === "blog") content.blog = blogList(lang, await BLOG().os.list(env, lang));
+  if (k === "blog-edit") {
+    // admin only (server-side, as the #106 page): guests sign in first, everyone else gets the 404 window
+    const a = await BLOG().admin(req, env).catch(() => ({ err: 500 }));
+    if (a.err === 401) return new Response(null, { status: 302, headers: { location: `/auth/discord/login?next=${encodeURIComponent("https://" + MAIN + route.path)}`, "cache-control": "no-store" } });
+    if (a.err) k = "notfound";
+    else { priv = true; content["blog-edit"] = `<p>${de ? "Der Editor braucht JavaScript." : "The editor needs JavaScript."}</p>`; }
+  } else if (k === "blog") content.blog = blogList(lang, await BLOG().os.list(env, lang));
   else if (k === "blog-post") {
     const d = await BLOG().os.post(req, env, route.m[1], url.searchParams.get("preview"), lang).catch(() => null);
     if (d) { content["blog-post"] = blogPost(lang, d.post, d.rx, { signedIn: d.signedIn, older: d.older, newer: d.newer, preview: d.priv }); title = d.post.title; priv = d.priv; if (!d.post.has_en) oneLang = "de"; }
@@ -1159,7 +1165,7 @@ async function route(req, env, ctx) {
       if (os.setCookie) { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
       const old = osLegacy(pre.path);
       if (old && old.location) return new Response(null, { status: 302, headers: { location: (pre.lang ? "/" + pre.lang : "") + old.location + url.search, "cache-control": "no-store" } });
-      const route = old ? old.route : nwebosRoute(pre.path);
+      const route = old ? old.route : nwebosRoute(pre.path);   // the blog editor too (#119): every page is a window
       if (route) {
         const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
         const res = await osResponse(req, env, url, lang, route);
