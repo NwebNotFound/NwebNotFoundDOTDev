@@ -260,8 +260,8 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
     const rest = p.slice("/api/blog/admin".length);
     if (rest === "/posts") {
       if (req.method === "GET") {
-        const { results } = await env.DB.prepare("SELECT id, slug, status, category, title_de, title_en, published_at, updated_at FROM blog_posts ORDER BY updated_at DESC LIMIT 200").all();
-        return json({ posts: results || [] });
+        const { results } = await env.DB.prepare("SELECT id, slug, status, category, tags, title_de, title_en, published_at, updated_at FROM blog_posts ORDER BY updated_at DESC LIMIT 200").all();
+        return json({ posts: (results || []).map((r) => ({ ...r, tags: parseTags(r.tags) })) });   // tags for the editor's list search
       }
       if (req.method === "POST") return create(req, env, a);
       return deny(405, "method_not_allowed");
@@ -334,29 +334,11 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
     return new Response(lines.join("\n") + "\n", { headers: { "content-type": "application/rss+xml; charset=utf-8", "cache-control": "public, max-age=300" } });
   }
 
-  async function editorPage(req, env, lang, rest) {
-    const a = await admin(req, env);
-    if (a.err === 401) return new Response(null, { status: 302, headers: { location: `/auth/discord/login?next=${encodeURIComponent(SITE + "/blog/admin" + rest)}`, "cache-control": "no-store" } });
-    if (a.err) return notFound(false, req);
-    const id = rest.slice(1);
-    if (rest && !ID.test(id)) return notFound(false, req);
-    const body = rest
-      ? `<div class="blog blog-editor" data-blog-editor="${id}"><p><a href="/blog/admin">← Alle Beiträge</a></p><h1>Beitrag bearbeiten</h1><p role="status" data-blog-state>Lädt …</p>
-<div class="blog-ed-meta"><label>Slug <input name="slug" maxlength="${LIMITS.slug}"></label> <label>Kategorie <select name="category">${CATEGORIES.map((c) => `<option value="${c}">${CAT_LABEL[c]}</option>`).join("")}</select></label> <label>Tags (Komma) <input name="tags" maxlength="300"></label></div>
-<div class="blog-ed-tabs" role="group" aria-label="Sprache"><button type="button" aria-pressed="true" data-tab="de">Deutsch</button> <button type="button" aria-pressed="false" data-tab="en">English (optional)</button></div>
-${["de", "en"].map((l) => `<fieldset data-lang="${l}"${l === "en" ? " hidden" : ""}><legend>${l === "de" ? "Deutsch" : "English"}</legend><label>Titel <input name="title_${l}" maxlength="${LIMITS.title}"></label><label>Kurzbeschreibung <textarea name="summary_${l}" rows="2" maxlength="${LIMITS.summary}"></textarea></label><label>Text (Markdown) <textarea name="body_${l}" rows="18" maxlength="${LIMITS.body}"></textarea></label></fieldset>`).join("")}
-<section class="blog-ed-preview" aria-label="Vorschau"><h2>Vorschau</h2><nav class="blog-toc" data-blog-toc></nav><div class="blog-body" data-blog-preview></div></section>
-<p class="blog-ed-actions"><span>Status: <b data-blog-status></b></span> <button type="button" data-set-status="published">Veröffentlichen</button> <button type="button" data-set-status="draft">Zurück zu Entwurf</button> <button type="button" data-set-status="withdrawn">Zurückziehen</button> <a data-blog-preview-link href="#">Geheimer Vorschau-Link</a> <button type="button" data-rotate>Neuen Vorschau-Link erzeugen</button></p></div>`
-      : `<div class="blog blog-editor" data-blog-admin><h1>Blog-Editor</h1><p><button type="button" data-blog-new>Neuer Beitrag</button></p><p role="status" data-blog-state>Lädt …</p><ul data-blog-posts></ul></div>`;
-    const head = `<meta name="robots" content="noindex"><script src="/design/blog-editor.js?v=${AV}" defer></script>`;
-    return html(sitePage({ lang, bare: "/blog/admin", title: "Blog-Editor · NwebNotFound", desc: "Blog-Editor", body, head }), 200, { "cache-control": "private, no-store" });
-  }
-
   /** Pages under /blog (bare path, language already split off). Returns null for other paths. */
   async function page(bare, req, env, url, lang) {
     if (bare === "/blog") return listPage(req, env, url, lang);
     if (bare === "/blog/feed.xml") return feed(env);
-    if (bare === "/blog/admin" || bare.startsWith("/blog/admin/")) return editorPage(req, env, lang, bare.slice("/blog/admin".length));
+    if (bare === "/blog/admin" || bare.startsWith("/blog/admin/")) return notFound(false, req);   // the editor is the NwebOS window (src/worker.js); a non-GET or an unknown id ends here
     if (bare.startsWith("/blog/")) return postPage(req, env, url, lang, bare.slice(6));
     return null;
   }

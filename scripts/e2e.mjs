@@ -1268,7 +1268,9 @@ try {
     ok(bp.s === 200 && can(bp.t) === "https://nwebnotfound.dev/blog/e2e-beitrag" && hl(bp.t) === "", "Blog: Beitrag nur auf Deutsch → canonical auf die deutsche URL, kein hreflang", `${bp.s} ${can(bp.t)}`);
     await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
     const adm = await b("/blog/admin", { cookie: c1, os: true });
-    ok(adm.s === 200 && !adm.t.includes('class="no-js nwebos"'), "NwebOS: Blog-Editor bleibt vorerst die eigene Seite (Admin)", String(adm.s));
+    const admOld = await b("/blog/admin", { cookie: c1 }), admGuest = await b("/blog/admin", { os: true }), admOther = await b("/blog/admin", { cookie: c2, os: true });
+    ok(adm.s === 200 && adm.t.includes('class="no-js nwebos"') && adm.t.includes('id="app-blog-edit"') && adm.t.includes('data-module="/design/nwebos-editor.js') && /private/.test(adm.h.get("cache-control") || "") && adm.h.get("x-robots-tag") === "noindex", "NwebOS: Blog-Editor ist ein Fenster (Admin, privat, noindex)", String(adm.s));
+    ok(admGuest.s === 302 && (admGuest.h.get("location") || "").startsWith("/auth/discord/login") && admOther.s === 404 && admOther.t.includes('id="app-notfound"') && !admOther.t.includes("app-blog-edit") && admOld.s === 200 && admOld.t.includes('id="app-blog-edit"'), "NwebOS-Editor: Gast → Login, Nicht-Admin → 404-Fenster; auch mit Opt-out das Fenster (die #106-Seite ist weg)", `${admGuest.s} ${admOther.s} ${admOld.s}`);
     // A draft with a preview link for the NwebOS deep-link check (the ?preview= token must survive the boot).
     const dr = await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: MO, body: { slug: "nwebos-entwurf", title_de: "NwebOS Entwurf", body_de: "## Teil\n\nEntwurfstext." } });
     process.env.NWEBOS_PREVIEW = `/blog/nwebos-entwurf?preview=${dr.j?.preview_token || ""}`;
@@ -1283,7 +1285,7 @@ try {
       ok(c.s === 201 && s.s === 200, `Blog: Beitrag ${p.slug} für NwebOS veröffentlicht`, `${c.s} ${s.s}`);
     }
   }
-  py("Blog-Editor im Browser fehlgeschlagen", "scripts/blog-editor-ui.py", BASE, c1);
+  py("NwebOS-Blog-Editor im Browser fehlgeschlagen", "scripts/nwebos-editor-ui.py", BASE, c1, c2);
   sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");
   // NwebOS (src/nwebos.js) is the default (Nils 07.11.); ?nwebos=0 opts out to the current pages, which stay for
   // paths without an NwebOS app yet.
@@ -1343,6 +1345,7 @@ try {
   py("NwebOS-Handy-Feinschliff im Browser fehlgeschlagen", "scripts/nwebos-phone-ui.py", BASE, c1);
   py("NwebOS-Handy-Sweep (Suche, Sheets, Toasts, Abonnieren) im Browser fehlgeschlagen", "scripts/nwebos-sweep-ui.py", BASE, c1);
   py("NwebOS-Stil-Wächter (Tippflächen, Browser-Look, alte Leiste, Überlauf) fehlgeschlagen", "scripts/nwebos-guard-ui.py", BASE, c1);
+  py("Fünf-Wortprüfung (DE/EN, ungültige Wörter, Umlaute) im Browser fehlgeschlagen", "scripts/fuenf-ui.py", BASE);
   py("Logo-Seitenwechsel „Wohin?“ fehlgeschlagen", "scripts/site-switch-ui.py", BASE);
   py("3D-Viewer: Pause/Fortsetzen fehlgeschlagen", "scripts/player3d-ui.py", BASE);
   py("Turnstile-Challenge-Ablauf fehlgeschlagen", "scripts/turnstile-ui.py", BASE);

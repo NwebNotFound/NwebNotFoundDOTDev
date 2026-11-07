@@ -19,7 +19,7 @@ MIN = int(os.environ.get("GUARD_MIN", "44"))
 H = "nwebnotfound.dev"
 GIF = bytes.fromhex("47494638396101000100800000ffd23f00000021f90401000000002c000000000100010000020144003b")
 ROUTES = ["/", "/about", "/portfolio", "/blog", "/blog/eine-navigation-fuer-zwei-seiten", "/music", "/writing", "/guestbook",
-          "/trash", "/profile", "/changelog", "/pixelwand", "/sommerfest"]   # + "/blog/admin" once #119 (editor window) is in main
+          "/trash", "/profile", "/changelog", "/pixelwand", "/sommerfest", "/blog/admin"]
 if os.environ.get("GUARD_ROUTES"):
     ROUTES = os.environ["GUARD_ROUTES"].split(",")
 

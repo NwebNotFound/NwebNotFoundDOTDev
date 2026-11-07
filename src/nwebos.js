@@ -45,6 +45,9 @@ export const APPS = [
 ];
 /** Windows without a desktop icon: opened from links, the start menu or their address. `re` matches the bare path. */
 export const EXTRA = [
+  // Blog editor (admin only, the server checks; mockups/nwebos/apps "Editor"): a module window, its client is
+  // public/design/nwebos-editor.js on the #106 admin API.
+  { k: "blog-edit", icon: "blog", re: /^\/blog\/admin(?:\/([0-9a-f-]{36}))?$/, de: "Blog-Editor", en: "Blog editor", w: 920, h: 580, x: 180, y: 20, menu: "no", module: "/design/nwebos-editor.js" },
   { k: "blog-post", icon: "blog", re: /^\/blog\/([a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?)$/, de: "Beitrag", en: "Post", w: 820, h: 560, x: 240, y: 30, menu: "no" },
   { k: "profile", icon: "profile", path: "/profile", de: "Mein Profil", en: "My profile", w: 740, h: 540, x: 260, y: 30, menu: "no" },
   { k: "changelog", icon: "changelog", path: "/changelog", de: "Neuigkeiten", en: "What's new", w: 560, h: 520, x: 420, y: 40, menu: "no" },
