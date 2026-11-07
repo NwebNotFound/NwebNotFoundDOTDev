@@ -50,7 +50,9 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   if (testHost === "nwebnotfound.dev" && !os && !/(^|;\s*)nnf_os=/.test(cookie || "")) cookie = cookie ? cookie + "; nnf_os=0" : "nnf_os=0";
   if (cookie) h.cookie = cookie;
   if (origin) h.origin = origin;
-  const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
+  const go = () => fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" });
+  // A browser run before this request can leave Node with a dead keep-alive socket: one retry for safe methods ("fetch failed" flake).
+  const r = await go().catch((e) => (/^(GET|HEAD)$/.test(method) ? go() : Promise.reject(e))); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
 };
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
 const now = Date.now(), H = 3600, HR0 = Math.floor(now / 1000 / H) * H, RESET = new Date((HR0 - 28 * H) * 1000).toISOString();
