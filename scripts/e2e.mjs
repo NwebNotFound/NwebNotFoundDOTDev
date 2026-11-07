@@ -1194,6 +1194,12 @@ try {
     ok(sv.s === 200 && pb.s === 200 && pg.s === 200 && pg.t.includes('<h2 id="h-teil">Teil</h2>') && !pg.t.includes("<script>alert(1)") && ls.j?.posts?.length === 1, "Blog: speichern, veröffentlichen, Seite sanitisiert, Suche findet Tag", `${sv.s} ${pb.s} ${pg.s}`);
     const rss = await b("/blog/feed.xml");
     ok(rss.s === 200 && /application\/rss\+xml/.test(rss.h.get("content-type") || "") && rss.t.includes("<title>E2E Beitrag</title>"), "Blog: RSS-Feed");
+    // #110/#111: self-referencing canonical + hreflang per language on the index, English category strings on /en/blog.
+    const bd = await b("/blog"), be = await b("/en/blog"), bp = await b("/en/blog/e2e-beitrag");
+    const can = (t) => (/<link rel="canonical" href="([^"]+)"/.exec(t) || [])[1], hl = (t) => [...t.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"/g)].map((m) => m[1] + " " + m[2]).sort().join("|");
+    ok(can(bd.t) === "https://nwebnotfound.dev/blog" && can(be.t) === "https://nwebnotfound.dev/en/blog" && hl(bd.t) === hl(be.t) && hl(be.t) === ["de https://nwebnotfound.dev/blog", "en https://nwebnotfound.dev/en/blog", "x-default https://nwebnotfound.dev/blog"].sort().join("|"), "Blog: canonical je Sprache selbstreferenzierend, hreflang de/en/x-default", `${can(bd.t)} ${can(be.t)} ${hl(be.t)}`);
+    ok(be.t.includes('aria-label="Categories"') && be.t.includes(">Build</a>") && !be.t.includes("Kategorien") && !be.t.includes(">Bauen</a>") && bd.t.includes('aria-label="Kategorien"') && bd.t.includes(">Bauen</a>"), "Blog: /en/blog hat englische Kategorien + aria-label, /blog deutsche");
+    ok(bp.s === 200 && can(bp.t) === "https://nwebnotfound.dev/blog/e2e-beitrag" && hl(bp.t) === "", "Blog: Beitrag nur auf Deutsch → canonical auf die deutsche URL, kein hreflang", `${bp.s} ${can(bp.t)}`);
     await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
   }
   try { execSync(`python3 scripts/blog-editor-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Blog-Editor im Browser fehlgeschlagen"); }
