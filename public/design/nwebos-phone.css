@@ -198,7 +198,8 @@
  .wt .wb,.mbar>button,.tp .cats button,.tp .lnk,.rbar .tbtn,.toc summary,.react .rx button,.clh .rss,.clf button,.sug a,.utabs button,.fbody h3 a,.ppl .lnk{position:relative}
  .wt .wb::after,.mbar>button::after,.tp .cats button::after,.tp .lnk::after,.rbar .tbtn::after,.toc summary::after,.react .rx button::after,.clh .rss::after,.clf button::after,.sug a::after,.utabs button::after,.fbody h3 a::after,.ppl .lnk::after{content:"";position:absolute;inset:-4px 0}
  .wt .wb::after{inset:-2px}
- .utabs button::after{inset:-7px -9px}
+ .utabs button::after{inset:-9px -9px}
+ .chs a,.chs button{min-height:44px}   /* stacked rows: a real 44px row, no overlapping overlays */
  .fbody h3 a::after,.ppl .lnk::after{inset:-15px 0}
  .toc a{display:flex;align-items:center;min-height:44px;padding-top:0;padding-bottom:0}.toc a::before{margin-right:.3em}
  input[type=range].seek{height:44px;margin:-11px 0}   /* the track stays 10px, centred; the box is the tap area */
