@@ -1105,10 +1105,10 @@ export default {
     // entstehen. Ein Sprachpräfix vor einer Hub-fremden Route fällt auf den Pfad ohne Präfix zurück
     // (301), damit z. B. /en/guestbook nicht in einem 404 endet.
     const pre = splitLang(p);
-    // NwebOS (src/nwebos.js), opt-in until the switch-over: ?nwebos=1 / ?nwebos=0 set or clear the cookie and
-    // come back to the clean URL; with the cookie, the OS paths serve the OS page instead of the old one.
+    // NwebOS (src/nwebos.js) is the default on its paths; ?nwebos=0 / ?nwebos=1 opt out / back in (cookie) and come
+    // back to the clean URL. Opted out, or on a path without an NwebOS app yet, the current page is served.
     {
-      const os = nwebosChoice(url, cookies(req));
+      const os = nwebosChoice(url, cookies(req), true);
       if (os.setCookie && req.method === "GET") { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
       const app = os.on ? nwebosApp(pre.path) : null;
       if (app !== null) {

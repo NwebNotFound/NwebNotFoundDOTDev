@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NwebOS shell in a real browser (src/nwebos.js + public/design/nwebos.js), opted in via ?nwebos=1.
+"""NwebOS shell in a real browser (src/nwebos.js + public/design/nwebos.js), the default on the main site.
 Boot only on the first desktop visit, login, desktop, windows on real paths with Back/Forward, windows
 restored from localStorage, Esc, phone home screen, no-JS reading, guestbook with Discord session and a
 mocked Turnstile widget. Args: BASE COOKIE(name=value, a signed-in session) [SHOTS_DIR]."""
@@ -17,7 +17,7 @@ TS = "window.turnstile={render(h){const i=document.createElement('input');i.type
 
 def ctx_for(br, width, cookie=False, js=True):
     c = br.new_context(viewport={"width": width, "height": 800 if width > 700 else 760}, java_script_enabled=js)
-    c.add_cookies([{"name": "nnf_os", "value": "1", "domain": H, "path": "/", "secure": True}])
+    # no nnf_os cookie: NwebOS is the default
     if cookie:
         n, v = COOKIE.split("=", 1)
         c.add_cookies([{"name": n, "value": unquote(v), "domain": H, "path": "/", "secure": True, "httpOnly": True}])
