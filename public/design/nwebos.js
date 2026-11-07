@@ -194,7 +194,48 @@
 
   /* ---------- start menu ---------- */
   function closeStart() { sm.hidden = true; sb.setAttribute("aria-expanded", "false"); }
-  sb.onclick = function (e) { e.stopPropagation(); sound.click(); var o = sm.hidden; sm.hidden = !o; sb.setAttribute("aria-expanded", String(o)); if (o) { var f = $("a,button", sm); if (f) f.focus(); } };
+  sb.onclick = function (e) { e.stopPropagation(); sound.click(); var o = sm.hidden; sm.hidden = !o; sb.setAttribute("aria-expanded", String(o)); if (o) { var f = $("#smq", sm) || $("a,button", sm); if (f) f.focus(); } };
+  /* search (start menu, phone home): windows, mc wiki and links from the page, blog posts from /api/blog on first use */
+  var IDX = (L.idx || []).slice(), blogP = null;
+  var norm = function (x) { return String(x).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); };
+  function loadBlog() {
+    return blogP || (blogP = fetch("/api/blog", { credentials: "omit" }).then(function (r) { return r.ok ? r.json() : { posts: [] }; }).then(function (j) {
+      (j.posts || []).forEach(function (q) { IDX.push({ t: q.title, d: "Blog · " + new Date(q.published_at).toLocaleDateString(L.lang === "en" ? "en-GB" : "de-DE", { day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }), p: (L.lang === "en" ? "/en" : "") + "/blog/" + q.slug, ic: "blog", kw: [q.category].concat(q.tags || []).join(" ") + " " + (q.summary || "") }); });
+    }).catch(function () {}));
+  }
+  function find(q) { q = norm(q.trim()); if (!q) return []; var parts = q.split(/\s+/); /* title hits first, then windows of this site before links out */
+    var all = function (h) { return parts.every(function (x) { return h.indexOf(x) >= 0; }); };
+    return IDX.map(function (r, i) { var t = norm(r.t); return { r: r, i: i, s: all(t) ? 0 : all(t + " " + norm(r.kw + " " + r.d)) ? 2 : 9 }; }).filter(function (x) { return x.s < 9; })
+      .sort(function (a, b) { return (a.s + (a.r.url ? 1 : 0)) - (b.s + (b.r.url ? 1 : 0)) || a.i - b.i; }).slice(0, 8).map(function (x) { return x.r; }); }
+  function bindSearch(inp, list, after) {
+    if (!inp || !list) return;
+    var sel = 0, res = [];
+    var draw = function () {
+      res = find(inp.value); list.hidden = !inp.value.trim(); sel = Math.min(sel, Math.max(0, res.length - 1));
+      list.replaceChildren();
+      if (!res.length) { var li0 = document.createElement("li"); li0.className = "none"; li0.textContent = L.noHit + " „" + inp.value.trim() + "“"; list.appendChild(li0); }
+      res.forEach(function (r, i) {
+        var li = document.createElement("li"), b = document.createElement("button"), sp = document.createElement("span"), bt = document.createElement("b"), sm2 = document.createElement("small");
+        b.type = "button"; b.dataset.i = i; if (i === sel) b.className = "on";
+        b.innerHTML = icon16(r.ic); bt.textContent = r.t; sm2.textContent = r.d; sp.append(bt, sm2); b.appendChild(sp);
+        if (r.url) { var em = document.createElement("em"); em.textContent = "↗"; b.appendChild(em); }
+        li.appendChild(b); list.appendChild(li);
+      });
+      var mid = $(".smmid", sm); if (list.id === "smres" && mid) mid.hidden = !list.hidden;
+    };
+    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else openUrl(r.p); inp.value = ""; draw(); if (after) after(); };
+    inp.addEventListener("focus", function () { loadBlog().then(function () { if (inp.value.trim()) draw(); }); });
+    inp.addEventListener("input", function () { sel = 0; draw(); });
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { sel = Math.min(res.length - 1, sel + 1); draw(); e.preventDefault(); }
+      else if (e.key === "ArrowUp") { sel = Math.max(0, sel - 1); draw(); e.preventDefault(); }
+      else if (e.key === "Enter") { e.preventDefault(); go(res[sel]); }
+      else if (e.key === "Escape" && inp.value) { inp.value = ""; draw(); e.stopPropagation(); }
+    });
+    list.addEventListener("click", function (e) { var b = e.target.closest("[data-i]"); if (b) { e.stopPropagation(); go(res[+b.dataset.i]); } });
+  }
+  bindSearch($("#smq"), $("#smres"), closeStart); bindSearch($("#hq"), $("#hres"));
+  var hf = $(".hsearch"); if (hf) hf.addEventListener("submit", function (e) { e.preventDefault(); });
   document.addEventListener("click", function (e) {
     if (!sm.hidden && !e.target.closest("#startm,#startb")) closeStart();
     var op = e.target.closest("[data-open]");

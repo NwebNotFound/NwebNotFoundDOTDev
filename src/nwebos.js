@@ -9,6 +9,7 @@
 // nnf_os=0, a year), `?nwebos=1` opts back in. Paths without an NwebOS app yet (blog, profile, changelog, …) keep
 // their current pages; their desktop/start-menu icons link there.
 import { AV } from "./asset-version.js";
+import { WIKI } from "./mc-hub.js";
 import { music, trash, soon } from "./nwebos-apps.js";
 
 export const MAIN_HOST = "nwebnotfound.dev";
@@ -57,6 +58,7 @@ const T = {
     skip: "Zum Inhalt springen", boot: "Klick oder Taste zum Überspringen", edition: "Sommer Edition",
     loginHint: "Klick auf deinen Namen, um anzufangen.", viaDiscord: "über Discord angemeldet", signIn: "Mit Discord anmelden", signInSub: "Name und Avatar im Gästebuch",
     guest: "Gast", guestSub: "ohne Anmeldung umsehen", loginFoot: "Nach dem Anmelden kannst du Fenster ziehen, schließen und stapeln.",
+    search: "Suchen", searchPh: "Suchen: Apps, Blog, Wiki …", noHit: "Nichts gefunden für", newTab: "neuer Tab",
     desktop: "Desktop", openWins: "Offene Fenster", start: "Startmenü", lang: "Sprache", theme: "Tag oder Nacht", sound: "Ton an oder aus",
     logout: "Abmelden", shutdown: "Herunterfahren", aboutOs: "Über NwebOS", trashSoon: "Papierkorb", home: "Startbildschirm",
     offText: "Du kannst die Seite jetzt schließen.", offSub: "(oder einfach klicken, dann geht's weiter)",
@@ -68,6 +70,7 @@ const T = {
     skip: "Skip to content", boot: "Click or press a key to skip", edition: "Summer Edition",
     loginHint: "Click your name to begin.", viaDiscord: "signed in with Discord", signIn: "Sign in with Discord", signInSub: "name and avatar in the guestbook",
     guest: "Guest", guestSub: "look around without signing in", loginFoot: "Once you're in, drag, close and stack windows.",
+    search: "Search", searchPh: "Search: apps, blog, wiki …", noHit: "Nothing found for", newTab: "new tab",
     desktop: "Desktop", openWins: "Open windows", start: "Start menu", lang: "Language", theme: "Day or night", sound: "Sound on or off",
     logout: "Log off", shutdown: "Shut down", aboutOs: "About NwebOS", trashSoon: "Recycle bin", home: "Home screen",
     offText: "It's now safe to close this page.", offSub: "(or click, and it starts again)",
@@ -130,6 +133,15 @@ const href = (lang, path) => (lang === "en" ? (path === "/" ? "/en" : "/en" + pa
  * The full OS page. `app` is the window for this address ("" = desktop only); `entries` the latest
  * guestbook entries; `sitekey` the Turnstile site key for the guestbook form.
  */
+/** Search index without the blog (the shell loads /api/blog on the first search): windows, mc wiki, links. */
+function searchIndex(lang) {
+  const t = T[lang], mc = `https://${MC_HOST}`;
+  const apps = ALL.filter((a) => a.path && a.k !== "soon").map((a) => ({ t: a[lang], d: "App", p: href(lang, a.path), ic: a.icon || a.k, kw: a.k }));
+  return [...apps,
+    { t: "Minecraft-Server", d: `${MC_HOST} · ${t.newTab}`, url: `${mc}/`, ic: "minecraft", kw: "minecraft server mc" },
+    ...WIKI.map((w) => ({ t: `Wiki: ${w.title}`, d: `${MC_HOST}/wiki · ${t.newTab}`, url: `${mc}/wiki/${w.slug}`, ic: "minecraft", kw: `wiki minecraft ${w.sum || ""}` })),
+    { t: "GitHub · NwebNotFound", d: t.newTab, url: GITHUB, ic: "portfolio", kw: "github code" }];
+}
 export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries = [], sitekey = "", content: extra = {}, title: winTitle = "", status = 200 } = {}) {
   lang = lang === "en" ? "en" : "de";
   const t = T[lang];
@@ -154,7 +166,7 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
   const other = lang === "en" ? "de" : "en";
   const alt = (l) => `https://${MAIN_HOST}${href(l, path)}`;
   const DISCORD = '<svg viewBox="0 0 71 55" fill="#fff" aria-hidden="true" focusable="false"><path d="M60.1 4.9A58.5 58.5 0 0045.4.4a40 40 0 00-1.9 3.8 54 54 0 00-16.2 0A40 40 0 0025.4.4 58.4 58.4 0 0010.7 4.9C1.4 18.7-1.1 32.2.1 45.5a59 59 0 0018 9.1 43 43 0 003.8-6.2 38 38 0 01-6-2.9l1.5-1.1a42 42 0 0036 0l1.5 1.1a38 38 0 01-6 2.9 43 43 0 003.8 6.2 58.7 58.7 0 0018-9.1c1.5-15.4-2.5-28.8-10.6-40.6zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2z"/></svg>';
-  const L = { ...t, lang, path, home: href(lang, "/"), login: `/auth/discord/login?next=`, logoutUrl: `/auth/discord/logout?next=`, sitekey, routes, status };
+  const L = { ...t, lang, path, idx: searchIndex(lang), home: href(lang, "/"), login: `/auth/discord/login?next=`, logoutUrl: `/auth/discord/logout?next=`, sitekey, routes, status };
   return `<!doctype html>
 <html lang="${lang}" class="no-js nwebos"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(t.desc)}"><link rel="canonical" href="${alt(lang)}">
@@ -170,8 +182,9 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
 <li><button type="button" data-user="gast"><span class="guest">${ic("about", 40)}</span><span><b>${t.guest}</b><small>${t.guestSub}</small></span></button></li></ul></div>
 <div class="lgbot"><span>NwebOS · ${t.edition}</span><span>${t.loginFoot}</span></div></div>
 <div id="off" class="scr" hidden><div class="offin">${ic("cat", 56)}<p>${t.offText}</p><small>${t.offSub}</small></div></div>
-<div id="desk" hidden><ul class="dicons" aria-label="${t.desktop}">${dicons}</ul><div id="wins"></div>
+<div id="desk" hidden><form class="hsearch" role="search"><input id="hq" type="search" placeholder="${t.search} …" aria-label="${t.search}" autocomplete="off"><ul class="results" id="hres" hidden></ul></form><ul class="dicons" aria-label="${t.desktop}">${dicons}</ul><div id="wins"></div>
 <div id="startm" hidden role="menu" aria-label="${t.start}"><div class="smtop" data-open="profile" title="${lang === "en" ? "My profile" : "Mein Profil"}"><img id="smav" src="data:," width="44" height="44" alt=""><b id="smname">${t.guest}</b></div>
+<div class="smsearch"><input id="smq" type="search" placeholder="${t.searchPh}" aria-label="${t.search}" autocomplete="off"></div><ul class="results" id="smres" hidden></ul>
 <div class="smmid"><ul class="progs">${progs}</ul><ul class="side"><li><a href="${href(lang, "/profile")}" data-open="profile">${ic("profile", 20)}<span>${lang === "en" ? "My profile" : "Mein Profil"}</span></a></li><li><a href="${href(lang, "/changelog")}" data-open="changelog">${ic("changelog", 20)}<span>${lang === "en" ? "What's new" : "Neuigkeiten"}</span></a></li><li><a href="${GITHUB}" rel="noopener"><span>GitHub</span></a></li><li><button type="button" data-egg="about-os"><span>${t.aboutOs}</span></button></li></ul></div>
 <div class="smbot"><button type="button" data-egg="logout">${t.logout}</button><button type="button" data-egg="shutdown" class="sd">${t.shutdown}</button></div></div>
 <footer class="task"><button id="startb" type="button" aria-expanded="false" aria-controls="startm" aria-label="${t.start}">${ic("cat", 22)}<span>NwebOS</span></button><div id="tbtns" role="tablist" aria-label="${t.openWins}"></div>

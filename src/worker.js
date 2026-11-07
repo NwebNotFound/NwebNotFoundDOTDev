@@ -1007,6 +1007,18 @@ function osSeries(lang) {
   const slugs = [...new Set(stories.map((w) => w.series))];
   return slugs.map((s) => { const ch = chaptersOf(WRITING_ALL, s); return { slug: s, title: ch[0]?.seriesTitle || s, chapters: ch.map((c) => ({ n: c.chapter, title: c.title, slug: c.slug, item: c })) }; });
 }
+/* Old Creative Hub addresses that have no window of their own: /writing/series/<s> is the Texte window,
+   /writing/<slug> is its chapter window (or the 404 window). 302, not 301: with ?nwebos=0 the old pages still
+   answer at these addresses until the opt-out goes away. */
+function osLegacy(bare) {
+  const se = /^\/writing\/series\/([a-z0-9-]+)$/.exec(bare);
+  if (se) return { location: "/writing" };
+  const one = /^\/writing\/([a-z0-9-]+)$/.exec(bare);
+  if (!one) return null;
+  const it = publishedWriting(WRITING_ALL).find((w) => w.slug === one[1]);
+  if (it && it.kind === "story" && it.series && it.chapter) return { location: `/writing/${it.series}/${it.chapter}` };
+  return { route: { k: "notfound", path: bare } };
+}
 async function osResponse(req, env, url, lang, route) {
   const de = lang !== "en";
   let k = route.k, content = {}, title = "", status = 200, priv = false;
@@ -1164,7 +1176,9 @@ export default {
     {
       const os = nwebosChoice(url, cookies(req), true);
       if (os.setCookie && req.method === "GET") { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
-      const route = os.on && req.method === "GET" ? nwebosRoute(pre.path) : null;
+      const old = os.on && req.method === "GET" ? osLegacy(pre.path) : null;
+      if (old && old.location) return new Response(null, { status: 302, headers: { location: (pre.lang ? "/" + pre.lang : "") + old.location + url.search, "cache-control": "no-store" } });
+      const route = old ? old.route : os.on && req.method === "GET" ? nwebosRoute(pre.path) : null;
       if (route) {
         const lang = pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]);
         const res = await osResponse(req, env, url, lang, route);

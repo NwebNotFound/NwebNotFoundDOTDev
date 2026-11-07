@@ -111,6 +111,31 @@ with sync_playwright() as p:
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS signed in: reaction toggles, reading progress saved, profile Weiterlesen")
 
+    # Start menu search: a blog post (from /api/blog) opens as a window, the wiki is a new-tab link; phone home search.
+    c = ctx_for(br, 1280)
+    pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(f"https://{H}/", wait_until="load")
+    pg.locator("#startb").click(); pg.locator("#smq").fill("vip welt")
+    pg.locator("#smres button", has_text="VIP-Welten").wait_for(timeout=10000)
+    assert pg.locator(".smmid").is_hidden(), "results replace the program list"
+    pg.keyboard.press("Enter")
+    pg.locator(".win.focus .rd .post h1").wait_for()
+    assert urlsplit(pg.url).path == "/blog/vip-welten" and pg.locator("#startm").is_hidden()
+    pg.locator("#startb").click(); pg.locator("#smq").fill("faq")
+    assert pg.locator("#smres button", has_text="Wiki: FAQ").locator("em").inner_text() == "↗"
+    pg.locator("#smq").fill("zzzqq"); assert "Nichts gefunden" in pg.locator("#smres").inner_text()
+    shot(pg, "x-search-1280.png")
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    c = ctx_for(br, 375)
+    pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(f"https://{H}/", wait_until="load")
+    pg.locator("#hq").fill("gäste")
+    pg.locator("#hres button", has_text="Gästebuch").click()
+    pg.locator('.win.focus[aria-label="Gästebuch"]').wait_for()
+    assert urlsplit(pg.url).path == "/guestbook"
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS search: start menu (blog post opens, wiki new tab, no hit) and phone home")
+
     # Guest profile: private, sign-in prompt, no data.
     c = ctx_for(br, 1280)
     pg = c.new_page()

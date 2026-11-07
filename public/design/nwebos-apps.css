@@ -193,3 +193,22 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
 
 /* list rows and nav are real links in the site markup (mockup: buttons) */
 .fbody h3 a,.bposts a,.toc a,.pn2 a,.bmk a,.chs a,.sug a,.pl a{text-decoration:none}.tp span a{display:inline;padding:0}
+
+/* search: start menu and phone home (shell markup in src/nwebos.js, design: mockups/nwebos os.css) */
+.smsearch{padding:6px 8px;background:#fff}
+.smsearch input,.hsearch input{width:100%;padding:5px 8px;border:1px solid #7f9db9;border-radius:2px;font:12px var(--f)}
+.results{list-style:none;margin:0;padding:4px 0;background:#fff;max-height:320px;overflow:auto;border-top:1px solid #d6dff7}
+.results button{display:flex;align-items:center;gap:8px;width:100%;padding:5px 10px;border:0;background:none;text-align:left;cursor:pointer;font:inherit;color:var(--ink)}
+.results button.on,.results button:hover{background:var(--sel);color:#fff}
+.results button.on small,.results button:hover small{color:#dbe6ff}
+.results svg,.results img{width:16px;height:16px;flex:none;image-rendering:pixelated}
+.results b{display:block;font-size:12px}
+.results small{display:block;font-size:10.5px;color:var(--mut)}
+.results em{margin-left:auto;font-style:normal}
+.results .none{padding:8px 10px;color:var(--mut)}
+.hsearch{display:none}
+@media (max-width:700px){
+ .hsearch{display:block;position:relative;margin:14px 12px 0}
+ .hsearch input{height:40px;border-radius:20px;padding:0 16px;font-size:14px;border:2px solid #fff;box-shadow:0 2px 0 rgba(0,0,0,.2)}
+ .hsearch .results{position:absolute;left:0;right:0;top:46px;z-index:5;border:2px solid #1c4fb8;border-radius:8px}
+}
