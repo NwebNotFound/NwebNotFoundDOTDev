@@ -785,8 +785,10 @@ try {
     const kf = [...css.matchAll(/@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g)];
     const slow = kf.filter((m) => [...m[2].matchAll(/([a-z-]+)\s*:/g)].some((p) => !["transform", "opacity"].includes(p[1]))).map((m) => m[1]);
     ok(kf.length > 20 && slow.length === 0, "Keyframes animieren nur transform/opacity (kein box-shadow etc. pro Frame)", slow.join(","));
-    const gb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev" } }).then((r) => r.text());
+    const gb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev", cookie: "nnf_os=0" } }).then((r) => r.text());   // the current page (opted out)
     ok(!/<script[^>]+turnstile\/v0\/api\.js/.test(gb) && /render=explicit/.test(gb), "Gästebuch: Turnstile erst beim Formular (kein api.js im Kopf)");
+    const osGb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev" } }).then((r) => r.text());
+    ok(osGb.includes('class="no-js nwebos"') && !/<script[^>]+turnstile\/v0\/api\.js/.test(osGb) && /render=explicit/.test(fs.readFileSync(ROOT + "public/design/nwebos.js", "utf8")), "NwebOS-Gästebuch: Turnstile erst beim Formular (nwebos.js, kein api.js im Kopf)");
     const mi = await fetch(BASE + "/markt/diamond", { headers: { host: HOST } }).then((r) => r.text());
     ok(!/<script[^>]+turnstile\/v0\/api\.js/.test(mi), "Markt-Item: kein Turnstile-Skript beim Laden");
     const FONTS = ["pixelify-sans-latin-400", "pixelify-sans-latin-700", "nunito-latin-400", "nunito-latin-700"];
