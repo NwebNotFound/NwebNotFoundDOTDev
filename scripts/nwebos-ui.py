@@ -3,6 +3,7 @@
 Boot only on the first desktop visit, login, desktop, windows on real paths with Back/Forward, windows
 restored from localStorage, Esc, phone home screen, no-JS reading, guestbook with Discord session and a
 mocked Turnstile widget. Args: BASE COOKIE(name=value, a signed-in session) [SHOTS_DIR]."""
+import json
 import os
 import sys
 from urllib.parse import unquote, urlsplit
@@ -36,7 +37,16 @@ def ctx_for(br, width, cookie=False, js=True):
         h = {k: v for k, v in r.request.all_headers().items() if not k.startswith(":")}
         h["host"] = "mc.nwebnotfound.dev"  # wrangler dev rewrites Origin unless Host is the --local-upstream host
         h["x-nnf-test-host"] = H
-        r.fulfill(response=r.fetch(url=BASE + u.path + ("?" + u.query if u.query else ""), headers=h, max_redirects=0))
+        resp = r.fetch(url=BASE + u.path + ("?" + u.query if u.query else ""), headers=h, max_redirects=0)
+        loc = resp.headers.get("location", "")
+        if r.request.is_navigation_request() and 300 <= resp.status < 400 and loc:
+            # Chromium follows a redirect of a fulfilled response WITHOUT routing it (it went to the live site, behind
+            # Cloudflare's challenge, on CI): answer with a page that navigates itself, so the next request is routed.
+            hd = {k: v for k, v in resp.headers.items() if k.lower() == "set-cookie"}
+            hd["content-type"] = "text/html"
+            r.fulfill(status=200, headers=hd, body="<script>location.replace(%s)</script>" % json.dumps(loc))
+            return
+        r.fulfill(response=resp)
 
     c.route("**/*", route)
     return c
