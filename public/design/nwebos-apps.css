@@ -273,7 +273,7 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
  .tabs button{min-height:40px;padding:0 16px;font-size:14px}
  .tagsin input{min-height:40px}
  [data-form][data-view=meta] .mplink{min-height:40px}
- .tagsin button{position:relative}.tagsin button::after{content:"";position:absolute;inset:-12px -14px}
+ .tagsin button{position:relative}.tagsin button::after{content:"";position:absolute;inset:-12px -16px}
  .edbar{gap:6px}.edbar .xpbtn{flex:1 1 auto;min-width:0;padding:0 12px;white-space:nowrap}
 }
 [data-theme=summer-night] .as{color:#7fdc6a}[data-theme=summer-night] .as.saving{color:var(--mut2,#a9afcc)}
