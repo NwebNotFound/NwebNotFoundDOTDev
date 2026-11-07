@@ -4,7 +4,8 @@
 // Runs alone (`node scripts/nwebos-unit.mjs`) and is imported by scripts/e2e.mjs.
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { nwebosPage, nwebosChoice, nwebosApp, OS_PATHS, APPS } from "../src/nwebos.js";
+import { nwebosPage, nwebosChoice, nwebosApp, nwebosRoute, OS_PATHS, APPS } from "../src/nwebos.js";
+import { blogList, blogPost, notfound, profile } from "../src/nwebos-apps.js";
 import { buildSprite } from "./build-nwebos-icons.mjs";
 
 const U = (q = "") => new URL("https://nwebnotfound.dev/guestbook" + q);
@@ -14,8 +15,23 @@ assert.match(nwebosChoice(U("?nwebos=1"), {}).setCookie, /^nnf_os=1; Path=\/; Ma
 assert.match(nwebosChoice(U("?nwebos=0"), { nnf_os: "1" }).setCookie, /^nnf_os=0; Path=\/; Max-Age=31536000;/, "opt-out is remembered, not just cleared");
 assert.equal(nwebosChoice(U(), {}, true).on, true, "default-on (switch-over PR) unless opted out");
 assert.equal(nwebosChoice(U(), { nnf_os: "0" }, true).on, false);
-assert.deepEqual(OS_PATHS, ["/", "/about", "/portfolio", "/guestbook"]);
-assert.equal(nwebosApp("/"), ""); assert.equal(nwebosApp("/guestbook"), "guestbook"); assert.equal(nwebosApp("/blog"), null, "blog stays the old page in this PR");
+assert.deepEqual(OS_PATHS, ["/", "/about", "/portfolio", "/blog", "/music", "/writing", "/guestbook", "/trash", "/profile", "/changelog", "/pixelwand"]);
+assert.equal(nwebosApp("/"), ""); assert.equal(nwebosApp("/guestbook"), "guestbook"); assert.equal(nwebosApp("/blog"), "blog");
+// every main-site page is a window: posts and chapters by pattern; the editor, feeds and unknown paths are not
+assert.equal(nwebosRoute("/blog/eine-navigation").k, "blog-post"); assert.equal(nwebosRoute("/blog/eine-navigation").m[1], "eine-navigation");
+for (const p of ["/blog/admin", "/blog/feed", "/blog/-x", "/blog/a/b", "/sommerfest", "/writing/x", "/api/blog"]) assert.equal(nwebosRoute(p), null, p);
+assert.deepEqual([nwebosRoute("/writing/roman/3").k, nwebosRoute("/writing/roman/3").m[2]], ["chapter", "3"]);
+// dynamic windows only on their own address; 404 window keeps the status; search index without the blog
+const post = nwebosPage({ app: "blog-post", path: "/blog/x", title: "Ein <Titel>", content: { "blog-post": "<p>inhalt</p>" } });
+assert.ok(post.includes('id="app-blog-post"') && post.includes("<title>Ein &lt;Titel&gt; · NwebOS</title>") && !nwebosPage({ app: "about" }).includes('id="app-blog-post"'));
+const nf = nwebosPage({ app: "notfound", path: "/sommerfest", content: { notfound: notfound("de", "/sommerfest") }, status: 404 });
+assert.ok(nf.includes('"status":404') && nf.includes("/sommerfest") && nf.includes('id="app-notfound"'));
+const idx = JSON.parse(/<script type="application\/json" id="os-l">(.*?)<\/script>/.exec(nwebosPage({}))[1]).idx;
+assert.ok(idx.some((r) => r.t === "Blog" && r.p === "/blog") && idx.some((r) => /^Wiki: /.test(r.t) && r.url.startsWith("https://mc.nwebnotfound.dev/wiki/")) && !idx.some((r) => r.k === "soon"));
+// app markup escapes user and post data
+const bl = blogList("de", [{ slug: "a", category: "bauen", tags: ["<b>"], title: "<img src=x>", summary: "s", published_at: 1794059416661, body_len: 900, hearts: 2 }]);
+assert.ok(!bl.includes("<img src=x>") && bl.includes("&lt;img src=x&gt;") && !bl.includes("#<b>"));
+assert.ok(profile("de", null).includes("Mit Discord anmelden") && !profile("de", null).includes("data-pf-delete"), "guest profile: sign-in prompt, no data");
 
 const evil = { name: '"><img src=x onerror=alert(1)>', message: "<script>alert(2)</script>", created_at: "2026-11-07 10:00:00", avatar: 'https://cdn.discordapp.com/x.png"onload="alert(3)' };
 const gb = nwebosPage({ lang: "de", app: "guestbook", entries: [evil], sitekey: "0xKEY" });

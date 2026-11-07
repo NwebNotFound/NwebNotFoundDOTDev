@@ -106,7 +106,7 @@ CREATE INDEX IF NOT EXISTS blog_posts_pub ON blog_posts (status, published_at);
 CREATE TABLE IF NOT EXISTS blog_reactions (
   post_id TEXT NOT NULL,
   discord_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('heart', 'star')),
+  kind TEXT NOT NULL CHECK (kind IN ('heart', 'star', 'sun')),   -- migrations/0017
   created_at INTEGER NOT NULL,
   PRIMARY KEY (post_id, discord_id, kind)
 );

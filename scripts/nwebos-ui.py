@@ -105,25 +105,26 @@ with sync_playwright() as p:
     pg.locator("#thm").click()
     pg.locator("#snd").click()
     assert pg.locator("#snd").get_attribute("aria-pressed") == "false" and pg.evaluate("localStorage.getItem('nwebos.mute')") == "1"
-    # Abmelden (guest): back to the login screen; a later visit shows the login again.
+    # Abmelden (guest): back to the login screen; a later visit to the desktop shows the login again (a window's
+    # address still opens that window directly).
     pg.locator("#startb").click(); pg.locator("[data-egg=logout]").click()
     assert pg.locator("#login").is_visible()
-    pg.reload(wait_until="load")
+    pg.goto(f"https://{H}/", wait_until="load")
     assert pg.locator("#login").is_visible() and pg.locator("#boot").is_hidden(), "after Abmelden: login, no boot"
     assert not errs, errs
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 1280 boot, login, windows on paths, back/forward, restore, esc, tray, logout")
 
-    # Direct visit to an app path: no boot; signed in with Discord -> own tile; guestbook form with Turnstile.
+    # First visit straight to a window's address (Planner 07.11.): no boot, no login, the window is readable at once
+    # and the visit counts as seen; signed in with Discord -> own avatar; guestbook form with Turnstile.
     c = ctx_for(br, 1280, cookie=True)
     pg = c.new_page()
     pg.goto(f"https://{H}/guestbook", wait_until="load")
-    assert pg.locator("#boot").is_hidden(), "a direct visit skips the boot"
-    pg.locator("[data-login-me]").wait_for(state="visible")
-    assert pg.locator("[data-login-discord]").is_hidden()
-    pg.locator("[data-user=me]").click()
     win = pg.locator('.win[aria-label="Gästebuch"]')
     win.locator("textarea").wait_for()
+    assert pg.locator("#boot").is_hidden() and pg.locator("#login").is_hidden() and pg.locator("#desk").is_visible(), "a deep link skips boot and login"
+    assert pg.evaluate("localStorage.getItem('nwebos.booted')") == "1", "deep link counts as seen"
+    pg.wait_for_function("() => (document.querySelector('#smav').getAttribute('src') || '').startsWith('https://cdn.discordapp.com/')")
     assert win.locator(".msgs .msg, .msgs .sys").count() >= 1, "server-rendered entries (or the empty state) in the window"
     assert pg.locator("#smav").get_attribute("src").startswith("https://cdn.discordapp.com/"), "rule 10: Discord avatar"
     win.locator("textarea").fill("Hallo aus NwebOS")
@@ -131,8 +132,16 @@ with sync_playwright() as p:
     pg.wait_for_function("() => document.querySelector('.win .gb-st').textContent === 'Danke!'", timeout=15000)
     pg.wait_for_function("() => [...document.querySelectorAll('.win .msg p')].some(p => p.textContent === 'Hallo aus NwebOS')", timeout=10000)
     shot(pg, "guestbook-1280.png")
+    pg.goto(f"https://{H}/", wait_until="load")
+    assert pg.locator("#boot").is_hidden() and pg.locator("#login").is_hidden(), "after a deep link the desktop shows no boot later"
     c.unroute_all(behavior="ignoreErrors"); c.close()
-    print("PASS 1280 direct visit, Discord tile, guestbook entry via Turnstile")
+    c = ctx_for(br, 375)
+    pg = c.new_page()
+    pg.goto(f"https://{H}/blog/vip-welten", wait_until="load")
+    pg.locator(".win.focus .rd .post h1").wait_for()
+    assert pg.locator("#boot").is_hidden() and pg.locator("#login").is_hidden(), "phone: deep link to a post opens it directly"
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 1280 deep link without boot/login, seen afterwards, Discord avatar, guestbook entry via Turnstile; 375 post deep link")
 
     # Phone: handheld home screen, an app opens full screen, the home button goes back.
     c = ctx_for(br, 375)
