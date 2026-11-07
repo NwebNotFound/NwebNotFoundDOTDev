@@ -261,7 +261,7 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
     if (rest === "/posts") {
       if (req.method === "GET") {
         const { results } = await env.DB.prepare("SELECT id, slug, status, category, tags, title_de, title_en, published_at, updated_at FROM blog_posts ORDER BY updated_at DESC LIMIT 200").all();
-        return json({ posts: (results || []).map((r) => ({ ...r, tags: (() => { try { return JSON.parse(r.tags || "[]"); } catch { return []; } })() })) });   // tags for the editor's list search
+        return json({ posts: (results || []).map((r) => ({ ...r, tags: parseTags(r.tags) })) });   // tags for the editor's list search
       }
       if (req.method === "POST") return create(req, env, a);
       return deny(405, "method_not_allowed");

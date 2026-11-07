@@ -214,6 +214,16 @@ with sync_playwright() as p:
                     assert bt.evaluate("e => { const r = document.createRange(); r.selectNodeContents(e); return r.getClientRects().length <= 1 && e.getBoundingClientRect().height <= 48; }"), ("bar button wraps", bt.inner_text(), width)
             small = pg.evaluate(HIT, [".win.focus .tabs button", ".win.focus .wt .wb", ".win.focus .segm button"])
             assert not small, ("tap targets below 40px", width, small)
+            # Design QA r4: white on the green buttons and (night) the footer links >= 4.5:1, day and night
+            low = pg.evaluate(CONTRAST, [".win.focus .xpbtn.go"] + ([".win.focus .edfoot .lnk"] if night else []))
+            assert not low, ("button/link contrast", width, night, low)
+            # Beiträge list: the status filter fits the window (wraps), every label readable
+            win.locator('.tabs [data-ep="l"]').click(); win.locator(".edl .lfil button").first.wait_for()
+            fit = pg.evaluate("(() => { const w = document.querySelector('.win.focus').getBoundingClientRect(); return [...document.querySelectorAll('.win.focus .edl .lfil button')].filter(b => b.offsetParent).every(b => { const r = b.getBoundingClientRect(); return r.right <= w.right + 0.5 && b.scrollWidth <= b.clientWidth + 1; }); })()")
+            low = pg.evaluate(CONTRAST, [".win.focus .edl .xpbtn.go", ".win.focus .edl .lfil button"])
+            assert fit and not low, ("list filter fits + contrast", width, night, fit, low)
+            if SHOTS: shot(pg, f"editor-list-{'night' if night else 'day'}-{width}.png")
+            win.locator('.tabs [data-ep="w"]').click(); win.locator("[name=body]").wait_for(state="visible")
             if night:
                 low = pg.evaluate(CONTRAST, [".win.focus .tabs button", ".win.focus .as", ".win.focus .meta .ttl", ".win.focus [name=body]", ".win.focus .edfoot span", ".win.focus .segm button"])
                 assert not low, ("editor night contrast", width, low)

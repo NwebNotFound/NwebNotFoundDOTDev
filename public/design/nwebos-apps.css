@@ -247,7 +247,7 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
  [data-form][data-view=md] .meta>:not(.ttl),[data-form][data-view=pv] .meta,[data-form][data-view=meta] .split,[data-form][data-view=meta] .tool>button,[data-form][data-view=meta] .meta .ttl{display:none!important}
  [data-form][data-view=meta] .mplink{display:inline-flex;align-self:flex-start}
  [data-form][data-view=meta] .meta{flex:1}
- .edl .lfil{display:flex;overflow-x:auto;max-width:calc(100% - 24px)}.edl .lfil button{flex:none;min-height:40px;padding:0 12px}
+ .edl .lfil{display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100% - 24px)}.edl .lfil button{flex:none;min-height:40px;padding:0 12px}   /* Design QA r4: two rows at 375, every label readable */
  .edl .lsearch input{min-height:44px}
  .edl .xtbl thead{display:none}.edl .xtbl,.edl .xtbl tbody,.edl .xtbl tr,.edl .xtbl td{display:block;width:auto}
  .edl .xtbl tr{display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:10px 12px;border-bottom:1px dashed var(--line,#d9d5c3)}
@@ -279,3 +279,6 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
 [data-theme=summer-night] .as{color:#7fdc6a}[data-theme=summer-night] .as.saving{color:var(--mut2,#a9afcc)}
 [data-theme=summer-night] .tabs em{background:#323c6a;color:#e9e7f3}
 [data-theme=summer-night] .tagsin>span{background:#2a3260;color:#e9e7f3}
+/* Design QA #119 r4: white on the editor's green buttons >= 4.5:1 (day and night); footer links readable at night */
+.ed .xpbtn.go,.edl .xpbtn.go{background:#2b7a26;border-color:#1b2238;color:#fff}
+[data-theme=summer-night] .edfoot .lnk{color:#9ec1ff}[data-theme=summer-night] .edfoot .lnk.danger{color:#ff8a80}
