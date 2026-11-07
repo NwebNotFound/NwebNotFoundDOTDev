@@ -23,6 +23,7 @@ const slugOk = (x) => SLUG.test(x) && !RESERVED_SLUGS.includes(x);
 const ID = /^[0-9a-f-]{36}$/;
 const TOKEN = /^[A-Za-z0-9_-]{20,64}$/;
 const CAT_LABEL = { bauen: "Bauen", server: "Server", musik: "Musik", notizen: "Notizen" };
+const CAT_LABEL_EN = { bauen: "Build", server: "Server", musik: "Music", notizen: "Notes" };
 
 /** "Über Häuser & Bäume" -> "ueber-haeuser-baeume" (max 80 chars, may be empty). */
 export function slugify(s) {
@@ -283,17 +284,23 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
   // ---- pages (minimal markup; restyled after the design reset) ----
   const href = (lang, path) => (lang === "en" ? "/en" + path : path);
   const T = (lang) => (lang === "en"
-    ? { list: "Blog", search: "Search", searchLabel: "Search title or tags", all: "All", none: "No posts yet.", noHits: "No posts match.", toc: "Contents", reply: "Reply in the guestbook", back: "All posts", draft: "Preview (not published)", other: "Deutsch", rss: "RSS feed" }
-    : { list: "Blog", search: "Suchen", searchLabel: "Titel oder Tags suchen", all: "Alle", none: "Noch keine Beiträge.", noHits: "Keine passenden Beiträge.", toc: "Inhalt", reply: "Im Gästebuch antworten", back: "Alle Beiträge", draft: "Vorschau (nicht veröffentlicht)", other: "English", rss: "RSS-Feed" });
+    ? { list: "Blog", search: "Search", searchLabel: "Search title or tags", all: "All", none: "No posts yet.", noHits: "No posts match.", cats: "Categories", toc: "Contents", reply: "Reply in the guestbook", back: "All posts", draft: "Preview (not published)", other: "Deutsch", rss: "RSS feed" }
+    : { list: "Blog", search: "Suchen", searchLabel: "Titel oder Tags suchen", all: "Alle", none: "Noch keine Beiträge.", noHits: "Keine passenden Beiträge.", cats: "Kategorien", toc: "Inhalt", reply: "Im Gästebuch antworten", back: "Alle Beiträge", draft: "Vorschau (nicht veröffentlicht)", other: "English", rss: "RSS-Feed" });
+  const catLabel = (c, lang) => (lang === "en" ? CAT_LABEL_EN : CAT_LABEL)[c] || c;
+  // Self-referencing canonical per language; hreflang de/en/x-default only where both languages exist (x-default = the German URL).
+  const langMeta = (bare, lang, both) => {
+    const u = (l) => `${SITE}${l === "en" ? "/en" : ""}${bare}`;
+    return { canonicalTo: u(lang), hreflangs: both ? [{ hreflang: "de", href: u("de") }, { hreflang: "en", href: u("en") }, { hreflang: "x-default", href: u("de") }] : [] };
+  };
   const rssLink = `<link rel="alternate" type="application/rss+xml" title="Blog · NwebNotFound" href="/blog/feed.xml">`;
 
   async function listPage(req, env, url, lang) {
     const t = T(lang), q = String(url.searchParams.get("q") || "").slice(0, LIMITS.query), cat = url.searchParams.get("cat") || "";
     const rows = await listPublished(env, { q, cat }).catch(() => []);
-    const cats = [["", t.all], ...CATEGORIES.map((c) => [c, CAT_LABEL[c]])].map(([c, l]) => `<a href="${href(lang, "/blog")}${c ? "?cat=" + c : ""}"${c === cat || (!c && !CATEGORIES.includes(cat)) ? ' aria-current="page"' : ""}>${esc(l)}</a>`).join(" · ");
-    const items = rows.map((r) => localized({ ...r, body_de: "" }, lang)).map((p) => `<li><article><h2><a href="${href(lang, "/blog/" + p.slug)}">${esc(p.title)}</a></h2><p><small>${esc(CAT_LABEL[p.category])} · <time datetime="${new Date(p.published_at).toISOString()}">${esc(fmtDate(p.published_at, lang))}</time>${p.tags.length ? " · " + p.tags.map(esc).join(", ") : ""}</small></p>${p.summary ? `<p>${esc(p.summary)}</p>` : ""}</article></li>`).join("");
-    const body = `<div class="blog"><h1>${t.list}</h1><form role="search" method="get" action="${href(lang, "/blog")}"><label>${t.searchLabel} <input type="search" name="q" value="${esc(q)}" maxlength="${LIMITS.query}"></label>${CATEGORIES.includes(cat) ? `<input type="hidden" name="cat" value="${cat}">` : ""} <button type="submit">${t.search}</button></form><nav aria-label="Kategorien"><p>${cats}</p></nav>${items ? `<ul class="blog-list">${items}</ul>` : `<p>${q || CATEGORIES.includes(cat) ? t.noHits : t.none}</p>`}<p><a href="/blog/feed.xml">${t.rss}</a></p></div>`;
-    return html(sitePage({ lang, bare: "/blog", title: "Blog · NwebNotFound", desc: lang === "en" ? "Notes on building, the server and music." : "Notizen zu Bauen, Server und Musik.", body, head: rssLink }));
+    const cats = [["", t.all], ...CATEGORIES.map((c) => [c, catLabel(c, lang)])].map(([c, l]) => `<a href="${href(lang, "/blog")}${c ? "?cat=" + c : ""}"${c === cat || (!c && !CATEGORIES.includes(cat)) ? ' aria-current="page"' : ""}>${esc(l)}</a>`).join(" · ");
+    const items = rows.map((r) => localized({ ...r, body_de: "" }, lang)).map((p) => `<li><article><h2><a href="${href(lang, "/blog/" + p.slug)}">${esc(p.title)}</a></h2><p><small>${esc(catLabel(p.category, lang))} · <time datetime="${new Date(p.published_at).toISOString()}">${esc(fmtDate(p.published_at, lang))}</time>${p.tags.length ? " · " + p.tags.map(esc).join(", ") : ""}</small></p>${p.summary ? `<p>${esc(p.summary)}</p>` : ""}</article></li>`).join("");
+    const body = `<div class="blog"><h1>${t.list}</h1><form role="search" method="get" action="${href(lang, "/blog")}"><label>${t.searchLabel} <input type="search" name="q" value="${esc(q)}" maxlength="${LIMITS.query}"></label>${CATEGORIES.includes(cat) ? `<input type="hidden" name="cat" value="${cat}">` : ""} <button type="submit">${t.search}</button></form><nav aria-label="${t.cats}"><p>${cats}</p></nav>${items ? `<ul class="blog-list">${items}</ul>` : `<p>${q || CATEGORIES.includes(cat) ? t.noHits : t.none}</p>`}<p><a href="/blog/feed.xml">${t.rss}</a></p></div>`;
+    return html(sitePage({ lang, bare: "/blog", title: "Blog · NwebNotFound", desc: lang === "en" ? "Notes on building, the server and music." : "Notizen zu Bauen, Server und Musik.", body, head: rssLink, ...langMeta("/blog", lang, true) }));
   }
 
   async function postPage(req, env, url, lang, slug) {
@@ -304,9 +311,9 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
     const keep = got.priv && url.searchParams.get("preview") ? "?preview=" + encodeURIComponent(url.searchParams.get("preview")) : "";
     const other = p.has_en ? `<p><a href="${p.lang === "en" ? "/blog/" + p.slug : "/en/blog/" + p.slug}${keep}" hreflang="${p.lang === "en" ? "de" : "en"}">${p.lang === "en" ? "Deutsch" : "English"}</a></p>` : "";
     const when = p.published_at ? `<time datetime="${new Date(p.published_at).toISOString()}">${esc(fmtDate(p.published_at, p.lang))}</time> · ` : "";
-    const body = `<div class="blog"><article class="blog-post" lang="${p.lang}">${got.priv && p.status !== "published" ? `<p role="status"><strong>${t.draft}</strong></p>` : ""}<p><a href="${href(lang, "/blog")}">← ${t.back}</a></p><h1>${esc(p.title)}</h1><p><small>${when}${esc(CAT_LABEL[p.category])}${p.tags.length ? " · " + p.tags.map(esc).join(", ") : ""}</small></p>${other}${toc}<div class="blog-body">${p.html}</div><p><a href="/guestbook">${t.reply}</a></p></article></div>`;
+    const body = `<div class="blog"><article class="blog-post" lang="${p.lang}">${got.priv && p.status !== "published" ? `<p role="status"><strong>${t.draft}</strong></p>` : ""}<p><a href="${href(lang, "/blog")}">← ${t.back}</a></p><h1>${esc(p.title)}</h1><p><small>${when}${esc(catLabel(p.category, p.lang))}${p.tags.length ? " · " + p.tags.map(esc).join(", ") : ""}</small></p>${other}${toc}<div class="blog-body">${p.html}</div><p><a href="/guestbook">${t.reply}</a></p></article></div>`;
     const head = (got.priv ? `<meta name="robots" content="noindex">` : "") + rssLink;
-    return html(sitePage({ lang: p.lang, bare: "/blog/" + p.slug, title: `${p.title} · Blog · NwebNotFound`, desc: p.summary || htmlToText(p.html).slice(0, 160), body, head }), 200, got.priv ? { "cache-control": "private, no-store" } : {});
+    return html(sitePage({ lang: p.lang, bare: "/blog/" + p.slug, title: `${p.title} · Blog · NwebNotFound`, desc: p.summary || htmlToText(p.html).slice(0, 160), body, head, ...langMeta("/blog/" + p.slug, p.lang, p.has_en && !got.priv) }), 200, got.priv ? { "cache-control": "private, no-store" } : {});
   }
 
   async function feed(env) {

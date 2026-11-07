@@ -865,9 +865,9 @@ export function hubPage(bare, lang, opts = {}) {
 }
 
 /** A hub-shell page with a caller-made body (the private /profile): same header, footer and tokens. */
-export function sitePage({ lang = "de", bare, title, desc, body, head = "" }) {
+export function sitePage({ lang = "de", bare, title, desc, body, head = "", canonicalTo, hreflangs }) {
   const t = makeT(lang);
-  return document_({ lang, bare, t, title, desc, body, head, hreflangs: [], canonicalTo: `https://${SITE}${bare}` });
+  return document_({ lang, bare, t, title, desc, body, head, hreflangs: hreflangs || [], canonicalTo: canonicalTo || `https://${SITE}${bare}` });
 }
 
 export const hubPageExists = (bare) => Object.prototype.hasOwnProperty.call(META, bare) || writingRoute(bare) !== null;
