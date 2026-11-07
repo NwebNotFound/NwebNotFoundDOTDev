@@ -25,10 +25,12 @@
         li.append(a); ul.append(li);
       });
     });
-    $("[data-blog-new]").addEventListener("click", function () {
+    var nb = $("[data-blog-new]");
+    nb.addEventListener("click", function () {
+      nb.disabled = true;   // re-enabled on every failure, so the same button is the retry
       call("POST", "/posts", { title_de: "" }).then(function (r) {
-        if (r.s === 201) location.href = "/blog/admin/" + r.j.id; else say("Fehler: " + (r.j.error || r.s));
-      });
+        if (r.s === 201) location.href = "/blog/admin/" + r.j.id; else { nb.disabled = false; say("Fehler: " + (r.j.error || r.s) + " – nochmal versuchen"); }
+      }).catch(function () { nb.disabled = false; say("Neuer Beitrag nicht angelegt (offline?) – nochmal versuchen"); });
     });
     return;
   }
@@ -100,7 +102,7 @@
   [].forEach.call(root.querySelectorAll("[data-tab]"), function (b) {
     b.addEventListener("click", function () {
       lang = b.getAttribute("data-tab");
-      [].forEach.call(root.querySelectorAll("[data-tab]"), function (x) { x.setAttribute("aria-selected", String(x === b)); });
+      [].forEach.call(root.querySelectorAll("[data-tab]"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
       [].forEach.call(root.querySelectorAll("fieldset[data-lang]"), function (f) { f.hidden = f.getAttribute("data-lang") !== lang; });
       preview();
     });

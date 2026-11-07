@@ -30,10 +30,25 @@ with sync_playwright() as p:
     ctx.route("**/*", route)
     pg = ctx.new_page()
     pg.goto(f"https://{H}/blog/admin", wait_until="load")
+    # A rejected create request is announced in the status line and the same button retries (Design QA #106).
+    fail = {"on": True}
+    def flaky(r):
+        if fail["on"] and r.request.method == "POST": r.abort()
+        else: r.fallback()
+    ctx.route("**/api/blog/admin/posts", flaky)
+    nb = pg.get_by_role("button", name="Neuer Beitrag"); nb.click()
+    pg.wait_for_function("() => document.querySelector('[data-blog-state]').textContent.includes('nochmal versuchen')")
+    assert nb.is_enabled() and pg.url.rstrip("/").endswith("/blog/admin"), "failed create: error shown, button usable again"
+    fail["on"] = False
     pg.get_by_role("button", name="Neuer Beitrag").click()
     pg.wait_for_url("**/blog/admin/*")
     pg.wait_for_function("() => document.querySelector('[data-blog-state]').textContent === 'Geladen'")
     edit_url = pg.url
+    # The DE/EN switch is a plain toggle-button pair, not a half-built tab widget.
+    assert pg.locator("[role=tab], [role=tablist]").count() == 0 and pg.locator("[data-tab=de]").get_attribute("aria-pressed") == "true"
+    pg.locator("[data-tab=en]").click()
+    assert pg.locator("[data-tab=en]").get_attribute("aria-pressed") == "true" and pg.locator("[data-tab=de]").get_attribute("aria-pressed") == "false"
+    pg.locator("[data-tab=de]").click()
     pg.fill("[name=title_de]", "UI Testbeitrag")
     pg.fill("[name=slug]", "ui-testbeitrag")
     pg.fill("[name=tags]", "ui, test")
