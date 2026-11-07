@@ -1176,6 +1176,10 @@ try {
   // Blog (src/blog.js) over HTTP against the real local D1: admin-only is enforced server-side
   // (c1 = Nils, verified link + rank admin; c2 = Seller, no admin), drafts stay private.
   {
+    // The VIP tests above end with an empty mc_player_ranks: make Nils admin for the blog checks and
+    // the browser editor test below, then remove the row again.
+    const blogAdminUuid = sqlRows(`SELECT mc_uuid FROM mc_links WHERE discord_id = '${D1}' AND verified = 1`)[0]?.mc_uuid;
+    sql(`INSERT OR REPLACE INTO mc_player_ranks (uuid, name, rank, color, weight, updated_at) VALUES ('${String(blogAdminUuid || "").replace(/-/g, "")}', 'Nils', 'admin', 'c', 100, 0)`);
     const MH = "nwebnotfound.dev", MO = "https://" + MH, b = (path, o = {}) => req(path, { testHost: MH, ...o });
     ok((await b("/api/blog/admin/posts")).s === 401 && (await b("/api/blog/admin/posts", { cookie: c2 })).s === 403, "Blog-Admin: ohne Login 401, Nicht-Admin 403");
     ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c2, origin: MO, body: { title_de: "x" } })).s === 403 && (await b("/blog/admin", { cookie: c2 })).s === 404, "Blog: Nicht-Admin kann nichts anlegen, Editor 404");
@@ -1192,6 +1196,7 @@ try {
     await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn" } });
   }
   try { execSync(`python3 scripts/blog-editor-ui.py ${BASE} '${c1}'`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Blog-Editor im Browser fehlgeschlagen"); }
+  sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");
   try { execSync(`python3 scripts/site-switch-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Logo-Seitenwechsel „Wohin?“ fehlgeschlagen"); }
   try { execSync(`python3 scripts/player3d-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ 3D-Viewer: Pause/Fortsetzen fehlgeschlagen"); }
   try { execSync(`python3 scripts/turnstile-ui.py ${BASE}`, { cwd: ROOT, stdio: "inherit" }); pass++; } catch { fail++; console.log("  ✗ Turnstile-Challenge-Ablauf fehlgeschlagen"); }
