@@ -74,12 +74,22 @@ with sync_playwright() as p:
     win.locator("[name=body]").fill("## Erster Teil\n\nText im **Fenster**.\n\n<img src=x onerror=alert(1)>")
     win.locator("[data-tagin]").fill("nwebos"); win.locator("[data-tagin]").press("Enter")
     pg.wait_for_function("() => /Automatisch gespeichert/.test(document.querySelector('[data-as]').textContent)", timeout=10000)
-    assert win.locator("[data-pv] h2").inner_text() == "Erster Teil" and win.locator("[data-pv] img").count() == 0, "server preview, sanitised"
+    # Design QA #119 1b: DE/EN carry aria-pressed; a draft offers no "Zurück zu Entwurf"/"Zurückziehen"
+    assert win.locator('[data-lang="de"]').get_attribute("aria-pressed") == "true" and win.locator('[data-lang="en"]').get_attribute("aria-pressed") == "false"
+    assert win.locator("[data-status=draft]").is_hidden() and win.locator("[data-status=withdrawn]").is_hidden()
+    # F5 and a deep link (with an editor window saved in localStorage by an earlier version): the editor mounts, no error
+    pg.evaluate("(id) => localStorage.setItem('nwebos.wins', JSON.stringify([{k:'blog-edit',p:'/blog/admin/'+id,x:100,y:40,w:900,h:560,z:5}]))", pid)
+    perr = []; pg.on("pageerror", lambda e: perr.append(str(e)))
+    pg.reload(wait_until="load")
+    win = pg.locator('.win[aria-label="Blog-Editor"]'); win.locator("[name=title]").wait_for(state="visible", timeout=10000)
+    assert win.locator("[name=title]").input_value() == "Editor im Fenster" and pg.locator('.win[aria-label="Blog-Editor"]').count() == 1 and not perr, perr
+    assert "braucht JavaScript" not in win.inner_text()
     assert "#nwebos" in win.locator("[data-tags]").inner_text()
     assert "Wörter" in win.locator("[data-wc]").inner_text()
     shot(pg, "editor-1280.png")
     win.locator("[data-publish]").click()
     pg.wait_for_function("() => document.querySelector('[data-pill]').textContent === 'Veröffentlicht'", timeout=10000)
+    assert win.locator("[data-status=draft]").is_visible() and win.locator("[data-status=withdrawn]").is_visible(), "published: back to draft / withdraw"
     # the published post is the reader window
     pub = c.new_page()
     rp = pub.goto(f"https://{H}/blog/editor-im-fenster", wait_until="load")
@@ -116,6 +126,12 @@ with sync_playwright() as p:
     win.locator('[data-ep="l"]').click()
     assert win.locator("[data-rows] tr", has_text="Editor im Fenster").locator(".pill").inner_text() == "Veröffentlicht"
     other = win.locator("[data-rows] [data-edit]:not([data-edit='%s'])" % pid).first.get_attribute("data-edit")
+    # a failed create says so readably and the button stays usable (Design QA #119 1b)
+    pg.route("**/api/blog/admin/posts", lambda r: r.fulfill(status=500, body='{"error":"x"}') if r.request.method == "POST" else r.fallback())
+    win.locator("[data-new]").click()
+    pg.wait_for_function("() => /nochmal versuchen/.test(document.querySelector('[data-as]').textContent)", timeout=10000)
+    assert win.locator("[data-new]").is_enabled() and ": x" not in win.locator("[data-as]").inner_text()
+    pg.unroute("**/api/blog/admin/posts")
 
     # Gatekeeper #119 (2): a failed save keeps the post open; Bearbeiten and + Neuer Beitrag wait for it
     win.locator('[data-ep="w"]').click()
