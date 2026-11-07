@@ -149,16 +149,19 @@ with sync_playwright() as p:
     if LO:
         c = ctx_for(br, 1280, cookie=LO)
         pg = c.new_page()
-        pg.goto(f"https://{H}/guestbook", wait_until="load")
-        pg.locator("[data-user=me]").click()
+        pg.goto(f"https://{H}/guestbook", wait_until="load")   # deep link: window directly, no login (#115)
+        pg.locator("#desk").wait_for(state="visible")
+        pg.wait_for_function("() => (document.querySelector('#smav').getAttribute('src') || '').startsWith('https://cdn.discordapp.com/')", timeout=10000)   # /api/me answered
         posts = []
-        pg.on("request", lambda r: posts.append(r.method) if "/auth/discord/logout" in r.url else None)
+        nexts = []
+        pg.on("request", lambda r: (posts.append(r.method), nexts.append(r.url)) if "/auth/discord/logout" in r.url else None)
         pg.locator("#startb").click()
         with pg.expect_navigation(wait_until="load"):
             pg.locator("[data-egg=logout]").click()
         assert posts and posts[0] == "POST", posts
         diag = lambda: (pg.url, pg.title(), pg.evaluate("[!!document.querySelector('#login:not([hidden])'), !!document.querySelector('[data-login-me]:not([hidden])'), document.documentElement.className]"))
-        assert urlsplit(pg.url).netloc == H and urlsplit(pg.url).path == "/", ("back on the desktop address", diag())
+        # back to the desktop address (restored windows may then show their own address again)
+        assert unquote(nexts[0]).endswith("next=https://nwebnotfound.dev/") and urlsplit(pg.url).netloc == H, ("logout goes to /", nexts, diag())
         try: pg.locator("#login").wait_for(state="visible", timeout=10000)
         except Exception: raise AssertionError(("login screen after Abmelden", diag()))
         me = pg.evaluate("fetch('/api/me', {credentials: 'include'}).then(r => r.json())")
