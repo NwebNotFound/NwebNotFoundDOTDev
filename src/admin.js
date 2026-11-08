@@ -3,6 +3,8 @@
 // read from D1 behind a 60 s cache. The windows keep today's texts in code as the fallback while a table is empty.
 
 /** Admin = Discord session + verified mc link + rank "admin" on that uuid (same rule as /vip). */
+import { purgeWriting } from "./writing.js";
+
 export async function isAdmin(req, env, getUser) {
   const u = await getUser(req, env).catch(() => null);
   if (!u) return { err: 401 };
@@ -76,10 +78,36 @@ export function cleanNews(b) {
   return bad.length ? { err: bad } : { val: o };
 }
 
+/* Texte & Kapitel (PR C, migration 0021). A series groups chapters; an item is a chapter (kind story) or a short text. */
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const slugOk = (v) => (typeof v === "string" && v.length <= 80 && SLUG.test(v) ? v : undefined);
+export function cleanSeries(b) {
+  const o = { slug: slugOk(b.slug), title_de: str(b.title_de, 80, { req: true }), title_en: str(b.title_en, 80, { nul: true }),
+    status: b.status == null ? "live" : ["draft", "live"].includes(b.status) ? b.status : undefined, sort: b.sort == null ? 0 : int(b.sort, 0, 9999) };
+  const bad = Object.keys(o).filter((k) => o[k] === undefined);
+  return bad.length ? { err: bad } : { val: o };
+}
+export const WRITING_BODY_MAX = 150000;
+export function cleanWriting(b) {
+  const kind = ["story", "short"].includes(b.kind) ? b.kind : b.kind == null ? "story" : undefined;
+  const tags = b.tags == null ? "[]" : (() => { let a = b.tags; if (typeof a === "string") { try { a = JSON.parse(a); } catch { return undefined; } }
+    return Array.isArray(a) && a.length <= 8 && a.every((t) => typeof t === "string" && t.trim() && t.length <= 30) ? JSON.stringify([...new Set(a.map((t) => t.trim()))]) : undefined; })();
+  const o = {
+    series_id: kind === "story" ? int(b.series_id, 1, 1e9) : b.series_id == null ? null : undefined,
+    kind, chapter: kind === "story" ? int(b.chapter, 1, 999) : b.chapter == null ? null : undefined,
+    slug: slugOk(b.slug), title_de: str(b.title_de, 120, { req: true }), title_en: str(b.title_en, 120, { nul: true }),
+    body_de: str(b.body_de, WRITING_BODY_MAX), body_en: str(b.body_en, WRITING_BODY_MAX, { nul: true }), tags,
+    status: b.status == null ? "draft" : ["draft", "live", "archived"].includes(b.status) ? b.status : undefined,
+    published_at: b.published_at == null ? null : int(b.published_at, 0, 4e12),
+  };
+  const bad = Object.keys(o).filter((k) => o[k] === undefined);
+  return bad.length ? { err: bad } : { val: o };
+}
+
 // ---------------- public site data (60 s cache, purged by every admin write in this isolate) ----------------
 let SITE = null;
 export const SITE_TTL_MS = 60000;
-export function purgeSite() { SITE = null; }
+export function purgeSite() { SITE = null; purgeWriting(); }
 /** { blocks: { key: { lang: data } }, projects: rows | null, changelog: live rows | null }. null = no (live) rows or table
  *  missing (before migration 0019 / the seed): the windows use their code fallback. */
 export function siteData(env, now = Date.now()) {
@@ -101,9 +129,13 @@ export function siteData(env, now = Date.now()) {
 // ---------------- the router ----------------
 const SECTIONS = {
   projects: { table: "projects", cols: ["sort", "status", "progress", "href", "icon", "title_de", "title_en", "text_de", "text_en"], clean: cleanProject, order: "sort, id" },
+  series: { table: "writing_series", cols: ["slug", "title_de", "title_en", "status", "sort"], clean: cleanSeries, order: "sort, id" },
+  // a text goes live with a first-publication date (the feeds and the "date" of the item)
+  writing: { publish: true, table: "writing_items", cols: ["series_id", "kind", "chapter", "slug", "title_de", "title_en", "body_de", "body_en", "tags", "status", "published_at"], clean: cleanWriting,
+    order: "series_id, chapter, id", max: 2 * WRITING_BODY_MAX + 8000, stamp: (v, now) => { if (v.status !== "draft" && !v.published_at) v.published_at = now; } },
   changelog: { publish: true, table: "changelog", cols: ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"], clean: cleanNews, order: "day DESC, sort, id" },
 };
-const ROUTE = /^\/api\/admin\/(overview|home|projects|changelog|guestbook)(?:\/([a-z0-9.]{1,40}))?(?:\/(publish|withdraw|hide|unhide))?$/;
+const ROUTE = /^\/api\/admin\/(overview|home|projects|changelog|guestbook|series|writing)(?:\/([a-z0-9.]{1,40}))?(?:\/(publish|withdraw|hide|unhide))?$/;
 export const ADMIN_RATE = { max: 120, windowMs: 60000 };
 const MAX_BODY = 32000;
 
@@ -119,10 +151,10 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
   const priv = { "cache-control": "private, no-store", "x-robots-tag": "noindex" };
   const out = (o, s = 200) => json(o, s, priv);
   const originOk = (req) => { const o = req.headers.get("origin"); if (!o) return false; try { return new URL(o).hostname === MAIN; } catch { return false; } };
-  async function body(req) {
+  async function body(req, max = MAX_BODY) {
     if (!/^application\/json\b/i.test(req.headers.get("content-type") || "")) return { err: out({ error: "json_expected" }, 415) };
     const t = await req.text();
-    if (t.length > MAX_BODY) return { err: out({ error: "too_large" }, 413) };
+    if (t.length > max) return { err: out({ error: "too_large" }, 413) };
     try { const b = JSON.parse(t); return b && typeof b === "object" && !Array.isArray(b) ? { b } : { err: out({ error: "invalid_json" }, 400) }; } catch { return { err: out({ error: "invalid_json" }, 400) }; }
   }
   const log = (env, who, section, item, action, before, now) => env.DB.prepare("INSERT INTO admin_log (at, discord_id, section, item, action, before_json) VALUES (?, ?, ?, ?, ?, ?)")
@@ -155,6 +187,11 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
     return out({ ok: true, key, lang, version: version + 1, updated_at: now });
   }
 
+  /* a taken slug or chapter number is a field problem, not a 500 */
+  const uniq = (run) => run().catch((e) => { const m = String(e?.message || ""); if (!/UNIQUE constraint failed/i.test(m)) throw e; return [{ dup: out({ error: "invalid", fields: [/chapter|series_id/.test(m) ? "chapter" : "slug"] }, 400) }]; });
+  /* a chapter belongs to an existing series */
+  const refProblem = async (env, name, v) => (name === "writing" && v.series_id != null && !(await env.DB.prepare("SELECT 1 FROM writing_series WHERE id = ?").bind(v.series_id).first()) ? out({ error: "invalid", fields: ["series_id"] }, 400) : null);
+
   async function table(req, env, who, name, id, action, now) {
     const S = SECTIONS[name];
     const one = (x) => env.DB.prepare(`SELECT * FROM ${S.table} WHERE id = ?`).bind(x).first();
@@ -165,10 +202,13 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
       return out({ items: results || [] });
     }
     if (req.method === "POST" && !id) {   // create
-      const r = await body(req); if (r.err) return r.err;
+      const r = await body(req, S.max); if (r.err) return r.err;
       const c = S.clean(r.b); if (c.err) return out({ error: "invalid", fields: c.err }, 400);
+      if (S.stamp) S.stamp(c.val, now);
+      const ref = await refProblem(env, name, c.val); if (ref) return ref;
       if (name === "projects" && r.b.sort == null) c.val.sort = ((await env.DB.prepare("SELECT MAX(sort) AS m FROM projects").first())?.m ?? 0) + 1;
-      const [ins] = logWrites("admin-" + name, await env.DB.batch([env.DB.prepare(`INSERT INTO ${S.table} (${S.cols.join(", ")}, version, updated_at) VALUES (${S.cols.map(() => "?").join(", ")}, 1, ?) RETURNING *`).bind(...S.cols.map((k) => c.val[k]), now)]));
+      const [ins] = logWrites("admin-" + name, await uniq(() => env.DB.batch([env.DB.prepare(`INSERT INTO ${S.table} (${S.cols.join(", ")}, version, updated_at) VALUES (${S.cols.map(() => "?").join(", ")}, 1, ?) RETURNING *`).bind(...S.cols.map((k) => c.val[k]), now)])));
+      if (ins.dup) return ins.dup;
       const row = ins.results[0];
       if (S.publish && row.status === "live") logWrites("admin-" + name, await log(env, who, name, row.id, "publish", null, now).run());   // created straight to live
       purgeSite();
@@ -178,26 +218,30 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
     const cur = await one(+id);
     if (!cur) return out({ error: "not_found" }, 404);
     if (req.method === "DELETE") {
+      if (name === "series" && (await env.DB.prepare("SELECT 1 FROM writing_items WHERE series_id = ? LIMIT 1").bind(+id).first())) return out({ error: "not_empty" }, 409);   // its chapters first
       const [res] = logWrites("admin-" + name, await env.DB.batch([env.DB.prepare(`DELETE FROM ${S.table} WHERE id = ?`).bind(+id), log(env, who, name, id, "delete", cur, now)]));
       purgeSite();
       return out({ ok: true, deleted: res.meta?.changes || 0 });
     }
     let patch;
-    if (req.method === "POST" && action && name === "changelog" && (action === "publish" || action === "withdraw")) {
+    if (req.method === "POST" && action && S.publish && (action === "publish" || action === "withdraw")) {
       const r = await body(req); if (r.err) return r.err;
       patch = { status: action === "publish" ? "live" : "draft", version: r.b.version };
     } else if (req.method === "PATCH" && !action) {
-      const r = await body(req); if (r.err) return r.err;
+      const r = await body(req, S.max); if (r.err) return r.err;
       patch = r.b;
     } else return out({ error: "method_not_allowed" }, 405);
     if (!Number.isInteger(patch.version)) return out({ error: "version_required" }, 400);
     if (patch.version !== cur.version) return out({ error: "conflict", item: cur }, 409);
     const merged = {}; for (const k of S.cols) merged[k] = Object.prototype.hasOwnProperty.call(patch, k) ? patch[k] : cur[k];
     const c = S.clean(merged); if (c.err) return out({ error: "invalid", fields: c.err }, 400);
+    if (S.stamp) S.stamp(c.val, now);
+    const ref = await refProblem(env, name, c.val); if (ref) return ref;
     if (S.cols.every((k) => c.val[k] === cur[k])) return out({ ok: true, item: cur, unchanged: true });   // nothing to write
     const upd = env.DB.prepare(`UPDATE ${S.table} SET ${S.cols.map((k) => `${k} = ?`).join(", ")}, version = version + 1, updated_at = ? WHERE id = ? AND version = ?`).bind(...S.cols.map((k) => c.val[k]), now, +id, cur.version);
     const vis = S.publish && c.val.status !== cur.status ? (c.val.status === "live" ? "publish" : "withdraw") : null;   // going live or offline is logged however it is sent
-    const [res] = logWrites("admin-" + name, await env.DB.batch(vis ? [upd, log(env, who, name, id, vis, cur, now)] : [upd]));
+    const [res] = logWrites("admin-" + name, await uniq(() => env.DB.batch(vis ? [upd, log(env, who, name, id, vis, cur, now)] : [upd])));
+    if (res.dup) return res.dup;
     if (!res.meta?.changes) return out({ error: "conflict", item: await one(+id) }, 409);
     purgeSite();
     return out({ ok: true, item: { ...cur, ...c.val, version: cur.version + 1, updated_at: now } });

@@ -27,6 +27,7 @@ import { feedFor, matchesEtag } from "./feed.js";
 import { epubPath, seriesEpubPath } from "./epub.js";
 import { makeProfile } from "./profile-v3.js";
 import { makeAdmin, siteData } from "./admin.js";
+import { writingIndex, writingFeeds } from "./writing.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
 import { safeDecode } from "./safe-decode.js";
 import { verifyTurnstile } from "./turnstile.js";
@@ -810,7 +811,7 @@ let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MA
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
 let _p3; const P3 = () => _p3 || (_p3 = makeProfile({ json, getUser, MAIN }));   // "Mein Profil" v3 (src/profile-v3.js)
 let _admin; const ADMIN = () => _admin || (_admin = makeAdmin({ json, getUser, MAIN, defaults: { blocks: DEFAULT_BLOCKS }, logWrites }));
-let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, onReadEnd: (env, id) => P3().award(env, id, "leseratte"), chapterExists: (s, n) => osSeries("de").some((se) => se.slug === s && se.chapters.some((c) => c.n === n)) }));
+let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, onReadEnd: (env, id) => P3().award(env, id, "leseratte"), chapterExists: async (env, s, n) => osSeries(await writingAll(env, "de")).some((se) => se.slug === s && se.chapters.some((c) => c.n === n)) }));
 let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
@@ -999,20 +1000,22 @@ async function assetOrNotFound(req, env, mc) {
 }
 
 // ---- NwebOS windows (src/nwebos.js + src/nwebos-apps.js): the data for the window at this address ----
-const WRITING_ALL = CONTENT.writing || [];
-function osSeries(lang) {
-  const stories = publishedWriting(WRITING_ALL).filter((w) => w.kind === "story");
+const WRITING_BUILT = CONTENT.writing || [];
+/** The texts for this request (src/writing.js): D1 once the Verwaltung published something, else the built index. */
+const writingAll = (env, lang) => writingIndex(env, lang, WRITING_BUILT);
+function osSeries(all) {
+  const stories = publishedWriting(all).filter((w) => w.kind === "story");
   const slugs = [...new Set(stories.map((w) => w.series))];
-  return slugs.map((s) => { const ch = chaptersOf(WRITING_ALL, s); return { slug: s, title: ch[0]?.seriesTitle || s, chapters: ch.map((c) => ({ n: c.chapter, title: c.title, slug: c.slug, item: c })) }; });
+  return slugs.map((s) => { const ch = chaptersOf(all, s); return { slug: s, title: ch[0]?.seriesTitle || s, chapters: ch.map((c) => ({ n: c.chapter, title: c.title, slug: c.slug, item: c })) }; });
 }
 /* Old Creative Hub addresses that have no window of their own: /writing/series/<s> is the Texte window,
    /writing/<chapter-slug> is its chapter window, any other /writing/<slug> the text window (drafts: 404 window). */
-function osLegacy(bare) {
+function osLegacy(bare, all) {
   const se = /^\/writing\/series\/([a-z0-9-]+)$/.exec(bare);   // a shared series link: the Texte window, filtered to it
-  if (se) return { route: chaptersOf(WRITING_ALL, se[1]).length ? { k: "writing", path: bare, filter: { series: se[1] } } : { k: "notfound", path: bare } };
+  if (se) return { route: chaptersOf(all, se[1]).length ? { k: "writing", path: bare, filter: { series: se[1] } } : { k: "notfound", path: bare } };
   const one = /^\/writing\/([a-z0-9-]+)$/.exec(bare);
   if (!one) return null;
-  const it = findWriting(WRITING_ALL, one[1]);   // archived stays reachable by its link, drafts never
+  const it = findWriting(all, one[1]);   // archived stays reachable by its link, drafts never
   if (it && it.kind === "story" && it.series && it.chapter) return { location: `/writing/${it.series}/${it.chapter}` };
   if (it) return { route: { k: "text", path: bare, item: it } };
   return { route: { k: "notfound", path: bare } };
@@ -1048,7 +1051,7 @@ async function osResponse(req, env, url, lang, route) {
       const rows = await BLOG().os.reads(env, u.id).catch(() => []);
       const blogSlugs = rows.filter((r) => r.post_id.startsWith("blog:")).map((r) => r.post_id.slice(5));
       const titles = await BLOG().os.titles(env, blogSlugs).catch(() => ({}));
-      const ser = osSeries(lang);
+      const ser = osSeries(await writingAll(env, lang));
       const reads = rows.map((r) => {
         if (r.post_id.startsWith("blog:")) { const t = titles[r.post_id.slice(5)]; return t && { kind: "Blog", title: de || !t.title_en ? t.title_de : t.title_en, pct: r.pct, href: (de ? "" : "/en") + "/blog/" + r.post_id.slice(5) }; }
         const [, s, n] = r.post_id.split(":"); const se = ser.find((x) => x.slug === s); const c = se && se.chapters.find((x) => String(x.n) === n);
@@ -1065,11 +1068,12 @@ async function osResponse(req, env, url, lang, route) {
   } else if (k === "changelog") content.changelog = osChangelog(lang, undefined, (await siteData(env)).changelog);
   else if (k === "writing") {
     const tag = (url.searchParams.get("tag") || "").slice(0, 40);
-    content.writing = osWriting(lang, osSeries(lang), publishedWriting(WRITING_ALL).filter((w) => w.kind !== "story"), route.filter || (tag ? { tag } : {}));
+    const all = await writingAll(env, lang);
+    content.writing = osWriting(lang, osSeries(all), publishedWriting(all).filter((w) => w.kind !== "story"), route.filter || (tag ? { tag } : {}));
   }
   else if (k === "chapter") {
-    const se = osSeries(lang).find((x) => x.slug === route.m[1]); const i = se ? se.chapters.findIndex((c) => String(c.n) === route.m[2]) : -1;
-    if (i >= 0) { const c = se.chapters[i]; content.chapter = osChapter(lang, se, { chapter: c.n, title: c.title }, c.item.html || "", se.chapters[i - 1], se.chapters[i + 1], { archived: !!c.item.archived, epub: epubPath(c.item.slug), seriesEpub: seriesEpubPath(se.slug), itemLang: c.item.lang }); title = `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`; }
+    const se = osSeries(await writingAll(env, lang)).find((x) => x.slug === route.m[1]); const i = se ? se.chapters.findIndex((c) => String(c.n) === route.m[2]) : -1;
+    if (i >= 0) { const c = se.chapters[i]; content.chapter = osChapter(lang, se, { chapter: c.n, title: c.title }, c.item.html || "", se.chapters[i - 1], se.chapters[i + 1], { archived: !!c.item.archived, epub: c.item.d1 ? null : epubPath(c.item.slug), seriesEpub: c.item.d1 ? null : seriesEpubPath(se.slug), itemLang: c.item.lang }); title = `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`; }
     else k = "notfound";
   }
   else if (k === "text") { content.text = osText(lang, route.item, route.item.html || ""); title = route.item.title; }
@@ -1211,7 +1215,7 @@ async function route(req, env, ctx) {
     // Vor dem Sprach-Redirect: /de/writing/feed.xml und /writing/feed.xml liefern denselben Feed (ein
     // Feed trägt die Sprache seines Inhalts, nicht die der Oberfläche). Vorgerendert, kein Markdown
     // zur Laufzeit.
-    { const feed = feedFor(FEEDS, p); if (feed) return feedResponse(req, feed); }
+    if (/^\/(?:de\/|en\/)?writing\/.*\.xml\/*$/.test(p)) { const feed = feedFor(await writingFeeds(env, FEEDS), p); if (feed) return feedResponse(req, feed); }
     // phone audit A14: the changelog window as RSS, per language (its rows exist in both)
     if (/^\/(?:de\/|en\/)?changelog\/feed\.xml$/.test(p)) return new Response(osChangelogFeed(p.startsWith("/en/") ? "en" : "de", undefined, (await siteData(env)).changelog), { headers: { "content-type": "application/rss+xml; charset=utf-8", "cache-control": "public, max-age=300" } });
     // ---- Creative Hub (nwebnotfound.dev) ----
@@ -1226,7 +1230,7 @@ async function route(req, env, ctx) {
     if (req.method === "GET" || req.method === "HEAD") {
       const os = nwebosChoice(url);
       if (os.setCookie) { const u = new URL(url); u.searchParams.delete("nwebos"); return new Response(null, { status: 302, headers: { location: u.pathname + u.search, "set-cookie": os.setCookie, "cache-control": "no-store" } }); }
-      const old = osLegacy(pre.path);
+      const old = /^\/writing\//.test(pre.path) ? osLegacy(pre.path, await writingAll(env, pre.lang || pickLang(req.headers.get("accept-language"), cookies(req)[LANG_COOKIE]))) : null;
       if (old && old.location) return new Response(null, { status: 302, headers: { location: (pre.lang ? "/" + pre.lang : "") + old.location + url.search, "cache-control": "no-store" } });
       const route = old ? old.route : nwebosRoute(pre.path);   // the blog editor too (#119): every page is a window
       if (route) {

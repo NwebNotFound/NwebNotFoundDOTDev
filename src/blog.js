@@ -405,7 +405,7 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
     if (!/^(?:blog:[a-z0-9-]{1,80}|writing:[a-z0-9-]{1,80}:\d{1,3})$/.test(key) || !(pct >= 0 && pct <= 100)) return deny(400, "invalid");
     // only for something that exists: a published post or a chapter in content/ (no free-form keys)
     if (key.startsWith("blog:")) { const row = await bySlug(env, key.slice(5)); if (!row || row.status !== "published") return deny(404, "not_found"); }
-    else { const [, s, n] = key.split(":"); if (!chapterExists(s, Number(n))) return deny(404, "not_found"); }
+    else { const [, s, n] = key.split(":"); if (!(await chapterExists(env, s, Number(n)))) return deny(404, "not_found"); }
     const known = await env.DB.prepare("SELECT 1 FROM blog_reads WHERE discord_id = ? AND post_id = ?").bind(String(u.id), key).first();
     if (!known) {
       const c = await env.DB.prepare("SELECT COUNT(*) AS n FROM blog_reads WHERE discord_id = ?").bind(String(u.id)).first();

@@ -18,6 +18,7 @@ import "./queue-unit.mjs";
 import "./nwebos-unit.mjs";
 import "./blog-unit.mjs";
 import "./admin-unit.mjs";
+import "./writing-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { writing as osWritingWin } from "../src/nwebos-apps.js";
@@ -1347,6 +1348,43 @@ try {
     sql("DELETE FROM site_blocks");
     const back = await req("/portfolio", { testHost: "nwebnotfound.dev", os: true });
     ok(back.t.includes("Diese Website"), "Verwaltung: leere Tabelle = wieder die Code-Texte"); }
+  // Texte & Kapitel from D1 (PR C, migration 0021): the fixture series written into D1 through the Verwaltung API
+  // renders like the built one (window, chapter text, feeds); edit/draft/publish show at once; empty again = built.
+  { const WA = (method, path, body) => req(path, { method, cookie: c1, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body });
+    const W = (path) => req(path, { testHost: "nwebnotfound.dev", os: true });
+    const sec = (t, k) => { const a = t.indexOf(`id="app-${k}"`), b = t.indexOf('<section class="app"', a + 1); return a < 0 ? "" : t.slice(a, b < 0 ? undefined : b); };
+    const series = (t) => sec(t, "writing").split("<h3>Kurztexte")[0];   // only the series is mirrored; D1 replaces the whole index, the built short texts are not copied
+    const art = (t) => (t.match(/<article[\s\S]*?<\/article>/) || [""])[0].replace(/\n?<p class="rexpb">[\s\S]*?<\/aside>/, "").replace(/\n+/g, "\n");   // EPUBs exist only for built texts
+    const md = (f) => fs.readFileSync(ROOT + "scripts/fixtures/content/" + f, "utf8").split(/^---$/m).slice(2).join("---").trim();
+    const before = { list: series((await W("/writing")).t), ch1: art((await W("/writing/test-fixture-serie/1")).t), ch3: (await W("/writing/test-fixture-serie/3")).s, feed: (await req("/writing/feed.xml", { testHost: "nwebnotfound.dev" })).t };
+    const se = await WA("POST", "/api/admin/series", { slug: "test-fixture-serie", title_de: "Test Fixture Series" });
+    const at = (d) => Date.parse(d + "T10:00:00Z");
+    const mk = (n, title, f, status, d, tags) => WA("POST", "/api/admin/writing", { series_id: se.j?.item?.id, kind: "story", chapter: n, slug: `test-fixture-chapter-${n}`, title_de: title, body_de: md(f), status, published_at: at(d), tags });
+    const c1r = await mk(1, "TEST FIXTURE Chapter one", "story-serie-01.md", "live", "2026-09-01", ["fixtures", "fiction"]);
+    const c2r = await mk(2, "TEST FIXTURE Chapter two", "story-serie-02.md", "live", "2026-09-08", ["fixtures"]);
+    const c3r = await mk(3, "TEST FIXTURE Chapter three (archived)", "story-serie-03-archived.md", "archived", "2026-09-15", ["fixtures"]);
+    ok(se.s === 201 && [c1r, c2r, c3r].every((r) => r.s === 201), "Texte (D1): Serie und drei Kapitel über die Verwaltung angelegt", `${se.s} ${c1r.s} ${c2r.s} ${c3r.s}`);
+    const dup = await WA("POST", "/api/admin/writing", { series_id: se.j?.item?.id, kind: "story", chapter: 9, slug: "test-fixture-chapter-1", title_de: "doppelt" }), noSer = await WA("POST", "/api/admin/writing", { series_id: 99999, kind: "story", chapter: 1, slug: "x-y", title_de: "x" });
+    ok(dup.s === 400 && dup.j?.fields?.join() === "slug" && noSer.s === 400 && noSer.j?.fields?.join() === "series_id", "Texte (D1): doppelter Slug / fehlende Serie → 400 mit Feld", `${dup.s} ${JSON.stringify(dup.j)} ${noSer.s}`);
+    const after = { list: series((await W("/writing")).t), ch1: art((await W("/writing/test-fixture-serie/1")).t), ch3: (await W("/writing/test-fixture-serie/3")).s, feed: (await req("/writing/feed.xml", { testHost: "nwebnotfound.dev" })).t };
+    const diff = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i >= a.length && a.length === b.length ? "=" : JSON.stringify([a.slice(Math.max(0, i - 80), i + 80), b.slice(Math.max(0, i - 80), i + 80)]); };
+    const titles = (x) => [...x.matchAll(/<title>(?:<!\[CDATA\[)?([^<\]]*)/g)].map((m) => m[1]).filter((x) => /Chapter/.test(x)).join("|");   // the chapters (the built feed also carries the short-text fixtures)
+    ok(after.list === before.list && after.ch1 === before.ch1 && after.ch3 === 200 && before.ch3 === 200 && titles(after.feed) === titles(before.feed), "Texte (D1): Fenster, Kapiteltext, archiviertes Kapitel und Feed wie aus dem Build", [diff(before.list, after.list), diff(before.ch1, after.ch1), after.ch3, titles(after.feed)].join(" "));
+    const ed = await WA("PATCH", `/api/admin/writing/${c1r.j.item.id}`, { title_de: "TEST FIXTURE Kapitel eins (neu)", version: 1 });
+    const ch1b = await W("/writing/test-fixture-serie/1");
+    const dr = await WA("POST", "/api/admin/writing", { series_id: se.j.item.id, kind: "story", chapter: 4, slug: "test-fixture-chapter-4", title_de: "Vier", body_de: "Viertes Kapitel." });
+    const hidden = await W("/writing/test-fixture-serie/4");
+    const pub = await WA("POST", `/api/admin/writing/${dr.j?.item?.id}/publish`, { version: 1 });
+    const shown = await W("/writing/test-fixture-serie/4"), feed4 = await req("/writing/feed.xml", { testHost: "nwebnotfound.dev" });
+    const prog = await req("/api/blog/progress", { method: "POST", cookie: c1, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { key: "writing:test-fixture-serie:4", pct: 50 } });
+    ok(ed.s === 200 && ch1b.t.includes("Kapitel eins (neu)") && dr.s === 201 && hidden.s === 404 && pub.s === 200 && pub.j?.item?.published_at > 0 && shown.s === 200 && shown.t.includes("Viertes Kapitel.") && feed4.t.includes("Vier") && prog.s === 200,
+      "Texte (D1): bearbeiten wirkt sofort; Entwurf unsichtbar, veröffentlicht sichtbar (Fenster + Feed), Lesefortschritt kennt das Kapitel", `${ed.s} ${hidden.s} ${pub.s} ${shown.s} ${prog.s}`);
+    const busy = await WA("DELETE", `/api/admin/series/${se.j.item.id}`);
+    for (const r of [c1r, c2r, c3r, dr]) await WA("DELETE", `/api/admin/writing/${r.j.item.id}`);
+    const gone = await WA("DELETE", `/api/admin/series/${se.j.item.id}`);
+    sql("DELETE FROM blog_reads WHERE post_id = 'writing:test-fixture-serie:4'");
+    const back = series((await W("/writing")).t);
+    ok(busy.s === 409 && gone.s === 200 && back === before.list, "Texte (D1): Serie mit Kapiteln nicht löschbar; leer = wieder der Build-Stand", `${busy.s} ${gone.s}`); }
   // Verwaltung window + entry points (server-rendered for admins only)
   { const W = (path, cookie) => req(path, { cookie, testHost: "nwebnotfound.dev", os: true });
     const anonW = await W("/admin"), otherW = await W("/admin/projects", c2), admW = await W("/admin/projects/12", c1);
