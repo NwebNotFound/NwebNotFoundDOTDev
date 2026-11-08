@@ -70,13 +70,15 @@ with sync_playwright() as p:
             on = page.evaluate("__draws")
             assert 5 <= on <= 40, f"visible viewer draws {on}/s, expected live and capped at 30 fps"
             # Off-screen: the viewer stops drawing.
-            page.evaluate("document.body.insertAdjacentHTML('beforeend','<div style=\"height:4000px\"></div>');scrollTo(0,document.body.scrollHeight)")
+            # the page body scrolls inside its window (Block Edition), not the document
+            SC = "(document.querySelector('.pf-hd').closest('.wc') || document.scrollingElement)"
+            page.evaluate(f"(() => {{ const sc = {SC}; sc.insertAdjacentHTML('beforeend','<div style=\"height:4000px\"></div>'); sc.scrollTop = sc.scrollHeight; }})()")
             page.wait_for_function("() => document.querySelector('.pf-hd .m3d').getBoundingClientRect().bottom < 0")
             page.wait_for_timeout(300); page.evaluate("__draws=0"); page.wait_for_timeout(1000)
             off = page.evaluate("__draws")
             assert off == 0, f"off-screen viewer still draws {off}/s"
             # Back on screen: it resumes.
-            page.evaluate("scrollTo(0,0)"); page.wait_for_timeout(300); page.evaluate("__draws=0"); page.wait_for_timeout(1000)
+            page.evaluate(f"{SC}.scrollTop = 0"); page.wait_for_timeout(300); page.evaluate("__draws=0"); page.wait_for_timeout(1000)
             back = page.evaluate("__draws")
             assert 5 <= back <= 40, f"viewer did not resume ({back}/s)"
             print(f"PASS {width}px live viewer {on}/s, off-screen {off}/s, resumed {back}/s")

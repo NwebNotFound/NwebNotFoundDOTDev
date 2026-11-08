@@ -27,6 +27,7 @@ import { feedFor, matchesEtag } from "./feed.js";
 import { epubPath, seriesEpubPath } from "./epub.js";
 import { makeProfile } from "./profile-v3.js";
 import { makeAdmin, siteData } from "./admin.js";
+import { nwebosMcPage } from "./nwebos-mc.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
 import { safeDecode } from "./safe-decode.js";
 import { verifyTurnstile } from "./turnstile.js";
@@ -230,6 +231,22 @@ function shell({ title, desc, css, nav, body, head = "", footer, themeColor }) {
 ${css === MC_CSS ? FONT_PRELOAD : ""}<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><script>document.documentElement.classList.add("js")</script><style>${BASE_CSS}${css}img[src^="/mc-head/"]{image-rendering:pixelated;image-rendering:crisp-edges}</style>${css === MC_CSS ? `<link rel="stylesheet" href="/bundle/mc.css?v=${AV}"><script src="/mc/item-names-de.js?v=${AV}"></script>${UNAV_JS}` : UNAV_HEAD}${head}</head><body>
 ${nav}
 <main>${body}</main><footer><div class="wrap">${footer}</div></footer>${REVEAL_JS}</body></html>`;
+}
+
+/* NwebOS Block Edition (src/nwebos-mc.js, BE-1): every mc page keeps its body and its own scripts/styles from <head>,
+   now inside its window. BASE_CSS (the old page frame) is left out; MC_CSS still styles the content. */
+const MC_OS_HEAD = `${FONT_PRELOAD}<link rel="stylesheet" href="/design/tokens.css?v=${AV}"><style>${MC_CSS}img[src^="/mc-head/"]{image-rendering:pixelated}</style>`;
+const unent = (s) => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+function mcHtml(path, page, status = 200) {
+  const h = String(page);
+  const a = h.indexOf("<main>"), b = h.lastIndexOf("</main>");
+  if (a < 0 || b < a) return html(h, status);   // not a shell page (should not happen): as before
+  const head = h.slice(h.indexOf("</style>") + 8, h.indexOf("</head>"));
+  const title = unent((/<title>([^<]*)<\/title>/.exec(h) || [])[1] || ""), desc = unent((/<meta name="description" content="([^"]*)"/.exec(h) || [])[1] || "");
+  // the old page footer (legal line "Kein offizielles Minecraft-Produkt …", Feedback, Hauptseite) and the reveal script
+  // stay at the end of the window, as on the old page
+  const foot = h.slice(b + 7, h.lastIndexOf("</body>"));
+  return html(nwebosMcPage({ title, desc, path, head: MC_OS_HEAD + head, body: h.slice(a + 6, b) + foot }), status);
 }
 
 /* ---------- Portfolio ---------- */
@@ -1176,31 +1193,31 @@ async function route(req, env, ctx) {
       const r = await auth(p, req, env, url); if (r) return r;
     }
     if (isMc) {
-      if (p === "/") return html(MC_HOME);
-      if (p === "/profile") return html(PROFILE_MC());
-      if (p === "/leaderboards") return html(LEADERBOARDS_MC());
-      if (p === "/pvp") return html(mcPage("PvP · NwebNotFound MC", "PvP-Rangliste der Arena: Siege, Niederlagen und Siegquote", pvpBody()));
-      if (p === "/vip") return html(mcPage("VIP · NwebNotFound MC", "VIP- und MVP-Panel: eigener Rang, Vorteile, Welten und Stats", vipBody()));
-      if (p === "/changelog") return html(mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", changelogBody()));
-      if (p === "/parkour") return html(mcPage("Parkour · NwebNotFound MC", "Parkour-Bestzeiten aus der Lobby: Top 10 pro Kurs", parkourBody()));
-      if (p === "/bestellungen" || p === "/abholungen") return html(mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));
-      if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
-      if (p === "/spieler") return html(mcPage("Spieler · NwebNotFound MC", "Spieler suchen: Skin, öffentliche Stats und Profil", playersBody()));
-      if (p.startsWith("/spieler/")) { const n = safeDecode(p.slice(9)); if (n == null || !/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return html(mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
+      if (p === "/") return mcHtml(p, MC_HOME);
+      if (p === "/profile") return mcHtml(p, PROFILE_MC());
+      if (p === "/leaderboards") return mcHtml(p, LEADERBOARDS_MC());
+      if (p === "/pvp") return mcHtml(p, mcPage("PvP · NwebNotFound MC", "PvP-Rangliste der Arena: Siege, Niederlagen und Siegquote", pvpBody()));
+      if (p === "/vip") return mcHtml(p, mcPage("VIP · NwebNotFound MC", "VIP- und MVP-Panel: eigener Rang, Vorteile, Welten und Stats", vipBody()));
+      if (p === "/changelog") return mcHtml(p, mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", changelogBody()));
+      if (p === "/parkour") return mcHtml(p, mcPage("Parkour · NwebNotFound MC", "Parkour-Bestzeiten aus der Lobby: Top 10 pro Kurs", parkourBody()));
+      if (p === "/bestellungen" || p === "/abholungen") return mcHtml(p, mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));
+      if (p === "/feedback") return mcHtml(p, shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
+      if (p === "/spieler") return mcHtml(p, mcPage("Spieler · NwebNotFound MC", "Spieler suchen: Skin, öffentliche Stats und Profil", playersBody()));
+      if (p.startsWith("/spieler/")) { const n = safeDecode(p.slice(9)); if (n == null || !/^[A-Za-z0-9_]{1,16}$/.test(n)) return notFound(true); return mcHtml(p, mcPage(n + " · Spieler · NwebNotFound MC", "Öffentliches Spielerprofil von " + n, playerBody(n, MAIN))); }
       if (p === "/markt" && url.searchParams.has("item")) {
         const raw = String(url.searchParams.get("item") || "").trim(), it = cleanItem(raw);
         const known = it ? await env.DB.prepare("SELECT 1 FROM mc_market WHERE item = ?").bind(it).first().catch(() => null) : null;
         return redirect(known ? `/markt/${encodeURIComponent(it)}` : `/markt?q=${encodeURIComponent(raw.replace(/^minecraft:/i, "").replace(/_/g, " ").slice(0, 48))}`);
       }
-      if (p === "/shops") return html(mcPage("Shops · NwebNotFound MC", "Spielershops: Angebote, Preise, Lager und Orte", shopsBody()));
-      if (p.startsWith("/shops/")) { const id = safeDecode(p.slice(7)); if (id == null || !/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Shop · NwebNotFound MC", "Spielershop", shopBody(id))); }
+      if (p === "/shops") return mcHtml(p, mcPage("Shops · NwebNotFound MC", "Spielershops: Angebote, Preise, Lager und Orte", shopsBody()));
+      if (p.startsWith("/shops/")) { const id = safeDecode(p.slice(7)); if (id == null || !/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return mcHtml(p, mcPage("Shop · NwebNotFound MC", "Spielershop", shopBody(id))); }
       if (p === "/bestenlisten" || p === "/bestenliste") return Response.redirect(`https://${MCD}/leaderboards`, 301);
-      if (p === "/auktionen") return html(mcPage("Auktionen · NwebNotFound MC", "Live-Auktionen vom Server", auctionsBody()));
-      if (p.startsWith("/auktionen/")) { const id = safeDecode(p.slice(11)); if (id == null || !/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return html(mcPage("Auktion · NwebNotFound MC", "Auktion mit Gebotsverlauf", auctionBody(id))); }
-      if (p === "/markt") return html(mcPage("Markt · NwebNotFound MC", "Preise, Gewinner und Verlierer im Server-Shop", marketBody()));
-      if (p.startsWith("/markt/")) { const raw = safeDecode(p.slice(7)), it = raw == null ? null : cleanItem(raw); if (!it) return notFound(true); return html(mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
-      if (p === "/wiki") return html(mcPage("Wiki · NwebNotFound MC", "Anleitungen, Regeln und FAQ zum Minecraft-Server", wikiIndexBody(MC_HOST)));
-      if (p.startsWith("/wiki/")) { const a = WIKI.find((x) => x.slug === p.slice(6)); if (!a) return notFound(true); return html(mcPage(a.title + " · Wiki · NwebNotFound MC", a.sum, wikiArticleBody(a, MC_HOST))); }
+      if (p === "/auktionen") return mcHtml(p, mcPage("Auktionen · NwebNotFound MC", "Live-Auktionen vom Server", auctionsBody()));
+      if (p.startsWith("/auktionen/")) { const id = safeDecode(p.slice(11)); if (id == null || !/^[A-Za-z0-9_.:-]{1,64}$/.test(id)) return notFound(true); return mcHtml(p, mcPage("Auktion · NwebNotFound MC", "Auktion mit Gebotsverlauf", auctionBody(id))); }
+      if (p === "/markt") return mcHtml(p, mcPage("Markt · NwebNotFound MC", "Preise, Gewinner und Verlierer im Server-Shop", marketBody()));
+      if (p.startsWith("/markt/")) { const raw = safeDecode(p.slice(7)), it = raw == null ? null : cleanItem(raw); if (!it) return notFound(true); return mcHtml(p, mcPage(it.replace(/_/g, " ") + " · Markt · NwebNotFound MC", "Preisverlauf im Server-Shop", marketItemBody(it))); }
+      if (p === "/wiki") return mcHtml(p, mcPage("Wiki · NwebNotFound MC", "Anleitungen, Regeln und FAQ zum Minecraft-Server", wikiIndexBody(MC_HOST)));
+      if (p.startsWith("/wiki/")) { const a = WIKI.find((x) => x.slug === p.slice(6)); if (!a) return notFound(true); return mcHtml(p, mcPage(a.title + " · Wiki · NwebNotFound MC", a.sum, wikiArticleBody(a, MC_HOST))); }
       return assetOrNotFound(req, env, true);
     }
     if (p === "/feedback") return new Response(null, { status: 301, headers: { location: `https://${MCD}/feedback`, "cache-control": "public, max-age=3600" } });

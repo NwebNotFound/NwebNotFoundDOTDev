@@ -97,9 +97,10 @@ with sync_playwright() as p:
         ok(pg.locator(".inv .iv-pane").count() >= 1 and pg.locator(".inv .ivs").count() >= 41, f"{w}px Profil: volles Inventar-Layout")
         ok("AB" not in pg.locator(".inv").inner_text(), f"{w}px Profil: keine Text-Platzhalter")
         pg.locator(".inv").scroll_into_view_if_needed(); pg.screenshot(path=f"{SH}/local-polish-profil-{w}.png", full_page=True)
-        ok(pg.locator("#umm a[href='/bestellungen']").count() == 1, f"{w}px Dropdown: Bestellungen")
+        # Block Edition (BE-1): the old nav with its account menu is gone; Konto and Bestellungen are in the start menu
+        ok(pg.locator("#startm a[href='/bestellungen']").count() == 1, f"{w}px Startmenü: Bestellungen")
         # 1) Profil: kein doppelter Tab, klare Blöcke
-        ok(pg.locator(".u-links a[href='/profile']").count() == 0 and pg.locator("#umm a[href='/profile']").count() == 1, f"{w}px Nav: Profil nur im Konto-Menü")
+        ok(pg.locator(".u-links").count() == 0 and pg.locator("#startm a[href='/profile']").count() >= 1, f"{w}px Block Edition: keine alte Leiste, Mein Konto im Startmenü")
         hd = pg.inner_text(".pf-hd")
         ok("Rot" in hd and pg.eval_on_selector(".pf-hd .pf-team", "e=>getComputedStyle(e).color") == "rgb(255, 85, 85)", f"{w}px Profil: Team in team_color", hd[:200])
         ok("01.11.26, 00:05 Uhr" in hd and pg.locator(".pf-hd .pf-on").count() == 0, f"{w}px Profil: last_seen in Europe/Berlin", hd[:300])
@@ -139,7 +140,7 @@ with sync_playwright() as p:
         sp.scroll_into_view_if_needed(); sp.screenshot(path=f"{SH}/local-spieler-parkour-{w}.png"); pg.unroute("**/api/mc-parkour")
         pg.goto("https://" + H + "/profile", wait_until="domcontentloaded"); pg.locator(".inv").wait_for(state="visible", timeout=20000)
         # Nav-Gruppen: max. 6 Top-Level-Einträge, aktive Gruppe markiert
-        ok(pg.locator(".u-links > .u-group").count() == 5 and pg.locator(".u-tools #umb").count() == 1, f"{w}px Nav: fünf Gruppen, Konto ganz rechts")
+        ok(pg.locator(".dicons .dicon").count() == 14 and pg.locator(".task #startb").count() == 1, f"{w}px Block Edition: 13 Apps + Hauptseite auf dem Desktop, Taskleiste")
         # Inventar: animierte Texturen (Magma 16x48) nur quadratisch
         pg.evaluate("()=>{const i=document.querySelector('.inv .ivs img');if(i)i.src='/mc-icon/v2/magma_block'}"); pg.wait_for_timeout(800)
         bx = pg.eval_on_selector(".inv .ivs img", "e=>{const r=e.getBoundingClientRect();return [r.width,r.height]}")
@@ -152,20 +153,10 @@ with sync_playwright() as p:
         pg.click(".pf-tl [data-k=markt]"); pg.wait_for_timeout(150)
         ok(pg.locator("#pbal").is_visible() and not pg.locator(".inv").is_visible(), f"{w}px Profil: Tab-Wechsel zeigt Markt")
         pg.screenshot(path=f"{SH}/local-profil-markt-{w}.png", full_page=True)
-        # 2) Dropdown im MC-Theme
-        if w < 900: pg.click(".u-burger")
-        else: pg.locator("#umb").dispatch_event("click")
-        pg.wait_for_timeout(300)
-        st = pg.evaluate("(()=>{const c=getComputedStyle(document.querySelector(innerWidth<=860?'.u-panel':'#umm'));return [c.backgroundColor,c.borderTopColor]})()")
-        ok("18, 13, 31" not in st[0] and "45, 29, 90" not in st[1], f"{w}px Dropdown: MC-Theme statt Lila", st)
-        pg.screenshot(path=f"{SH}/ux-dropdown-{w}.png")
-        # 4) einheitliches Hover
-        hov = []
-        for sel in ("#umm a[href='/bestellungen']" if w >= 900 else ".u-me__links a.u-out", "#pbal .acts .btn.sec"):
-            el = pg.locator(sel).first; el.hover(); pg.wait_for_timeout(200)
-            hov.append(el.evaluate("e=>{const c=getComputedStyle(e);return c.backgroundColor+'|'+c.boxShadow}"))
-        pg.keyboard.press("Escape")
-        ok(len(set(hov)) == 1, f"{w}px Hover: Menüeintrag = Button (gleiches Token)", hov)
+        # 2)+4) Block Edition: the old account dropdown is gone (Bestellungen are in the start menu); the hover token is the button's
+        el = pg.locator("#pbal .acts .btn.sec").first; el.hover(); pg.wait_for_timeout(200)
+        hov = [el.evaluate("e=>{const c=getComputedStyle(e);return c.backgroundColor+'|'+c.boxShadow}")]
+        ok(pg.locator("#startm a[href='/bestellungen']").count() == 1, f"{w}px Startmenü: Bestellungen")
         t = go("/abholungen"); ok("Abholfach" in t and "abgelehnt" in t and "erledigt" in t and "Diamant" in t, f"{w}px Bestellungen: Stufen + Abholfach in einer Liste", t[:400])
         ok(pg.locator("#olist").count() == 1 and pg.locator(".card").count() == 1, f"{w}px Bestellungen: genau eine Liste")
         if pg.locator("[data-hide]").count():
@@ -174,7 +165,7 @@ with sync_playwright() as p:
         ok(r1.evaluate("e=>getComputedStyle(e).backgroundColor") == hov[0].split("|")[0], f"{w}px Hover: Listenzeile nutzt dasselbe Token")
         # 6) Bank-Direktkauf auf der Item-Seite
         go("/markt/diamond"); pg.locator("#bbf").wait_for(timeout=10000)
-        ok(pg.locator('.u-group[data-g=wirtschaft] .u-gbtn[data-cur]').count() == 1 and pg.locator('a[href="/markt"][aria-current=page]').count() == 1, f"{w}px Nav: /markt/diamond markiert Markt")
+        ok(pg.locator("#app-markt").count() == 1 and pg.locator(".win.live").count() == 1, f"{w}px Block Edition: /markt/diamond im Markt-Fenster")
         ok(pg.evaluate("document.documentElement.scrollWidth<=innerWidth+1"), f"{w}px Item-Seite mit Bank-Kauf: kein Overflow")
         t0 = pg.inner_text("#bbt"); pg.fill("#bba", "2"); ok(pg.inner_text("#bbt") != t0, f"{w}px Bank-Kauf: Summe live", pg.inner_text("#bbt"))
         pg.click("#bbb"); pg.wait_for_function("() => document.getElementById('bbm').textContent.length>0", timeout=10000)
@@ -195,66 +186,15 @@ with sync_playwright() as p:
         pg.screenshot(path=f"{SH}/local-spieler-nils-{w}.png", full_page=True)
         for nm, path in (("start", "/"), ("markt", "/markt"), ("bestenlisten", "/leaderboards")): go(path); pg.wait_for_timeout(400); pg.screenshot(path=f"{SH}/local-polish-{nm}-{w}.png", full_page=True)
         go("/"); ok(pg.locator(".qgrid .q").count() == 6 and pg.locator('.qgrid a[href="/#srv-sec"]').count() == 1 and pg.locator('.qgrid a[href="/pvp"]').count() == 1 and pg.locator('.qgrid a[href="/profile"]').count() == 1, f"{w}px Start: sechs Kacheln wie das Menü")
-        ok(pg.locator('.u-group[data-g=server] a[href="/changelog"]').count() == 1 and pg.locator('.u-group[data-g=wiki] a[href="/wiki/befehle"]').count() == 1 and pg.locator('#umm a[href="/bestellungen"]').count() == 1 and pg.locator('#umm a[href="/vip"]').count() == 1, f"{w}px Nav: Server, Wiki, Konto")
+        ok(all(pg.locator(f'#startm a[href="{h}"]').count() >= 1 for h in ("/changelog", "/wiki", "/bestellungen", "/vip")), f"{w}px Startmenü: Changelog, Wiki, Bestellungen, VIP")
         for path in ("/markt", "/wiki", "/wiki/befehle"): go(path); pg.screenshot(path=f"{SH}/local{path.replace('/','-')}-{w}.png", full_page=True)
-        ok(pg.locator('.u-links a[href="/wiki/befehle"][aria-current=page]').count() == 1 and pg.locator('.u-group[data-g=wiki] .u-gbtn[data-cur]').count() == 1 and pg.locator('.u-links a[href="/wiki"][aria-current=page]').count() == 0, f"{w}px Nav: Wiki-Artikel markiert, nicht die Übersicht")
-        if w < 900:
-            # Wiki-Drawer: bei 375/390 liefen die Gruppen mit flex-wrap in eine zweite Spalte,
-            # Wiki und Konto waren nicht erreichbar (Designer-Audit fix-unified-nav).
-            pg.click(".u-burger"); pg.wait_for_timeout(250)
-            dr = pg.evaluate("""() => { const n = document.querySelector('.u-panel'); const g = [...n.querySelectorAll('.u-group')]; const r = n.getBoundingClientRect(); return { sw: n.scrollWidth, cw: n.clientWidth, groups: g.length, labels: g.map(x => x.querySelector('.u-gbtn').textContent.trim()), acc: !!n.querySelector('.u-me__links a.u-out'), bottom: innerHeight - r.bottom, page: document.documentElement.scrollWidth - innerWidth }; }""")
-            ok(dr["sw"] <= dr["cw"] + 1 and dr["groups"] == 5 and dr["acc"] and dr["bottom"] >= 8 and dr["page"] <= 0, f"{w}px Wiki-Drawer: kein Querscroll, alle Gruppen + Konto erreichbar, endet vor der Bildschirmkante", dr)
-            if pg.locator(".u-panel .u-drow").count():  # the mc drawer has no language/theme rows
-                th = pg.evaluate("""() => { const n = document.querySelector('.u-panel'); const hit = el => { const r = el.getBoundingClientRect(), x = r.left + r.width / 2, c = r.top + r.height / 2; return [c - 21, c + 21].every(y => { const e = document.elementFromPoint(x, y); return e === el || el.contains(e); }); }; const A = [...n.querySelectorAll('.u-drow .u-seg a')], T = n.querySelector('.u-drow .u-theme'); return { seg: A.length, segOk: A.every(hit), themeOk: hit(T), themeH: Math.round(T.getBoundingClientRect().height), page: document.documentElement.scrollWidth - innerWidth }; }""")
-                ok(th["seg"] == 2 and th["segOk"] and th["themeOk"] and th["themeH"] >= 44 and th["page"] <= 0, f"{w}px Drawer: DE/EN + Theme-Schalter haben 44px Touch-Fläche, kein Überlauf", th)
-            if pg.locator(".u-me__who").count():
-                me = pg.evaluate("""() => { const n = document.querySelector('.u-panel'); const hit = el => { const r = el.getBoundingClientRect(), x = r.left + r.width / 2, c = r.top + r.height / 2; return [c - 21, c + 21].every(y => { const e = document.elementFromPoint(x, y); return e === el || el.contains(e); }); }; return { who: hit(n.querySelector('.u-me__who')), out: hit(n.querySelector('.u-me__links a.u-out')) }; }""")
-                ok(me["who"] and me["out"], f"{w}px Drawer: Profil + Abmelden haben 44px Touch-Fläche", me)
-            if pg.locator(".u-panel .u-drow").count(): pg.focus(".u-drow .u-theme"); pg.keyboard.press("Tab"); ok(pg.evaluate("!!document.activeElement.closest('.u-panel')"), f"{w}px Drawer: Tastatur erreicht die Schalter")
-            y0 = pg.evaluate("document.querySelector('.u-nav').getBoundingClientRect().top"); pg.mouse.wheel(0, 400); pg.wait_for_timeout(150)
-            ok(abs(pg.evaluate("document.querySelector('.u-nav').getBoundingClientRect().top") - y0) < 1, f"{w}px Drawer offen: Kopfleiste bleibt sticky (#69)")
-            pg.keyboard.press("Escape")
+        ok(pg.locator("#app-wiki").count() == 1 and pg.locator(".win.live").count() == 1, f"{w}px Block Edition: Wiki-Artikel im Wiki-Fenster")
+        # the old nav drawer is gone: the phone shell (bottom bar, windows) is checked in scripts/nwebos-mc-ui.py
         go("/parkour?course=test"); pg.locator(".pkr").first.wait_for(timeout=10000); t = pg.inner_text("body")
         ok(pg.locator(".pkg").count() == 1 and pg.locator(".pkr").count() == 10 and "00:39.000" in t, f"{w}px Parkour ?course=test: nur ein Board, Top 10, Zeit mm:ss.mmm", t[:300])
         ok(pg.locator(".pkr img[src^='/mc-head/']").count() == 10 and pg.locator(".pkh img[src*='/mc-icon/v2/']").count() == 1, f"{w}px Parkour: Köpfe + Item-Icon")
-        ok(pg.locator('.u-group[data-g=minispiele] .u-gbtn[data-cur]').count() == 1, f"{w}px Nav: Gruppe Minispiele aktiv")
-        if w < 900:
-            ok(not pg.locator(".u-panel").is_visible(), f"{w}px Nav mobil: eingeklappt"); pg.click(".u-burger"); pg.wait_for_timeout(200)
-            ok(pg.locator('.u-links a[href="/parkour"]').is_visible() and pg.get_attribute(".u-burger", "aria-expanded") == "true", f"{w}px Nav mobil: Drawer öffnet aktive Gruppe")
-            ok(pg.evaluate("document.activeElement.closest('.u-panel') !== null"), f"{w}px Nav mobil: Fokus springt in den Drawer")
-            for _ in range(40): pg.keyboard.press("Tab")
-            ok(pg.evaluate("!!document.activeElement.closest('.u-nav')"), f"{w}px Nav mobil: Tab bleibt im Drawer")
-            # nav v2: the drawer fades out (opacity), visibility switches after 0.35 s
-            pg.keyboard.press("Escape"); pg.wait_for_timeout(450); ok(not pg.locator(".u-panel").is_visible() and pg.evaluate("document.activeElement.classList.contains('u-burger')"), f"{w}px Nav mobil: Escape schließt, Fokus zurück auf dem Menüknopf")
-        else:
-            pg.focus(".u-group[data-g=wirtschaft] .u-gbtn"); pg.keyboard.press("Enter"); pg.keyboard.press("ArrowDown")
-            ok(pg.evaluate("document.activeElement.getAttribute('href')") == "/markt", f"{w}px Nav: Tastatur öffnet Dropdown")
-            pg.keyboard.press("Escape"); ok(pg.get_attribute(".u-group[data-g=wirtschaft] .u-gbtn", "aria-expanded") == "false", f"{w}px Nav: Escape schließt Dropdown")
-            pg.locator(".u-group[data-g=community] .u-gbtn").dispatch_event("click")
-            ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "true" and pg.locator('.u-group[data-g=community] a[href="/spieler"]').count() == 1, f"{w}px Nav: Klick öffnet Community")
-            pg.locator(".u-group[data-g=community] .u-gbtn").dispatch_event("click")
-            ok(pg.get_attribute(".u-group[data-g=community] .u-gbtn", "aria-expanded") == "false", f"{w}px Nav: zweiter Klick schließt")
-            # real mouse: hover opens, the click that follows keeps it open, a second click closes it (intentional close)
-            gb = ".u-group[data-g=community] .u-gbtn"; pg.mouse.move(5, 400); pg.wait_for_timeout(250)
-            bx = pg.locator(gb).bounding_box(); cx, cy = bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2
-            pg.mouse.move(cx, cy); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "true", f"{w}px Nav: Hover öffnet Community")
-            pg.mouse.down(); pg.mouse.up(); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "true", f"{w}px Nav: echter Klick nach Hover lässt das Menü offen")
-            pg.mouse.down(); pg.mouse.up(); pg.wait_for_timeout(120); ok(pg.get_attribute(gb, "aria-expanded") == "false", f"{w}px Nav: zweiter echter Klick schließt absichtlich")
-            pg.mouse.move(5, 400); pg.wait_for_timeout(300)
-            pg.mouse.move(cx, cy); pg.wait_for_timeout(120); pg.focus(gb); pg.keyboard.press("Enter"); pg.wait_for_timeout(120)
-            ok(pg.get_attribute(gb, "aria-expanded") == "false", f"{w}px Nav: Enter nach Hover schaltet um (Tastatur unverändert)")
-            pg.mouse.move(5, 400); pg.wait_for_timeout(300); pg.keyboard.press("Escape")
-            # Wiki has the longest dropdown: with space it must show every link (no 440px clip),
-            # on a short viewport it scrolls while the scrollbar stays hidden (Nils' request).
-            pg.locator(".u-group[data-g=wiki] .u-gbtn").dispatch_event("click")
-            wd = pg.evaluate("""() => { const d = document.querySelector('.u-group[data-g=wiki] .u-drop'); const r = d.getBoundingClientRect(); const a = [...d.querySelectorAll('a')]; return { n: a.length, hidden: a.filter(x => x.getBoundingClientRect().bottom > r.bottom - 1).map(x => x.textContent.trim()), clipped: d.scrollHeight > d.clientHeight, bottom: Math.round(r.bottom), vh: innerHeight, bar: getComputedStyle(d).scrollbarWidth }; }""")
-            ok(wd["n"] == 11 and not wd["hidden"] and not wd["clipped"] and wd["bottom"] < wd["vh"] and wd["bar"] == "none", f"{w}px Wiki-Dropdown: alle Links sichtbar ohne Beschnitt, Scrollbar bleibt versteckt", wd)
-            pg.set_viewport_size({"width": w, "height": 520}); pg.wait_for_timeout(150)
-            ws = pg.evaluate("""() => { const d = document.querySelector('.u-group[data-g=wiki] .u-drop'); const a = [...d.querySelectorAll('a')]; const last = a[a.length - 1]; const fits = () => last.getBoundingClientRect().bottom <= d.getBoundingClientRect().bottom + 1; const before = fits(); d.scrollTop = d.scrollHeight; const after = fits(); return { scrolls: d.scrollHeight > d.clientHeight, before, after, bar: getComputedStyle(d).scrollbarWidth, page: document.documentElement.scrollWidth - innerWidth }; }""")
-            ok(ws["scrolls"] and not ws["before"] and ws["after"] and ws["bar"] == "none" and ws["page"] <= 0, f"{w}px Wiki-Dropdown kurz: scrollt bis zum letzten Link, Scrollbar bleibt versteckt", ws)
-            pg.set_viewport_size({"width": w, "height": 900}); pg.wait_for_timeout(150)
-            pg.keyboard.press("Escape")
-        ok(pg.locator(".pkt .btn").count() >= 3 and pg.locator('.pkt .btn[aria-selected=true][data-k="test"]').count() == 1 and pg.locator('.u-links a[href="/parkour"][aria-current=page]').count() == 1, f"{w}px Parkour: Kurs-Auswahl + Nav aktiv")
+        ok(pg.locator("#app-parkour").count() == 1, f"{w}px Block Edition: Parkour-Fenster")
+        ok(pg.locator(".pkt .btn").count() >= 3 and pg.locator('.pkt .btn[aria-selected=true][data-k="test"]').count() == 1, f"{w}px Parkour: Kurs-Auswahl")
         hs = pg.eval_on_selector_all(".pkr", "els=>els.map(e=>e.getBoundingClientRect().height)"); ok(max(hs) < 70, f"{w}px Parkour: Zeilen einzeilig", hs)
         pg.screenshot(path=f"{SH}/local-parkour-{w}.png", full_page=True)
         go("/parkour"); pg.locator(".pkg").first.wait_for(timeout=10000); n = pg.locator(".pkg").count(); hs = pg.locator(".pkh h2").all_inner_texts()
@@ -287,7 +227,7 @@ with sync_playwright() as p:
         pg.screenshot(path=f"{SH}/local-parkour-leer-{w}.png", full_page=True); pg.unroute("**/api/mc-parkour")
         go("/vip"); pg.locator("#vip .vip-ranks").wait_for(timeout=10000); vt = pg.inner_text("#vip")
         ok("Das Panel ist für die Ränge VIP, MVP und Admin." in vt and "Vorteile" in vt and "900" not in vt and pg.locator("#vip a.btn.discord").count() == 0 and pg.locator("#vip a[href='/profile']").count() == 1, f"{w}px VIP ohne Rang: Übersicht, kein Panel", vt[:240])
-        ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator('#umm a[href="/vip"]').count() == 1 and pg.locator('.u-group[data-g=community] a[href="/vip"]').count() == 0 and pg.locator('#umm a[href="/vip"][aria-current=page]').count() == 1 and pg.locator('#umb[data-cur]').count() == 1, f"{w}px VIP: Konto-Menü aktiv, kein Formular")
+        ok(pg.locator("#vip [style]").count() == 0 and pg.locator("#vip form").count() == 0 and pg.locator("#app-vip").count() == 1 and pg.locator('.dicon[href="/vip"]').count() == 1, f"{w}px VIP: eigenes Fenster + Desktop-Icon, kein Formular")
         # Summer Theme v2: page headings use the self-hosted SmPixel (Pixelify Sans); Monocraft
         # left the MC surface with the redesign.
         ok("SmPixel" in pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"), f"{w}px VIP: Pixel-Schrift", pg.eval_on_selector("h1.hub-h", "e=>getComputedStyle(e).fontFamily"))
@@ -570,13 +510,13 @@ with sync_playwright() as p:
     def konto(avatar, mc_name):
         me["avatar"], me["mc_name"] = avatar, mc_name
         kpg.goto("https://" + H + "/", wait_until="domcontentloaded", timeout=45000)
-        kpg.wait_for_function("() => { const s = document.querySelector('#umb img') && document.querySelector('#umb img').src || ''; return s.includes('MHF_Steve') || s.includes('discordapp.com') || /\\/mc-head\\/[A-Za-z0-9_]+\\//.test(s) }", timeout=10000)
-        src = kpg.locator("#umb img").get_attribute("src") or kpg.evaluate("document.querySelector('#umb img').src")
+        kpg.wait_for_function("() => { const s = document.querySelector('#smav') && document.querySelector('#smav').src || ''; return s.includes('MHF_Steve') || s.includes('discordapp.com') || /\\/mc-head\\/[A-Za-z0-9_]+\\//.test(s) }", timeout=10000)
+        src = kpg.locator("#smav").get_attribute("src") or kpg.evaluate("document.querySelector('#smav').src")
         # Vor dem Schließen auf ein Ende des Bild-Requests warten: der Route-Handler darf einen
         # noch laufenden Kopf-Request ignorieren (siehe oben), aber Playwright wirft beim
         # Browser.close() „Route.fulfill: Fetch response has been disposed", wenn genau dieser
         # Request noch fliegt. `complete` gilt für geladen UND für fehlgeschlagen.
-        try: kpg.wait_for_function("() => { const i = document.querySelector('#umb img'); return !i || i.complete }", timeout=3000)
+        try: kpg.wait_for_function("() => { const i = document.querySelector('#smav'); return !i || i.complete }", timeout=3000)
         except Exception: pass
         return {"src": src, "xss": kpg.evaluate("window.__xss || 0")}
     kb = konto('"><img src=x onerror=window.__xss=1>', None)

@@ -26,6 +26,10 @@ a{color:#0b4fd1}
 .nojs-note{max-width:760px;margin:0 auto;padding:12px 20px;background:#fff3c2}
 /* ---------- screens ---------- */
 .scr{position:fixed;inset:0;z-index:100}
+/* switching between the editions (public/design/nwebos-mc.js): a full-screen bar in the target OS's colour */
+#switch{display:grid;place-items:center;background:#1f5bd8;color:#fff;animation:swf .3s ease both}#switch p{font:700 18px var(--f);margin:0 0 16px}
+@keyframes swf{from{opacity:0}}.rm #switch{animation:none}
+.swin{display:flex;flex-direction:column;align-items:center}
 #boot{display:grid;place-items:center;background:#000;color:#fff;cursor:pointer}
 .bootin{display:flex;flex-direction:column;align-items:center;gap:10px}
 .blogo{display:flex;align-items:center;gap:14px;font:700 54px/1 var(--f);letter-spacing:-.02em}

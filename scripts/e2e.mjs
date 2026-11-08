@@ -21,6 +21,7 @@ import "./admin-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { writing as osWritingWin } from "../src/nwebos-apps.js";
+import { MC_APPS, mcAppFor } from "../src/nwebos-mc.js";
 // `new URL(...).pathname` keeps the leading slash on Windows ("/C:/…"), which every fs call then
 // resolved to "C:\C:\…" — the suite could not start there. fileURLToPath gives the native path.
 // Every request in this file (req() and the direct ones): one retry when the dev server reset a reused keep-alive
@@ -572,8 +573,8 @@ try {
   const home = (await req("/")).t; ok(!/<ul class="u-links">[^]*?href="\/profile"[^]*?<\/ul>/.test(home), "kein doppelter Profil-Tab in der Nav");
   // The account slot of the unified nav is filled by the external /design/unav.js (no inline script).
   { const port = await req("/portfolio", { testHost: "nwebnotfound.dev" }); const os = fs.readFileSync(ROOT + "public/design/nwebos.js", "utf8");
-    ok(port.s === 200 && port.t.includes('class="no-js nwebos"') && !port.t.includes("/design/unav.js") && os.includes(String.raw`/^https:\/\//.test(me.avatar`), "Hauptdomain: NwebOS statt Portfolio-Chip; Avatar nur https (Regel 10)"); }
-  ok(home.includes("&quot;/bestellungen&quot;") && fs.readFileSync(ROOT + "public/design/unav.js", "utf8").includes("L.menu"), "Dropdown verlinkt zusammengelegte Bestellungen");
+    ok(port.s === 200 && port.t.includes('class="no-js nwebos"') && !port.t.includes("/design/unav.js") && os.includes(String.raw`/^https:\/\//.test(u.avatar || "") ? u.avatar : GUEST_AV`), "Hauptdomain: NwebOS statt Portfolio-Chip; Avatar nur https (Regel 10)"); }
+  ok(home.includes('<a href="/bestellungen">') && home.includes('"url":"/bestellungen"'), "Block Edition: Startmenü und Suche verlinken die Bestellungen (früher das Konto-Menü)");
   for (const p of ["/bestellungen", "/abholungen"]) { const x = await req(p); ok(x.s === 200 && x.t.includes("/mc/orders.js"), p + " → 200, gemeinsame Liste"); }
   ok((await req("/markt/diamond")).t.includes('id="bbuy"'), "Item-Seite hat Bank-Kauf");
   const css = fs.readFileSync(ROOT + "public/mc/ds.css", "utf8");
@@ -728,7 +729,20 @@ try {
     ok(port.s === 200 && port.t.includes('data-app="portfolio"') && !port.t.includes('id="projekte"'), "/portfolio → 200, Projekte-Fenster (keine alte Seite)");
     { const gb = await hub("/guestbook"); ok(gb.s === 200 && gb.t.includes('data-app="guestbook"') && !gb.t.includes("u-bar"), "/guestbook → 200, Gästebuch-Fenster (keine alte Seite)"); }
     const mcHome = await req("/");
-    ok(mcHome.s === 200 && mcHome.t.includes("Kein offizielles Minecraft-Produkt") && !mcHome.t.includes("sm-root"), "mc.nwebnotfound.dev / unverändert (kein Hub-Theme, Regression)");
+    ok(mcHome.s === 200 && mcHome.t.includes("Kein offizielles Minecraft-Produkt") && !mcHome.t.includes("sm-root") && mcHome.t.includes('data-app="status"'), "mc.nwebnotfound.dev / = Block Edition, Status-Fenster mit Rechtshinweis (kein Hub-Theme, Regression)");
+  }
+  console.log("7b2) NwebOS Block Edition (mc.*)");
+  {
+    // every mc address is a page load whose own window holds the old page body (data-live), with the shell around it
+    for (const p of [...MC_APPS.map((a) => a.path), "/bestellungen", "/wiki/regeln", "/spieler/Steve"]) {
+      const r = await req(p), k = mcAppFor(p).k;
+      ok([200, 404].includes(r.s) && r.t.includes('class="no-js nwebos edb mc"') && r.t.includes(`data-app="${k}"`) && r.t.includes(" data-live ") && r.t.includes('data-os-nav="page"')
+        && r.t.includes("Kein offizielles Minecraft-Produkt") && r.t.includes('href="https://nwebnotfound.dev/" data-os-switch="main"') && !r.t.includes("{{UNAV") && (r.t.match(/<main[ >]/g) || []).length === 1,
+        `Block Edition ${p}: Fenster ${k} mit Seiteninhalt, Rechtshinweis, Hauptseite-Wechsel`, String(r.s));
+    }
+    ok(mcAppFor("/wiki/x").k === "wiki" && mcAppFor("/abholungen").k === "konto" && mcAppFor("/wikiz") === null, "mcAppFor: Unterseiten gehören zu ihrer App");
+    const main = await req("/", { testHost: "nwebnotfound.dev" });
+    ok(main.t.includes('data-os-switch="mc"') && main.t.includes("/design/nwebos-mc.js"), "Hauptseite: Minecraft-Server-Icon wechselt zur Block Edition (Übergang)");
   }
   console.log("7c) Hub: Writing (Fixture-Build)");
   {
@@ -1050,8 +1064,8 @@ try {
     sql("DELETE FROM mc_player_ranks");
     sql(`UPDATE mc_player_stats SET stats = json_remove(stats, '$.skin_url') WHERE mc_uuid = '${U1}'`);
     const pg = await req("/vip"); const sec = pg.t.slice(pg.t.indexOf('id="vip"'));
-    { const comm = (pg.t.split('data-g="community"')[1] || "").split("</li>")[0], konto = pg.t.match(/data-l="([^"]*)"/)?.[1] || "";
-      ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && konto.includes("&quot;/vip&quot;") && !comm.includes('href="/vip"'), "GET /vip bindet Panel ein, Link im Konto-Menü", String(pg.s)); }
+    { const comm = (pg.t.split('data-g="community"')[1] || "").split("</li>")[0], icon = pg.t.includes('<a class="dicon" href="/vip">');
+      ok(pg.s === 200 && pg.t.includes("/mc/vip.js") && pg.t.includes("/mc/vip.css") && pg.t.includes("/mc/ranks.css") && icon && pg.t.includes('data-app="vip"') && !comm.includes('href="/vip"'), "GET /vip bindet Panel ein, im VIP-Panel-Fenster, Desktop-Icon", String(pg.s)); }
     ok(!/<script|<style| style=/.test(sec.slice(0, sec.indexOf("</section>"))), "/vip-Inhalt ohne Inline-Script/-Style");
     { const m = await req("/vip", { testHost: "nwebnotfound.dev" }); ok(!(m.s === 200 && m.t.includes('id="vip"')), "/vip nur auf mc-Domain", String(m.s)); }
     { const js = await req("/mc/vip.js"); ok(js.s === 200 && js.t.includes("E(p.title)") && js.t.includes("E(s.label)") && js.t.includes('href="/profile"') && js.t.includes("encodeURIComponent(rel)") && !js.t.includes("location.href") && !/style=|\.style\./.test(js.t), "vip.js escaped, Login-next relativ, keine Inline-Styles"); }
@@ -1422,7 +1436,7 @@ try {
     // #nwebos-apps: every main-site page is a window; HTTP status and caching stay honest.
     const osOn = (r) => r.t.includes('class="no-js nwebos"');
     const blog = await n("/blog"), post = await n("/blog/eine-navigation-fuer-zwei-seiten"), miss = await n("/blog/gibt-es-nicht"), prof = await n("/profile"), profIn = await n("/profile", { cookie: c1 }), chl = await n("/changelog"), mc = await req("/");
-    ok([blog, post, prof, chl].every((r) => r.s === 200 && osOn(r)) && blog.t.includes('id="app-blog"') && post.t.includes('id="app-blog-post"') && miss.s === 404 && osOn(miss) && miss.t.includes('id="app-notfound"') && !mc.t.includes("nwebos"), "NwebOS: Blog, Beitrag, Profil, Changelog als Fenster, unbekannter Beitrag = 404-Fenster, mc.* unverändert", `${blog.s} ${post.s} ${miss.s} ${prof.s} ${chl.s} ${mc.s}`);
+    ok([blog, post, prof, chl].every((r) => r.s === 200 && osOn(r)) && blog.t.includes('id="app-blog"') && post.t.includes('id="app-blog-post"') && miss.s === 404 && osOn(miss) && miss.t.includes('id="app-notfound"') && mc.t.includes('class="no-js nwebos edb mc"') && !mc.t.includes('id="app-blog"'), "NwebOS: Blog, Beitrag, Profil, Changelog als Fenster, unbekannter Beitrag = 404-Fenster, mc.* = Block Edition (eigene Apps)", `${blog.s} ${post.s} ${miss.s} ${prof.s} ${chl.s} ${mc.s}`);
     ok(/private/.test(prof.h.get("cache-control") || "") && prof.h.get("x-robots-tag") === "noindex" && !prof.t.includes("Weiterlesen") && profIn.t.includes("Nils"), "NwebOS: Profil privat (private, noindex), Gast ohne Daten");
     const other = await Promise.all(["/music", "/writing", "/trash", "/pixelwand", "/en/blog", "/de/blog"].map((p) => n(p)));
     const unk = await n("/sommerfest"), ws = await n("/writing/series/x"), w1 = await n("/writing/gibt-es-nicht"), feed = await n("/blog/feed.xml"), css = await n("/design/nwebos-apps.css");
@@ -1469,7 +1483,8 @@ try {
   py("Mein Profil v3 (Tabs, Einstellungen, Spiele, Abzeichen, Einstiege) im Browser fehlgeschlagen", "scripts/nwebos-profile-ui.py", BASE, c1);
   py("NwebOS-Stil-Wächter (Tippflächen, Browser-Look, alte Leiste, Überlauf) fehlgeschlagen", "scripts/nwebos-guard-ui.py", BASE, c1);
   py("Fünf-Wortprüfung (DE/EN, ungültige Wörter, Umlaute) im Browser fehlgeschlagen", "scripts/fuenf-ui.py", BASE);
-  py("Logo-Seitenwechsel „Wohin?“ fehlgeschlagen", "scripts/site-switch-ui.py", BASE);
+  py("Wechsel Block Edition ⇄ Hauptseite fehlgeschlagen", "scripts/site-switch-ui.py", BASE);
+  py("NwebOS Block Edition (Fenster, Shell-Look, kein Überlauf, ohne JS) im Browser fehlgeschlagen", "scripts/nwebos-mc-ui.py", BASE);
   py("3D-Viewer: Pause/Fortsetzen fehlgeschlagen", "scripts/player3d-ui.py", BASE);
   py("Turnstile-Challenge-Ablauf fehlgeschlagen", "scripts/turnstile-ui.py", BASE);
   py("UI-Prüfung fehlgeschlagen", "scripts/e2e_ui.py", BASE, c1);

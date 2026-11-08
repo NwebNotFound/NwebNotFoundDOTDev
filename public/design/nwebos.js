@@ -19,6 +19,7 @@
   if (askLogout) history.replaceState(history.state, "", location.pathname + location.search.replace(/[?&]logout=1/, "").replace(/^&/, "?") + location.hash);
   /* Edition patches (nwebos-mc mockup, Decisions 1-8): each acts only when its attribute is on the page. OSS = <html data-os-store="..."> */
   var OSS = document.documentElement.dataset.osStore || "", PFX = (OSS || "nwebos") + ".";
+  var OSNAV = document.documentElement.dataset.osNav === "page";   /* edition: links load pages, no fetched windows */
   try { var rmSet = localStorage.getItem(PFX + "rm"); if (rmSet === "1") RM = true; else if (rmSet === "0") RM = false; if (RM) document.documentElement.classList.add("rm"); } catch (e) {}
   var PHONE = function () { return matchMedia("(max-width:700px)").matches; };
   /* With data-os-store the boot/login "seen" flag lives in the shared nnf_os cookie on .nwebnotfound.dev (1 = seen), so it
@@ -262,7 +263,8 @@
       (src && src.dataset.edit ? '<button type="button" class="wb ed" data-editgo="' + esc(src.dataset.edit) + '" aria-label="' + (lang === "en" ? "Edit" : "Bearbeiten") + '">' + '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><use href="' + (L.sprite || "/design/nwebos-icons.svg") + '#i-pen"/></svg>' + '<span>' + (lang === "en" ? "Edit" : "Bearbeiten") + "</span></button>" : "") +
       '<button type="button" class="wb mn" aria-label="' + esc(L.minimize) + '">–</button><button type="button" class="wb mx" aria-label="' + esc(L.maximize) + '">' + ic2("max") + '</button><button type="button" class="wb x" aria-label="' + esc(L.close) + '"><span class="wbt">×</span>' + ic2("close") + '</button></header>' + (opt.menu === false ? '' : '<nav class="wm" aria-hidden="true">' + (L.menu || []).map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</nav>') + '<div class="wc"></div><span class="wr" aria-hidden="true"></span>';
     var wc = $(".wc", el);
-    if (src) [].slice.call(src.cloneNode(true).childNodes).forEach(function (n) { if (!(n.classList && n.classList.contains("nojs-h"))) wc.appendChild(n); });
+    if (src && src.hasAttribute("data-live")) { el.classList.add("live"); while (src.firstChild) wc.appendChild(src.firstChild); }   /* edition: moved, not cloned — the page scripts' handlers and ids stay */
+    else if (src) [].slice.call(src.cloneNode(true).childNodes).forEach(function (n) { if (!(n.classList && n.classList.contains("nojs-h"))) wc.appendChild(n); });
     else wc.innerHTML = opt.html || "";
     wins.appendChild(el);
     var btn = document.createElement("button"); btn.type = "button"; btn.className = "tbb"; btn.setAttribute("role", "tab");
@@ -317,7 +319,7 @@
   function close(k, fromHistory) {
     var o = open.get(k); if (!o) return; open.delete(k); o.btn.remove(); sound.close();
     if (MODS[k] && MODS[k].unmount) { try { MODS[k].unmount($(".wc", o.el)); } catch (e) {} }
-    var done = function () { o.el.remove(); };
+    var done = function () { var s0 = APPS[k]; if (s0 && s0.hasAttribute("data-live")) { var wc0 = $(".wc", o.el); while (wc0 && wc0.firstChild) s0.appendChild(wc0.firstChild); } o.el.remove(); };
     if (RM) done(); else { o.el.classList.add("closing"); after(o.el, done); }
     syncInert();   /* before focus moves: an inert icon list cannot take it */
     var t = topWindow(); if (t) { focus(t, false); open.get(t).el.focus({ preventScroll: true }); } else { $("#mtitle").textContent = "NwebOS"; var di = $(".dicon"); if (di) di.focus({ preventScroll: true }); }
@@ -434,7 +436,7 @@
     if (op && !op.classList.contains("dicon") && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); if (APPS[op.dataset.open]) openWin(op.dataset.open); else if (op.href || ROUTES[op.dataset.open]) openUrl(op.href || ROUTES[op.dataset.open]); return; }
     /* an internal link inside the desktop opens its window instead of reloading the page */
     var a = e.target.closest("#desk a[href]");
-    if (a && !a.classList.contains("dicon") && !a.hasAttribute("data-close") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href, a.hasAttribute("data-fresh") ? { fresh: true } : null); return; } }
+    if (a && !OSNAV && !a.classList.contains("dicon") && !a.hasAttribute("data-close") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href, a.hasAttribute("data-fresh") ? { fresh: true } : null); return; } }
     var cl = e.target.closest("[data-close]"); if (cl && cl.closest(".win")) { e.preventDefault(); var w0 = cl.closest(".win"); open.forEach(function (o, k) { if (o.el === w0) close(k); }); return; }
     var cw = e.target.closest("[data-closewin]"); if (cw) { var w = cw.closest(".win"); open.forEach(function (o, k) { if (o.el === w) close(k, true); }); return; }
     var egg = e.target.closest("[data-egg]"); if (egg) { closeStart(); if (eggs[egg.dataset.egg]) eggs[egg.dataset.egg](); }
@@ -444,13 +446,13 @@
     var useMe = me && (ask || store.get("user") !== "gast");
     if (!useMe) { eggs.logout(); return; }
     var en = lang === "en";
-    var s = sheet({ cls: "ask", label: en ? "Sign out?" : "Abmelden?", html: '<div class="hero"><img alt="" width="56" height="56" style="border-radius:50%;border:2px solid var(--edge)" src="' + escH(/^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV) + '"><h2>' + (en ? "Sign out?" : "Abmelden?") + "</h2><p>" + escH((en ? "You are signed in as " : "Du bist als ") + me.name + (en ? "." : " angemeldet.")) + '</p></div><div class="acts two"><button type="button" class="xpbtn" data-x>' + (en ? "Cancel" : "Abbrechen") + '</button><button type="button" class="xpbtn go" data-yes>' + (en ? "Sign out" : "Abmelden") + "</button></div>" });
+    var s = sheet({ cls: "ask", label: en ? "Sign out?" : "Abmelden?", html: '<div class="hero"><img alt="" width="56" height="56" style="border-radius:50%;border:2px solid var(--edge)" src="' + escH(avatarOf(me)) + '"><h2>' + (en ? "Sign out?" : "Abmelden?") + "</h2><p>" + escH((en ? "You are signed in as " : "Du bist als ") + me.name + (en ? "." : " angemeldet.")) + '</p></div><div class="acts two"><button type="button" class="xpbtn" data-x>' + (en ? "Cancel" : "Abbrechen") + '</button><button type="button" class="xpbtn go" data-yes>' + (en ? "Sign out" : "Abmelden") + "</button></div>" });
     $("[data-yes]", s).addEventListener("click", function () { closeSheet(); eggs.logout(); });
   }
   /* A2: the phone has no tray or start menu: the avatar pill opens the quick sheet (account, day/night, sound, language) */
   function quickSheet() {
     var en = lang === "en", useMe = me && store.get("user") !== "gast", n = night(), path = bare(location.pathname);
-    var av = useMe && /^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV;
+    var av = useMe ? avatarOf(me) : GUEST_AV;
     /* phone audit row 56 / profile v3: the whole account card is the link — "Mein Profil ›" or "Anmelden ›" */
     var acct = useMe ? '<a class="acct" href="' + (en ? "/en" : "") + '/profile" data-qopen><img alt="" src="' + escH(av) + '"><span><b>' + (en ? "My profile" : "Mein Profil") + "</b><small>" + escH(me.name) + " · " + (en ? "games, badges, settings" : "Spiele, Abzeichen, Einstellungen") + "</small></span><em>›</em></a>"
       : '<a class="acct" href="' + escH(L.login + encodeURIComponent(location.origin + (en ? "/en" : "") + "/profile")) + '"><img alt="" src="' + escH(GUEST_AV) + '"><span><b>' + (en ? "Sign in" : "Anmelden") + "</b><small>" + (en ? "with Discord · for profile and guestbook" : "mit Discord · für Profil und Gästebuch") + "</small></span><em>›</em></a>";
@@ -522,10 +524,17 @@
 
   /* ---------- account (rule 10: the Discord avatar on the main site) ---------- */
   var GUEST_AV = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges"><rect width="16" height="16" fill="#ffd23f"/><rect x="3" y="5" width="10" height="7" fill="#fff6dc"/><rect x="5" y="7" width="2" height="2" fill="#1b2238"/><rect x="9" y="7" width="2" height="2" fill="#1b2238"/></svg>');
+  /* edition: <html data-os-avatar="mc"> (Block Edition) shows the linked Minecraft head, Steve without a link, never the
+     Discord picture (as the old mc nav); elsewhere the Discord avatar (https only) or the guest face */
+  var MCAV = document.documentElement.dataset.osAvatar === "mc";
+  function avatarOf(u) {
+    if (MCAV) return "/mc-head/" + (u && u.mc_name && /^[A-Za-z0-9_]{1,16}$/.test(u.mc_name) ? u.mc_name : "MHF_Steve") + "/64?v=5";
+    return u && /^https:\/\//.test(u.avatar || "") ? u.avatar : GUEST_AV;
+  }
   function setUser() {
     var useMe = me && store.get("user") !== "gast";
     $("#smname").textContent = useMe ? me.name : L.guest;
-    var av = $("#smav"); av.src = useMe && /^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV;
+    var av = $("#smav"); av.src = useMe ? avatarOf(me) : GUEST_AV;
     if (OSS && !useMe) { var gt = $('[data-user="gast"]'), gb = gt && $("b", gt), gi = gt && $("img", gt); if (gb) $("#smname").textContent = gb.textContent; if (gi) av.src = gi.src; }   /* edition: guest name and avatar come from the login markup */
     var qa = $("[data-qav]"); if (qa) qa.src = av.src;
     /* profile v3 entry points: the first home icon and the start-menu tile say "Mein Profil" or "Anmelden" */
@@ -542,7 +551,7 @@
     me = d && d.user ? d.user : null; window.__me = d;
     if (me && me.prefs) applyPrefs(me.prefs, false);   /* profile v3: settings follow the account */
     var li = $("[data-login-me]"), dl = $("[data-login-discord]");
-    if (me) { li.hidden = false; dl.hidden = true; $("[data-me-name]").textContent = me.name; if (/^https:\/\//.test(me.avatar || "")) $("[data-me-av]").src = me.avatar; }
+    if (me) { li.hidden = false; dl.hidden = true; $("[data-me-name]").textContent = me.name; var ma = avatarOf(me); if (ma !== GUEST_AV) $("[data-me-av]").src = ma; }
     else if (d && !d.available) dl.hidden = true;
     setUser();
     if (askLogout && me) logoutSheet(true);   /* phone audit A8 */
@@ -614,7 +623,7 @@
   var firstVisit = !store.get("booted");
   // restore the saved windows quietly (no sound, no animation), the deep-linked app goes on top
   var restoring = [];
-  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { if (w.k === "blog-edit" || w.k === "admin") return; if (deep && w.k === deep && w.p !== APPS[deep].dataset.path) return;   /* same app as the deep link (another post): the deep link wins */ var o = { quiet: true, noPush: true, restore: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
+  (OSNAV ? [] : saved()).sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { if (w.k === "blog-edit" || w.k === "admin") return; if (deep && w.k === deep && w.p !== APPS[deep].dataset.path) return;   /* same app as the deep link (another post): the deep link wins */ var o = { quiet: true, noPush: true, restore: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
   if (deep) openWin(deep, { noPush: true, quiet: open.has(deep) });
   /* windows restored from their address arrive later: the deep-linked window stays on top */
   if (deep && restoring.length) Promise.all(restoring).then(function () { if (open.has(deep)) { focus(deep, false); open.get(deep).el.focus({ preventScroll: true }); } });
