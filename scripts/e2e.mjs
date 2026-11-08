@@ -178,6 +178,12 @@ try {
     ok(re.s === 200 && r(hr - 26 * H) === before && r(hr) === 12 && r(hr - 30 * H) === 7, "Markt-Historie: abgeschlossene Stunde nicht neu geschrieben, aktuelle aktualisiert, fehlende eingefügt", `${before} ${r(hr - 26 * H)} ${r(hr)} ${r(hr - 30 * H)}`);
     sql(`DELETE FROM mc_market_history WHERE item='diamond' AND hour_ts IN (${hr}, ${hr - 30 * H})`);   // keep the fixture as before for the checks below
   }
+  { // D1 write budget: the same push again rewrites nothing (snapshot, links, player stats, market keep their updated_at)
+    const stamp = () => JSON.stringify([sqlRows("SELECT updated_at FROM mc_snapshot"), sqlRows("SELECT discord_id, updated_at FROM mc_links ORDER BY discord_id"), sqlRows("SELECT mc_uuid, updated_at FROM mc_player_stats ORDER BY mc_uuid"), sqlRows("SELECT item, updated_at FROM mc_market ORDER BY item")]);
+    const s0 = stamp(); await new Promise((r) => setTimeout(r, 20));
+    const again = await req("/api/mc-ingest", { method: "POST", body: payload, token: TOK });
+    ok(again.s === 200 && stamp() === s0, "Gleicher Push noch einmal: nichts neu geschrieben (updated_at unverändert)", again.s);
+  }
 
   console.log("2) Markt");
   const m = (await req("/api/mc-market")).j, by = Object.fromEntries(m.items.map((x) => [x.item, x]));

@@ -28,7 +28,7 @@ export function cleanPvp(a) {
 }
 export function pvpStatements(env, rows, now) {
   const st = rows.map((r) => env.DB.prepare(
-    "INSERT INTO mc_pvp_stats (uuid, name, wins, losses, draws, matches, winrate_pct, favorite_kit, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET name=excluded.name, wins=excluded.wins, losses=excluded.losses, draws=excluded.draws, matches=excluded.matches, winrate_pct=excluded.winrate_pct, favorite_kit=excluded.favorite_kit, updated_at=excluded.updated_at"
+    "INSERT INTO mc_pvp_stats (uuid, name, wins, losses, draws, matches, winrate_pct, favorite_kit, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET name=excluded.name, wins=excluded.wins, losses=excluded.losses, draws=excluded.draws, matches=excluded.matches, winrate_pct=excluded.winrate_pct, favorite_kit=excluded.favorite_kit, updated_at=excluded.updated_at WHERE name IS NOT excluded.name OR wins IS NOT excluded.wins OR losses IS NOT excluded.losses OR draws IS NOT excluded.draws OR matches IS NOT excluded.matches OR winrate_pct IS NOT excluded.winrate_pct OR favorite_kit IS NOT excluded.favorite_kit"
   ).bind(r.uuid, r.name, r.wins, r.losses, r.draws, r.matches, r.winrate_pct, r.favorite_kit, now));
   st.push(env.DB.prepare("DELETE FROM mc_pvp_stats WHERE uuid NOT IN (SELECT value FROM json_each(?))").bind(JSON.stringify(rows.map((r) => r.uuid))));
   return st;

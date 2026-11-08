@@ -32,7 +32,7 @@ export function cleanEconomy(a) {
   return { rows };
 }
 export const economyStatements = (env, rows, now) => rows.map((r) => env.DB.prepare(
-  "INSERT INTO mc_economy_daily (day, money_supply_cp, minted_cp, burned_cp, net_cp, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(day) DO UPDATE SET money_supply_cp=excluded.money_supply_cp, minted_cp=excluded.minted_cp, burned_cp=excluded.burned_cp, net_cp=excluded.net_cp, updated_at=excluded.updated_at"
+  "INSERT INTO mc_economy_daily (day, money_supply_cp, minted_cp, burned_cp, net_cp, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(day) DO UPDATE SET money_supply_cp=excluded.money_supply_cp, minted_cp=excluded.minted_cp, burned_cp=excluded.burned_cp, net_cp=excluded.net_cp, updated_at=excluded.updated_at WHERE money_supply_cp IS NOT excluded.money_supply_cp OR minted_cp IS NOT excluded.minted_cp OR burned_cp IS NOT excluded.burned_cp OR net_cp IS NOT excluded.net_cp"
 ).bind(r.day, r.money_supply_cp, r.minted_cp, r.burned_cp, r.net_cp, now));
 export async function economyApi(env) {
   const { results } = await env.DB.prepare("SELECT day, money_supply_cp, minted_cp, burned_cp, net_cp, updated_at FROM mc_economy_daily ORDER BY day DESC LIMIT ?").bind(ECON_MAX).all().catch(() => ({ results: [] }));
