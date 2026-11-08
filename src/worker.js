@@ -907,9 +907,13 @@ function marketStatements(env, market, hist) {
     st.push(env.DB.prepare("DELETE FROM mc_market WHERE item NOT IN (SELECT value FROM json_each(?))").bind(JSON.stringify(market.map((m) => m.item))));
   }
   if (hist && hist.length) {
+    /* D1 free tier: 100k written rows a day. A history resync re-sends every hour of the last 90 days; hours that are
+       over (older than 2 h) are only inserted when missing, never rewritten — slightly different averages from a
+       recomputation upstream no longer cost a write per row (08.11.: 87k of 100k rows went here) */
+    const closed = Math.floor(Date.now() / 1000) - 7200;
     for (let i = 0; i < hist.length; i += HIST_CHUNK) st.push(env.DB.prepare(`INSERT INTO mc_market_history (item, hour_ts, avg_price, min_price, max_price, volume_qty)
       SELECT json_extract(value,'$.item'), json_extract(value,'$.hour_ts'), json_extract(value,'$.avg_price'), json_extract(value,'$.min_price'), json_extract(value,'$.max_price'), json_extract(value,'$.volume_qty') FROM json_each(?) WHERE 1
-      ON CONFLICT(item, hour_ts) DO UPDATE SET avg_price=excluded.avg_price, min_price=excluded.min_price, max_price=excluded.max_price, volume_qty=excluded.volume_qty WHERE avg_price IS NOT excluded.avg_price OR min_price IS NOT excluded.min_price OR max_price IS NOT excluded.max_price OR volume_qty IS NOT excluded.volume_qty`).bind(JSON.stringify(hist.slice(i, i + HIST_CHUNK))));
+      ON CONFLICT(item, hour_ts) DO UPDATE SET avg_price=excluded.avg_price, min_price=excluded.min_price, max_price=excluded.max_price, volume_qty=excluded.volume_qty WHERE excluded.hour_ts >= ?2 AND (avg_price IS NOT excluded.avg_price OR min_price IS NOT excluded.min_price OR max_price IS NOT excluded.max_price OR volume_qty IS NOT excluded.volume_qty)`).bind(JSON.stringify(hist.slice(i, i + HIST_CHUNK)), closed));
     st.push(env.DB.prepare("DELETE FROM mc_market_history WHERE hour_ts < ?").bind(Math.floor(Date.now() / 1000) - HIST_DAYS * 86400));
   }
   return st;

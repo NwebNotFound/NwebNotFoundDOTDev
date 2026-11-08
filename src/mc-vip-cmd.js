@@ -78,7 +78,7 @@ async function blob(env, kind) {
   try { const list = JSON.parse(r.data); return { list: Array.isArray(list) ? list : [], updated_at: r.updated_at }; } catch { return { list: [], updated_at: r.updated_at }; }
 }
 async function writeBlob(env, kind, list, now) {
-  await env.DB.prepare("INSERT INTO mc_blobs (kind, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(kind) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(kind, JSON.stringify(list), now).run();
+  await env.DB.prepare("INSERT INTO mc_blobs (kind, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(kind) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at WHERE data IS NOT excluded.data OR updated_at < excluded.updated_at - 240000").bind(kind, JSON.stringify(list), now).run();
 }
 
 function num(v) { return v == null || v === "" || typeof v === "boolean" || !Number.isFinite(+v) ? null : +v; }

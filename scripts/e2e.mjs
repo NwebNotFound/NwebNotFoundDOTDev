@@ -171,6 +171,13 @@ try {
   ok(ing.j?.auctions === 5 && ing.j?.shops === 2 && ing.j?.market === 8, "Zählung auctions/shops/market", JSON.stringify(ing.j));
   ok(ing.j?.views?.leaderboards >= 3 && ing.j?.players_stats === 2, "Views: Leaderboards + Player-Stats erkannt", JSON.stringify(ing.j));
   ok(ing.j?.market_history === 5, "v_market_history: 5 Punkte", JSON.stringify(ing.j));
+  { // D1 write budget (08.11.): a resync with recomputed averages rewrites no closed hour (> 2 h old); the current hour still updates
+    const before = sqlRows(`SELECT avg_price FROM mc_market_history WHERE item='diamond' AND hour_ts=${hr - 26 * H}`)[0]?.avg_price;
+    const re = await req("/api/mc-ingest", { method: "POST", body: { v_market_history: [{ item: "diamond", ts: hr - 26 * H, price: 99, volume: 4 }, { item: "diamond", ts: hr, price: 12, volume: 1 }, { item: "diamond", ts: hr - 30 * H, price: 7, volume: 1 }] }, token: TOK });
+    const r = (h) => sqlRows(`SELECT avg_price FROM mc_market_history WHERE item='diamond' AND hour_ts=${h}`)[0]?.avg_price;
+    ok(re.s === 200 && r(hr - 26 * H) === before && r(hr) === 12 && r(hr - 30 * H) === 7, "Markt-Historie: abgeschlossene Stunde nicht neu geschrieben, aktuelle aktualisiert, fehlende eingefügt", `${before} ${r(hr - 26 * H)} ${r(hr)} ${r(hr - 30 * H)}`);
+    sql(`DELETE FROM mc_market_history WHERE item='diamond' AND hour_ts IN (${hr}, ${hr - 30 * H})`);   // keep the fixture as before for the checks below
+  }
 
   console.log("2) Markt");
   const m = (await req("/api/mc-market")).j, by = Object.fromEntries(m.items.map((x) => [x.item, x]));
