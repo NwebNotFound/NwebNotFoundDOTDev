@@ -1,0 +1,276 @@
+/* NwebOS phone sweep (mockups/nwebos/phone-audit, notes.md; Designer's audit.css): what #120 (phone polish) did not cover.
+   Markup for A1/A2/A3/A4/A7/A9 lives in src/nwebos.js and public/design/nwebos.js (no runtime patch layer).
+   Loads after nwebos-polish.css and uses only its tokens (--ink --edge --pn --pn2 --line --txt --mut2 --c-*) plus --f/--px.
+   Every block carries its audit number (A1 … A14). */
+:root{--hl:rgba(255,210,63,.55);--on-t:#e8e1ff;--sheet-bd:rgba(14,18,38,.42);--ease:cubic-bezier(.2,.8,.2,1)}
+[data-theme=summer-night]{--hl:rgba(255,210,63,.35);--on-t:#2a3260;--sheet-bd:rgba(3,5,14,.6)}
+
+/* ---------- A1 home search: a themed field, never the native iOS pill ---------- */
+@media (max-width:700px){
+ .hsearch{display:flex;align-items:center;gap:8px;margin:14px 12px 0;position:relative;z-index:6}
+ .hsearch .fld{position:relative;flex:1;min-width:0}
+ .hsearch input{-webkit-appearance:none;appearance:none;width:100%;height:48px;margin:0;padding:0 44px 0 46px;border:2px solid var(--edge);border-radius:14px;background:var(--pn);color:var(--txt);
+  font:600 16px var(--f);box-shadow:var(--c-sh);outline:0;transition:border-color .15s,box-shadow .15s,transform .15s}
+ .hsearch input::placeholder{color:var(--mut2);opacity:1}
+ .hsearch input::-webkit-search-cancel-button,.hsearch input::-webkit-search-decoration{-webkit-appearance:none;display:none}
+ .hsearch .fld::before{content:"";position:absolute;left:14px;top:14px;width:20px;height:20px;background:var(--mut2);-webkit-mask:var(--srch) center/contain no-repeat;mask:var(--srch) center/contain no-repeat;pointer-events:none;z-index:1;transition:background .15s}
+ .hsearch:focus-within .fld::before,.hsearch.focus .fld::before{background:var(--c-on)}
+ .hsearch input:focus,.hsearch.focus input{border-color:var(--c-on);box-shadow:0 0 0 4px rgba(122,95,214,.28),0 3px 0 var(--ink);transform:translateY(-1px)}
+ [data-theme=summer-night] .hsearch input:focus,[data-theme=summer-night] .hsearch.focus input{box-shadow:0 0 0 4px rgba(160,140,255,.35),0 3px 0 #05070f}
+ .hsearch .clr{position:absolute;right:6px;top:6px;display:none;place-items:center;width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:var(--mut2);cursor:pointer}
+ .hsearch .clr i{display:block;width:20px;height:20px;border-radius:50%;background:var(--line);position:relative}
+ .hsearch .clr i::before,.hsearch .clr i::after{content:"";position:absolute;left:5px;top:9px;width:10px;height:2px;background:var(--txt);transform:rotate(45deg)}.hsearch .clr i::after{transform:rotate(-45deg)}
+ .hsearch.has .clr{display:grid}
+ /* "Abbrechen" slides in while the field has focus (iOS pattern): one tap closes keyboard and results */
+ .hsearch .cnl{flex:none;width:0;overflow:hidden;padding:0;border:0;background:none;color:#fff;font:700 15px var(--f);white-space:nowrap;opacity:0;transition:width .2s var(--ease),opacity .2s;text-shadow:0 1px 0 #1b2238;cursor:pointer;min-height:44px}
+ .hsearch.focus .cnl{width:86px;opacity:1}
+ /* the home screen steps back while searching */
+ .dicons{transition:opacity .2s,filter .2s}
+ #desk.searching .dicons{opacity:.18;filter:saturate(.6)}
+ #desk.searching::after{content:"";position:absolute;inset:0;z-index:5;background:linear-gradient(rgba(14,18,38,.18),transparent 60%);pointer-events:none}
+
+ /* results panel: family card, 56px rows (fix 15 of #120) + header, icon tile, highlight, kind chip, empty state */
+ .hsearch .results{position:absolute;left:0;right:0;top:56px;z-index:7;margin:0;padding:0;max-height:min(62vh,452px);overflow:auto;-webkit-overflow-scrolling:touch;
+  border:2px solid var(--edge);border-radius:14px;background:var(--pn);box-shadow:var(--c-sh),0 18px 40px rgba(14,18,38,.22);animation:rin .22s var(--ease)}
+ @keyframes rin{from{opacity:0;transform:translateY(-6px) scale(.98)}}
+ .results .rh{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;font:700 11px var(--px);letter-spacing:.04em;color:var(--mut2);text-transform:uppercase}
+ .results .rh kbd{font:700 10px var(--f);color:var(--mut2);border:1.5px solid var(--line);border-radius:5px;padding:1px 5px}
+ .results li+li:not(.rh) button,.results .rh+li button{border-top:1px dashed var(--line)}
+ .results .rh+li button{border-top:0}
+ .results button{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:8px 14px;border:0;background:none;color:var(--txt);text-align:left;font:inherit;cursor:pointer;position:relative}
+ .results button .tile{display:grid;place-items:center;flex:none;width:36px;height:36px;border:2px solid var(--line);border-radius:10px;background:var(--pn2)}
+ .results button .tile svg,.results button .tile img{width:22px;height:22px;image-rendering:pixelated}
+ [data-theme=summer-night] .results button .tile{background:#e9e7f3;border-color:#05070f}
+ .results b{display:block;font:700 15px/1.25 var(--f);color:var(--txt)}
+ .results small{display:block;margin-top:2px;font-size:12px;color:var(--mut2)}
+ .results mark{padding:0;background:linear-gradient(transparent 55%,var(--hl) 0);color:inherit;border-radius:2px}
+ .results button.on small{color:var(--mut2)}
+ .results .kind{margin-left:auto;flex:none;padding:2px 8px;border:2px solid var(--line);border-radius:9px;font:700 10px var(--px);color:var(--mut2)}
+ .results .go{flex:none;width:8px;height:12px;margin-left:6px;background:var(--mut2);-webkit-mask:linear-gradient(#000 0 0) 0 0/2px 2px,linear-gradient(#000 0 0) 2px 2px/2px 2px,linear-gradient(#000 0 0) 4px 4px/2px 4px,linear-gradient(#000 0 0) 2px 8px/2px 2px,linear-gradient(#000 0 0) 0 10px/2px 2px;-webkit-mask-repeat:no-repeat;opacity:.8}
+ .results button.on,.results button:active{background:var(--on-t)}
+ .results button.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:4px;border-radius:0 4px 4px 0;background:var(--c-on)}
+ [data-theme=summer-night] .results button.on b{color:#fff}
+ /* suggestions when the field is focused but empty */
+ .results .sugg{padding:4px 12px 14px;display:flex;flex-wrap:wrap;gap:8px}
+ .results .sugg .chip{width:auto;flex:none;border-top:2px solid var(--edge)!important;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px 0 8px;border:2px solid var(--edge);border-radius:18px;background:var(--pn);color:var(--txt);font:700 13px var(--f);box-shadow:0 2px 0 var(--ink);cursor:pointer}
+ .results .chip svg{width:18px;height:18px}
+ [data-theme=summer-night] .results .chip svg{background:#e9e7f3;border-radius:4px}
+ /* empty state */
+ .results .none{display:grid;justify-items:center;gap:6px;padding:22px 16px 8px;text-align:center;color:var(--txt);font-size:15px}
+ .results .none svg{width:44px;height:44px;margin-bottom:4px}
+ [data-theme=summer-night] .results .none svg{background:#e9e7f3;border-radius:8px;box-shadow:0 0 0 2px #05070f}
+ .results .none b{font:700 15px var(--f)}.results .none small{font-size:13px}
+}
+
+/* ---------- A2 bottom bar: avatar opens the quick sheet (tray + start menu were display:none on phones) ---------- */
+@media (max-width:700px){
+ .mbar #mtitle{flex:1}
+ .mbar .mme,.mbar button.mme{display:flex;width:auto;box-shadow:none;align-items:center;gap:8px;margin-left:auto;height:40px;padding:0 6px 0 4px;border:2px solid rgba(255,255,255,.5);border-radius:20px;background:rgba(255,255,255,.14);color:#fff;font:700 13px var(--f);cursor:pointer}
+ .mbar .mme img{width:30px;height:30px;border-radius:50%;border:2px solid #fff;background:#ffd23f}
+ .mbar .mme .mi{display:block;width:14px;height:14px;border-radius:50%;background:#ffd23f;box-shadow:inset -4px -3px 0 #f0a020}
+ [data-theme=summer-night] .mbar .mme .mi{background:transparent;box-shadow:inset 5px -3px 0 #ffe7a0}
+ .mbar #mclock,.mbar time{display:none}
+ .mbar .mme time{display:block}
+}
+/* ---------- A3 sheets: quick sheet, dialogs, confirms (phone) — one component ---------- */
+.shbd{position:fixed;inset:0;z-index:90;background:var(--sheet-bd);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);animation:bdin .2s ease}
+@keyframes bdin{from{opacity:0}}
+.shx{position:fixed;left:0;right:0;bottom:0;z-index:91;max-height:88vh;overflow:auto;padding:8px 16px calc(18px + env(safe-area-inset-bottom));border:2px solid var(--edge);border-bottom:0;border-radius:22px 22px 0 0;background:var(--pn);color:var(--txt);
+ box-shadow:0 -3px 0 var(--ink),0 -20px 50px rgba(14,18,38,.25);animation:shin .32s var(--ease);font-family:var(--f)}
+@keyframes shin{from{transform:translateY(100%)}}
+.shx .grab{display:block;width:44px;height:5px;margin:2px auto 12px;border-radius:3px;background:var(--line)}
+.shx h2{margin:0 0 4px;font:700 19px var(--f)}.shx p{margin:0 0 14px;font-size:15px;line-height:1.45;color:var(--mut2)}
+.shx .hero{display:grid;justify-items:center;text-align:center;gap:8px;padding:6px 0 4px}.shx .hero svg{width:56px;height:56px}
+[data-theme=summer-night] .shx .hero svg{background:#e9e7f3;border-radius:10px;box-shadow:0 0 0 2px #05070f;padding:4px}
+.shx .acts{display:grid;gap:10px;margin-top:6px}.shx .acts.two{grid-template-columns:1fr 1fr}
+.shx .xpbtn{width:100%;min-height:48px;font-size:15px}
+/* quick sheet content */
+.qs .acct{display:flex;align-items:center;gap:12px;padding:12px;border:2px solid var(--line);border-radius:16px;background:var(--pn2)}
+.qs .acct img{width:48px;height:48px;border-radius:50%;border:2px solid var(--edge);background:#ffd23f}
+.qs .acct b{display:block;font:700 16px var(--f)}.qs .acct small{font-size:12px;color:var(--mut2)}
+.qs .acct .xpbtn{width:auto;margin-left:auto;min-height:40px;padding:0 12px;font-size:13px}
+.qs .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.qs .tile2{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:10px;min-height:84px;padding:12px;border:2px solid var(--edge);border-radius:16px;background:var(--pn);color:var(--txt);font:700 14px var(--f);box-shadow:var(--c-sh);text-align:left;cursor:pointer}
+.qs .tile2 small{display:block;font:600 12px var(--f);color:var(--mut2)}
+.qs .tile2[aria-pressed=true]{background:var(--c-on);border-color:var(--ink);color:#fff}.qs .tile2[aria-pressed=true] small{color:#e8e1ff}
+.qs .tile2 .ti{width:26px;height:26px}
+.qs .seg3{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr 1fr;align-items:center;gap:8px;padding:8px 8px 8px 14px;border:2px solid var(--edge);border-radius:16px;background:var(--pn);box-shadow:var(--c-sh);font:700 14px var(--f)}
+.qs .seg3 a{display:grid;place-items:center;min-height:40px;border:2px solid var(--line);border-radius:12px;color:var(--txt);text-decoration:none;font:700 14px var(--f)}
+.qs .seg3 a[aria-current]{background:var(--ink);border-color:var(--ink);color:#fff}
+[data-theme=summer-night] .qs .seg3 a[aria-current]{background:var(--c-on);border-color:var(--c-on)}
+.qs .rows{margin:0 0 12px;padding:0;list-style:none;border:2px solid var(--line);border-radius:16px;overflow:hidden}
+.qs .rows a,.qs .rows button{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:0 14px;border:0;background:var(--pn);color:var(--txt);font:600 15px var(--f);text-decoration:none;text-align:left;cursor:pointer}
+.qs .rows li+li a,.qs .rows li+li button{border-top:1px dashed var(--line)}
+.qs .rows svg{width:22px;height:22px}.qs .rows em{margin-left:auto;font-style:normal;color:var(--mut2)}
+[data-theme=summer-night] .qs .rows svg{background:#e9e7f3;border-radius:5px}
+.qs .bot{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qs .bot .xpbtn.ghost{background:transparent;box-shadow:none;border-color:var(--line);color:var(--txt)}
+.qs .bot .xpbtn.dz{background:transparent;color:var(--c-red);border-color:var(--c-red);box-shadow:none}
+[data-theme=summer-night] .qs .bot .xpbtn.dz{color:#ff8a76;border-color:#ff8a76}
+
+/* ---------- A4 toast: top, under the safe area; info / ok / error ---------- */
+.toast{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:95;display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 8px 8px 12px;border:2px solid var(--edge);border-radius:16px;background:var(--pn);color:var(--txt);
+ box-shadow:var(--c-sh),0 12px 30px rgba(14,18,38,.2);font:700 14px/1.3 var(--f);animation:tin .35s var(--ease)}
+@keyframes tin{from{opacity:0;transform:translateY(-120%)}}
+.toast .dot{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--c-on);color:#fff;font:700 15px var(--px)}
+.toast.ok .dot{background:var(--c-go)}.toast.err .dot{background:var(--c-red)}
+.toast span{flex:1}.toast span small{display:block;font:600 12px var(--f);color:var(--mut2)}
+.toast .xpbtn{min-height:36px;padding:0 12px;font-size:13px}
+@media (min-width:701px){.toast{left:auto;right:16px;top:16px;width:360px}}
+
+/* ---------- A5 night desktop icons: a 2px light pixel outline so dark icons (Pixelminen) stay visible ---------- */
+[data-theme=summer-night] .dicon svg,[data-theme=summer-night] .wt>svg{filter:drop-shadow(2px 0 0 #e9e7f3) drop-shadow(-2px 0 0 #e9e7f3) drop-shadow(0 2px 0 #e9e7f3) drop-shadow(0 -2px 0 #e9e7f3)}
+
+/* ---------- A6 games in the family: Pixelminen + Fünf (phone sizes, night palette, no XP bevels) ---------- */
+#wins .g-mines,#wins .pm{background:var(--pn)}
+#wins .mnbar{max-width:340px;padding:8px;border:2px solid var(--edge);border-radius:14px;background:var(--pn2);box-shadow:var(--c-sh)}
+#wins .lcd7{padding:4px 8px;border-radius:6px;background:#1b2238;color:#ff6a55}
+#wins .face,#wins .flagm{width:44px;height:44px;border:2px solid var(--edge);border-radius:12px;background-color:var(--c-bg);box-shadow:var(--c-sh)}
+#wins .face:active,#wins .flagm:active{transform:translateY(3px);box-shadow:none;border-style:solid}
+#wins .flagm[aria-pressed=true]{border-style:solid;background:#ffd23f;color:#c4401a}
+#wins .mngrid{gap:3px;padding:6px;border:2px solid var(--edge);border-radius:12px;background:var(--pn2)}
+#wins .mngrid .c{border:2px solid var(--edge);border-radius:6px;background-color:#c9d3f0;box-shadow:inset 0 -3px 0 rgba(27,34,56,.18)}
+#wins .mngrid .c.o{border:1.5px solid var(--line);background-color:var(--pn);box-shadow:none}
+#wins .mngrid .c.f{background-color:#c9d3f0}
+#wins .mnhelp,#wins .mnstat{font-size:13px;color:var(--mut2);max-width:320px}
+[data-theme=summer-night] #wins .mngrid .c{background-color:#3a4478;border-color:#05070f}[data-theme=summer-night] #wins .mngrid .c.o{background-color:var(--pn);border-color:var(--line);color:#e9e7f3}
+[data-theme=summer-night] #wins .mngrid .c.o[data-n="1"]{color:#8fb4ff}[data-theme=summer-night] #wins .mngrid .c.o[data-n="2"]{color:#7fdc6a}[data-theme=summer-night] #wins .mngrid .c.o[data-n="4"]{color:#c3b4ff}
+#wins .g-five,#wins .fv{background:var(--pn);color:var(--txt)}
+#wins .fvmsg{font-size:13px}#wins .fvmsg:not(.err){color:var(--mut2)}
+#wins .seg2{border:2px solid var(--edge);border-radius:10px;box-shadow:0 2px 0 var(--ink)}#wins .seg2 button{min-width:40px;min-height:36px;padding:0 10px;font:700 13px var(--f);background:var(--pn);color:var(--txt)}#wins .seg2 button.on{background:var(--ink);color:#fff}
+#wins .fvnew{min-height:36px;padding:0 12px;border:2px solid var(--edge);border-radius:10px;background:var(--c-bg);color:var(--c-fg);font:700 13px var(--f);box-shadow:var(--c-sh)}
+#wins .ft{border:2px solid var(--line);border-radius:8px;background:var(--pn2);color:var(--txt)}#wins .ft.in{border-color:var(--edge);animation:pop .12s}
+@keyframes pop{50%{transform:scale(1.06)}}
+#wins .kb button{border:2px solid var(--edge);border-radius:8px;background:var(--c-bg);color:var(--c-fg);box-shadow:0 2px 0 var(--ink);font:700 15px var(--f)}
+#wins .kb button:active{transform:translateY(2px);box-shadow:none}
+#wins .ft.t,#wins .kb .t{background:#2bb3a3;border-color:var(--ink);color:#fff}#wins .ft.o,#wins .kb .o{background:#f2a33a;border-color:var(--ink);color:#fff}#wins .ft.s,#wins .kb .s{background:#8e94a3;border-color:var(--ink);color:#fff}
+[data-theme=summer-night] #wins .ft.t,[data-theme=summer-night] #wins .kb .t{background:#239b8d}[data-theme=summer-night] #wins .ft.s,[data-theme=summer-night] #wins .kb .s{background:#4a5170;color:#cfd3e6}
+#wins .fvhelp{font-size:12px;color:var(--mut2)}
+@media (min-width:701px){#wins .seg2 button,#wins .fvnew{min-height:0}}   /* desktop Fünf keeps its frame (the 36px chips are the phone size) */
+[data-theme=summer-night] #wins .seg2 button.on{background:var(--c-on);color:#fff}
+@media (max-width:700px){
+#wins .mngrid{grid-template-columns:repeat(9,minmax(0,34px))}#wins .mngrid .c{width:auto;aspect-ratio:1;height:auto}
+#wins .fr{grid-template-columns:repeat(5,56px);gap:6px}#wins .fvgrid{gap:6px}#wins .ft{height:56px;font-size:24px}
+#wins .kb button{height:48px}   /* key widths: the flexible rows from #124 (nwebos-games.css) */
+}
+/* ---------- A7 Gästebuch signed in: textarea, Turnstile, status chip ---------- */
+@media (max-width:700px){
+ .gb-form form{display:grid;gap:10px}
+ .gb-form textarea{-webkit-appearance:none;appearance:none;width:100%;min-height:96px;padding:12px;border:2px solid var(--edge);border-radius:12px;background:var(--pn);color:var(--txt);font:500 16px/1.4 var(--f);resize:none;box-shadow:inset 0 2px 0 rgba(27,34,56,.06);outline:0}
+ .gb-form textarea:focus{border-color:var(--c-on);box-shadow:0 0 0 4px rgba(122,95,214,.25)}
+ .gb-form .cnt{justify-self:end;margin-top:-6px;font:700 11px var(--px);color:var(--mut2)}
+ .gb-form .cf-turnstile{justify-self:center;min-height:65px}
+ .gb-form .row{display:flex;align-items:center;gap:10px}.gb-form .row .xpbtn{margin-left:auto;min-height:48px;padding:0 20px;font-size:15px}
+ .gb-st{display:inline-flex;align-items:center;gap:6px;font:700 13px var(--f);color:var(--mut2)}
+ .gb-st:empty{display:none}
+ .gb-st.err{padding:6px 10px;border:2px solid var(--c-red);border-radius:10px;background:rgba(217,69,47,.08);color:var(--c-red)}
+ .gb-st.ok{padding:6px 10px;border:2px solid var(--c-go);border-radius:10px;background:rgba(58,154,51,.1);color:#2a7a25}
+ [data-theme=summer-night] .gb-st.err{color:#ff8a76;border-color:#ff8a76}[data-theme=summer-night] .gb-st.ok{color:#8fe36a;border-color:#8fe36a}
+ .msg.new>div{animation:pop .3s;border-color:var(--c-go)}
+ [data-theme=summer-night] .msg b{color:#9ec1ff}[data-theme=summer-night] .msg time{color:var(--mut2)}
+}
+/* ---------- A9 login screen on phones: equal tiles, tap wording ---------- */
+@media (max-width:700px){
+ .users{justify-items:stretch;width:min(320px,100%);margin:0 auto}.users li{width:100%}
+ .users button{width:100%;min-height:76px;padding:10px 14px;border:2px solid rgba(255,255,255,.75);border-radius:16px;background:rgba(255,255,255,.12);box-shadow:0 3px 0 rgba(14,18,38,.35);text-align:left}
+ .users button:active{transform:translateY(3px);box-shadow:none}
+}
+/* ---------- A12 small tap targets left after #120: changelog chips + RSS, Über-mich links, dialog OK ---------- */
+@media (max-width:700px){
+ .cl2 .seg button,.seg button{min-height:36px;padding:0 12px;border:2px solid var(--edge);border-radius:18px;font:700 13px var(--f)}
+ .props a,.about a{display:inline-block;padding:10px 4px;margin:-10px 0}
+ .skip:not(:focus){top:-60px}
+}
+/* ---------- A1 desktop: the start-menu results use the same rows (44px, lavender selection, no XP blue) ---------- */
+@media (min-width:701px){
+ #smres{padding:4px 0}#smres button{min-height:44px;padding:6px 12px;border-radius:0;color:var(--txt)}#smres li+li button{border-top:1px dashed var(--line)}
+ #smres button.on,#smres button:hover{background:var(--on-t);color:var(--ink);box-shadow:inset 4px 0 0 var(--c-on)}#smres button.on small,#smres button:hover small{color:var(--mut2)}
+ #smq{-webkit-appearance:none;appearance:none;height:36px;padding:0 12px;border:2px solid var(--edge);border-radius:10px;font:600 14px var(--f)}#smq:focus{outline:0;border-color:var(--c-on);box-shadow:0 0 0 3px rgba(122,95,214,.28)}
+}
+/* A9 / row 40: touch wording ("Tipp", "tippen") on touch screens, "Klick" with a mouse */
+.ptr-t{display:none}
+@media (pointer:coarse){.ptr-t{display:inline}.ptr-m{display:none}}
+/* A13: a draft preview says so in the category chip style */
+.rd .draftpill{display:inline-block;margin:0 0 10px;padding:3px 10px;border:2px solid var(--ink);border-radius:9px;background:#ffd23f;color:#1b2238;font:700 12px var(--f)}
+/* tap rule (c): Designer's visual sizes stay (40x40 title bar, 48x40 bottom bar, 36px chips); an invisible inset ::after
+   makes the tap area at least 44x44 (the guard in scripts/nwebos-guard-ui.py measures it) */
+@media (max-width:700px){
+ .wt .wb,.mbar>button,.tp .cats button,.tp .lnk,.rbar .tbtn,.toc summary,.react .rx button,.clh .rss,.clf button,.sug a,.utabs button,.fbody h3 a,.ppl .lnk{position:relative}
+ .wt .wb::after,.mbar>button::after,.tp .cats button::after,.tp .lnk::after,.rbar .tbtn::after,.toc summary::after,.react .rx button::after,.clh .rss::after,.clf button::after,.sug a::after,.utabs button::after,.fbody h3 a::after,.ppl .lnk::after{content:"";position:absolute;inset:-6px -2px}   /* inset counts from the padding box: -6 = 4px past a 2px border */
+ .wt .wb::after{inset:-4px}
+ .utabs button::after{inset:-9px -9px}
+ .chs a,.chs button{min-height:44px}   /* stacked rows: a real 44px row, no overlapping overlays */
+ .fbody h3 a::after,.ppl .lnk::after{inset:-15px 0}
+ .toc a{display:flex;align-items:center;min-height:44px;padding-top:0;padding-bottom:0}.toc a::before{margin-right:.3em}
+ input[type=range].seek{height:44px;margin:-11px 0}   /* the track stays 10px, centred; the box is the tap area */
+}
+/* ---------- A14 Abonnieren (RSS): one pill per feed window, one sheet (Designer audit.css) ---------- */
+.subb{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px 0 8px;border:2px solid var(--edge);border-radius:18px;background:var(--pn);color:var(--txt);font:700 13px var(--f);box-shadow:0 2px 0 var(--ink);cursor:pointer;text-decoration:none;white-space:nowrap}
+.subb:active{transform:translateY(2px);box-shadow:none}
+.subb svg{width:18px;height:18px}
+.shx .feedu{display:flex;gap:8px;margin:4px 0 12px}
+.shx .feedu input{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:48px;padding:0 12px;border:2px solid var(--edge);border-radius:12px;background:var(--pn2);color:var(--txt);font:600 14px ui-monospace,Menlo,Consolas,monospace}
+.shx .feedu .xpbtn{width:auto;min-width:112px}
+.shx .feedu .xpbtn.ok{background:var(--c-go);color:#fff}
+.shx .rows2{margin:0 0 12px;padding:0;list-style:none;border:2px solid var(--line);border-radius:16px;overflow:hidden}
+.shx .rows2 a{display:flex;align-items:center;gap:12px;min-height:56px;padding:6px 14px;background:var(--pn);color:var(--txt);text-decoration:none;font:600 15px var(--f)}
+.shx .rows2 li+li a{border-top:1px dashed var(--line)}
+.shx .rows2 .ap{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:9px;color:#fff;font:800 15px var(--f)}
+.shx .rows2 small{display:block;font:500 12px var(--f);color:var(--mut2)}
+.shx .rows2 em{margin-left:auto;font-style:normal;color:var(--mut2)}
+.shx .ios{display:flex;gap:8px;align-items:flex-start;margin:0;padding:10px 12px;border-radius:12px;background:var(--on-t);font-size:13px;line-height:1.4;color:var(--txt)}
+.shx .ios b{white-space:nowrap}
+.shx .what{margin:-6px 0 12px;font-size:14px}
+/* desktop: sheets become a centred card (A3 too) */
+@media (min-width:701px){.shx{left:50%;right:auto;bottom:auto;top:50%;width:440px;max-height:80vh;border-bottom:2px solid var(--edge);border-radius:18px;transform:translate(-50%,-50%);box-shadow:var(--c-sh),0 24px 60px rgba(14,18,38,.3);animation:dlin .22s var(--ease)}.shx .grab{display:none}}
+@keyframes dlin{from{opacity:0;transform:translate(-50%,-46%) scale(.98)}}
+.bl-h{flex-wrap:wrap;align-items:center}.bl-h .subw{margin-left:auto}
+.lib>.subw{display:flex;justify-content:flex-end;padding:10px 12px 0}
+.clh .subb{margin-left:auto}
+.tp .subb{margin:0 0 8px}
+@media (pointer:fine){.shx .ios{display:none}}
+@media (max-width:700px){.subb{position:relative}.subb::after{content:"";position:absolute;inset:-4px 0}}
+/* row 56: the quick-sheet account card is one link (profile v3 mockup) */
+.qs a.acct{display:flex;align-items:center;gap:12px;min-height:56px;color:var(--txt);text-decoration:none}.qs a.acct em{margin-left:auto;font-style:normal;font-size:22px;color:var(--mut2)}
+/* ---------- #123 Design QA r1b ---------- */
+/* 7: one darker primary green (white text >= 4.5:1, same as #119); chips with readable text; quick-sheet hints */
+:root{--c-go:#2b7a26}
+.chip.c-bauen{color:#1b2238}.chip.c-notizen{background:#2563c9}
+.qs .tile2[aria-pressed=true] small{color:#fff}
+/* 4: Über mich and Projekte at night */
+[data-theme=summer-night] .about h1{color:#9ec1ff}
+[data-theme=summer-night] .props dt{background:var(--pn2);color:var(--txt)}[data-theme=summer-night] .props dt,[data-theme=summer-night] .props dd{border-color:var(--line)}[data-theme=summer-night] .props{border-color:var(--line)}
+[data-theme=summer-night] .st.bald,[data-theme=summer-night] .st.Idee{color:#c3c8e0}[data-theme=summer-night] .st.neu{color:#ff9e80}[data-theme=summer-night] .st.live{color:#7fdc6a}
+[data-theme=summer-night] .bl-h span,[data-theme=summer-night] .crumb2,[data-theme=summer-night] .crumb2 a,[data-theme=summer-night] .tg,[data-theme=summer-night] .tg a,[data-theme=summer-night] .meta,[data-theme=summer-night] .bm{color:#c3c8e0}
+/* 5: real 44px tap areas where an overlay was clipped or missing (QA probed with elementFromPoint) */
+@media (max-width:700px){
+ .utabs button{min-height:44px}.utabs button::after{content:none}
+ .hsearch .clr{width:44px;height:44px;top:2px;right:2px}
+ .tp .lnk{display:inline-flex;align-items:center;min-height:44px}.tp .lnk::after{content:none}
+ .qs .seg3 a{min-height:44px}
+ .subb::after{inset:-6px -2px}
+ .soonw .lnk{display:inline-block;padding:15px 4px;margin:-15px -4px}
+}
+/* r1b-5 follow-up: overlays inside overflow containers were clipped (guard now checks with elementFromPoint).
+   Chip rows keep their 36px look and get padding room for the 4px overlay; single controls are simply 44px tall. */
+@media (max-width:700px){
+ .tp .cats,.clf{padding-block:5px;row-gap:10px}.tp .cats button,.clf button{position:relative}
+ .rbar .tbtn,.sug a,.subb,.trw .tp .lnk{min-height:44px}.rbar .tbtn::after,.sug a::after,.subb::after,.trw .tp .lnk::after{content:none}
+ .trw .tp .lnk{display:flex;align-items:center}
+ .utabs button{min-width:44px}
+ .ppl .lnk{display:inline-block;padding:14px 0;margin:-14px 0}.ppl .lnk::after{content:none}
+}
+/* after #119/#124 in main: Fünf keys have the A6 2px border, so the gap-closing overlay counts from inside it;
+   editor controls follow the 44px rule of the rest of the site (guard covers /blog/admin now) */
+@media (max-width:700px){
+ .ed .tabs button,.edl .lfil button,.edl .xtbl td.acts .xpbtn,.edl .xpbtn{min-height:44px}
+}
+/* #123 Design QA r2: the last small tap areas and two day contrasts */
+.toast .xpbtn{min-height:44px}
+.cover .new{background:#c4302a}                                  /* "Neu" white on red >= 4.5:1 */
+.st.live{color:#23711f}[data-theme=summer-night] .st.live{color:#7fdc6a}   /* "live" day >= 4.5:1 */
+@media (max-width:700px){
+ .pf .dash .seg a{display:inline-grid;place-items:center;min-height:44px;min-width:44px;padding:0 12px}
+ .pf .dash .xpbtn{min-height:44px}
+ .props dd a{min-height:44px;min-width:44px}
+}

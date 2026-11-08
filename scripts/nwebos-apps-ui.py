@@ -91,7 +91,7 @@ with sync_playwright() as p:
     assert urlsplit(pg.url).path == "/blog" and pg.evaluate("window.__marker") == 1, "Back to the list window"
     # recycle bin dialog
     pg.goto(f"https://{H}/trash", wait_until="load")
-    pg.locator(".win.focus [data-trash-empty]").click(); pg.locator(".win.focus [data-trash-yes]").click()
+    pg.locator(".win.focus [data-trash-empty]").click(); pg.locator(".shx.ask [data-yes]").click()   # phone audit A3: the confirm is a sheet (a card on desktop)
     assert pg.locator(".win.focus .tempty").is_visible()
     shot(pg, "x-trash-empty-1280.png")
     c.unroute_all(behavior="ignoreErrors"); c.close()
@@ -128,7 +128,7 @@ with sync_playwright() as p:
     pg.locator(".win.focus .rd .post h1").wait_for()
     assert urlsplit(pg.url).path == "/blog/vip-welten" and pg.locator("#startm").is_hidden()
     pg.locator("#startb").click(); pg.locator("#smq").fill("faq")
-    assert pg.locator("#smres button", has_text="Wiki: FAQ").locator("em").inner_text() == "↗"
+    assert pg.locator("#smres button", has_text="Wiki: FAQ").locator(".kind").inner_text() == "Wiki ↗"   # phone audit A1: kind chip
     pg.locator("#smq").fill("zzzqq"); assert "Nichts gefunden" in pg.locator("#smres").inner_text()
     shot(pg, "x-search-1280.png")
     c.unroute_all(behavior="ignoreErrors"); c.close()
@@ -141,6 +141,21 @@ with sync_playwright() as p:
     assert urlsplit(pg.url).path == "/guestbook"
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS search: start menu (blog post opens, wiki new tab, no hit) and phone home")
+
+    # #128 / #129: "Zum Desktop" on the 404 window leaves the plain desktop; the maximise button flips its label.
+    c = ctx_for(br, 1280, signed=True)
+    pg = c.new_page()
+    pg.goto(f"https://{H}/nope-404", wait_until="load"); pg.locator(".win.focus .nf").wait_for(timeout=10000)
+    pg.locator(".win.focus [data-close]").click(); pg.wait_for_timeout(500)
+    assert pg.locator(".win").count() == 0, ("Zum Desktop opens no window", pg.locator(".win .tt").all_inner_texts())
+    pg.locator('.dicon[data-open="about"]').dblclick(); pg.locator(".win.focus .mx").wait_for()
+    assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Maximieren"
+    pg.locator(".win.focus .mx").click()
+    assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Wiederherstellen", "label flips when maximised"
+    pg.locator(".win.focus .mx").click()
+    assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Maximieren", "label flips back"
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 404 Zum Desktop leaves no window; maximise label flips")
 
     # Deep links (Gatekeeper #115): /de/… opens its window; a draft's ?preview= token stays in the address after the boot.
     c = ctx_for(br, 1280)

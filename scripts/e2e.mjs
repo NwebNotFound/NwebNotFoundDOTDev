@@ -169,6 +169,30 @@ try {
   ok(ing.j?.auctions === 5 && ing.j?.shops === 2 && ing.j?.market === 8, "Zählung auctions/shops/market", JSON.stringify(ing.j));
   ok(ing.j?.views?.leaderboards >= 3 && ing.j?.players_stats === 2, "Views: Leaderboards + Player-Stats erkannt", JSON.stringify(ing.j));
   ok(ing.j?.market_history === 5, "v_market_history: 5 Punkte", JSON.stringify(ing.j));
+  { // D1 write budget (08.11.): a resync with recomputed averages rewrites no closed hour (> 2 h old); the current hour still updates
+    const before = sqlRows(`SELECT avg_price FROM mc_market_history WHERE item='diamond' AND hour_ts=${hr - 26 * H}`)[0]?.avg_price;
+    const re = await req("/api/mc-ingest", { method: "POST", body: { v_market_history: [{ item: "diamond", ts: hr - 26 * H, price: 99, volume: 4 }, { item: "diamond", ts: hr, price: 12, volume: 1 }, { item: "diamond", ts: hr - 30 * H, price: 7, volume: 1 }] }, token: TOK });
+    const r = (h) => sqlRows(`SELECT avg_price FROM mc_market_history WHERE item='diamond' AND hour_ts=${h}`)[0]?.avg_price;
+    ok(re.s === 200 && r(hr - 26 * H) === before && r(hr) === 12 && r(hr - 30 * H) === 7, "Markt-Historie: abgeschlossene Stunde nicht neu geschrieben, aktuelle aktualisiert, fehlende eingefügt", `${before} ${r(hr - 26 * H)} ${r(hr)} ${r(hr - 30 * H)}`);
+    sql(`DELETE FROM mc_market_history WHERE item='diamond' AND hour_ts IN (${hr}, ${hr - 30 * H})`);   // keep the fixture as before for the checks below
+  }
+  { // D1 write budget: the same push again rewrites nothing (snapshot, links, player stats, market keep their updated_at)
+    const stamp = () => JSON.stringify([sqlRows("SELECT updated_at FROM mc_snapshot"), sqlRows("SELECT discord_id, updated_at FROM mc_links ORDER BY discord_id"), sqlRows("SELECT mc_uuid, updated_at FROM mc_player_stats ORDER BY mc_uuid"), sqlRows("SELECT item, updated_at FROM mc_market ORDER BY item")]);
+    const s0 = stamp(); await new Promise((r) => setTimeout(r, 20));
+    const again = await req("/api/mc-ingest", { method: "POST", body: payload, token: TOK });
+    ok(again.s === 200 && stamp() === s0, "Gleicher Push noch einmal: nichts neu geschrieben (updated_at unverändert)", again.s);
+  }  { // Gatekeeper #126: the heartbeat is per part — a servers push that changes every time must not keep an unchanged
+    // leaderboards push from refreshing leaderboards_at (readers drop a part whose *_at is older than 5 min)
+    const lbAt = () => Number(sqlRows("SELECT json_extract(data, '$.leaderboards_at') AS t FROM mc_snapshot")[0]?.t);
+    const old = Date.now() - 400000;
+    sql(`UPDATE mc_snapshot SET data = json_set(data, '$.leaderboards_at', ${old})`);
+    await req("/api/mc-ingest", { method: "POST", body: { servers: { survival: { online: true, players: 3 } } }, token: TOK });   // servers change → row updated_at is fresh
+    const lb = await req("/api/mc-ingest", { method: "POST", body: { v_leaderboards: payload.v_leaderboards }, token: TOK });        // leaderboards unchanged
+    ok(lb.s === 200 && lbAt() > old + 300000, "Snapshot-Heartbeat je Teil: unveränderte Bestenliste frischt leaderboards_at auf, obwohl servers frisch ist", `${lb.s} ${lbAt() - old}`);
+    const t1 = lbAt(); await req("/api/mc-ingest", { method: "POST", body: { v_leaderboards: payload.v_leaderboards }, token: TOK });
+    ok(lbAt() === t1, "…und innerhalb des Heartbeats schreibt derselbe Push nichts");
+  }
+
 
   console.log("2) Markt");
   const m = (await req("/api/mc-market")).j, by = Object.fromEntries(m.items.map((x) => [x.item, x]));
@@ -1005,7 +1029,7 @@ try {
       sql(`INSERT INTO sessions (id, discord_id, username, expires_at) VALUES ('slo', '100000000000000001', 'Nils', datetime('now', '+1 day'))`);
       const ck = await cookieFor("slo"), has = () => sqlRows("SELECT id FROM sessions WHERE id = 'slo'").length === 1, NX = "?next=" + encodeURIComponent("https://mc.nwebnotfound.dev/vip");
       const g = await req("/auth/discord/logout" + NX, { cookie: ck, testHost: "nwebnotfound.dev" });
-      ok(g.s === 200 && /<form method="post" action="\/auth\/discord\/logout\?next=/.test(g.t) && has(), "GET-Logout meldet nicht ab, zeigt POST-Formular", g.s);
+      ok(g.s === 302 && g.h.get("location") === "/?logout=1" && has(), "GET-Logout meldet nicht ab, führt zum NwebOS-Abmelde-Sheet (A8)", `${g.s} ${g.h.get("location")}`);
       ok(!g.t.includes("{{"), "Logout-Seite ohne unersetzte {{…}}-Marker");
       const ev = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://evil.example", testHost: "nwebnotfound.dev" });
       const no = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, testHost: "nwebnotfound.dev" });
@@ -1066,6 +1090,11 @@ try {
     ok(slot0?.label === "Insel" && slot0?.online === true && slot0?.max === 10 && slot0?.players === 2 && slot0?.members?.some((m) => m.name === null && m.role === "member"), "VIP-Seite: online aus status running, max aus player_limit, name aus name", JSON.stringify(seen0.j?.worlds));
     // Panel v2: ein siebter Regel-Schlüssel im Plugin darf die Welt nicht aus dem Panel werfen.
     await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ settings: { gamemode: "creative", pvp: true, weather: "rain" } })] }, { token: TOK, origin: null, cookie: null });
+    { // D1 write budget: the same world list again writes 0 rows (updated_at stays)
+      const at = () => sqlRows("SELECT updated_at FROM mc_blobs WHERE kind='vip_worlds'")[0]?.updated_at; const a0 = at(); await new Promise((r) => setTimeout(r, 20));
+      const again = await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ settings: { gamemode: "creative", pvp: true, weather: "rain" } })] }, { token: TOK, origin: null, cookie: null });
+      ok(again.s === 200 && a0 != null && at() === a0, "VIP-Sync: gleiche Liste noch einmal schreibt nichts", `${again.s} ${a0} ${at()}`);
+    }
     const exSeen = await req("/api/mc-vip", { cookie: c1 });
     const exSlot = exSeen.j?.worlds?.slots?.find((x) => x.id === WID);
     ok(exSlot && exSlot.settings?.pvp === true && exSlot.settings?.gamemode === "creative" && !("weather" in (exSlot.settings || {})), "Sync: unbekannter Regel-Schlüssel wirft die Welt nicht raus", JSON.stringify(exSlot?.settings));
@@ -1290,6 +1319,10 @@ try {
     const other = await Promise.all(["/music", "/writing", "/trash", "/pixelwand", "/en/blog", "/de/blog"].map((p) => n(p)));
     const unk = await n("/sommerfest"), ws = await n("/writing/series/x"), w1 = await n("/writing/gibt-es-nicht"), feed = await n("/blog/feed.xml"), css = await n("/design/nwebos-apps.css");
     ok(other.every((r) => r.s === 200 && osOn(r)) && unk.s === 404 && osOn(unk) && ws.s === 404 && osOn(ws) && w1.s === 404 && osOn(w1) && feed.s === 200 && !osOn(feed) && css.s === 200, "NwebOS: Musik, Texte, Papierkorb, Kommt bald, /de /en, 404-Fenster, alte /writing-Adressen, Feed und Assets unberührt", [...other, unk, ws, w1, feed, css].map((r) => r.s).join(" "));
+    // phone audit A14: the changelog as RSS per language, autodiscovery in every NwebOS head
+    const clf = await n("/changelog/feed.xml"), clfEn = await n("/en/changelog/feed.xml"), osHome = await n("/");
+    ok(clf.s === 200 && /application\/rss\+xml/.test(clf.h.get("content-type") || "") && clf.t.includes("<item>") && clf.t.includes("<language>de</language>") && clfEn.s === 200 && clfEn.t.includes("<language>en</language>")
+      && osHome.t.includes('type="application/rss+xml" title="Blog · NwebNotFound" href="/blog/feed.xml"') && osHome.t.includes('href="/changelog/feed.xml"') && !osHome.t.includes('href="/writing/feed.xml"'), "NwebOS: Neuigkeiten-Feed DE/EN, Autodiscovery im Head", `${clf.s} ${clfEn.s}`);
     // Reactions and reading progress: only signed in, same-origin JSON; sun is a valid kind (migration 0017).
     const rx = (o) => req("/api/blog/react", { method: "POST", testHost: MH, origin: "https://" + MH, ...o });
     const g = await rx({ body: { slug: "vip-welten", kind: "heart" } }), ev = await rx({ cookie: c1, origin: "https://evil.example", body: { slug: "vip-welten", kind: "heart" } });
@@ -1324,6 +1357,8 @@ try {
   py("NwebOS im Browser fehlgeschlagen", "scripts/nwebos-ui.py", BASE, c1);
   py("NwebOS-Apps im Browser fehlgeschlagen", "scripts/nwebos-apps-ui.py", BASE, c1);
   py("NwebOS-Handy-Feinschliff im Browser fehlgeschlagen", "scripts/nwebos-phone-ui.py", BASE, c1);
+  py("NwebOS-Handy-Sweep (Suche, Sheets, Toasts, Abonnieren) im Browser fehlgeschlagen", "scripts/nwebos-sweep-ui.py", BASE, c1);
+  py("NwebOS-Stil-Wächter (Tippflächen, Browser-Look, alte Leiste, Überlauf) fehlgeschlagen", "scripts/nwebos-guard-ui.py", BASE, c1);
   py("Fünf-Wortprüfung (DE/EN, ungültige Wörter, Umlaute) im Browser fehlgeschlagen", "scripts/fuenf-ui.py", BASE);
   py("Logo-Seitenwechsel „Wohin?“ fehlgeschlagen", "scripts/site-switch-ui.py", BASE);
   py("3D-Viewer: Pause/Fortsetzen fehlgeschlagen", "scripts/player3d-ui.py", BASE);

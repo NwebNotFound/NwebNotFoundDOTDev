@@ -39,6 +39,6 @@
  /* German rows have 11 keys (Ü, Ö, Ä): keys share the row instead of a fixed minimum width */
  #wins .kb{align-self:stretch;width:100%}#wins .kb div{gap:3px}#wins .kb div button{position:relative;flex:1 1 0;min-width:0;max-width:44px;height:48px;padding:0}#wins .kb div button.wide{flex:1.6 1 0;max-width:64px}
  /* the hit area closes the 3px gaps and the 4px row gap: no dead zone between keys */
- #wins .kb div button::after{content:"";position:absolute;inset:-2px -2px}
+ #wins .kb div button::after{content:"";position:absolute;inset:-4px}#wins .kb div button:first-child::after{left:0}#wins .kb div button:last-child::after{right:0}   /* from inside the border: covers the 3px gaps; the row ends stay inside the row */
 }
 @media (prefers-reduced-motion:reduce){.g-mines *,.g-five *{animation:none!important;transition:none!important}}

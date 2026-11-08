@@ -19,6 +19,10 @@ const berlin = (ms) => { const d = new Date(ms); const p = new Intl.DateTimeForm
 const dateLong = (ms) => { const b = berlin(ms); return `${b.d}.${String(b.m).padStart(2, "0")}.${b.y}`; };
 const minutes = (chars) => Math.max(1, Math.round((Number(chars) || 0) / 6 / 200));
 
+// A14: the "Abonnieren" pill; nwebos.js opens the subscribe sheet. Without JS it is the plain feed link.
+const RSSI = '<svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><rect width="16" height="16" rx="3" fill="#f2a33a"/><rect x="3" y="11" width="2" height="2" fill="#fff"/><path d="M3 7h2v1h1v1h1v1h1v3H6v-2H5v-1H4V9H3zM3 3h4v1h2v1h1v1h1v1h1v2h1v4h-2V9h-1V8h-1V7H9V6H8V5H6V4H3z" fill="#fff"/></svg>';
+export const FEED_URL = { blog: () => "/blog/feed.xml", writing: () => "/writing/feed.xml", changelog: (lang) => (lang === "en" ? "/en" : "") + "/changelog/feed.xml" };
+const subb = (k, lang) => `<a class="subb" href="${FEED_URL[k](lang)}" data-sub="${k}" role="button">${RSSI}${lang === "en" ? "Subscribe" : "Abonnieren"}</a>`;
 // ---------------- Blog list ----------------
 /** posts: [{ slug, category, tags[], title, summary, published_at, body_len, hearts }] (published, newest first) */
 export function blogList(lang, posts = []) {
@@ -39,8 +43,8 @@ export function blogList(lang, posts = []) {
 <div class="tp"><b>${de ? "Kategorien" : "Categories"}</b><nav class="cats" aria-label="${de ? "Kategorien" : "Categories"}"><button type="button" class="on" data-cat="">${de ? "Alle" : "All"} <em>${posts.length}</em></button>${CATS.map(([k]) => `<button type="button" data-cat="${k}">${esc(catName(k, lang))} ${((n) => `<em${n === 0 ? ' class="zero"' : ""}>${n}</em>`)(posts.filter((p) => p.category === k).length)}</button>`).join("")}</nav></div>
 ${tags.length ? `<details class="tp more" open><summary><b>Tags</b></summary><span class="tagc">${tags.map((t) => `<button type="button" data-tag="${esc(t)}">#${esc(t)}</button>`).join("")}</span></details>` : ""}
 ${months.size ? `<details class="tp more" open><summary><b>${de ? "Archiv" : "Archive"}</b></summary><span class="arch">${[...months].map(([k, n]) => `<button type="button" data-month="${k}" aria-pressed="false">${MONTHS_LONG[de ? "de" : "en"][+k.slice(5) - 1]} ${k.slice(0, 4)} <em>${n}</em></button>`).join("")}</span></details>` : ""}
-<div class="tp"><a href="/blog/feed.xml" class="rss">${ic("blog", 14)} RSS-Feed</a><span>${de ? "Den Roman findest du unter" : "The novel lives in"} <a href="${href(lang, "/writing")}" data-open="writing">${de ? "Texte" : "Writing"}</a>.</span></div></aside>
-<div class="bl-main"><p class="bl-h"><b>${de ? "Notizen vom Bauen." : "Notes from building."}</b> <span>${posts.length} ${de ? (posts.length === 1 ? "Beitrag" : "Beiträge") : posts.length === 1 ? "post" : "posts"}</span></p>
+<div class="tp">${subb("blog", lang)}<span>${de ? "Den Roman findest du unter" : "The novel lives in"} <a href="${href(lang, "/writing")}" data-open="writing">${de ? "Texte" : "Writing"}</a>.</span></div></aside>
+<div class="bl-main"><p class="bl-h"><b>${de ? "Notizen vom Bauen." : "Notes from building."}</b> <span>${posts.length} ${de ? (posts.length === 1 ? "Beitrag" : "Beiträge") : posts.length === 1 ? "post" : "posts"}</span><span class="subw">${subb("blog", lang)}</span></p>
 ${posts.length ? featHtml + `<ul class="bposts">${rows}</ul><p class="empty nohit" hidden>${de ? "Keine passenden Beiträge." : "No matching posts."} <button type="button" class="lnk" data-clear>${de ? "Filter zurücksetzen" : "Reset filters"}</button></p>` : `<p class="empty">${empty}</p>`}</div></div>`;
 }
 
@@ -59,7 +63,7 @@ export function blogPost(lang, post, rx = {}, { signedIn = false, older = null, 
   return `<div class="rd" data-read="${esc(post.slug)}"><div class="rbar"><a class="tbtn" href="${href(lang, "/blog")}" data-open="blog">‹ ${de ? "Alle Beiträge" : "All posts"}</a><span class="sp"></span>
 <button type="button" class="tbtn" data-fs="-1" aria-label="${de ? "Schrift kleiner" : "Smaller text"}">A−</button><button type="button" class="tbtn" data-fs="1" aria-label="${de ? "Schrift größer" : "Larger text"}">A+</button>${other}<button type="button" class="tbtn" data-copy="${esc(url)}">${de ? "Link kopieren" : "Copy link"}</button></div>
 <div class="prog" aria-hidden="true"><i></i></div><div class="rscroll"><div class="rgrid">${toc}
-<article class="post" lang="${post.lang}">${preview ? `<p class="hint"><b>${de ? "Vorschau (nicht veröffentlicht)" : "Preview (not published)"}</b></p>` : ""}<p class="crumb2">Blog › ${esc(catName(post.category, lang))}</p><h1>${esc(post.title)}</h1>
+<article class="post" lang="${post.lang}">${preview ? `<p class="draftpill" role="status">${de ? "Entwurf · nur mit Link sichtbar" : "Draft · visible with the link only"}</p>` : ""}<p class="crumb2">Blog › ${esc(catName(post.category, lang))}</p><h1>${esc(post.title)}</h1>
 <p class="by">${ic("cat", 28, "ic dav")}<span><b>Nils</b><small>${post.published_at ? dateLong(post.published_at) + " · " : ""}${minutes(post.body_len)} ${de ? "Min. Lesezeit" : "min read"}</small></span>${chip(post.category, lang)}${post.tags.length ? `<span class="tg">${post.tags.map((t) => "#" + esc(t)).join(" ")}</span>` : ""}</p>
 ${post.summary ? `<p class="lead">${esc(post.summary)}</p>` : ""}<div class="pbody">${post.html}</div>
 ${preview ? "" : react}${preview ? "" : pn}</article></div></div></div>`;
@@ -76,7 +80,7 @@ const SITE_LOG = [
   ["2026-11-06", "website", "Eine Navigation für alles", "One navigation for everything", "Hauptseite und Server-Seite teilen sich dieselbe Leiste.", "The main site and the server site share the same bar."],
 ];
 const TN = { website: ["Website", "Website"], server: ["Server", "Server"], blog: ["Blog", "Blog"] };
-export function changelog(lang, today = new Date()) {
+function changelogDays(lang, today) {
   const de = lang !== "en";
   const groups = new Map();
   // one row per change: the mc changelog repeats some website changes of the same day (Design QA #115)
@@ -90,13 +94,36 @@ export function changelog(lang, today = new Date()) {
     const iso = `${year}-${mm}-${dd}`;
     add(iso, /\b(?:website|webseite)\b/i.test(e.title + " " + e.sub) ? "website" : "server", e.title, e.sub);
   }
+  return { groups };
+}
+export function changelog(lang, today = new Date()) {
+  const de = lang !== "en";
+  const { groups } = changelogDays(lang, today);
   const todayIso = new Date(today.getTime() + 3600e3).toISOString().slice(0, 10);
   const days = [...groups.keys()].sort().reverse().slice(0, 8);
   const fmt = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
-  return `<div class="cl2"><header class="clh">${ic("changelog", 40)}<div><b>${de ? "Neu auf NwebOS" : "New on NwebOS"}</b><small>${de ? "Sommer Edition · Stand" : "Summer Edition · as of"} ${days[0] ? fmt(days[0]) : ""}</small></div><a class="rss" href="/blog/feed.xml">${ic("blog", 14)} RSS</a></header>
+  return `<div class="cl2"><header class="clh">${ic("changelog", 40)}<div><b>${de ? "Neu auf NwebOS" : "New on NwebOS"}</b><small>${de ? "Sommer Edition · Stand" : "Summer Edition · as of"} ${days[0] ? fmt(days[0]) : ""}</small></div>${subb("changelog", lang)}</header>
 <nav class="seg clf" aria-label="Filter"><button type="button" class="on" data-clf="">${de ? "Alle" : "All"}</button><button type="button" data-clf="website">Website</button><button type="button" data-clf="server">Server</button><button type="button" data-clf="blog">Blog</button></nav>
 <ol class="tl">${days.map((iso) => `<li><h3><time datetime="${iso}">${fmt(iso)}</time>${iso === todayIso ? ` <i class="today">${de ? "heute" : "today"}</i>` : ""}</h3><ul>${groups.get(iso).map((x) => `<li data-t="${x.t}"><span class="ctag t-${x.t}">${TN[x.t][de ? 0 : 1]}</span><b>${esc(x.title)}</b>${x.text ? `<p>${esc(x.text)}</p>` : ""}</li>`).join("")}</ul></li>`).join("")}</ol>
 <p class="hint">${de ? "Server-Neuigkeiten kommen aus dem Changelog von" : "Server news comes from the changelog of"} <a href="https://mc.nwebnotfound.dev/changelog">mc.nwebnotfound.dev</a>.</p></div>`;
+}
+
+// A14: the changelog as RSS (/changelog/feed.xml, /en/changelog/feed.xml): the same rows as the window, newest 30
+export function changelogFeed(lang, today = new Date()) {
+  const de = lang !== "en", { groups } = changelogDays(lang, today), SITE = "https://nwebnotfound.dev", page = SITE + (de ? "" : "/en") + "/changelog";
+  const x = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]);
+  const items = [];
+  for (const iso of [...groups.keys()].sort().reverse()) for (const e of groups.get(iso)) items.push({ iso, ...e });
+  const out = ['<?xml version="1.0" encoding="utf-8"?>', '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">', "<channel>",
+    `<title>${de ? "Neuigkeiten" : "What's new"} · NwebNotFound</title>`, `<link>${page}</link>`, `<description>${x(de ? "Neues an Website und Minecraft-Server." : "New on the website and the Minecraft server.")}</description>`, `<language>${de ? "de" : "en"}</language>`,
+    `<atom:link href="${SITE}${FEED_URL.changelog(lang)}" rel="self" type="application/rss+xml"/>`];
+  for (const e of items.slice(0, 30)) {
+    const id = e.iso + "-" + e.title.toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+    out.push("<item>", `<title>${x(e.title)}</title>`, `<link>${page}#${encodeURIComponent(e.iso)}</link>`, `<guid isPermaLink="false">${x("changelog:" + id)}</guid>`,
+      `<pubDate>${new Date(e.iso + "T12:00:00Z").toUTCString()}</pubDate>`, `<description>${x(e.text || "")}</description>`, `<category>${TN[e.t][de ? 0 : 1]}</category>`, "</item>");
+  }
+  out.push("</channel>", "</rss>");
+  return out.join("\n") + "\n";
 }
 
 // ---------------- Music ----------------
@@ -147,7 +174,7 @@ export function writing(lang, allSeries = [], allShorts = [], f = {}) {
     : `<header class="libh"><div class="bkc">${ic("writing", 48)}<span>${de ? "ROMAN" : "NOVEL"}</span></div><div><small>${de ? "Roman · in Arbeit" : "Novel · in progress"}</small><b>${de ? "Der Roman entsteht gerade" : "The novel is being written"}</b><p>${de ? "Eine Geschichte in Kapiteln. Das erste Kapitel erscheint hier, sobald es fertig ist." : "A story in chapters. The first chapter appears here once it's done."}</p></div></header>`;
   const sh = shorts.length ? `<ul class="dash">${shorts.map((x) => `<li><a href="${href(lang, "/writing/" + x.slug)}"><b>${esc(x.title)}</b></a></li>`).join("")}</ul>` : `<p class="empty">${de ? "Noch keine Kurztexte." : "No short texts yet."}</p>`;
   const none = f.tag && !series.length && !shorts.length ? `<p class="empty">${de ? "Nichts mit diesem Stichwort." : "Nothing with this tag."}</p>` : "";
-  return `<div class="lib">${chip}${none}${f.tag && !series.length ? "" : head}${f.series ? "" : `<h3>${de ? "Kurztexte" : "Short texts"}</h3>${sh}`}</div>`;
+  return `<div class="lib"><div class="subw">${subb("writing", lang)}</div>${chip}${none}${f.tag && !series.length ? "" : head}${f.series ? "" : `<h3>${de ? "Kurztexte" : "Short texts"}</h3>${sh}`}</div>`;
 }
 /* A text from Texte that is not a chapter (/writing/<slug>): the chapter reader without series navigation. item: the
    content index entry ({ title, date, lang, archived, readingMinutes, tags }). Written in another language than the

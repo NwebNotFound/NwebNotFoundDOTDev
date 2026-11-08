@@ -32,6 +32,97 @@
      A section with data-module loads that script on the first open; the window is mounted once it registered. */
   var MODS = {}, loading = {}, waiting = {};
   window.NwebOS = { register: function (key, mod) { MODS[key] = mod; (waiting[key] || []).forEach(function (f) { f(); }); delete waiting[key]; } };
+
+  /* ---------- phone audit A3: one bottom sheet for dialogs, confirms and the quick menu; A4: toasts ---------- */
+  var sheetOpener = null;
+  var sheetKeys = null;
+  function closeSheet() { if (sheetKeys) { document.removeEventListener("keydown", sheetKeys, true); sheetKeys = null; } $$(".shbd,.shx").forEach(function (e) { e.remove(); }); if (sheetOpener && sheetOpener.focus) { try { sheetOpener.focus({ preventScroll: true }); } catch (e) {} } sheetOpener = null; }
+  /* opts: { html, cls, label } ; [data-x] buttons close it; returns the sheet element */
+  function sheet(opts) {
+    $$(".shbd,.shx").forEach(function (e) { e.remove(); });
+    sheetOpener = document.activeElement;
+    var bd = document.createElement("div"); bd.className = "shbd"; bd.addEventListener("click", closeSheet);
+    var s = document.createElement("section"); s.className = "shx " + (opts.cls || ""); s.setAttribute("role", "dialog"); s.setAttribute("aria-modal", "true"); if (opts.label) s.setAttribute("aria-label", opts.label);
+    s.innerHTML = '<i class="grab" aria-hidden="true"></i>' + opts.html;
+    document.body.append(bd, s);
+    s.addEventListener("click", function (e) { if (e.target.closest("[data-x]")) closeSheet(); });
+    /* Esc and Tab while the sheet is open, wherever focus is (a click on its text drops focus to <body>): one
+       document listener in the capture phase, so the page's own Esc never closes the window behind (#123 review) */
+    s.tabIndex = -1;
+    if (sheetKeys) document.removeEventListener("keydown", sheetKeys, true);
+    sheetKeys = function (e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSheet(); return; }
+      if (e.key !== "Tab") return;
+      var f = $$("button,a[href],input,select,textarea", s).filter(function (x) { return !x.disabled && x.offsetParent; }); if (!f.length) { e.preventDefault(); s.focus(); return; }
+      var a = f[0], z = f[f.length - 1], cur = document.activeElement;
+      if (!s.contains(cur)) { e.preventDefault(); (e.shiftKey ? z : a).focus(); return; }   /* focus had left: back inside */
+      if (e.shiftKey && cur === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && cur === z) { e.preventDefault(); a.focus(); }
+    };
+    document.addEventListener("keydown", sheetKeys, true);
+    /* swipe down on the grab area closes it */
+    var y0 = null; s.addEventListener("touchstart", function (e) { y0 = s.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
+    s.addEventListener("touchend", function (e) { if (y0 !== null && e.changedTouches[0].clientY - y0 > 70) closeSheet(); y0 = null; }, { passive: true });
+    var f0 = $("button,a[href]", s); if (f0) f0.focus({ preventScroll: true });
+    return s;
+  }
+  var toastT = 0;
+  /* kind: "" | "ok" | "err"; act: { label, href } optional */
+  function toast(kind, text, sub, act) {
+    $$(".toast").forEach(function (e) { e.remove(); }); clearTimeout(toastT);
+    var t = document.createElement("div"); t.className = "toast " + (kind || ""); t.setAttribute("role", kind === "err" ? "alert" : "status");
+    var dot = document.createElement("i"); dot.className = "dot"; dot.setAttribute("aria-hidden", "true"); dot.textContent = kind === "ok" ? "✓" : kind === "err" ? "!" : "i";
+    var sp = document.createElement("span"); sp.textContent = text; if (sub) { var sm2 = document.createElement("small"); sm2.textContent = sub; sp.appendChild(sm2); }
+    t.append(dot, sp);
+    if (act) { var a = document.createElement("a"); a.className = "xpbtn discord"; a.href = act.href; a.textContent = act.label; t.appendChild(a); }
+    document.body.appendChild(t);
+    toastT = setTimeout(function () { t.remove(); }, kind === "err" ? 7000 : 4000);
+    return t;
+  }
+  var escH = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  /* a confirm as a sheet: resolves true on the confirm button (danger = red) */
+  function ask(o) {
+    return new Promise(function (done) {
+      var s = sheet({ cls: "ask", label: o.title, html: '<div class="hero">' + (o.icon || icon16("notfound") || "") + "<h2>" + escH(o.title) + "</h2><p>" + escH(o.text) + '</p></div><div class="acts' + (o.stack ? "" : " two") + '">' +
+        (o.stack ? '<button type="button" class="xpbtn ' + (o.danger ? "danger" : "go") + '" data-yes>' + escH(o.yes) + '</button><button type="button" class="xpbtn" data-x>' + escH(o.no) + "</button>"
+          : '<button type="button" class="xpbtn" data-x>' + escH(o.no) + '</button><button type="button" class="xpbtn ' + (o.danger ? "danger" : "go") + '" data-yes>' + escH(o.yes) + "</button>") + "</div>" });
+      var hero = $(".hero svg", s); if (hero) { hero.setAttribute("width", "56"); hero.setAttribute("height", "56"); }
+      var answered = false;
+      $("[data-yes]", s).addEventListener("click", function () { answered = true; closeSheet(); done(true); });
+      var obs = new MutationObserver(function () { if (!s.isConnected) { obs.disconnect(); if (!answered) done(false); } }); obs.observe(document.body, { childList: true });
+    });
+  }
+  window.NwebOS.sheet = sheet; window.NwebOS.closeSheet = closeSheet; window.NwebOS.toast = toast; window.NwebOS.ask = ask;
+
+  /* phone audit A14: "Abonnieren" pills (a.subb[data-sub], the feed link without JS) open one subscribe sheet.
+     iOS has no RSS handler, so copying the URL is the first and biggest action. */
+  var RSSI = '<svg viewBox="0 0 16 16" width="48" height="48" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><rect width="16" height="16" rx="3" fill="#f2a33a"/><rect x="3" y="11" width="2" height="2" fill="#fff"/><path d="M3 7h2v1h1v1h1v1h1v3H6v-2H5v-1H4V9H3zM3 3h4v1h2v1h1v1h1v1h1v2h1v4h-2V9h-1V8h-1V7H9V6H8V5H6V4H3z" fill="#fff"/></svg>';
+  function subscribe(k, path) {
+    var en = lang === "en", T = function (d, e) { return en ? e : d; };
+    var F = { blog: [T("Blog", "Blog"), T("neue Beiträge", "new posts")], changelog: [T("Neuigkeiten", "What's new"), T("neue Änderungen an Website und Server", "new changes to the site and server")],
+      writing: [T("Texte", "Writing"), T("neue Kapitel und Kurztexte", "new chapters and short texts")] }[k] || [k, ""];
+    var url = location.origin + path, e = encodeURIComponent(url);
+    var s = sheet({ cls: "sub", label: F[0] + T(" abonnieren", ": subscribe"), html: '<div class="hero">' + RSSI + "<h2>" + escH(F[0]) + T(" abonnieren", ": subscribe") + '</h2></div><p class="what">' +
+      escH(T("Mit RSS landen " + F[1] + " automatisch in deiner Feed-App. Ohne Konto, ohne Newsletter, jederzeit abbestellbar.", "With RSS, " + F[1] + " show up in your feed app on their own. No account, no newsletter, cancel any time.")) + "</p>" +
+      '<div class="feedu"><input readonly value="' + escH(url) + '" aria-label="' + T("Feed-URL", "Feed URL") + '"><button type="button" class="xpbtn go" data-copyfeed>' + T("Kopieren", "Copy") + "</button></div>" +
+      '<ul class="rows2"><li><a href="feed:' + escH(url) + '"><span class="ap" style="background:#f2a33a" aria-hidden="true">↗</span><span>' + T("In Feed-App öffnen", "Open in a feed app") + "<small>NetNewsWire, Reeder, Feeeed …</small></span><em>›</em></a></li>" +
+      '<li><a href="https://feedly.com/i/subscription/feed/' + e + '" rel="noopener" target="_blank"><span class="ap" style="background:#2bb24c" aria-hidden="true">f</span><span>Feedly<small>' + T("im Browser oder in der App", "in the browser or the app") + "</small></span><em>↗</em></a></li>" +
+      '<li><a href="https://www.inoreader.com/?add_feed=' + e + '" rel="noopener" target="_blank"><span class="ap" style="background:#1875f3" aria-hidden="true">i</span><span>Inoreader<small>' + T("im Browser oder in der App", "in the browser or the app") + "</small></span><em>↗</em></a></li></ul>" +
+      '<p class="ios"><span><b>' + T("Auf dem iPhone:", "On iPhone:") + "</b> " + T("Link kopieren, dann in deiner Feed-App „Feed hinzufügen“ und einfügen. Safari öffnet RSS nicht selbst.", "copy the link, then “Add feed” in your feed app and paste it. Safari doesn’t open RSS by itself.") + "</span></p>" });
+    var c = $("[data-copyfeed]", s), inp = $(".feedu input", s);
+    c.focus({ preventScroll: true });
+    c.addEventListener("click", function () {
+      var done = function () { c.classList.add("ok"); c.textContent = T("Kopiert ✓", "Copied ✓"); toast("ok", T("Feed-Link kopiert", "Feed link copied"), T("Jetzt in deiner Feed-App einfügen.", "Now paste it in your feed app.")); };
+      /* no clipboard API (http, old browser): select the field so the native "Kopieren" bubble appears */
+      var sel = function () { inp.focus(); inp.select(); inp.setSelectionRange(0, inp.value.length); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, sel); else sel();
+    });
+    return s;
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-sub]"); if (!b || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault(); e.stopPropagation(); subscribe(b.getAttribute("data-sub"), b.getAttribute("href"));
+  }, true);
+  window.NwebOS.subscribe = subscribe;
   function ctxFor(k, el) { return { key: k, lang: lang, window: el, sound: { click: function () { sound.click(); }, open: function () { sound.open(); }, close: function () { sound.close(); }, tone: tone },
     store: { get: function (x) { return store.get(k + "." + x); }, set: function (x, v) { store.set(k + "." + x, v); } }, close: function () { close(k); } }; }
   function mount(k, el) {
@@ -126,7 +217,7 @@
     var d = opt.pos || DEF[k] || (src && src.dataset.x ? [+src.dataset.x, +src.dataset.y] : [120 + 30 * (seq % 8), 60 + 24 * (seq % 8)]); seq++;
     if (src && src.dataset.menu === "no") opt.menu = false;
     var p = clampPos(d[0], d[1], w, h);
-    el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = h + "px";
+    el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = Math.min(h, innerHeight - 46) + "px";   /* short laptop screens: the window fits above the taskbar, its content scrolls */
     var ico = opt.icon || icon16(k), tt = esc(opt.title || title(k));
     el.innerHTML = '<header class="wt"><button type="button" class="wb back" aria-label="' + esc(L.back) + '"><span class="wbt">‹</span>' + ic2("back") + '</button>' + ico + '<span class="tt">' + tt + '</span>' +
       '<button type="button" class="wb mn" aria-label="' + esc(L.minimize) + '">–</button><button type="button" class="wb mx" aria-label="' + esc(L.maximize) + '">□</button><button type="button" class="wb x" aria-label="' + esc(L.close) + '"><span class="wbt">×</span>' + ic2("close") + '</button></header>' + (opt.menu === false ? '' : '<nav class="wm" aria-hidden="true">' + (L.menu || []).map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</nav>') + '<div class="wc"></div><span class="wr" aria-hidden="true"></span>';
@@ -143,12 +234,13 @@
     $(".x", el).onclick = function () { close(k); };
     $(".back", el).onclick = function () { close(k); };
     $(".mn", el).onclick = function () { minimize(k); };
-    $(".mx", el).onclick = function () { el.classList.toggle("max"); save(); };
+    var mxb = $(".mx", el), mxSet = function () { var m = el.classList.contains("max"); mxb.setAttribute("aria-label", m ? L.restoreWin : L.maximize); mxb.title = m ? L.restoreWin : ""; mxb.textContent = m ? "❐" : "□"; };
+    mxb.onclick = function () { el.classList.toggle("max"); mxSet(); save(); };
     var bar = $(".wt", el);
-    bar.addEventListener("dblclick", function (e) { if (!e.target.closest(".wb")) { el.classList.toggle("max"); save(); } });
+    bar.addEventListener("dblclick", function (e) { if (!e.target.closest(".wb")) { el.classList.toggle("max"); mxSet(); save(); } });
     drag(bar, el, false); drag($(".wr", el), el, true);
     if (opt.min) el.classList.add("min");
-    if (opt.max) el.classList.add("max");
+    if (opt.max) { el.classList.add("max"); mxSet(); }
     if (!opt.quiet) sound.open();
     if (!opt.min) focus(k, !opt.noPush);
     if (!opt.quiet && !opt.min) el.focus({ preventScroll: true });
@@ -193,6 +285,7 @@
     save();
   }
   function dialog(t, msg) {
+    if (PHONE()) { var s = sheet({ cls: "dlg", label: t, html: '<div class="hero">' + icon16("about").replace(/width="\d+" height="\d+"/, 'width="56" height="56"') + "<h2>" + t + "</h2><p>" + msg + '</p></div><div class="acts"><button type="button" class="xpbtn go" data-x>OK</button></div>' }); return s; }
     return openWin("dlg" + (++seq), { title: t, w: 320, h: 170, menu: false, icon: icon16("about"), pos: [innerWidth / 2 - 160, innerHeight / 2 - 120], noPush: true,
       html: '<div class="pad" style="display:flex;gap:12px;align-items:flex-start">' + icon16("about").replace('width="16" height="16"', 'width="32" height="32"') + '<p style="margin:0;font-size:13px">' + msg + '</p></div><p class="btns pad" style="justify-content:flex-end;padding-top:0"><button type="button" class="xpbtn" data-closewin>OK</button></p>' });
   }
@@ -215,27 +308,78 @@
   function bindSearch(inp, list, after) {
     if (!inp || !list) return;
     var sel = 0, res = [];
+    /* phone audit A1: header "N Treffer", icon tile, the query marked, a kind chip (App / Blog / Wiki ↗ / Link ↗),
+       a chevron; no hits = an empty card with chips; focused but empty (home only) = "Schnell öffnen" chips */
+    var EN = L.lang === "en", home = list.id === "hres";
+    var SUG = [["blog", EN ? "Blog" : "Blog", "/blog"], ["guestbook", EN ? "Guestbook" : "Gästebuch", "/guestbook"], ["music", EN ? "Music" : "Musik", "/music"], ["changelog", EN ? "What's new" : "Neuigkeiten", "/changelog"], ["minecraft", "Minecraft", "https://mc.nwebnotfound.dev/"]];
+    var el = function (tag, cls, txt) { var x = document.createElement(tag); if (cls) x.className = cls; if (txt != null) x.textContent = txt; return x; };
+    var chips = function (n) {
+      var li = el("li", "sugg");
+      SUG.slice(0, n).forEach(function (s) { var c = el("button", "chip"); c.type = "button"; c.dataset.sug = s[2]; c.innerHTML = icon16(s[0]); c.appendChild(document.createTextNode(s[1])); li.appendChild(c); });
+      return li;
+    };
+    var kindOf = function (r) { return r.url ? (/wiki/i.test(r.d) ? "Wiki ↗" : "Link ↗") : /^Blog/.test(r.d || "") ? "Blog" : "App"; };
+    var mark = function (b, t, q) {
+      var i = t.toLowerCase().indexOf(q.toLowerCase());
+      if (!q || i < 0) { b.textContent = t; return; }
+      b.append(document.createTextNode(t.slice(0, i)), el("mark", "", t.slice(i, i + q.length)), document.createTextNode(t.slice(i + q.length)));
+    };
     var draw = function () {
-      res = find(inp.value); list.hidden = !inp.value.trim(); sel = Math.min(sel, Math.max(0, res.length - 1));
+      var q = inp.value.trim();
+      res = find(inp.value); sel = Math.min(sel, Math.max(0, res.length - 1));
       list.replaceChildren();
-      if (!res.length) { var li0 = document.createElement("li"); li0.className = "none"; li0.textContent = L.noHit + " „" + inp.value.trim() + "“"; list.appendChild(li0); }
-      res.forEach(function (r, i) {
-        var li = document.createElement("li"), b = document.createElement("button"), sp = document.createElement("span"), bt = document.createElement("b"), sm2 = document.createElement("small");
-        b.type = "button"; b.dataset.i = i; if (i === sel) b.className = "on";
-        b.innerHTML = icon16(r.ic); bt.textContent = r.t; sm2.textContent = r.d; sp.append(bt, sm2); b.appendChild(sp);
-        if (r.url) { var em = document.createElement("em"); em.textContent = "↗"; b.appendChild(em); }
-        li.appendChild(b); list.appendChild(li);
-      });
+      if (!q) {
+        list.hidden = !(home && document.activeElement === inp);
+        if (!list.hidden) { list.appendChild(el("li", "rh", EN ? "Quick open" : "Schnell öffnen")); list.appendChild(chips(5)); }
+      } else {
+        list.hidden = false;
+        if (!res.length) {
+          var no = el("li", "none"); no.innerHTML = icon16("notfound") || icon16("about");
+          no.appendChild(el("b", "", (EN ? "Nothing found for “" : "Nichts gefunden für „") + q + (EN ? "”" : "“")));
+          no.appendChild(el("small", "", EN ? "Try one of these:" : "Versuch’s mit einem von diesen:"));
+          list.appendChild(no); list.appendChild(chips(4));
+        } else {
+          var rh = el("li", "rh"); rh.appendChild(el("span", "", res.length + " " + (EN ? (res.length === 1 ? "result" : "results") : "Treffer"))); list.appendChild(rh);
+        }
+        res.forEach(function (r, i) {
+          var li = el("li"), b = el("button"), tile = el("span", "tile"), sp = el("span"), bt = el("b"), kd = kindOf(r);
+          b.type = "button"; b.dataset.i = i; if (i === sel) b.className = "on";
+          tile.innerHTML = icon16(r.ic); mark(bt, r.t, q);
+          sp.append(bt, el("small", "", kd === "App" ? (r.url ? r.d : (EN ? "opens as a window" : "öffnet als Fenster")) : r.d));
+          b.append(tile, sp, el("span", "kind", kd), el("i", "go"));
+          li.appendChild(b); list.appendChild(li);
+        });
+      }
       var mid = $(".smmid", sm); if (list.id === "smres" && mid) mid.hidden = !list.hidden;
     };
-    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else if (r.k) openWin(r.k); else openUrl(r.p); inp.value = ""; draw(); if (after) after(); };
+    var form = inp.closest(".hsearch");
+    var leave = function () { if (!form) return; inp.value = ""; form.classList.remove("focus", "has"); desk.classList.remove("searching"); list.hidden = true; inp.blur(); };
+    if (form) {
+      inp.addEventListener("focus", function () { form.classList.add("focus"); desk.classList.add("searching"); draw(); });
+      inp.addEventListener("input", function () { form.classList.toggle("has", !!inp.value); });
+      $(".clr", form).addEventListener("click", function () { inp.value = ""; form.classList.remove("has"); inp.focus(); draw(); });
+      $(".cnl", form).addEventListener("click", leave);
+      /* focus left the search (Tab, a tap elsewhere) with nothing typed: the home screen comes back */
+      form.addEventListener("focusout", function (e) {
+        if (form.contains(e.relatedTarget)) return;
+        /* late enough that a tap on a chip (iOS doesn't focus buttons) still lands */
+        setTimeout(function () { if (!form.contains(document.activeElement) && !inp.value) { form.classList.remove("focus", "has"); desk.classList.remove("searching"); list.hidden = true; } }, 250);
+      });
+      list.addEventListener("mousedown", function (e) { if (e.target.closest("button")) e.preventDefault(); });   // keep the field focused
+    }
+    list.addEventListener("click", function (e) {
+      var c = e.target.closest("[data-sug]"); if (!c) return; e.stopPropagation();
+      if (/^https?:/.test(c.dataset.sug)) window.open(c.dataset.sug, "_blank", "noopener"); else openUrl((EN ? "/en" : "") + c.dataset.sug);
+      leave(); if (after) after();
+    });
+    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else if (r.k) openWin(r.k); else openUrl(r.p); if (form) leave(); else { inp.value = ""; draw(); } if (after) after(); };
     inp.addEventListener("focus", function () { loadBlog().then(function () { if (inp.value.trim()) draw(); }); });
     inp.addEventListener("input", function () { sel = 0; draw(); });
     inp.addEventListener("keydown", function (e) {
       if (e.key === "ArrowDown") { sel = Math.min(res.length - 1, sel + 1); draw(); e.preventDefault(); }
       else if (e.key === "ArrowUp") { sel = Math.max(0, sel - 1); draw(); e.preventDefault(); }
       else if (e.key === "Enter") { e.preventDefault(); go(res[sel]); }
-      else if (e.key === "Escape" && inp.value) { inp.value = ""; draw(); e.stopPropagation(); }
+      else if (e.key === "Escape" && (inp.value || form)) { if (form) leave(); else { inp.value = ""; draw(); } e.stopPropagation(); }
     });
     list.addEventListener("click", function (e) { var b = e.target.closest("[data-i]"); if (b) { e.stopPropagation(); go(res[+b.dataset.i]); } });
   }
@@ -247,12 +391,45 @@
     if (op && !op.classList.contains("dicon") && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); if (APPS[op.dataset.open]) openWin(op.dataset.open); else if (op.href || ROUTES[op.dataset.open]) openUrl(op.href || ROUTES[op.dataset.open]); return; }
     /* an internal link inside the desktop opens its window instead of reloading the page */
     var a = e.target.closest("#desk a[href]");
-    if (a && !a.classList.contains("dicon") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href); return; } }
+    if (a && !a.classList.contains("dicon") && !a.hasAttribute("data-close") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href); return; } }
     var cl = e.target.closest("[data-close]"); if (cl && cl.closest(".win")) { e.preventDefault(); var w0 = cl.closest(".win"); open.forEach(function (o, k) { if (o.el === w0) close(k); }); return; }
     var cw = e.target.closest("[data-closewin]"); if (cw) { var w = cw.closest(".win"); open.forEach(function (o, k) { if (o.el === w) close(k, true); }); return; }
     var egg = e.target.closest("[data-egg]"); if (egg) { closeStart(); if (eggs[egg.dataset.egg]) eggs[egg.dataset.egg](); }
     if (!e.target.closest(".dicon")) $$(".dicon.sel").forEach(function (d) { d.classList.remove("sel"); });
   });
+  function logoutSheet(ask) {   /* ask: always show the sheet for a real session (a GET of the logout address never signs out by itself) */
+    var useMe = me && (ask || store.get("user") !== "gast");
+    if (!useMe) { eggs.logout(); return; }
+    var en = lang === "en";
+    var s = sheet({ cls: "ask", label: en ? "Sign out?" : "Abmelden?", html: '<div class="hero"><img alt="" width="56" height="56" style="border-radius:50%;border:2px solid var(--edge)" src="' + escH(/^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV) + '"><h2>' + (en ? "Sign out?" : "Abmelden?") + "</h2><p>" + escH((en ? "You are signed in as " : "Du bist als ") + me.name + (en ? "." : " angemeldet.")) + '</p></div><div class="acts two"><button type="button" class="xpbtn" data-x>' + (en ? "Cancel" : "Abbrechen") + '</button><button type="button" class="xpbtn go" data-yes>' + (en ? "Sign out" : "Abmelden") + "</button></div>" });
+    $("[data-yes]", s).addEventListener("click", function () { closeSheet(); eggs.logout(); });
+  }
+  /* A2: the phone has no tray or start menu: the avatar pill opens the quick sheet (account, day/night, sound, language) */
+  function quickSheet() {
+    var en = lang === "en", useMe = me && store.get("user") !== "gast", n = night(), path = bare(location.pathname);
+    var av = useMe && /^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV;
+    /* phone audit row 56 / profile v3: the whole account card is the link — "Mein Profil ›" or "Anmelden ›" */
+    var acct = useMe ? '<a class="acct" href="' + (en ? "/en" : "") + '/profile" data-qopen><img alt="" src="' + escH(av) + '"><span><b>' + (en ? "My profile" : "Mein Profil") + "</b><small>" + escH(me.name) + " · " + (en ? "games, badges, settings" : "Spiele, Abzeichen, Einstellungen") + "</small></span><em>›</em></a>"
+      : '<a class="acct" href="' + escH(L.login + encodeURIComponent(location.origin + (en ? "/en" : "") + "/profile")) + '"><img alt="" src="' + escH(GUEST_AV) + '"><span><b>' + (en ? "Sign in" : "Anmelden") + "</b><small>" + (en ? "with Discord · for profile and guestbook" : "mit Discord · für Profil und Gästebuch") + "</small></span><em>›</em></a>";
+    var s = sheet({ cls: "qs", label: en ? "Quick menu" : "Schnellmenü", html: acct +
+      '<div class="tiles"><button type="button" class="tile2" data-qtheme aria-pressed="' + n + '"><span>' + (n ? (en ? "Night" : "Nacht") : (en ? "Day" : "Tag")) + "<small>" + (en ? "Tap to switch" : "Tippen zum Wechseln") + '</small></span></button>' +
+      '<button type="button" class="tile2" data-qsound aria-pressed="' + (!muted) + '"><span>' + (muted ? (en ? "Sound off" : "Ton aus") : (en ? "Sound on" : "Ton an")) + "<small>" + (en ? "Clicks and start jingle" : "Klicks und Start-Jingle") + "</small></span></button>" +
+      '<div class="seg3"><span>' + (en ? "Language" : "Sprache") + '</span><a href="' + escH(path) + '" hreflang="de"' + (en ? "" : ' aria-current="true"') + '>Deutsch</a><a href="' + escH("/en" + (path === "/" ? "" : path)) + '" hreflang="en"' + (en ? ' aria-current="true"' : "") + ">English</a></div></div>" +
+      '<ul class="rows"><li><a href="' + (en ? "/en" : "") + '/changelog" data-qopen>'  + icon16("changelog") + (en ? "What's new" : "Neuigkeiten") + "<em>›</em></a></li>" +
+      '<li><button type="button" data-qabout>' + icon16("about") + (en ? "About NwebOS" : "Über NwebOS") + "<em>›</em></button></li>" +
+      '<li><a href="https://github.com/NwebNotFound" rel="noopener" target="_blank">' + icon16("portfolio") + "GitHub<em>↗</em></a></li></ul>" +
+      '<div class="bot">' + (useMe ? '<button type="button" class="xpbtn dz" data-qlogout>' + (en ? "Sign out" : "Abmelden") + "</button>" : '<button type="button" class="xpbtn ghost" data-x>' + (en ? "Close" : "Schließen") + "</button>") + '<button type="button" class="xpbtn ghost" data-qoff>' + (en ? "Shut down" : "Ausschalten") + "</button></div>" });
+    s.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-qtheme],[data-qsound],[data-qabout],[data-qlogout],[data-qoff],[data-qopen],[data-qprofile]"); if (!b) return;
+      if (b.hasAttribute("data-qtheme")) { thm.click(); var nn = night(); b.setAttribute("aria-pressed", String(nn)); b.firstChild.firstChild.textContent = nn ? (en ? "Night" : "Nacht") : (en ? "Day" : "Tag"); return; }
+      if (b.hasAttribute("data-qsound")) { snd.click(); b.setAttribute("aria-pressed", String(!muted)); b.firstChild.firstChild.textContent = muted ? (en ? "Sound off" : "Ton aus") : (en ? "Sound on" : "Ton an"); return; }
+      e.preventDefault(); closeSheet();
+      if (b.hasAttribute("data-qabout")) eggs["about-os"]();
+      else if (b.hasAttribute("data-qlogout")) logoutSheet();
+      else if (b.hasAttribute("data-qoff")) eggs.shutdown();
+      else openUrl(b.getAttribute("href"));
+    });
+  }
   var eggs = {
     logout: function () {
       store.set("loggedout", "1"); store.set("user", null);
@@ -275,6 +452,7 @@
     });
     d.addEventListener("dblclick", function () { if (d.dataset.open) { if (APPS[d.dataset.open]) openWin(d.dataset.open); else openUrl(d.href); } else location.href = d.href; });
   });
+  var qb = $("[data-quick]"); if (qb) qb.onclick = function () { sound.click(); quickSheet(); };
   $("[data-home]").onclick = function () { var t = topWindow(); if (t) minimize(t); };
   /* phone bottom bar: search goes to the home screen and focuses its search field (phone polish 5) */
   var ms = $("[data-msearch]"); if (ms) ms.onclick = function () { open.forEach(function (o, key) { if (!o.el.classList.contains("min")) minimize(key); }); setTimeout(function () { var q = $("#hq"); if (q) q.focus(); }, 60); };
@@ -296,15 +474,16 @@
   function syncTheme() { thm.setAttribute("aria-pressed", String(night())); R.toggleAttribute("data-night", night()); }
   thm.onclick = function () { var n = night() ? "summer-day" : "summer-night"; R.dataset.theme = n; try { localStorage.setItem("summer-theme", n); } catch (e) {} syncTheme(); sound.click(); };
   syncTheme();
-  var tick = function () { var t = new Date().toLocaleTimeString(lang === "en" ? "en-GB" : "de-DE", { hour: "2-digit", minute: "2-digit" }); $("#clock").textContent = t; $("#mclock").textContent = t; };
+  var tick = function () { var t = new Date().toLocaleTimeString(lang === "en" ? "en-GB" : "de-DE", { hour: "2-digit", minute: "2-digit" }); $("#clock").textContent = t; $("#mclock").textContent = t; var qc = $("[data-qclock]"); if (qc) qc.textContent = t; };
   tick(); setTimeout(function () { tick(); setInterval(tick, 60000); }, 60000 - (Date.now() % 60000));
 
   /* ---------- account (rule 10: the Discord avatar on the main site) ---------- */
-  var GUEST_AV = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#ffd23f"/></svg>');
+  var GUEST_AV = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges"><rect width="16" height="16" fill="#ffd23f"/><rect x="3" y="5" width="10" height="7" fill="#fff6dc"/><rect x="5" y="7" width="2" height="2" fill="#1b2238"/><rect x="9" y="7" width="2" height="2" fill="#1b2238"/></svg>');
   function setUser() {
     var useMe = me && store.get("user") !== "gast";
     $("#smname").textContent = useMe ? me.name : L.guest;
     var av = $("#smav"); av.src = useMe && /^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV;
+    var qa = $("[data-qav]"); if (qa) qa.src = av.src;
   }
   var meP = fetch("/api/me", { credentials: "include" }).then(function (r) { return r.json(); }).then(function (d) {
     me = d && d.user ? d.user : null; window.__me = d;
@@ -312,6 +491,11 @@
     if (me) { li.hidden = false; dl.hidden = true; $("[data-me-name]").textContent = me.name; if (/^https:\/\//.test(me.avatar || "")) $("[data-me-av]").src = me.avatar; }
     else if (d && !d.available) dl.hidden = true;
     setUser();
+    if (/[?&]logout=1(&|$)/.test(location.search)) {   /* phone audit A8: /auth/discord/logout (GET) lands here and asks */
+      history.replaceState(history.state, "", location.pathname + location.search.replace(/[?&]logout=1/, "").replace(/^&/, "?") + location.hash);
+      if (me) logoutSheet(true);
+    }
+
     return me;
   }).catch(function () { return null; });
   $("[data-login-link]").href = L.login + encodeURIComponent(location.href);
@@ -330,8 +514,9 @@
     meP.then(function (u) {
       if (!u || !box) { var a = box && $("a", box); if (a) a.href = L.login + encodeURIComponent(location.href); return; }
       var de = lang !== "en";
-      box.innerHTML = '<form><label class="vh" for="gb-m-' + seq + '">' + (de ? "Nachricht" : "Message") + '</label><textarea id="gb-m-' + seq + '" name="message" maxlength="500" required placeholder="' + (de ? "Schreib etwas Nettes (max. 500 Zeichen)" : "Write something nice (max. 500 characters)") + '"></textarea><div class="cf-turnstile" data-sitekey="' + esc(L.sitekey) + '" data-theme="auto"></div><div class="row"><span class="gb-st" role="status"></span><button class="xpbtn go" type="submit">' + (de ? "Eintragen" : "Send") + "</button></div></form>";
-      var form = $("form", box), st = $(".gb-st", box), host = $(".cf-turnstile", box);
+      box.innerHTML = '<form><label class="vh" for="gb-m-' + seq + '">' + (de ? "Nachricht" : "Message") + '</label><textarea id="gb-m-' + seq + '" name="message" maxlength="500" required placeholder="' + (de ? "Schreib etwas Nettes (max. 500 Zeichen)" : "Write something nice (max. 500 characters)") + '"></textarea><span class="cnt" aria-hidden="true">0 / 500</span><div class="cf-turnstile" data-sitekey="' + esc(L.sitekey) + '" data-theme="auto"></div><div class="row"><span class="gb-st" role="status"></span><button class="xpbtn go" type="submit">' + (de ? "Eintragen" : "Send") + "</button></div></form>";
+      var form = $("form", box), st = $(".gb-st", box), host = $(".cf-turnstile", box), ta = $("textarea", form), cnt = $(".cnt", form);
+      ta.addEventListener("input", function () { cnt.textContent = ta.value.length + " / 500"; });
       tsLoad().then(function () { try { if (!host.querySelector("iframe")) turnstile.render(host); } catch (e) {} }).catch(function () {});
       form.onsubmit = function (ev) {
         ev.preventDefault(); st.className = "gb-st"; st.textContent = de ? "Sende …" : "Sending …";
@@ -339,9 +524,10 @@
         fetch("/api/guestbook", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: fd.get("message"), token: fd.get("cf-turnstile-response") }) })
           .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
           .then(function (r) {
-            if (r.ok) { st.textContent = de ? "Danke!" : "Thanks!"; form.reset(); sound.open(); } else { st.className = "gb-st err"; st.textContent = r.j.error || (de ? "Fehler" : "Error"); }
+            if (r.ok) { st.className = "gb-st ok"; st.textContent = de ? "✓ Danke! Dein Gruß ist drin." : "✓ Thanks! Your note is in."; form.reset(); cnt.textContent = "0 / 500"; sound.open(); toast("ok", de ? "Danke!" : "Thanks!", de ? "Dein Gruß steht jetzt im Gästebuch." : "Your note is in the guestbook now."); }
+            else { st.className = "gb-st err"; st.textContent = r.j.error || (de ? "Fehler" : "Error"); }
             try { if (window.turnstile) turnstile.reset(host); } catch (e) {}
-            return fetch("/api/guestbook").then(function (x) { return x.json(); }).then(function (d) { renderEntries(list, d.entries || []); });
+            return fetch("/api/guestbook").then(function (x) { return x.json(); }).then(function (d) { renderEntries(list, d.entries || []); if (r.ok) { var m0 = $(".msg", list); if (m0) m0.classList.add("new"); } });
           }).catch(function () { st.className = "gb-st err"; st.textContent = de ? "Nicht gesendet (offline?)" : "Not sent (offline?)"; });
       };
     });
@@ -359,6 +545,7 @@
     if (!open.size) { var d = $(".dicon"); if (d) d.focus({ preventScroll: true }); }
   }
   addEventListener("popstate", function () {
+    if ($(".shx")) closeSheet();   /* Back on a phone: the sheet goes with it, never left over the next window */
     var k = appOf(location.pathname);
     if (k) { openWin(k, { noPush: true }); return; }
     if (bare(location.pathname) !== "/") { openUrl(location.href, { noPush: true }); return; }
@@ -366,7 +553,11 @@
   });
 
   setUser();
-  var deep = appOf(location.pathname);
+  if (/[?&]login=failed(&|$)/.test(location.search)) {
+    var en0 = lang === "en";
+    toast("err", en0 ? "Sign-in didn't work." : "Anmeldung hat nicht geklappt.", en0 ? "Discord cancelled or the link expired." : "Discord hat abgebrochen oder der Link war alt.", { label: en0 ? "Try again" : "Nochmal", href: L.login + encodeURIComponent(location.origin + location.pathname) });
+    var u0 = new URL(location.href); u0.searchParams.delete("login"); history.replaceState(history.state, "", u0.pathname + u0.search + u0.hash);
+  }  var deep = appOf(location.pathname);
   if (deep && /[?&]preview=/.test(location.search)) APPS[deep].dataset.q = location.search;
   var atDesk = bare(location.pathname) === "/";   /* before restored windows change the address */
   var firstVisit = !store.get("booted");

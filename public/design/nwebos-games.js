@@ -8,7 +8,7 @@
   var S = {
     de: {
       mines: "Pixelminen", grid: "Spielfeld 9 mal 9", cell: "Feld", row: "Reihe", col: "Spalte", hidden: "verdeckt", flag: "Flagge", mine: "Mine", near: "Minen nebenan", empty: "leer",
-      newGame: "Neues Spiel", flagMode: "Flaggen-Modus", help: "Aufdecken: Klick oder Enter · Flagge: Rechtsklick, ⚑ oder F · Pfeiltasten bewegen",
+      newGame: "Neues Spiel", flagMode: "Flaggen-Modus", help: "Aufdecken: Klick oder Enter · Flagge: Rechtsklick, ⚑ oder F · Pfeiltasten bewegen", helpT: "Tippen: aufdecken · ⚑ antippen, dann Feld tippen: Fahne · lange drücken: Fahne",
       won: "Gewonnen!", lost: "Boom! Nochmal?", stats: function (p, w, b) { return "Siege " + w + " von " + p + (b ? " · Bestzeit " + b + " s" : ""); },
       newWord: "Neues Wort", start: "Errate das Wort mit 5 Buchstaben", five: "Bitte fünf Buchstaben", bad: "Kein gültiges Wort", loading: "Wörter laden …", got: "Geschafft!", was: "Das Wort war ",
       right: "richtig", other: "anderer Platz", no: "nicht drin", enter: "Eingabe", back: "Löschen", lang: "Sprache", letter: "Buchstabe", empty5: "leer",
@@ -16,7 +16,7 @@
     },
     en: {
       mines: "Pixel Mines", grid: "Board 9 by 9", cell: "Cell", row: "row", col: "column", hidden: "hidden", flag: "flag", mine: "mine", near: "mines nearby", empty: "empty",
-      newGame: "New game", flagMode: "Flag mode", help: "Reveal: click or Enter · Flag: right-click, ⚑ or F · arrow keys move",
+      newGame: "New game", flagMode: "Flag mode", help: "Reveal: click or Enter · Flag: right-click, ⚑ or F · arrow keys move", helpT: "Tap: reveal · tap ⚑ then a cell: flag · long-press: flag",
       won: "You won!", lost: "Boom! Again?", stats: function (p, w, b) { return "Wins " + w + " of " + p + (b ? " · best " + b + " s" : ""); },
       newWord: "New word", start: "Guess the 5-letter word", five: "Five letters, please", bad: "Not in word list", loading: "Loading words …", got: "Got it!", was: "The word was ",
       right: "right", other: "wrong place", no: "not in word", enter: "Enter", back: "Delete", lang: "Language", letter: "letter", empty5: "empty",
@@ -63,7 +63,7 @@
     el.classList.add("g-mines");
     el.innerHTML = '<div class="pm"><div class="mnbar"><span class="lcd7" data-m role="img"></span><button type="button" class="face" aria-label="' + t.newGame + '"></button>' +
       '<button type="button" class="flagm" aria-pressed="false" aria-label="' + t.flagMode + '">⚑</button><span class="lcd7" data-t aria-hidden="true"></span></div>' +
-      '<div class="mngrid" role="group" aria-label="' + t.grid + '"></div><p class="mnst" role="status" aria-live="polite"></p><p class="mnhelp">' + t.help + '</p><p class="mnstat"></p></div>';
+      '<div class="mngrid" role="group" aria-label="' + t.grid + '"></div><p class="mnst" role="status" aria-live="polite"></p><p class="mnhelp">' + (matchMedia("(pointer:coarse)").matches ? t.helpT : t.help) + '</p><p class="mnstat"></p></div>';
     var grid = el.querySelector(".mngrid"), face = el.querySelector(".face"), fm = el.querySelector(".flagm"), lm = el.querySelector("[data-m]"), lt = el.querySelector("[data-t]"),
       st = el.querySelector(".mnst"), sl = el.querySelector(".mnstat");
     var nbs = [];
@@ -128,7 +128,12 @@
     }
     function focusCell(k) { grid.children[cur].tabIndex = -1; cur = k; grid.children[k].tabIndex = 0; grid.children[k].focus(); }
     grid.addEventListener("click", function (e) { var b = e.target.closest(".c"); if (b) { cur = +b.dataset.i; if (flagMode) flag(cur); else open(cur); } });
-    grid.addEventListener("contextmenu", function (e) { var b = e.target.closest(".c"); if (b) { e.preventDefault(); flag(+b.dataset.i); } });
+    grid.addEventListener("contextmenu", function (e) { var b = e.target.closest(".c"); if (b) { e.preventDefault(); if (!lpDone) flag(+b.dataset.i); lpDone = false; } });
+    /* touch: long-press (450 ms) flags (phone audit A6); the click that follows the long-press is swallowed */
+    var lpT = 0, lpDone = false;
+    grid.addEventListener("touchstart", function (e) { var b = e.target.closest(".c"); if (!b) return; lpDone = false; clearTimeout(lpT); lpT = setTimeout(function () { lpDone = true; flag(+b.dataset.i); }, 450); }, { passive: true });
+    ["touchend", "touchmove", "touchcancel"].forEach(function (ev) { grid.addEventListener(ev, function () { clearTimeout(lpT); }, { passive: true }); });
+    grid.addEventListener("click", function (e) { if (lpDone) { e.stopImmediatePropagation(); lpDone = false; } }, true);
     grid.addEventListener("keydown", function (e) {
       var b = e.target.closest(".c"); if (!b || e.altKey || e.ctrlKey || e.metaKey) return;
       var k = +b.dataset.i, x = k % N, y = (k / N) | 0, d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
