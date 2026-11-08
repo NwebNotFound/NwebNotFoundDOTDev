@@ -1148,6 +1148,12 @@ async function handle(req, env, ctx) {
   catch (e) {
     console.error("unhandled error", req.method, new URL(req.url).pathname, e && e.stack || e);
     let api = false; try { api = new URL(req.url).pathname.startsWith("/api/"); } catch {}
+    /* D1's free-tier daily limit (resets 00:00 UTC): a soft 503 with Retry-After until the reset, so the senders
+       (bot note_status, CraftCore sync) wait instead of hammering a hard 500 */
+    if (/daily row (write|read) limit|exceeded D1's free tier/i.test(String(e && e.message || e))) {
+      const now = Date.now(), wait = Math.max(60, Math.ceil((Math.ceil(now / 86400000) * 86400000 - now) / 1000));
+      return new Response(JSON.stringify({ error: "Datenbank-Tageslimit erreicht, bitte später erneut", retry_after: wait }), { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "retry-after": String(wait) } });
+    }
     return api ? json({ error: "Interner Fehler" }, 500) : new Response("Interner Fehler", { status: 500, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
   }
 }
