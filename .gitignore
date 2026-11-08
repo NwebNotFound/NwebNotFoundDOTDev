@@ -7,3 +7,12 @@ screens/qa/
 src/generated/*.e2e-bak
 public/downloads/
 __pycache__/
+
+# Secrets and local data must never be committed (repo goes public)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+backups/
+data/
