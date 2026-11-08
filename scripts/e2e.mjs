@@ -171,6 +171,30 @@ try {
   ok(ing.j?.auctions === 5 && ing.j?.shops === 2 && ing.j?.market === 8, "Zählung auctions/shops/market", JSON.stringify(ing.j));
   ok(ing.j?.views?.leaderboards >= 3 && ing.j?.players_stats === 2, "Views: Leaderboards + Player-Stats erkannt", JSON.stringify(ing.j));
   ok(ing.j?.market_history === 5, "v_market_history: 5 Punkte", JSON.stringify(ing.j));
+  { // D1 write budget (08.11.): a resync with recomputed averages rewrites no closed hour (> 2 h old); the current hour still updates
+    const before = sqlRows(`SELECT avg_price FROM mc_market_history WHERE item='diamond' AND hour_ts=${hr - 26 * H}`)[0]?.avg_price;
+    const re = await req("/api/mc-ingest", { method: "POST", body: { v_market_history: [{ item: "diamond", ts: hr - 26 * H, price: 99, volume: 4 }, { item: "diamond", ts: hr, price: 12, volume: 1 }, { item: "diamond", ts: hr - 30 * H, price: 7, volume: 1 }] }, token: TOK });
+    const r = (h) => sqlRows(`SELECT avg_price FROM mc_market_history WHERE item='diamond' AND hour_ts=${h}`)[0]?.avg_price;
+    ok(re.s === 200 && r(hr - 26 * H) === before && r(hr) === 12 && r(hr - 30 * H) === 7, "Markt-Historie: abgeschlossene Stunde nicht neu geschrieben, aktuelle aktualisiert, fehlende eingefügt", `${before} ${r(hr - 26 * H)} ${r(hr)} ${r(hr - 30 * H)}`);
+    sql(`DELETE FROM mc_market_history WHERE item='diamond' AND hour_ts IN (${hr}, ${hr - 30 * H})`);   // keep the fixture as before for the checks below
+  }
+  { // D1 write budget: the same push again rewrites nothing (snapshot, links, player stats, market keep their updated_at)
+    const stamp = () => JSON.stringify([sqlRows("SELECT updated_at FROM mc_snapshot"), sqlRows("SELECT discord_id, updated_at FROM mc_links ORDER BY discord_id"), sqlRows("SELECT mc_uuid, updated_at FROM mc_player_stats ORDER BY mc_uuid"), sqlRows("SELECT item, updated_at FROM mc_market ORDER BY item")]);
+    const s0 = stamp(); await new Promise((r) => setTimeout(r, 20));
+    const again = await req("/api/mc-ingest", { method: "POST", body: payload, token: TOK });
+    ok(again.s === 200 && stamp() === s0, "Gleicher Push noch einmal: nichts neu geschrieben (updated_at unverändert)", again.s);
+  }  { // Gatekeeper #126: the heartbeat is per part — a servers push that changes every time must not keep an unchanged
+    // leaderboards push from refreshing leaderboards_at (readers drop a part whose *_at is older than 5 min)
+    const lbAt = () => Number(sqlRows("SELECT json_extract(data, '$.leaderboards_at') AS t FROM mc_snapshot")[0]?.t);
+    const old = Date.now() - 400000;
+    sql(`UPDATE mc_snapshot SET data = json_set(data, '$.leaderboards_at', ${old})`);
+    await req("/api/mc-ingest", { method: "POST", body: { servers: { survival: { online: true, players: 3 } } }, token: TOK });   // servers change → row updated_at is fresh
+    const lb = await req("/api/mc-ingest", { method: "POST", body: { v_leaderboards: payload.v_leaderboards }, token: TOK });        // leaderboards unchanged
+    ok(lb.s === 200 && lbAt() > old + 300000, "Snapshot-Heartbeat je Teil: unveränderte Bestenliste frischt leaderboards_at auf, obwohl servers frisch ist", `${lb.s} ${lbAt() - old}`);
+    const t1 = lbAt(); await req("/api/mc-ingest", { method: "POST", body: { v_leaderboards: payload.v_leaderboards }, token: TOK });
+    ok(lbAt() === t1, "…und innerhalb des Heartbeats schreibt derselbe Push nichts");
+  }
+
 
   console.log("2) Markt");
   const m = (await req("/api/mc-market")).j, by = Object.fromEntries(m.items.map((x) => [x.item, x]));
@@ -1084,6 +1108,11 @@ try {
     ok(slot0?.label === "Insel" && slot0?.online === true && slot0?.max === 10 && slot0?.players === 2 && slot0?.members?.some((m) => m.name === null && m.role === "member"), "VIP-Seite: online aus status running, max aus player_limit, name aus name", JSON.stringify(seen0.j?.worlds));
     // Panel v2: ein siebter Regel-Schlüssel im Plugin darf die Welt nicht aus dem Panel werfen.
     await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ settings: { gamemode: "creative", pvp: true, weather: "rain" } })] }, { token: TOK, origin: null, cookie: null });
+    { // D1 write budget: the same world list again writes 0 rows (updated_at stays)
+      const at = () => sqlRows("SELECT updated_at FROM mc_blobs WHERE kind='vip_worlds'")[0]?.updated_at; const a0 = at(); await new Promise((r) => setTimeout(r, 20));
+      const again = await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ settings: { gamemode: "creative", pvp: true, weather: "rain" } })] }, { token: TOK, origin: null, cookie: null });
+      ok(again.s === 200 && a0 != null && at() === a0, "VIP-Sync: gleiche Liste noch einmal schreibt nichts", `${again.s} ${a0} ${at()}`);
+    }
     const exSeen = await req("/api/mc-vip", { cookie: c1 });
     const exSlot = exSeen.j?.worlds?.slots?.find((x) => x.id === WID);
     ok(exSlot && exSlot.settings?.pvp === true && exSlot.settings?.gamemode === "creative" && !("weather" in (exSlot.settings || {})), "Sync: unbekannter Regel-Schlüssel wirft die Welt nicht raus", JSON.stringify(exSlot?.settings));

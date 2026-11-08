@@ -27,7 +27,7 @@ export function cleanRanks(a) {
 // Snapshot: Upsert + alle UUIDs löschen, die nicht im Snapshot sind
 export function rankStatements(env, rows, now) {
   const st = rows.map((r) => env.DB.prepare(
-    "INSERT INTO mc_player_ranks (uuid, name, rank, color, weight, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET name=excluded.name, rank=excluded.rank, color=excluded.color, weight=excluded.weight, updated_at=excluded.updated_at"
+    "INSERT INTO mc_player_ranks (uuid, name, rank, color, weight, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET name=excluded.name, rank=excluded.rank, color=excluded.color, weight=excluded.weight, updated_at=excluded.updated_at WHERE name IS NOT excluded.name OR rank IS NOT excluded.rank OR color IS NOT excluded.color OR weight IS NOT excluded.weight"
   ).bind(r.uuid, r.name, r.rank, r.color, r.weight, now));
   st.push(env.DB.prepare("DELETE FROM mc_player_ranks WHERE uuid NOT IN (SELECT value FROM json_each(?))").bind(JSON.stringify(rows.map((r) => r.uuid))));
   return st;

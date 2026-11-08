@@ -629,12 +629,22 @@ async function auth(p, req, env, url) {
   return null;
 }
 
+/** D1 write budget (free tier: 100k rows a day): one log line per write burst with the rows D1 really wrote, so
+ *  `wrangler tail` / Workers logs show the writes per source. No counter in D1 (that would cost writes itself). */
+export function logWrites(src, results) {
+  const n = (Array.isArray(results) ? results : [results]).reduce((a, r) => a + (Number(r?.meta?.rows_written) || 0), 0);
+  if (n) console.log(JSON.stringify({ d1_rows_written: n, src }));
+  return results;
+}
+
 /* ---------- MC-Ingest (Push von PC-Nils) ---------- */
 // mc_snapshot: servers und leaderboards kommen in getrennten Pushes. Nur den gesendeten Teil in SQL
 // ersetzen (json_set), statt die ganze Zeile in JS zu lesen, zu ändern und zurückzuschreiben: zwei
 // parallele Pushes überschreiben sich sonst gegenseitig mit dem alten Stand des jeweils anderen Teils.
 // Für den nicht gesendeten Teil wird ein fehlender Zeitstempel (Altdaten) aus dem bisherigen
 // updated_at nachgetragen, bevor updated_at weiterspringt. undefined = Teil nicht gesendet.
+/* heartbeat < FRESH_MS with margin: bot pushes every 30–60 s, so the stamp is at most ~3.5 min old (< 5 min) */
+const SNAP_HEARTBEAT_MS = 150000;
 export function snapshotStatement(env, servers, leaderboards, now) {
   const parts = [["servers", servers], ["leaderboards", leaderboards]];
   const fresh = {}; for (const [k, v] of parts) if (v !== undefined) { fresh[k] = v; fresh[k + "_at"] = now; }
@@ -643,7 +653,14 @@ export function snapshotStatement(env, servers, leaderboards, now) {
     if (v !== undefined) { sets.push(`'$.${k}', json(?${args.length + 1}), '$.${k}_at', ?2`); args.push(JSON.stringify(v)); }
     else sets.push(`'$.${k}_at', COALESCE(json_extract(mc_snapshot.data, '$.${k}_at'), CASE WHEN json_type(mc_snapshot.data, '$.${k}') IS NOT NULL THEN mc_snapshot.updated_at END)`);
   }
-  return env.DB.prepare(`INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?1, ?2) ON CONFLICT(id) DO UPDATE SET data = json_set(json(mc_snapshot.data), ${sets.join(", ")}), updated_at = excluded.updated_at`).bind(...args);
+  /* D1 write budget: only when a sent part changed, or when that part's own *_at stamp is older than SNAP_HEARTBEAT_MS
+     (servers and leaderboards come in separate pushes; one part changing must not keep the other's stamp from
+     refreshing — readers drop a part whose *_at is older than FRESH_MS) */
+  const diff = []; for (const [k, v] of parts) if (v !== undefined) {
+    const n = args.indexOf(JSON.stringify(v), 2) + 1;
+    diff.push(`json_extract(mc_snapshot.data, '$.${k}') IS NOT json(?${n})`, `COALESCE(json_extract(mc_snapshot.data, '$.${k}_at'), 0) < ?2 - ${SNAP_HEARTBEAT_MS}`);
+  }
+  return env.DB.prepare(`INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?1, ?2) ON CONFLICT(id) DO UPDATE SET data = json_set(json(mc_snapshot.data), ${sets.join(", ")}), updated_at = excluded.updated_at WHERE ${diff.join(" OR ")}`).bind(...args);
 }
 // Craft-Views direkt annehmen (v_leaderboards, v_player_stats_ext, v_market_history) → interne Formen
 const pk = (o, ...k) => { for (const x of k) if (o?.[x] != null && o[x] !== "") return o[x]; return null; };
@@ -820,8 +837,9 @@ async function mcIngest(req, env) {
     st.push(snapshotStatement(env, b.servers ? data.servers ?? null : undefined, b.leaderboards ? data.leaderboards ?? null : undefined, now));
   }
   if (links) {
-    if (b.links_full === true) st.push(env.DB.prepare("DELETE FROM mc_links"));
     for (const l of links) st.push(env.DB.prepare("INSERT INTO mc_links (discord_id, mc_name, mc_uuid, has_role, verified, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(discord_id) DO UPDATE SET mc_name=excluded.mc_name, mc_uuid=excluded.mc_uuid, has_role=excluded.has_role, verified=excluded.verified, updated_at=excluded.updated_at WHERE mc_name IS NOT excluded.mc_name OR mc_uuid IS NOT excluded.mc_uuid OR has_role IS NOT excluded.has_role OR verified IS NOT excluded.verified").bind(l.discord_id, l.mc_name, l.mc_uuid, l.has_role ? 1 : 0, l.verified ? 1 : 0, now));
+    // a full list removes the links that are gone, instead of deleting and re-inserting all of them (D1 write budget)
+    if (b.links_full === true) st.push(env.DB.prepare("DELETE FROM mc_links WHERE discord_id NOT IN (SELECT value FROM json_each(?))").bind(JSON.stringify(links.map((l) => String(l.discord_id)))));
   }
   if (b?.leaderboards) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('total', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at WHERE data IS NOT excluded.data OR updated_at < excluded.updated_at - 240000").bind(JSON.stringify(cleanLb(b.leaderboards) || {}), now));
   if (leaderboards_weekly) st.push(env.DB.prepare("INSERT INTO mc_leaderboards (kind, data, updated_at) VALUES ('weekly', ?, ?) ON CONFLICT(kind) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at WHERE data IS NOT excluded.data OR updated_at < excluded.updated_at - 240000").bind(JSON.stringify(leaderboards_weekly), now));
@@ -832,7 +850,7 @@ async function mcIngest(req, env) {
   if (b && "price_reset_at" in b) {
     const v = b.price_reset_at, t = parseReset(v);
     if (v === null || v === "") { st.push(env.DB.prepare("DELETE FROM mc_meta WHERE key = 'price_reset_at'")); reset_info = null; }
-    else if (t) { reset_info = new Date(t * 1000).toISOString(); st.push(env.DB.prepare("INSERT INTO mc_meta (key, value, updated_at) VALUES ('price_reset_at', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(reset_info, now)); }
+    else if (t) { reset_info = new Date(t * 1000).toISOString(); st.push(env.DB.prepare("INSERT INTO mc_meta (key, value, updated_at) VALUES ('price_reset_at', ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at WHERE value IS NOT excluded.value").bind(reset_info, now)); }
     else reset_info = "invalid";
   }
   const shops = cleanShops(b?.shops), auctions = cleanAuctions(b?.auctions ?? b?.v_auctions, b?.auction_bids ?? b?.v_auction_bids);
@@ -842,7 +860,7 @@ async function mcIngest(req, env) {
   if (econ) st.push(...economyStatements(env, econ.rows, now));
   if (ranks && ranks.rows.length) st.push(...rankStatements(env, ranks.rows, now));
   if (pvp && pvp.rows.length) st.push(...pvpStatements(env, pvp.rows, now));
-  if (st.length) await env.DB.batch(st);
+  if (st.length) logWrites("mc-ingest", await env.DB.batch(st));
   HIST_MEMO = null; MARKET_MEMO = null; // neue Marktdaten/Reset: kurzer Speicher ist nicht mehr gültig
   return json({ ok: true, ...(econ ? { economy_daily: econ.rows.length } : {}), ...(ranks ? { player_ranks: ranks.rows.length, ...(ranks.dropped ? { player_ranks_dropped: true } : {}) } : {}), ...(pvp ? { pvp_stats: pvp.rows.length, ...(pvp.dropped ? { pvp_stats_dropped: true } : {}) } : {}), ...(parkour ? { parkour: parkour.rows.length, parkour_rejected: parkour.rejected, parkour_course_names: parkour.names.length } : {}), views: vinfo, shops: shops ? shops.length : 0, auctions: auctions ? auctions.length : 0, market: market ? market.length : 0, market_history: market_history ? market_history.length : 0, servers: Object.keys(data.servers).length, leaderboards: Object.keys(data.leaderboards).length, links: links ? links.length : 0, players_stats: Object.keys(players_stats).length, details: Object.keys(details).length, leaderboards_weekly: leaderboards_weekly ? Object.keys(leaderboards_weekly).length : 0, ...(reset_info !== undefined ? { price_reset_at: reset_info } : {}) });
 }
@@ -907,9 +925,13 @@ function marketStatements(env, market, hist) {
     st.push(env.DB.prepare("DELETE FROM mc_market WHERE item NOT IN (SELECT value FROM json_each(?))").bind(JSON.stringify(market.map((m) => m.item))));
   }
   if (hist && hist.length) {
+    /* D1 free tier: 100k written rows a day. A history resync re-sends every hour of the last 90 days; hours that are
+       over (older than 2 h) are only inserted when missing, never rewritten — slightly different averages from a
+       recomputation upstream no longer cost a write per row (08.11.: 87k of 100k rows went here) */
+    const closed = Math.floor(Date.now() / 1000) - 7200;
     for (let i = 0; i < hist.length; i += HIST_CHUNK) st.push(env.DB.prepare(`INSERT INTO mc_market_history (item, hour_ts, avg_price, min_price, max_price, volume_qty)
       SELECT json_extract(value,'$.item'), json_extract(value,'$.hour_ts'), json_extract(value,'$.avg_price'), json_extract(value,'$.min_price'), json_extract(value,'$.max_price'), json_extract(value,'$.volume_qty') FROM json_each(?) WHERE 1
-      ON CONFLICT(item, hour_ts) DO UPDATE SET avg_price=excluded.avg_price, min_price=excluded.min_price, max_price=excluded.max_price, volume_qty=excluded.volume_qty WHERE avg_price IS NOT excluded.avg_price OR min_price IS NOT excluded.min_price OR max_price IS NOT excluded.max_price OR volume_qty IS NOT excluded.volume_qty`).bind(JSON.stringify(hist.slice(i, i + HIST_CHUNK))));
+      ON CONFLICT(item, hour_ts) DO UPDATE SET avg_price=excluded.avg_price, min_price=excluded.min_price, max_price=excluded.max_price, volume_qty=excluded.volume_qty WHERE excluded.hour_ts >= ?2 AND (avg_price IS NOT excluded.avg_price OR min_price IS NOT excluded.min_price OR max_price IS NOT excluded.max_price OR volume_qty IS NOT excluded.volume_qty)`).bind(JSON.stringify(hist.slice(i, i + HIST_CHUNK)), closed));
     st.push(env.DB.prepare("DELETE FROM mc_market_history WHERE hour_ts < ?").bind(Math.floor(Date.now() / 1000) - HIST_DAYS * 86400));
   }
   return st;
@@ -1132,6 +1154,12 @@ async function handle(req, env, ctx) {
   catch (e) {
     console.error("unhandled error", req.method, new URL(req.url).pathname, e && e.stack || e);
     let api = false; try { api = new URL(req.url).pathname.startsWith("/api/"); } catch {}
+    /* D1's free-tier daily limit (resets 00:00 UTC): a soft 503 with Retry-After until the reset, so the senders
+       (bot note_status, CraftCore sync) wait instead of hammering a hard 500 */
+    if (/daily row (write|read) limit|exceeded D1's free tier/i.test(String(e && e.message || e))) {
+      const now = Date.now(), wait = Math.max(60, Math.ceil((Math.ceil(now / 86400000) * 86400000 - now) / 1000));
+      return new Response(JSON.stringify({ error: "Datenbank-Tageslimit erreicht, bitte später erneut", retry_after: wait }), { status: 503, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "retry-after": String(wait) } });
+    }
     return api ? json({ error: "Interner Fehler" }, 500) : new Response("Interner Fehler", { status: 500, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
   }
 }
