@@ -14,7 +14,8 @@ import { playersApi, playerApi, playersBody, playerBody } from "./mc-players.js"
 import { makeFeedback, feedbackBody } from "./mc-feedback.js";
 import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
 import { normInv, renderInventoryCard } from "./mc-inventory.js";
-import { changelogBody } from "./mc-changelog.js";
+import { changelogBody, rowsToMd } from "./mc-changelog.js";
+import { CHANGELOG_MD } from "./generated/changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
 import { navReady, sitePage } from "./hub.js";
 import { nwebosPage, nwebosChoice, nwebosRoute, DEFAULT_BLOCKS } from "./nwebos.js";
@@ -26,7 +27,8 @@ import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { epubPath, seriesEpubPath } from "./epub.js";
 import { makeProfile } from "./profile-v3.js";
-import { makeAdmin, siteData } from "./admin.js";
+import { makeAdmin, siteData, purgeSite } from "./admin.js";
+import { makeChangelogIngest } from "./changelog-ingest.js";
 import { nwebosMcPage } from "./nwebos-mc.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
 import { safeDecode } from "./safe-decode.js";
@@ -826,6 +828,7 @@ async function mcIngest(req, env) {
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
 let _p3; const P3 = () => _p3 || (_p3 = makeProfile({ json, getUser, MAIN }));   // "Mein Profil" v3 (src/profile-v3.js)
+let _clIngest; const CL_INGEST = (req, env) => (_clIngest || (_clIngest = makeChangelogIngest({ json, safeEq, onWrite: purgeSite, logWrites })))(req, env);
 let _admin; const ADMIN = () => _admin || (_admin = makeAdmin({ json, getUser, MAIN, defaults: { blocks: DEFAULT_BLOCKS }, logWrites }));
 let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, onReadEnd: (env, id) => P3().award(env, id, "leseratte"), chapterExists: (s, n) => osSeries("de").some((se) => se.slug === s && se.chapters.some((c) => c.n === n)) }));
 let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
@@ -1198,7 +1201,7 @@ async function route(req, env, ctx) {
       if (p === "/leaderboards") return mcHtml(p, LEADERBOARDS_MC());
       if (p === "/pvp") return mcHtml(p, mcPage("PvP · NwebNotFound MC", "PvP-Rangliste der Arena: Siege, Niederlagen und Siegquote", pvpBody()));
       if (p === "/vip") return mcHtml(p, mcPage("VIP · NwebNotFound MC", "VIP- und MVP-Panel: eigener Rang, Vorteile, Welten und Stats", vipBody()));
-      if (p === "/changelog") return mcHtml(p, mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", changelogBody()));
+      if (p === "/changelog") { const rows = ((await siteData(env)).changelog || []).filter((r) => r.area === "server"); return mcHtml(p, mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", rows.length ? changelogBody(rowsToMd(rows, CHANGELOG_MD), "D1") : changelogBody())); }
       if (p === "/parkour") return mcHtml(p, mcPage("Parkour · NwebNotFound MC", "Parkour-Bestzeiten aus der Lobby: Top 10 pro Kurs", parkourBody()));
       if (p === "/bestellungen" || p === "/abholungen") return mcHtml(p, mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));
       if (p === "/feedback") return mcHtml(p, shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
@@ -1223,6 +1226,7 @@ async function route(req, env, ctx) {
     if (p === "/feedback") return new Response(null, { status: 301, headers: { location: `https://${MCD}/feedback`, "cache-control": "public, max-age=3600" } });
     if (p === "/api/guestbook") return guestbookApi(req, env);
     if (p === "/api/admin" || p.startsWith("/api/admin/")) return ADMIN().api(p, req, env, url);
+    if (p === "/api/changelog/ingest") return CL_INGEST(req, env);   // merged PRs -> Neuigkeiten (GitHub Action, bearer token)
     if (p === "/api/blog" || p.startsWith("/api/blog/")) { const r = await BLOG().api(p, req, env, url); if (r) return r; }
     // ---- Feeds (Creative Hub, phase 3b) ----
     // Vor dem Sprach-Redirect: /de/writing/feed.xml und /writing/feed.xml liefern denselben Feed (ein

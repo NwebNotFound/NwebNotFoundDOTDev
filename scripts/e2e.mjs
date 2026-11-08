@@ -18,6 +18,7 @@ import "./queue-unit.mjs";
 import "./nwebos-unit.mjs";
 import "./blog-unit.mjs";
 import "./admin-unit.mjs";
+import "./changelog-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { writing as osWritingWin } from "../src/nwebos-apps.js";
@@ -101,7 +102,7 @@ if (await globalThis.fetch(BASE + "/", { headers: { host: HOST }, signal: AbortS
 }
 fs.rmSync(PERSIST, { recursive: true, force: true });
 const hadDV = fs.existsSync(DV); if (hadDV) fs.copyFileSync(DV, DV + ".e2e-bak");
-fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\nPRICE_RESET_AT=${RESET}\n`);
+fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_CLIENT_ID=1\nDISCORD_CLIENT_SECRET=x\nTURNSTILE_SECRET=1x0000000000000000000000000000000AA\nFEEDBACK_ADMIN_TOKEN=e2e-admin\nCHANGELOG_TOKEN=e2e-changelog\nPRICE_RESET_AT=${RESET}\n`);
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
 { let okS = true; try { execSync(`bash scripts/schema-check.sh --local --persist-to ${PERSIST}`, { cwd: ROOT, stdio: "ignore" }); } catch { okS = false; } ok(okS, "schema.sql erfüllt scripts/schema-check.sh (deploy.sh-Vorabprüfung)"); }
 console.log((await localDb()) ? "Fixture-SQL: node:sqlite direkt auf die lokale D1" : "Fixture-SQL: wrangler d1 execute (node:sqlite fehlt)");
@@ -1361,6 +1362,26 @@ try {
     sql("DELETE FROM site_blocks");
     const back = await req("/portfolio", { testHost: "nwebnotfound.dev", os: true });
     ok(back.t.includes("Diese Website"), "Verwaltung: leere Tabelle = wieder die Code-Texte"); }
+  // Automatic changelog (migration 0022, src/changelog-ingest.js): a merged PR event with the bearer token becomes a live
+  // row; the main Neuigkeiten window and the mc /changelog show it; a re-send and a Verwaltung edit are respected.
+  { const CI = (body, auth = "Bearer e2e-changelog") => req("/api/changelog/ingest", { method: "POST", testHost: "nwebnotfound.dev", headers: { authorization: auth }, body });
+    const ev = (n, body, repo = "NwebNotFound/NwebNotFoundDOTDev") => ({ repository: { full_name: repo }, pull_request: { number: n, merged: true, merged_at: "2026-11-08T12:00:00Z", base: { ref: "main" }, html_url: `https://github.com/${repo}/pull/${n}`, body } });
+    const site = await CI(ev(9001, "## Changelog\narea: site\nde: E2E-Automatik – aus dem PR\nen: E2E automation – from the PR"));
+    const mc = await CI(ev(9002, "## Changelog\narea: mc\nde: E2E-Serverneuigkeit – automatisch", "NwebNotFound/mc-stack"));
+    const bad = await CI(ev(9003, "## Changelog\narea: site\nde: x"), "Bearer falsch"), none = await CI(ev(9004, "## Changelog\nnone"));
+    ok(site.s === 201 && mc.s === 201 && bad.s === 401 && none.s === 202, "Changelog-Automatik: PR-Ereignis → Eintrag; falscher Token 401; none übersprungen", `${site.s} ${mc.s} ${bad.s} ${none.s}`);
+    const win = await req("/changelog", { testHost: "nwebnotfound.dev", os: true }), winEn = await req("/en/changelog", { testHost: "nwebnotfound.dev", os: true }), mcPage = await req("/changelog");
+    ok(win.t.includes("E2E-Automatik") && win.t.includes("E2E-Serverneuigkeit") && winEn.t.includes("E2E automation") && mcPage.t.includes("E2E-Serverneuigkeit") && mcPage.t.includes("Automatisch aus den Änderungen") && !mcPage.t.includes("E2E-Automatik"),
+      "Changelog-Automatik: Neuigkeiten-Fenster (DE/EN) und mc-/changelog (nur Server-Einträge) zeigen sie", mcPage.s);
+    const again = await CI(ev(9001, "## Changelog\narea: site\nde: E2E-Automatik – aus dem PR\nen: E2E automation – from the PR"));
+    const rowId = sqlRows("SELECT id, version FROM changelog WHERE source = 'NwebNotFound/NwebNotFoundDOTDev#9001'")[0];
+    const edit = await req(`/api/admin/changelog/${rowId.id}`, { method: "PATCH", cookie: c1, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { title_de: "Von Nils geändert", version: rowId.version } });
+    const resend = await CI(ev(9001, "## Changelog\narea: site\nde: Überschreiben?"));
+    const after = sqlRows("SELECT title_de, edited FROM changelog WHERE source = 'NwebNotFound/NwebNotFoundDOTDev#9001'")[0];
+    ok(again.s === 200 && again.j?.changed === false && edit.s === 200 && resend.j?.changed === false && after.title_de === "Von Nils geändert" && after.edited === 1 && sqlRows("SELECT COUNT(*) AS n FROM changelog WHERE source LIKE '%#900%'")[0].n === 2,
+      "Changelog-Automatik: gleiches Ereignis schreibt nichts, eine Verwaltungs-Änderung wird nie überschrieben, ein Eintrag pro PR", JSON.stringify(after));
+    for (const r of sqlRows("SELECT id FROM changelog WHERE source LIKE '%#900%'")) await req(`/api/admin/changelog/${r.id}`, { method: "DELETE", cookie: c1, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev" });
+    ok(sqlRows("SELECT COUNT(*) AS n FROM changelog")[0].n === 0, "Changelog-Automatik: Testeinträge entfernt"); }
   // Verwaltung window + entry points (server-rendered for admins only)
   { const W = (path, cookie) => req(path, { cookie, testHost: "nwebnotfound.dev", os: true });
     const anonW = await W("/admin"), otherW = await W("/admin/projects", c2), admW = await W("/admin/projects/12", c1);
