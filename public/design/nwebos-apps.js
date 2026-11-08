@@ -51,8 +51,8 @@
     }
     /* the secret badge: night theme on, signed in; the server checks the Berlin clock (once per device and night) */
     try {
-      var k = "nwebos.p3night." + new Date().toISOString().slice(0, 10);
-      if (document.documentElement.dataset.theme === "summer-night" && !localStorage.getItem(k)) { localStorage.setItem(k, "1"); post("/api/profile/badges/night", {}); }
+      var k = "nwebos.p3night." + new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date());   /* Berlin date */
+      if (document.documentElement.dataset.theme === "summer-night" && !localStorage.getItem(k)) post("/api/profile/badges/night", {}).then(function (r) { if (r.s === 200) localStorage.setItem(k, "1"); });
     } catch (e) {}
   }
   new MutationObserver(function (ms) { ms.forEach(function (m) { [].forEach.call(m.addedNodes, function (n) { if (n.classList && n.classList.contains("win")) initWin(n); }); }); }).observe($("#wins"), { childList: true });
@@ -83,6 +83,7 @@
       b.disabled = true;
       post("/api/profile/games/merge", body).then(function (r) {
         if (r.s === 200) { GUEST.forEach(function (g) { try { localStorage.removeItem(g[1]); } catch (e) {} }); if (window.NwebOS && NwebOS.toast) NwebOS.toast("ok", T("Übernommen", "Added"), T("Deine Spiele zählen jetzt für dein Konto.", "Your games now count for your account.")); setTimeout(function () { location.reload(); }, 600); }
+        else if (r.s === 409) { GUEST.forEach(function (g) { try { localStorage.removeItem(g[1]); } catch (e) {} }); var mc = b.closest("[data-p3-merge]"); if (mc) mc.hidden = true; if (window.NwebOS && NwebOS.toast) NwebOS.toast("info", T("Schon übernommen", "Already added"), T("Dein Konto hat die Spiele von vor dem Anmelden bereits.", "Your account already has the games from before you signed in.")); }
         else { b.disabled = false; if (window.NwebOS && NwebOS.toast) NwebOS.toast("err", T("Nicht übernommen – nochmal versuchen.", "Not added – try again.")); }
       });
       return;

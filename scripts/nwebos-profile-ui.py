@@ -103,6 +103,20 @@ with sync_playwright() as p:
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS 375 signed in: tab links, switches + theme saved to the account, switch hit area >= 44, RSS and delete sheets, home icon")
 
+    # taskbar day/night + sound toggles (1280) save to the account: after a reload with local storage cleared they stay
+    c = ctx_for(br, 1280); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(f"https://{H}/", wait_until="load"); pg.wait_for_function("() => window.__me && window.__me.user"); pg.wait_for_timeout(300)
+    assert pg.evaluate("document.documentElement.dataset.theme") == "summer-day", "starts at day (put back above)"
+    pg.locator("#thm").click(); pg.locator("#snd").click(); pg.wait_for_timeout(600)
+    saved = pg.evaluate("fetch('/api/me').then(r => r.json()).then(j => j.user.prefs)")
+    assert saved and saved["theme"] == "night" and saved["sound"] == 0, ("taskbar toggles saved to the account", saved)
+    pg.evaluate("localStorage.removeItem('summer-theme'); localStorage.removeItem('nwebos.mute')")
+    pg.reload(wait_until="load"); pg.wait_for_function("() => window.__me && window.__me.user"); pg.wait_for_timeout(400)
+    assert pg.evaluate("document.documentElement.dataset.theme") == "summer-night" and pg.evaluate("NwebOS.prefs().sound") is False, "after reload: night and muted from the account"
+    pg.evaluate("fetch('/api/profile/prefs', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ theme: 'day', sound: true }) })"); pg.wait_for_timeout(300)
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 1280 taskbar: day/night and sound toggles saved to the account and kept after a reload")
+
     # guest stats from before the sign-in: the merge card, "Verwerfen" removes them
     c = ctx_for(br, 375, extra="localStorage.setItem('nwebos.five.stats.guest', JSON.stringify({played:3,won:2,streak:1,best:2,variant:'de'}));")
     pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))

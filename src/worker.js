@@ -483,11 +483,9 @@ async function profileDelete(req, env) {
     // reading progress and reactions from the NwebOS blog/reader (Gatekeeper #115)
     env.DB.prepare("DELETE FROM blog_reads WHERE discord_id = ?").bind(String(u.id)),
     env.DB.prepare("DELETE FROM blog_reactions WHERE discord_id = ?").bind(String(u.id)),
-    // profile v3: settings, game stats, badges
-    env.DB.prepare("DELETE FROM user_prefs WHERE discord_id = ?").bind(String(u.id)),
-    env.DB.prepare("DELETE FROM game_stats WHERE discord_id = ?").bind(String(u.id)),
-    env.DB.prepare("DELETE FROM user_badges WHERE discord_id = ?").bind(String(u.id)),
   ]);
+  // profile v3 (migration 0018): settings, game stats, badges — own batch, so the old deletes never depend on it
+  await env.DB.batch(["user_prefs", "game_stats", "user_badges"].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE discord_id = ?`).bind(String(u.id)))).catch(() => {});
   return json({ ok: true }, 200, { "set-cookie": sessCookie("", 0) });
 }
 

@@ -331,8 +331,13 @@ try {
       const mg = await P("/api/profile/games/merge", { stats: { mines: { played: 3, won: 1, best: 80 }, five: { played: 2, won: 2, best: 7 } } });
       const st2 = sqlRows(`SELECT game, played, best, best_streak FROM game_stats WHERE discord_id='${DD}' ORDER BY game`);
       ok(mg.s === 200 && st2[0].played === 8 && st2[0].best_streak === 7 && st2[1].played === 5 && st2[1].best === 80, "Profil v3: lokale Werte zusammenführen (Summe gespielt, bester Wert)", JSON.stringify(st2));
+      const mgAgain = await P("/api/profile/games/merge", { stats: { mines: { played: 3, won: 1, best: 80 }, five: { played: 2, won: 9, best: 7 } } });
+      const st3 = sqlRows(`SELECT game, played, won, best, best_streak FROM game_stats WHERE discord_id='${DD}' ORDER BY game`);
+      ok(mgAgain.s === 409 && JSON.stringify(st3.map(({ game, played, best, best_streak }) => ({ game, played, best, best_streak }))) === JSON.stringify(st2) && st3.every((r) => r.won <= r.played), "Profil v3: zweites Zusammenführen (Wiederholung) 409, nichts doppelt gezählt, gewonnen ≤ gespielt", `${mgAgain.s} ${JSON.stringify(st3)}`);
+      const meB = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
+      ok(!JSON.stringify(meB.j).includes("_merged"), "Profil v3: interne Markierung erscheint nicht als Abzeichen");
       const ex = await req("/api/profile/export", { cookie: cd, testHost: "nwebnotfound.dev" });
-      ok(ex.s === 200 && /attachment/.test(ex.h.get("content-disposition") || "") && ex.j?.games?.length === 2 && ex.j?.prefs?.theme === "night" && !ex.t.includes("sdel") && ex.j?.guestbook?.[0]?.message === "zum-loeschen-e2e", "Profil v3: Export als JSON-Download, ohne Sitzungs-ID", ex.t.slice(0, 160));
+      ok(ex.s === 200 && /attachment/.test(ex.h.get("content-disposition") || "") && ex.j?.games?.length === 2 && ex.j?.prefs?.theme === "night" && !ex.t.includes("sdel") && !ex.t.includes("_merged") && ex.j?.guestbook?.[0]?.message === "zum-loeschen-e2e", "Profil v3: Export als JSON-Download, ohne Sitzungs-ID", ex.t.slice(0, 160));
       const win = await req("/profile", { testHost: "nwebnotfound.dev", os: true, cookie: cd + "; nnf_os=1" });
       ok(win.t.includes('data-p3') && win.t.includes('<span class="p3-stat"><b>1</b>Gruß</span>') && win.t.includes("Minenräumer") && win.t.includes('data-pf-delete') && win.t.includes('href="/api/profile/export"'), "Profil v3: Fenster mit Kennzahlen, Abzeichen, Export und Löschen", win.s);
       ok(sqlRows(`SELECT badge FROM user_badges WHERE discord_id='${DD}' AND badge='gruss'`).length === 1, "Profil v3: Erster Gruß beim Öffnen nachgetragen (Eintrag von vor v3)"); }

@@ -55,7 +55,7 @@ export function cleanRun(b) {
 export function mergeLocal(row, local, game) {
   const r = row ? { ...row } : { played: 0, won: 0, best: null, streak: 0, best_streak: 0, dist: null };
   const played = int(local?.played, 0, 1e6) || 0, won = Math.min(played, int(local?.won, 0, 1e6) || 0);
-  r.played += played; r.won += won;
+  r.played += played; r.won = Math.min(r.played, r.won + won);
   if (game === "mines") { const b = int(local?.best, 1, 86400); if (b != null) r.best = r.best == null ? b : Math.min(r.best, b); }
   if (game === "five") {
     r.best_streak = Math.max(r.best_streak, int(local?.best, 0, 1e6) || 0, int(local?.streak, 0, 1e6) || 0);
@@ -97,7 +97,7 @@ export function makeProfile({ json, getUser, MAIN }) {
       const [prefs, games, badges, sess] = await Promise.all([
         env.DB.prepare("SELECT lang, theme, sound, boot, reduced_motion, updated_at FROM user_prefs WHERE discord_id = ?").bind(id).first().catch(() => null),
         env.DB.prepare("SELECT game, variant, played, won, best, streak, best_streak, dist, updated_at FROM game_stats WHERE discord_id = ?").bind(id).all().then((x) => x.results || []).catch(() => []),
-        env.DB.prepare("SELECT badge, earned_at FROM user_badges WHERE discord_id = ? ORDER BY earned_at").bind(id).all().then((x) => x.results || []).catch(() => []),
+        env.DB.prepare("SELECT badge, earned_at FROM user_badges WHERE discord_id = ? AND substr(badge, 1, 1) <> '_' ORDER BY earned_at").bind(id).all().then((x) => x.results || []).catch(() => []),
         u.sid ? env.DB.prepare("SELECT created_at, expires_at FROM sessions WHERE id = ?").bind(u.sid).first().catch(() => null) : null,
       ]);
       const g = {}; for (const r of games) g[r.game + ":" + r.variant] = rowOf(r);
@@ -130,6 +130,9 @@ export function makeProfile({ json, getUser, MAIN }) {
       const b = await req.json().catch(() => null);
       if (!b || typeof b !== "object" || typeof b.stats !== "object" || !b.stats) return json({ error: "invalid json" }, 400);
       const now = Date.now(), st = [], out = {};
+      /* one merge per account: the marker goes in first; a replay (lost response, a second tab) finds it and changes nothing */
+      const mark = await env.DB.prepare("INSERT OR IGNORE INTO user_badges (discord_id, badge, earned_at) VALUES (?, '_merged', ?)").bind(o.id, now).run();
+      if (!mark.meta || !mark.meta.changes) return json({ ok: false, error: "already merged" }, 409);
       for (const [game, variant] of [["mines", "9x9"], ["five", GAMES.five.includes(b.variant) ? b.variant : "de"]]) {
         const local = b.stats[game]; if (!local || typeof local !== "object" || !(Number(local.played) > 0)) continue;
         const cur = await env.DB.prepare("SELECT played, won, best, streak, best_streak, dist FROM game_stats WHERE discord_id = ? AND game = ? AND variant = ?").bind(o.id, game, variant).first();
@@ -159,7 +162,7 @@ export function makeProfile({ json, getUser, MAIN }) {
         q("SELECT post_id, kind, created_at FROM blog_reactions WHERE discord_id = ?"),
         q("SELECT lang, theme, sound, boot, reduced_motion, updated_at FROM user_prefs WHERE discord_id = ?"),
         q("SELECT game, variant, played, won, best, streak, best_streak, dist, updated_at FROM game_stats WHERE discord_id = ?"),
-        q("SELECT badge, earned_at FROM user_badges WHERE discord_id = ?"),
+        q("SELECT badge, earned_at FROM user_badges WHERE discord_id = ? AND substr(badge, 1, 1) <> '_'"),
         q("SELECT created_at, expires_at FROM sessions WHERE discord_id = ?"),   // never the session id
         q("SELECT mc_name, verified, has_role, updated_at FROM mc_links WHERE discord_id = ?"),
       ]);

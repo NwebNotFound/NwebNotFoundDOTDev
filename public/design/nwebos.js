@@ -110,9 +110,11 @@
     if (pr.sound != null) setMute(!(pr.sound === true || pr.sound === 1));
     if (pr.boot != null) store.set("noboot", pr.boot === false || pr.boot === 0 ? "1" : null);
     if (pr.reduced_motion != null) { var on = pr.reduced_motion === true || pr.reduced_motion === 1; document.documentElement.classList.toggle("rm", on); try { localStorage.setItem("nwebos.rm", on ? "1" : "0"); } catch (e) {} }
-    if (save && me && store.get("user") !== "gast") {
-      fetch("/api/profile/prefs", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(pr) }).catch(function () {});
-    }
+    if (save) savePref(pr);
+  }
+  /* signed in: a changed setting goes to the account (taskbar toggles, quick sheet, profile); guests keep it local */
+  function savePref(pr) {
+    if (me && store.get("user") !== "gast") fetch("/api/profile/prefs", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(pr) }).catch(function () {});
   }
   window.NwebOS.prefs = prefsNow; window.NwebOS.setPref = function (pr) { applyPrefs(pr, true); };
 
@@ -180,7 +182,7 @@
   var snd = $("#snd");
   function setMute(m) { muted = m; store.set("mute", m ? "1" : null); snd.setAttribute("aria-pressed", m ? "false" : "true"); if (m && ac) ac.suspend(); }
   setMute(muted);
-  snd.addEventListener("click", function () { setMute(!muted); if (!muted) sound.click(); });
+  snd.addEventListener("click", function () { setMute(!muted); if (!muted) sound.click(); savePref({ sound: !muted }); });
 
   /* ---------- window state in localStorage ---------- */
   function save() {
@@ -495,7 +497,7 @@
   var thm = $("#thm");
   var night = function () { var t = R.dataset.theme; return t === "summer-night" || (!t && matchMedia("(prefers-color-scheme: dark)").matches); };
   function syncTheme() { thm.setAttribute("aria-pressed", String(night())); R.toggleAttribute("data-night", night()); }
-  thm.onclick = function () { var n = night() ? "summer-day" : "summer-night"; R.dataset.theme = n; try { localStorage.setItem("summer-theme", n); } catch (e) {} syncTheme(); sound.click(); };
+  thm.onclick = function () { var n = night() ? "summer-day" : "summer-night"; R.dataset.theme = n; try { localStorage.setItem("summer-theme", n); } catch (e) {} syncTheme(); sound.click(); savePref({ theme: n === "summer-night" ? "night" : "day" }); };
   syncTheme();
   var tick = function () { var t = new Date().toLocaleTimeString(lang === "en" ? "en-GB" : "de-DE", { hour: "2-digit", minute: "2-digit" }); $("#clock").textContent = t; $("#mclock").textContent = t; var qc = $("[data-qclock]"); if (qc) qc.textContent = t; };
   tick(); setTimeout(function () { tick(); setInterval(tick, 60000); }, 60000 - (Date.now() % 60000));
