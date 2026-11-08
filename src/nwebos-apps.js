@@ -89,7 +89,7 @@ function changelogDays(lang, today, rows = null) {
   if (rows) for (const r of rows) add(r.day, r.area, de ? r.title_de : r.title_en || r.title_de, de ? r.text_de : r.text_en || r.text_de);   // D1 (Verwaltung), live rows
   else for (const [iso, t, tde, ten, xde, xen] of SITE_LOG) add(iso, t, de ? tde : ten, de ? xde : xen);
   const year = today.getUTCFullYear();
-  for (const e of latestEntries(24, undefined, lang)) {
+  for (const e of rows && rows.some((r) => r.area === "server") ? [] : latestEntries(24, undefined, lang)) {   // D1 has the server entries (ingest/import)
     if (!e.date) continue;
     const [dd, mm] = e.date.split(".");
     const iso = `${year}-${mm}-${dd}`;

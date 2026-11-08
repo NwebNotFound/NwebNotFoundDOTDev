@@ -201,3 +201,7 @@ CREATE TABLE IF NOT EXISTS admin_log (
   before_json TEXT
 );
 CREATE INDEX IF NOT EXISTS admin_log_at ON admin_log (at DESC);
+ALTER TABLE changelog ADD COLUMN source TEXT;
+ALTER TABLE changelog ADD COLUMN edited INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE changelog ADD COLUMN pr_url TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS changelog_source ON changelog (source) WHERE source IS NOT NULL;

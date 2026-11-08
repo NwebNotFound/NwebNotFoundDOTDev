@@ -85,7 +85,17 @@ export function latestEntries(limit = 4, md = CHANGELOG_MD, lang = "de") {
   return out;
 }
 
-export const changelogBody = (md = CHANGELOG_MD) => {
+/** D1 changelog rows (area server; automatic + imported) as the CHANGELOG.md player part, newest day first. */
+export function rowsToMd(rows) {
+  const safe = (s) => String(s || "").replace(/<!--|-->/g, "").replace(/[*`\r\n]/g, " ").replace(/\s+/g, " ").trim();
+  const byDay = new Map();
+  for (const r of rows) { if (!byDay.has(r.day)) byDay.set(r.day, []); byDay.get(r.day).push(r); }
+  const days = [...byDay.keys()].sort().reverse();
+  const item = (r) => `- **${safe(r.title_de)}**${r.text_de ? " – " + safe(r.text_de) : ""}${r.title_en ? ` <!-- en: **${safe(r.title_en)}**${r.text_en ? " – " + safe(r.text_en) : ""} -->` : ""}`;
+  return "## Für Spieler\n" + days.map((d) => `### ${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}\n` + byDay.get(d).map(item).join("\n")).join("\n") + "\n";
+}
+
+export const changelogBody = (md = CHANGELOG_MD, source = null) => {
   const groups = [];
   for (const section of playerSections(md)) {
     const date = sectionDate(section.title);
@@ -96,5 +106,5 @@ export const changelogBody = (md = CHANGELOG_MD) => {
   const list = groups.length ? `<div class="cl-timeline">${groups.map((group) => `<article class="g clg"${group.date ? ` data-date="${group.date.iso}"` : ""}>${group.date ? `<time class="chip cl-date" datetime="${group.date.iso}">${esc(group.date.label)}</time>` : ""}${group.sections.map((s) => `${s.title == null ? `<h2 class="clh">Neu auf dem Server</h2>` : dateOnly(s.title) ? "" : `<h2 class="clh">${inline(s.title)}</h2>`}<ul class="cll">${s.items.map(renderEntry).join("")}</ul>`).join("")}</article>`).join("")}</div>`
     : `<div class="g empty-st" id="cl-empty"><h2 class="hub-h2">Noch keine Einträge</h2><p class="mut">Sobald es Neuigkeiten gibt, stehen sie hier.</p></div>`;
   return `<link rel="stylesheet" href="/mc/changelog.css?v=${AV}"><section class="hero cl-hero"><div class="pixbg"></div><div class="hub-wrap"><p class="eyb">Server-News</p><h1 class="hub-h">Changelog.</h1><p class="sub">Was sich auf dem Server geändert hat.</p></div></section>
-<section class="sec cl-sec"><div class="hub-wrap cl-wrap" id="changelog">${list}<p class="mut cl-src">Stand: mc-stack@${esc(CHANGELOG_SRC.sha.slice(0, 7))}</p></div></section>`;
+<section class="sec cl-sec"><div class="hub-wrap cl-wrap" id="changelog">${list}<p class="mut cl-src">${source === "D1" ? "Automatisch aus den Änderungen am Server" : `Stand: mc-stack@${esc(CHANGELOG_SRC.sha.slice(0, 7))}`}</p></div></section>`;
 };
