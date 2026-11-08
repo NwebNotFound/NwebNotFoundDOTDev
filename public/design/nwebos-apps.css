@@ -298,3 +298,5 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
 @media (max-width:700px){.page .rexp{display:none}.rexpb{display:block;margin:20px 0 0}.rexpb .xpbtn{width:100%;min-height:44px}}
 .shx.rexps .xpbtn.wide{display:flex;justify-content:center;width:100%;min-height:48px;margin:0 0 8px}.shx.rexps .hint,.shx.rexps .rights{margin:4px 0;font-size:13px;color:var(--mut2,#5b6170)}
 @media print{.rexpb{display:none!important}}
+/* Texte: the short texts are a list of real tap targets (44px rows) */
+.lib .dash a{display:flex;align-items:center;min-height:44px;text-decoration:none}

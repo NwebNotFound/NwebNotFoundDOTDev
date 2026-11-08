@@ -14,6 +14,9 @@
   var $ = function (s, el) { return (el || document).querySelector(s); };
   var $$ = function (s, el) { return [].slice.call((el || document).querySelectorAll(s)); };
   var RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* phone audit A8: /auth/discord/logout (GET) lands on /?logout=1; read it now, before restored windows rewrite the address */
+  var askLogout = /[?&]logout=1(&|$)/.test(location.search);
+  if (askLogout) history.replaceState(history.state, "", location.pathname + location.search.replace(/[?&]logout=1/, "").replace(/^&/, "?") + location.hash);
   var PHONE = function () { return matchMedia("(max-width:700px)").matches; };
   var store = {
     get: function (k) { try { return localStorage.getItem("nwebos." + k); } catch (e) { return null; } },
@@ -491,10 +494,7 @@
     if (me) { li.hidden = false; dl.hidden = true; $("[data-me-name]").textContent = me.name; if (/^https:\/\//.test(me.avatar || "")) $("[data-me-av]").src = me.avatar; }
     else if (d && !d.available) dl.hidden = true;
     setUser();
-    if (/[?&]logout=1(&|$)/.test(location.search)) {   /* phone audit A8: /auth/discord/logout (GET) lands here and asks */
-      history.replaceState(history.state, "", location.pathname + location.search.replace(/[?&]logout=1/, "").replace(/^&/, "?") + location.hash);
-      if (me) logoutSheet(true);
-    }
+    if (askLogout && me) logoutSheet(true);   /* phone audit A8 */
 
     return me;
   }).catch(function () { return null; });
