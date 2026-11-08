@@ -172,6 +172,7 @@
   function openUrl(url, opt) {
     opt = opt || {};
     var u = new URL(url, location.href), b = bare(u.pathname);
+    if (b === "/" && !u.search) return Promise.resolve(null);   /* "/" is the plain desktop: never fall through to the first app */
     var have = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === b) have = k; });
     if (have && !u.search) { openWin(have, opt); return Promise.resolve(have); }
     var key = u.pathname + u.search; if (pending[key]) return pending[key];
@@ -220,7 +221,7 @@
     el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = Math.min(h, innerHeight - 46) + "px";   /* short laptop screens: the window fits above the taskbar, its content scrolls */
     var ico = opt.icon || icon16(k), tt = esc(opt.title || title(k));
     el.innerHTML = '<header class="wt"><button type="button" class="wb back" aria-label="' + esc(L.back) + '"><span class="wbt">‹</span>' + ic2("back") + '</button>' + ico + '<span class="tt">' + tt + '</span>' +
-      '<button type="button" class="wb mn" aria-label="' + esc(L.minimize) + '">–</button><button type="button" class="wb mx" aria-label="' + esc(L.maximize) + '">□</button><button type="button" class="wb x" aria-label="' + esc(L.close) + '"><span class="wbt">×</span>' + ic2("close") + '</button></header>' + (opt.menu === false ? '' : '<nav class="wm" aria-hidden="true">' + (L.menu || []).map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</nav>') + '<div class="wc"></div><span class="wr" aria-hidden="true"></span>';
+      '<button type="button" class="wb mn" aria-label="' + esc(L.minimize) + '">–</button><button type="button" class="wb mx" aria-label="' + esc(L.maximize) + '">' + ic2("max") + '</button><button type="button" class="wb x" aria-label="' + esc(L.close) + '"><span class="wbt">×</span>' + ic2("close") + '</button></header>' + (opt.menu === false ? '' : '<nav class="wm" aria-hidden="true">' + (L.menu || []).map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</nav>') + '<div class="wc"></div><span class="wr" aria-hidden="true"></span>';
     var wc = $(".wc", el);
     if (src) [].slice.call(src.cloneNode(true).childNodes).forEach(function (n) { if (!(n.classList && n.classList.contains("nojs-h"))) wc.appendChild(n); });
     else wc.innerHTML = opt.html || "";
@@ -234,7 +235,7 @@
     $(".x", el).onclick = function () { close(k); };
     $(".back", el).onclick = function () { close(k); };
     $(".mn", el).onclick = function () { minimize(k); };
-    var mxb = $(".mx", el), mxSet = function () { var m = el.classList.contains("max"); mxb.setAttribute("aria-label", m ? L.restoreWin : L.maximize); mxb.title = m ? L.restoreWin : ""; mxb.textContent = m ? "❐" : "□"; };
+    var mxb = $(".mx", el), mxSet = function () { var m = el.classList.contains("max"); mxb.setAttribute("aria-label", m ? L.restoreWin : L.maximize); mxb.title = m ? L.restoreWin : ""; mxb.innerHTML = ic2(m ? "restore" : "max"); };
     mxb.onclick = function () { el.classList.toggle("max"); mxSet(); save(); };
     var bar = $(".wt", el);
     bar.addEventListener("dblclick", function (e) { if (!e.target.closest(".wb")) { el.classList.toggle("max"); mxSet(); save(); } });
