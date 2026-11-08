@@ -68,7 +68,7 @@ const T = {
     logout: "Abmelden", shutdown: "Herunterfahren", aboutOs: "Über NwebOS", trashSoon: "Papierkorb", home: "Startbildschirm",
     offText: "Du kannst die Seite jetzt schließen.", offSub: "(oder einfach klicken, dann geht's weiter)",
     nojs: "NwebOS braucht JavaScript für die Fenster. Alle Inhalte stehen oben als normale Seite.",
-    minimize: "Minimieren", maximize: "Maximieren", close: "Schließen", back: "Zurück", menu: ["Datei", "Bearbeiten", "Ansicht", "Hilfe"],
+    minimize: "Minimieren", maximize: "Maximieren", restoreWin: "Wiederherstellen", close: "Schließen", back: "Zurück", menu: ["Datei", "Bearbeiten", "Ansicht", "Hilfe"],
     desc: "Nils' Ecke im Internet: Projekte, Gästebuch, Blog und ein Minecraft-Server, als kleines Betriebssystem.",
   },
   en: {
@@ -80,7 +80,7 @@ const T = {
     logout: "Log off", shutdown: "Shut down", aboutOs: "About NwebOS", trashSoon: "Recycle bin", home: "Home screen",
     offText: "It's now safe to close this page.", offSub: "(or click, and it starts again)",
     nojs: "NwebOS needs JavaScript for its windows. All content is above as a normal page.",
-    minimize: "Minimise", maximize: "Maximise", close: "Close", back: "Back", menu: ["File", "Edit", "View", "Help"],
+    minimize: "Minimise", maximize: "Maximise", restoreWin: "Restore", close: "Close", back: "Back", menu: ["File", "Edit", "View", "Help"],
     desc: "Nils' corner of the internet: projects, guestbook, blog and a Minecraft server, as a tiny operating system.",
   },
 };
