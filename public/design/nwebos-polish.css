@@ -6,7 +6,7 @@
 [data-theme=summer-night]{--edge:#7480c4;--c-sh:0 3px 0 #05070f;--c-bg:#2a3260;--c-fg:#eef0ff;--pn:#171d38;--pn2:#202848;--line:#323c6a;--txt:#e9e7f3;--mut2:#a9afcc}
 .ic2{width:20px;height:20px;flex:none;image-rendering:pixelated;shape-rendering:crispEdges}
 /* (4) title bar: the desktop keeps its glyphs, the phone shows the pixel icons */
-.wt .wb .ic2{display:none}
+.wt .wb .ic2{display:none}.wt .wb.mx .ic2{display:block;width:16px;height:16px}
 @media (max-width:700px){.wt .wb .wbt{display:none}.wt .wb .ic2{display:block}}
 /* (5) the phone search button lives in the bottom bar only */
 .mbar .msrch{display:none}

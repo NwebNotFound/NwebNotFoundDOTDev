@@ -148,10 +148,15 @@ with sync_playwright() as p:
     pg.goto(f"https://{H}/nope-404", wait_until="load"); pg.locator(".win.focus .nf").wait_for(timeout=10000)
     pg.locator(".win.focus [data-close]").click(); pg.wait_for_timeout(500)
     assert pg.locator(".win").count() == 0, ("Zum Desktop opens no window", pg.locator(".win .tt").all_inner_texts())
+    # openUrl("/") is the plain desktop: a desktop link to "/" opens no window (it used to fall through to the first app)
+    pg.evaluate("document.querySelector('#desk').insertAdjacentHTML('beforeend', '<a id=\"t-root\" href=\"/\" style=\"position:absolute;left:300px;top:300px;z-index:9\">root</a>')")
+    pg.locator("#t-root").click(); pg.wait_for_timeout(500)
+    assert pg.locator(".win").count() == 0, "openUrl('/') opens no window"
     pg.locator('.dicon[data-open="about"]').dblclick(); pg.locator(".win.focus .mx").wait_for()
     assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Maximieren"
     pg.locator(".win.focus .mx").click()
     assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Wiederherstellen", "label flips when maximised"
+    assert pg.locator(".win.focus .mx use").get_attribute("href").endswith("#i-c-restore") and not pg.locator(".win.focus .mx").inner_text().strip(), "restore icon is a sprite symbol, no text glyph"
     pg.locator(".win.focus .mx").click()
     assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Maximieren", "label flips back"
     c.unroute_all(behavior="ignoreErrors"); c.close()
