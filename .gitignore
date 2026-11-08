@@ -6,3 +6,4 @@ node_modules/
 screens/qa/
 src/generated/*.e2e-bak
 public/downloads/
+__pycache__/

@@ -16,6 +16,13 @@ from playwright.sync_api import sync_playwright
 BASE = sys.argv[1]
 COOKIE = sys.argv[2] if len(sys.argv) > 2 else ""
 MIN = int(os.environ.get("GUARD_MIN", "44"))
+# profile switches (.p3s): scrolled to the middle, the tappable height/width = how far from the centre a tap still
+# lands on the switch (elementFromPoint), so clipping or overlap counts
+SWITCHES = r"""() => [...document.querySelectorAll(".win.focus .p3s")].map((s) => { s.scrollIntoView({ block: "center" });
+  const r = s.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const on = (x, y) => { const e = document.elementFromPoint(x, y); return !!e && (e === s || s.contains(e)); };
+  const reach = (dx, dy) => { let n = 0; while (n < 60 && on(cx + dx * (n + 1), cy + dy * (n + 1))) n++; return n; };
+  return [s.dataset.p3Pref, reach(-1, 0) + reach(1, 0) + 1, reach(0, -1) + reach(0, 1) + 1]; })"""
 H = "nwebnotfound.dev"
 GIF = bytes.fromhex("47494638396101000100800000ffd23f00000021f90401000000002c000000000100010000020144003b")
 ROUTES = ["/", "/about", "/portfolio", "/blog", "/blog/eine-navigation-fuer-zwei-seiten", "/music", "/writing", "/guestbook",
@@ -49,7 +56,10 @@ PROBE = r"""(min) => {
       L = Math.min(L, r.left + bl + px(c.left)); T = Math.min(T, r.top + bt + px(c.top)); R = Math.max(R, r.right - br - px(c.right)); B = Math.max(B, r.bottom - bb - px(c.bottom)); }
     /* verify each grown side with elementFromPoint (an overlay clipped by an overflow parent or covered by a neighbour
        does not count); only inside the viewport, elsewhere the computed box stands */
-    const mx = (L + R) / 2, my = (T + B) / 2, inV = (x, y) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight;
+    /* only points inside the visible part of the element's window content (not under the title bar, the bottom bar or
+       outside the scrolled area): elsewhere the computed box stands */
+    const wc = el.closest(".wc"), vb = wc ? wc.getBoundingClientRect() : { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+    const mx = (L + R) / 2, my = (T + B) / 2, inV = (x, y) => x >= Math.max(0, vb.left) && y >= Math.max(0, vb.top) && x < Math.min(innerWidth, vb.right) && y < Math.min(innerHeight, vb.bottom) && !(document.querySelector(".mbar") && y >= document.querySelector(".mbar").getBoundingClientRect().top && getComputedStyle(document.querySelector(".mbar")).display !== "none");
     const hits = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === el || el.contains(t)); };
     const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, onTop = inV(cx, cy) && hits(cx, cy);   // covered elements (a window behind) are not checked
     if (onTop && T < r.top && inV(mx, T + 1) && !hits(mx, T + 1)) T = r.top;
@@ -122,6 +132,8 @@ with sync_playwright() as p:
                             tb.click(); pg.wait_for_timeout(250)
                             for kind, what, info in pg.evaluate(PROBE, MIN):
                                 if kind == "tap": found.append(("/profile (Einstellungen)", f"{who} {width} {'night' if night else 'day'}", kind, what, info))
+                            for key, hw, hh in pg.evaluate(SWITCHES):
+                                if hw < MIN or hh < MIN: found.append(("/profile (Einstellungen)", f"{who} {width} {'night' if night else 'day'}", "tap", f"switch {key}", f"{hw}x{hh}"))
                     if path == "/guestbook":   # the error toast of a failed Discord sign-in (?login=failed)
                         pg.goto(f"https://{H}/guestbook?login=failed", wait_until="load"); pg.locator(".toast.err").wait_for(timeout=5000); pg.wait_for_timeout(200)
                         for kind, what, info in pg.evaluate(PROBE, MIN):
