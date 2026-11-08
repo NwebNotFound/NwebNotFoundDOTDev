@@ -59,6 +59,7 @@ export const EXTRA = [
   { k: "soon", icon: "soon", path: "/pixelwand", de: "Pixelwand", en: "Pixel wall", w: 460, h: 250, x: 460, y: 200, menu: "no", inline: true },
   { k: "notfound", icon: "warn", de: "Nicht gefunden", en: "Not found", w: 470, h: 250, x: 420, y: 180, menu: "no" },
 ];
+const ADMIN_ONLY = new Set(["admin", "blog-edit"]);
 const ALL = [...APPS.filter((a) => a.win), ...EXTRA];
 export const OS_PATHS = ["/", ...ALL.filter((a) => a.path).map((a) => a.path)];
 
@@ -164,9 +165,9 @@ const href = (lang, path) => (lang === "en" ? (path === "/" ? "/en" : "/en" + pa
  * guestbook entries; `sitekey` the Turnstile site key for the guestbook form.
  */
 /** Search index without the blog (the shell loads /api/blog on the first search): windows, mc wiki, links. */
-function searchIndex(lang) {
+function searchIndex(lang, admin = false) {
   const t = T[lang], mc = `https://${MC_HOST}`;
-  const apps = ALL.filter((a) => (a.path || a.module) && a.k !== "soon").map((a) => ({ t: a[lang], d: "App", p: a.path ? href(lang, a.path) : "", ic: a.icon || a.k, kw: a.k, ...(a.path ? {} : { k: a.k }) }));
+  const apps = ALL.filter((a) => (a.path || a.module) && a.k !== "soon" && (admin || !ADMIN_ONLY.has(a.k)))   /* admin-only windows leave no trace for guests */.map((a) => ({ t: a[lang], d: "App", p: a.path ? href(lang, a.path) : "", ic: a.icon || a.k, kw: a.k, ...(a.path ? {} : { k: a.k }) }));
   return [...apps,
     { t: "Minecraft-Server", d: `${MC_HOST} · ${t.newTab}`, url: `${mc}/`, ic: "minecraft", kw: "minecraft server mc" },
     ...WIKI.map((w) => ({ t: `Wiki: ${w.title}`, d: `${MC_HOST}/wiki · ${t.newTab}`, url: `${mc}/wiki/${w.slug}`, ic: "minecraft", kw: `wiki minecraft ${w.sum || ""}` })),
@@ -201,11 +202,11 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
   // the phone quick sheet (built by the shell) takes this row first when it exists: admins only
   const admQ = admin ? `<template id="adm-q"><li class="adm-q"><a href="${esc(href(lang, "/admin"))}" data-qopen>${ic("admin", 16)}<b>${lang === "en" ? "Admin" : "Verwaltung"}</b><span class="ad-tag-adm">ADMIN</span><em>›</em></a></li></template>` : "";
   const progs = APPS.map((a) => `<li><a href="${esc(iconHref(a))}"${a.win ? ` data-open="${a.k}"` : ""}>${icon(a.k, 24)}<span>${esc(a[lang])}</span></a></li>`).join("");
-  const tpl = [...APPS.map((a) => [a.k, a.k]), ...EXTRA.map((a) => [a.k, a.icon])].map(([k, i]) => `<template id="ic-${k}">${icon(i, 16)}</template>`).join("");
+  const tpl = [...APPS.map((a) => [a.k, a.k]), ...EXTRA.map((a) => [a.k, a.icon])].filter(([k]) => admin || !ADMIN_ONLY.has(k)).map(([k, i]) => `<template id="ic-${k}">${icon(i, 16)}</template>`).join("");
   const other = lang === "en" ? "de" : "en";
   const alt = (l) => `https://${MAIN_HOST}${href(l, path)}`;
   const DISCORD = '<svg viewBox="0 0 71 55" fill="#fff" aria-hidden="true" focusable="false"><path d="M60.1 4.9A58.5 58.5 0 0045.4.4a40 40 0 00-1.9 3.8 54 54 0 00-16.2 0A40 40 0 0025.4.4 58.4 58.4 0 0010.7 4.9C1.4 18.7-1.1 32.2.1 45.5a59 59 0 0018 9.1 43 43 0 003.8-6.2 38 38 0 01-6-2.9l1.5-1.1a42 42 0 0036 0l1.5 1.1a38 38 0 01-6 2.9 43 43 0 003.8 6.2 58.7 58.7 0 0018-9.1c1.5-15.4-2.5-28.8-10.6-40.6zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2z"/></svg>';
-  const L = { ...t, lang, path, sprite: `/design/nwebos-icons.svg?v=${AV}`, idx: searchIndex(lang), home: href(lang, "/"), login: `/auth/discord/login?next=`, logoutUrl: `/auth/discord/logout?next=`, sitekey, routes, status };
+  const L = { ...t, lang, path, sprite: `/design/nwebos-icons.svg?v=${AV}`, idx: searchIndex(lang, admin), home: href(lang, "/"), login: `/auth/discord/login?next=`, logoutUrl: `/auth/discord/logout?next=`, sitekey, routes, status };
   return `<!doctype html>
 <html lang="${lang}" class="no-js nwebos"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(t.desc)}"><link rel="canonical" href="${alt(oneLang || lang)}">
