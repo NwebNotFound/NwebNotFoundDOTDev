@@ -101,7 +101,7 @@ export function siteData(env, now = Date.now()) {
 // ---------------- the router ----------------
 const SECTIONS = {
   projects: { table: "projects", cols: ["sort", "status", "progress", "href", "icon", "title_de", "title_en", "text_de", "text_en"], clean: cleanProject, order: "sort, id" },
-  changelog: { publish: true, table: "changelog", cols: ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"], clean: cleanNews, order: "day DESC, sort, id" },
+  changelog: { publish: true, touch: "edited = 1", table: "changelog", cols: ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"], clean: cleanNews, order: "day DESC, sort, id" },
 };
 const ROUTE = /^\/api\/admin\/(overview|home|projects|changelog|guestbook)(?:\/([a-z0-9.]{1,40}))?(?:\/(publish|withdraw|hide|unhide))?$/;
 export const ADMIN_RATE = { max: 120, windowMs: 60000 };
@@ -195,7 +195,7 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
     const merged = {}; for (const k of S.cols) merged[k] = Object.prototype.hasOwnProperty.call(patch, k) ? patch[k] : cur[k];
     const c = S.clean(merged); if (c.err) return out({ error: "invalid", fields: c.err }, 400);
     if (S.cols.every((k) => c.val[k] === cur[k])) return out({ ok: true, item: cur, unchanged: true });   // nothing to write
-    const upd = env.DB.prepare(`UPDATE ${S.table} SET ${S.cols.map((k) => `${k} = ?`).join(", ")}, version = version + 1, updated_at = ? WHERE id = ? AND version = ?`).bind(...S.cols.map((k) => c.val[k]), now, +id, cur.version);
+    const upd = env.DB.prepare(`UPDATE ${S.table} SET ${S.cols.map((k) => `${k} = ?`).join(", ")}${S.touch ? ", " + S.touch : ""}, version = version + 1, updated_at = ? WHERE id = ? AND version = ?`).bind(...S.cols.map((k) => c.val[k]), now, +id, cur.version);
     const vis = S.publish && c.val.status !== cur.status ? (c.val.status === "live" ? "publish" : "withdraw") : null;   // going live or offline is logged however it is sent
     const [res] = logWrites("admin-" + name, await env.DB.batch(vis ? [upd, log(env, who, name, id, vis, cur, now)] : [upd]));
     if (!res.meta?.changes) return out({ error: "conflict", item: await one(+id) }, 409);
