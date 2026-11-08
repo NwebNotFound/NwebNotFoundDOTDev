@@ -177,7 +177,8 @@
     var u = new URL(url, location.href), b = bare(u.pathname);
     if (b === "/" && !u.search) return Promise.resolve(null);   /* "/" is the plain desktop: never fall through to the first app */
     var have = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === b) have = k; });
-    if (have && !u.search) { openWin(have, opt); return Promise.resolve(have); }
+    if (have && !u.search && !opt.fresh) { openWin(have, opt);   /* fresh: reload its content (a filtered window back to all) */
+      return Promise.resolve(have); }
     var key = u.pathname + u.search; if (pending[key]) return pending[key];
     return (pending[key] = fetch(u.pathname + u.search, { credentials: "include", headers: { accept: "text/html" } }).then(function (r) { return r.text(); }).then(function (txt) {
       delete pending[key];
@@ -395,7 +396,7 @@
     if (op && !op.classList.contains("dicon") && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); if (APPS[op.dataset.open]) openWin(op.dataset.open); else if (op.href || ROUTES[op.dataset.open]) openUrl(op.href || ROUTES[op.dataset.open]); return; }
     /* an internal link inside the desktop opens its window instead of reloading the page */
     var a = e.target.closest("#desk a[href]");
-    if (a && !a.classList.contains("dicon") && !a.hasAttribute("data-close") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href); return; } }
+    if (a && !a.classList.contains("dicon") && !a.hasAttribute("data-close") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href, a.hasAttribute("data-fresh") ? { fresh: true } : null); return; } }
     var cl = e.target.closest("[data-close]"); if (cl && cl.closest(".win")) { e.preventDefault(); var w0 = cl.closest(".win"); open.forEach(function (o, k) { if (o.el === w0) close(k); }); return; }
     var cw = e.target.closest("[data-closewin]"); if (cw) { var w = cw.closest(".win"); open.forEach(function (o, k) { if (o.el === w) close(k, true); }); return; }
     var egg = e.target.closest("[data-egg]"); if (egg) { closeStart(); if (eggs[egg.dataset.egg]) eggs[egg.dataset.egg](); }

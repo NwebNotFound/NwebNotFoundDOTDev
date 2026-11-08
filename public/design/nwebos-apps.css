@@ -292,7 +292,8 @@ mark{padding:0 3px;background:linear-gradient(transparent 45%,#ffe27a 45% 90%,tr
 }
 /* Texte: the filter of a shared series/tag link, clearable (Planner 08.11.) */
 .lib .fchip{display:inline-flex;align-items:center;gap:8px;margin:10px 12px 0;padding:0 4px 0 12px;min-height:36px;border:2px solid var(--edge,#1b2238);border-radius:18px;background:var(--on-t,#ece6ff);color:var(--txt,#1b2238);font:700 13px var(--f)}
-.lib .fchip a{display:grid;place-items:center;width:40px;height:32px;margin:0;border-radius:14px;color:inherit;text-decoration:none;font-size:18px}
+.lib .fchip a{position:relative;display:grid;place-items:center;width:40px;height:32px;margin:0;border-radius:14px;color:inherit;text-decoration:none;font-size:18px}
+.lib .fchip a::after{content:"";position:absolute;inset:-6px -2px}
 /* chapter export: an aside on desktop, one button -> sheet on phones */
 .rexpb{display:none}
 @media (max-width:700px){.page .rexp{display:none}.rexpb{display:block;margin:20px 0 0}.rexpb .xpbtn{width:100%;min-height:44px}}

@@ -166,7 +166,7 @@ export function writing(lang, allSeries = [], allShorts = [], f = {}) {
   const de = lang !== "en";
   const { series, shorts } = filterTexte(allSeries, allShorts, f);
   const fs = f.series && allSeries.find((x) => x.slug === f.series);
-  const chip = f.series || f.tag ? `<p class="fchip" role="status"><span>${f.series ? `${de ? "Serie" : "Series"}: ${esc(fs ? fs.title : f.series)}` : `#${esc(f.tag)}`}</span><a href="${href(lang, "/writing")}" data-open="writing" aria-label="${de ? "Filter entfernen" : "Clear filter"}">×</a></p>` : "";
+  const chip = f.series || f.tag ? `<p class="fchip" role="status"><span>${f.series ? `${de ? "Serie" : "Series"}: ${esc(fs ? fs.title : f.series)}` : `#${esc(f.tag)}`}</span><a href="${href(lang, "/writing")}" data-fresh aria-label="${de ? "Filter entfernen" : "Clear filter"}">×</a></p>` : "";
   const s = series[0];
   const head = s ? `<header class="libh"><div class="bkc">${ic("writing", 48)}<span>${de ? "ROMAN" : "NOVEL"}</span></div><div><small>${de ? "Roman" : "Novel"}</small><b>${esc(s.title)}</b>
 <p>${de ? "Eine Geschichte in Kapiteln." : "A story in chapters."}</p><p class="btns"><a class="xpbtn go" href="${href(lang, `/writing/${s.slug}/${s.chapters[0].n}`)}">${de ? "Von vorn lesen" : "Start reading"}</a></p></div></header>
@@ -181,7 +181,7 @@ export function writing(lang, allSeries = [], allShorts = [], f = {}) {
    window: a note says so. */
 export function text(lang, item, html) {
   const de = lang !== "en", other = item.lang && item.lang !== lang;
-  return `<div class="rd rbook" data-read="writing:${esc(item.slug)}"><div class="rbar"><a class="tbtn" href="${href(lang, "/writing")}" data-open="writing">‹ ${de ? "Bibliothek" : "Library"}</a><span class="rtitle">${esc(item.title)}</span><span class="sp"></span>
+  return `<div class="rd rbook"><div class="rbar"><a class="tbtn" href="${href(lang, "/writing")}" data-open="writing">‹ ${de ? "Bibliothek" : "Library"}</a><span class="rtitle">${esc(item.title)}</span><span class="sp"></span>
 <button type="button" class="tbtn" data-fs="-1" aria-label="${de ? "Schrift kleiner" : "Smaller text"}">A−</button><button type="button" class="tbtn" data-fs="1" aria-label="${de ? "Schrift größer" : "Larger text"}">A+</button></div>
 <div class="prog" aria-hidden="true"><i></i></div><div class="rscroll"><article class="page"${item.lang ? ` lang="${esc(item.lang)}"` : ""}><p class="kap">${item.date ? `<time datetime="${esc(item.date)}">${esc(item.date.split("-").reverse().join("."))}</time> · ` : ""}${Number(item.readingMinutes) || 1} ${de ? "Min. Lesezeit" : "min read"}</p><h1>${esc(item.title)}</h1>
 ${item.archived ? `<p class="arch" role="note">${de ? "Dieser Text wurde archiviert. Er bleibt über den direkten Link lesbar, wird aber nicht mehr in der Übersicht geführt." : "This text has been archived. It stays readable through the direct link but is no longer listed."}</p>` : ""}${other ? `<p class="arch" role="note" lang="${lang}">${de ? (item.lang === "en" ? "Original auf Englisch." : "Original in einer anderen Sprache.") : item.lang === "de" ? "Original in German." : "Original in another language."}</p>` : ""}<div class="drop">${html}</div></article></div></div>`;

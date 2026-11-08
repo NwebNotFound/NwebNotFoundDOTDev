@@ -108,7 +108,7 @@ a.xpbtn[href*="/auth/discord"],.say .xpbtn{background:#5865f2;color:#fff}
 [data-theme=summer-night] .feat,[data-theme=summer-night] .react,[data-theme=summer-night] .toc,[data-theme=summer-night] .bmk button,[data-theme=summer-night] .bmk a,[data-theme=summer-night] .pn2>*{background:var(--pn2);border-color:var(--line);color:var(--txt)}
 [data-theme=summer-night] .dblk{background:var(--pn2);border-color:var(--edge);color:var(--txt)}
 [data-theme=summer-night] .rd,[data-theme=summer-night] .rscroll,[data-theme=summer-night] .bposts a:hover{background:var(--pn);color:var(--txt)}
-[data-theme=summer-night] .rbar{background:var(--pn2);border-color:var(--line);color:var(--txt)}
+[data-theme=summer-night] .rbar{background:var(--pn2);border-color:var(--line);color:var(--txt)}[data-theme=summer-night] .rtitle{color:var(--txt)}
 [data-theme=summer-night] .rx button{background:var(--pn);color:var(--txt);border-color:var(--edge)}
 [data-theme=summer-night] .rx button[aria-pressed=true]{background:#3a3270}
 [data-theme=summer-night] .toc a.on{background:#2a3260;color:#fff}
