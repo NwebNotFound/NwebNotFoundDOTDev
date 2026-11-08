@@ -1,14 +1,23 @@
 name: e2e
 on:
   pull_request:
+    # ready_for_review / labeled start the browser job on a draft that is now ready (or labelled run-browser)
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+  push:
+    branches: [main]
 permissions:
   contents: read
+# A new push cancels the old PR run (main runs are never cancelled). A label other than run-browser gets its own
+# group so it cannot cancel a run that is in progress. e2e-fast has no `if`, so the required check is never skipped.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.action == 'labeled' && github.event.label.name != 'run-browser' && 'label' || 'run' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   # Fast gate (meant as the required check): unit checks, static gates and every HTTP check of scripts/e2e.mjs
   # (NwebOS, blog, VIP, guestbook, mc pages) against wrangler dev + local D1. No browser, no Playwright install.
   e2e-fast:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,28 +41,53 @@ jobs:
   # Full run: the same HTTP checks plus the Playwright browser checks (NwebOS, blog editor, Turnstile, UI at
   # 390/1440) and the skin lookup against a real local D1.
   e2e-browser:
+    # Slow job (~10 min): not on drafts. Runs on ready_for_review, on pushes to main, on a PR that is not a draft, or
+    # with the label run-browser. Docs-only changes (*.md, mockups/, docs/) skip all steps.
+    if: >-
+      (github.event.action != 'labeled' || github.event.label.name == 'run-browser') &&
+      (github.event_name == 'push' || github.event.pull_request.draft == false ||
+      contains(github.event.pull_request.labels.*.name, 'run-browser'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Docs-only change?
+        id: docs
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          docs=false
+          if [ "$EVENT" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            if ! git diff --name-only "$BASE_SHA" HEAD | grep -qvE '(\.md$|^mockups/|^docs/)'; then docs=true; fi
+          fi
+          echo "docs=$docs" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
+        if: steps.docs.outputs.docs != 'true'
         with:
           node-version: 22
       - uses: actions/setup-python@v5
+        if: steps.docs.outputs.docs != 'true'
         with:
           python-version: "3.12"
       - name: Playwright-Browser-Cache
+        if: steps.docs.outputs.docs != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-1.64.1-chromium
       - name: Playwright installieren
+        if: steps.docs.outputs.docs != 'true'
         run: pip install playwright==1.64.1 && python -m playwright install --with-deps chromium
       - name: Install wrangler
+        if: steps.docs.outputs.docs != 'true'
         run: npm i -g wrangler
       - name: Skin-Lookup gegen echte lokale D1
+        if: steps.docs.outputs.docs != 'true'
         run: node scripts/skin-sql.mjs
       - name: e2e (HTTP + browser)
+        if: steps.docs.outputs.docs != 'true'
         env:
           E2E_SCREENS_DIR: ${{ runner.temp }}/screens/qa
         run: node scripts/e2e.mjs
