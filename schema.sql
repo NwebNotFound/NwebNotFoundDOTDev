@@ -201,6 +201,36 @@ CREATE TABLE IF NOT EXISTS admin_log (
   before_json TEXT
 );
 CREATE INDEX IF NOT EXISTS admin_log_at ON admin_log (at DESC);
+CREATE TABLE IF NOT EXISTS writing_series (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  title_de TEXT NOT NULL,
+  title_en TEXT,
+  status TEXT NOT NULL DEFAULT 'live',
+  sort INTEGER NOT NULL DEFAULT 0,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);
+-- A chapter (kind story, series_id + chapter set) or a short text (kind short). status: draft | live | archived
+-- (archived: off the lists, still reachable by its address — like `archived: true` in the old front matter).
+CREATE TABLE IF NOT EXISTS writing_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  series_id INTEGER,
+  kind TEXT NOT NULL DEFAULT 'story',
+  chapter INTEGER,
+  slug TEXT NOT NULL UNIQUE,
+  title_de TEXT NOT NULL,
+  title_en TEXT,
+  body_de TEXT NOT NULL DEFAULT '',
+  body_en TEXT,
+  tags TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'draft',
+  published_at INTEGER,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS writing_items_chapter ON writing_items (series_id, chapter) WHERE series_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS writing_items_status ON writing_items (status, published_at DESC);
 ALTER TABLE changelog ADD COLUMN source TEXT;
 ALTER TABLE changelog ADD COLUMN edited INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE changelog ADD COLUMN pr_url TEXT;
