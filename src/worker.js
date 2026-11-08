@@ -643,6 +643,8 @@ export function logWrites(src, results) {
 // parallele Pushes überschreiben sich sonst gegenseitig mit dem alten Stand des jeweils anderen Teils.
 // Für den nicht gesendeten Teil wird ein fehlender Zeitstempel (Altdaten) aus dem bisherigen
 // updated_at nachgetragen, bevor updated_at weiterspringt. undefined = Teil nicht gesendet.
+/* heartbeat < FRESH_MS with margin: bot pushes every 30–60 s, so the stamp is at most ~3.5 min old (< 5 min) */
+const SNAP_HEARTBEAT_MS = 150000;
 export function snapshotStatement(env, servers, leaderboards, now) {
   const parts = [["servers", servers], ["leaderboards", leaderboards]];
   const fresh = {}; for (const [k, v] of parts) if (v !== undefined) { fresh[k] = v; fresh[k + "_at"] = now; }
@@ -651,9 +653,13 @@ export function snapshotStatement(env, servers, leaderboards, now) {
     if (v !== undefined) { sets.push(`'$.${k}', json(?${args.length + 1}), '$.${k}_at', ?2`); args.push(JSON.stringify(v)); }
     else sets.push(`'$.${k}_at', COALESCE(json_extract(mc_snapshot.data, '$.${k}_at'), CASE WHEN json_type(mc_snapshot.data, '$.${k}') IS NOT NULL THEN mc_snapshot.updated_at END)`);
   }
-  /* D1 write budget: only when a sent part changed, or every 4 min (the *_at stamps say how fresh the data is) */
-  const diff = []; for (const [k, v] of parts) if (v !== undefined) diff.push(`json_extract(mc_snapshot.data, '$.${k}') IS NOT json(?${args.indexOf(JSON.stringify(v), 2) + 1})`);
-  diff.push("mc_snapshot.updated_at < excluded.updated_at - 240000");
+  /* D1 write budget: only when a sent part changed, or when that part's own *_at stamp is older than SNAP_HEARTBEAT_MS
+     (servers and leaderboards come in separate pushes; one part changing must not keep the other's stamp from
+     refreshing — readers drop a part whose *_at is older than FRESH_MS) */
+  const diff = []; for (const [k, v] of parts) if (v !== undefined) {
+    const n = args.indexOf(JSON.stringify(v), 2) + 1;
+    diff.push(`json_extract(mc_snapshot.data, '$.${k}') IS NOT json(?${n})`, `COALESCE(json_extract(mc_snapshot.data, '$.${k}_at'), 0) < ?2 - ${SNAP_HEARTBEAT_MS}`);
+  }
   return env.DB.prepare(`INSERT INTO mc_snapshot (id, data, updated_at) VALUES (1, ?1, ?2) ON CONFLICT(id) DO UPDATE SET data = json_set(json(mc_snapshot.data), ${sets.join(", ")}), updated_at = excluded.updated_at WHERE ${diff.join(" OR ")}`).bind(...args);
 }
 // Craft-Views direkt annehmen (v_leaderboards, v_player_stats_ext, v_market_history) → interne Formen

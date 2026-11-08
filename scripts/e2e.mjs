@@ -183,7 +183,18 @@ try {
     const s0 = stamp(); await new Promise((r) => setTimeout(r, 20));
     const again = await req("/api/mc-ingest", { method: "POST", body: payload, token: TOK });
     ok(again.s === 200 && stamp() === s0, "Gleicher Push noch einmal: nichts neu geschrieben (updated_at unverändert)", again.s);
+  }  { // Gatekeeper #126: the heartbeat is per part — a servers push that changes every time must not keep an unchanged
+    // leaderboards push from refreshing leaderboards_at (readers drop a part whose *_at is older than 5 min)
+    const lbAt = () => Number(sqlRows("SELECT json_extract(data, '$.leaderboards_at') AS t FROM mc_snapshot")[0]?.t);
+    const old = Date.now() - 400000;
+    sql(`UPDATE mc_snapshot SET data = json_set(data, '$.leaderboards_at', ${old})`);
+    await req("/api/mc-ingest", { method: "POST", body: { servers: { survival: { online: true, players: 3 } } }, token: TOK });   // servers change → row updated_at is fresh
+    const lb = await req("/api/mc-ingest", { method: "POST", body: { v_leaderboards: payload.v_leaderboards }, token: TOK });        // leaderboards unchanged
+    ok(lb.s === 200 && lbAt() > old + 300000, "Snapshot-Heartbeat je Teil: unveränderte Bestenliste frischt leaderboards_at auf, obwohl servers frisch ist", `${lb.s} ${lbAt() - old}`);
+    const t1 = lbAt(); await req("/api/mc-ingest", { method: "POST", body: { v_leaderboards: payload.v_leaderboards }, token: TOK });
+    ok(lbAt() === t1, "…und innerhalb des Heartbeats schreibt derselbe Push nichts");
   }
+
 
   console.log("2) Markt");
   const m = (await req("/api/mc-market")).j, by = Object.fromEntries(m.items.map((x) => [x.item, x]));
