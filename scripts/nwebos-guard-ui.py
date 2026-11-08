@@ -59,7 +59,7 @@ PROBE = r"""(min) => {
     return { left: L, top: T, right: R, bottom: B, w: R - L, h: B - T }; };
   const targets = [];
   for (const el of document.querySelectorAll("button,a[href],input:not([type=hidden]),select,textarea,[role=button],summary")) {
-    if (!visible(el) || el.closest("#boot,#off,.nojs-h,.post p,.post li,.pft p,.rxn,.hint,.edfoot span,.tl ul li p,.props dd,.crumb2")) continue;   // inline text links are not tap targets
+    if (!visible(el) || el.closest("#boot,#off,.nojs-h,.post p,.post li,.pft p,.rxn,.hint,.edfoot span,.tl ul li p,.crumb2")) continue;   // inline text links are not tap targets
     if (el.parentElement && el.parentElement.closest("button,a[href],summary")) continue;   // nested (a button inside a link row)
     targets.push([el, hit(el)]);
   }
@@ -116,6 +116,16 @@ with sync_playwright() as p:
                     pg.wait_for_timeout(500)
                     for kind, what, info in pg.evaluate(PROBE, MIN):
                         found.append((path, f"{who} {width} {'night' if night else 'day'}", kind, what, info))
+                    if path == "/profile" and who == "signed-in":   # the settings pane is hidden until its tab is tapped
+                        tb = pg.locator('.win.focus [data-pane="pf-s"], .win.focus [data-pane="p3-set"]').first
+                        if tb.count():
+                            tb.click(); pg.wait_for_timeout(250)
+                            for kind, what, info in pg.evaluate(PROBE, MIN):
+                                if kind == "tap": found.append(("/profile (Einstellungen)", f"{who} {width} {'night' if night else 'day'}", kind, what, info))
+                    if path == "/guestbook":   # the error toast of a failed Discord sign-in (?login=failed)
+                        pg.goto(f"https://{H}/guestbook?login=failed", wait_until="load"); pg.locator(".toast.err").wait_for(timeout=5000); pg.wait_for_timeout(200)
+                        for kind, what, info in pg.evaluate(PROBE, MIN):
+                            if kind == "tap" and ("xpbtn" in what or "Nochmal" in info): found.append(("/guestbook?login=failed", f"{who} {width} {'night' if night else 'day'}", kind, what, info))
                     if path == "/":   # states that only exist after a tap: the quick sheet, the search with text
                         where = f"{who} {width} {'night' if night else 'day'}"
                         pg.locator("[data-quick]").click(); pg.locator(".shx.qs").wait_for(); pg.wait_for_timeout(300)
