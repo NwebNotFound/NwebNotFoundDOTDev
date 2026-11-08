@@ -49,7 +49,10 @@ PROBE = r"""(min) => {
       L = Math.min(L, r.left + bl + px(c.left)); T = Math.min(T, r.top + bt + px(c.top)); R = Math.max(R, r.right - br - px(c.right)); B = Math.max(B, r.bottom - bb - px(c.bottom)); }
     /* verify each grown side with elementFromPoint (an overlay clipped by an overflow parent or covered by a neighbour
        does not count); only inside the viewport, elsewhere the computed box stands */
-    const mx = (L + R) / 2, my = (T + B) / 2, inV = (x, y) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight;
+    /* only points inside the visible part of the element's window content (not under the title bar, the bottom bar or
+       outside the scrolled area): elsewhere the computed box stands */
+    const wc = el.closest(".wc"), vb = wc ? wc.getBoundingClientRect() : { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+    const mx = (L + R) / 2, my = (T + B) / 2, inV = (x, y) => x >= Math.max(0, vb.left) && y >= Math.max(0, vb.top) && x < Math.min(innerWidth, vb.right) && y < Math.min(innerHeight, vb.bottom) && !(document.querySelector(".mbar") && y >= document.querySelector(".mbar").getBoundingClientRect().top && getComputedStyle(document.querySelector(".mbar")).display !== "none");
     const hits = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === el || el.contains(t)); };
     const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, onTop = inV(cx, cy) && hits(cx, cy);   // covered elements (a window behind) are not checked
     if (onTop && T < r.top && inV(mx, T + 1) && !hits(mx, T + 1)) T = r.top;

@@ -141,3 +141,5 @@ html.rm *,html.rm *::before,html.rm *::after{animation:none!important;transition
 /* tap areas (guard): card header links and the buttons inside the profile reach 44px */
 .p3-card h3 a{padding:15px 4px;margin-top:-15px;margin-bottom:-15px}
 .p3 .xpbtn{min-height:44px}
+/* guard (settings pane probe): segment buttons/links at least 44px wide */
+.p3-seg button,.p3-seg a{min-width:44px}
