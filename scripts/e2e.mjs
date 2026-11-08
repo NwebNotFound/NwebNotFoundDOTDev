@@ -1298,6 +1298,13 @@ try {
     const blogAdminUuid = sqlRows(`SELECT mc_uuid FROM mc_links WHERE discord_id = '${D1}' AND verified = 1`)[0]?.mc_uuid;
     sql(`INSERT OR REPLACE INTO mc_player_ranks (uuid, name, rank, color, weight, updated_at) VALUES ('${String(blogAdminUuid || "").replace(/-/g, "")}', 'Nils', 'admin', 'c', 100, 0)`);
     const MH = "nwebnotfound.dev", MO = "https://" + MH, b = (path, o = {}) => req(path, { testHost: MH, ...o });
+  // Verwaltung: no trace for guests and non-admins in the public HTML (app index, search index, icons, adm-q); admins get it
+  { const traces = ["Verwaltung", '"k":"admin"', "nwebos-admin", "adm-q", "ic-admin"], seen = (t) => traces.filter((w) => t.includes(w));
+    for (const path of ["/", "/about", "/portfolio", "/guestbook"]) {
+      const guest = await req(path, { testHost: "nwebnotfound.dev" }), plain = await req(path, { cookie: c2, testHost: "nwebnotfound.dev" }), adm = await req(path, { cookie: c1, testHost: "nwebnotfound.dev" });
+      ok(guest.s === 200 && seen(guest.t).length === 0 && plain.s === 200 && seen(plain.t).length === 0, `Verwaltung: kein Hinweis im HTML von ${path} für Gast und Nicht-Admin`, `${seen(guest.t)} | ${seen(plain.t)}`);
+      ok(adm.s === 200 && seen(adm.t).length === traces.length, `Verwaltung: im HTML von ${path} für Admins vorhanden`, seen(adm.t).join());
+    } }
   // Verwaltung data side (migration 0019, src/admin.js): admin only (others 404), D1 content replaces the code
   // fallback in the windows and the feed at once (cache purged), hidden guestbook entries are not public.
   { const AP = (method, path, body, o = {}) => req(path, { method, cookie: c1, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body, ...o });
