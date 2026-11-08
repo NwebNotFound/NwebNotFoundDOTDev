@@ -45,7 +45,7 @@ export function nwebosMcPage({ title = "", desc = "", body = "", head = "", path
   const winTitle = title.replace(/\s*·\s*NwebNotFound MC\s*$/, "") || app.t;
   const count = online == null ? "" : `${online}/${max}`;
   const idx = MC_APPS.map((a) => ({ t: a.t, d: "App", url: a.path, ic: a.k, kw: a.kw }))
-    .concat([{ t: "Bestellungen", d: "Mein Konto", url: "/bestellungen", ic: "konto", kw: "bestellungen abholfach abholungen bank käufe" }, { t: "Hauptseite", d: "nwebnotfound.dev", url: `https://${MAIN}/`, ic: "status", kw: "hauptseite nwebos blog gästebuch" }]);
+    .concat([{ t: "Bestellungen", d: "Mein Konto", url: "/bestellungen", ic: "konto", kw: "bestellungen abholfach abholungen bank käufe" }, { t: "Hauptseite", d: "nwebnotfound.dev", url: `https://${MAIN}/`, sw: "main", ic: "status", kw: "hauptseite nwebos blog gästebuch" }]);
   const dicons = MC_APPS.map((a) => `<li><a class="dicon" href="${esc(a.path)}">${tex(a.tx, 40)}<span>${esc(a.t)}</span></a></li>`).join("")
     + `<li><a class="dicon home" href="https://${MAIN}/" data-os-switch="main">${HOME_ICON}<span>Hauptseite</span></a></li>`;
   const progs = MC_APPS.map((a) => `<li><a href="${esc(a.path)}">${tex(a.tx, 24)}<span>${esc(a.t)}</span></a></li>`).join("");
@@ -53,10 +53,13 @@ export function nwebosMcPage({ title = "", desc = "", body = "", head = "", path
   const L = { lang: "de", path, edition: "Block Edition", routes: [], status: 200, sprite: `/design/nwebos-icons.svg?v=${AV}`, home: "/", login: `https://${MAIN}/auth/discord/login?next=`, logoutUrl: `https://${MAIN}/auth/discord/logout?next=`,
     skip: "Zum Inhalt springen", boot: "Klick oder Taste zum Überspringen", search: "Suchen", searchPh: "Suchen: Apps, Spieler, Wiki …", noHit: "Nichts gefunden für", newTab: "neuer Tab",
     desktop: "Desktop", openWins: "Offene Fenster", start: "Startmenü", theme: "Tag oder Nacht", sound: "Ton an oder aus", logout: "Abmelden", shutdown: "Herunterfahren", aboutOs: "Über NwebOS",
-    home2: "Startbildschirm", offText: "Du kannst die Seite jetzt schließen.", offSub: "(oder einfach klicken, dann geht's weiter)", minimize: "Minimieren", maximize: "Maximieren", restoreWin: "Wiederherstellen", close: "Schließen", back: "Zurück", menu: [] };
+    home2: "Startbildschirm", offText: "Du kannst die Seite jetzt schließen.", offSub: "(oder einfach klicken, dann geht's weiter)", minimize: "Minimieren", maximize: "Maximieren", restoreWin: "Wiederherstellen", close: "Schließen", back: "Zurück", menu: [],
+    // "Schnell öffnen" chips of the empty search (the main site's are Blog/Gästebuch/Musik)
+    sug: [["markt", "Markt", "/markt"], ["wiki", "Wiki", "/wiki"], ["spieler", "Spieler", "/spieler"], ["changelog", "Changelog", "/changelog"], ["vip", "VIP", "/vip"]] };
   return `<!doctype html>
 <html lang="de" class="no-js nwebos edb mc" data-os-store="nwebos-mc" data-os-home="status" data-os-nav="page" data-os-avatar="mc"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>${esc(winTitle)} · NwebOS Block Edition</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="#3f8a2a"><link rel="icon" href="/favicon.ico">
+<title>${esc(winTitle)} · NwebOS Block Edition</title><meta name="description" content="${esc(desc)}">
+<meta property="og:title" content="${esc(title || winTitle)}"><meta property="og:description" content="${esc(desc)}"><meta name="theme-color" content="#3f8a2a"><link rel="icon" href="/favicon.ico">
 <script src="/design/summer-theme.js?v=${AV}"></script>
 <link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-polish.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-phone.css?v=${AV}">
 ${head}<link rel="stylesheet" href="/design/nwebos-block.css?v=${AV}">

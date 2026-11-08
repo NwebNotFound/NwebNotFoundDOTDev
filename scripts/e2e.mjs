@@ -741,6 +741,7 @@ try {
         && r.t.includes("Kein offizielles Minecraft-Produkt") && r.t.includes('href="https://nwebnotfound.dev/" data-os-switch="main"') && !r.t.includes("{{UNAV") && (r.t.match(/<main[ >]/g) || []).length === 1,
         `Block Edition ${p}: Fenster ${k} mit Seiteninhalt, Rechtshinweis, Hauptseite-Wechsel`, String(r.s));
     }
+    { const v = await req("/vip"); ok(v.t.includes('<meta property="og:title" content="VIP · NwebNotFound MC">') && /<meta property="og:description" content="[^"]+">/.test(v.t), "Block Edition: og:title/og:description bleiben (Link-Vorschau)"); }
     ok(mcAppFor("/wiki/x").k === "wiki" && mcAppFor("/abholungen").k === "konto" && mcAppFor("/wikiz") === null, "mcAppFor: Unterseiten gehören zu ihrer App");
     const main = await req("/", { testHost: "nwebnotfound.dev" });
     ok(main.t.includes('data-os-switch="mc"') && main.t.includes("/design/nwebos-mc.js"), "Hauptseite: Minecraft-Server-Icon wechselt zur Block Edition (Übergang)");

@@ -67,6 +67,27 @@ with sync_playwright() as p:
         # a page script still works in its window: the market search filters (markt.js)
         pg.goto(f"https://{H}/markt", wait_until="load"); pg.locator(".win").first.wait_for(timeout=10000)
         assert pg.locator(".win .wc input[type=search], .win .wc input").count() >= 1, f"{tag}: market search field in the window"
+        # review #144: search hits and quick-sheet rows load their page in this tab (no new tab, no fetched copy window)
+        pg.goto(f"https://{H}/vip", wait_until="load"); pg.locator(".win.live").wait_for(timeout=10000)
+        if phone:
+            pg.locator("[data-msearch]").click(); pg.wait_for_timeout(300)
+            q = pg.locator("#hq")
+        else:
+            pg.locator("#startb").click(); q = pg.locator("#smq"); q.wait_for(timeout=3000)
+        q.fill("")
+        q.focus(); pg.wait_for_timeout(200)
+        sugs = pg.locator("[data-sug]").evaluate_all("els => els.map(e => e.dataset.sug)")
+        assert not any(s in ("/blog", "/guestbook", "/music") for s in sugs), f"{tag}: no main-site chips on mc {sugs}"
+        q.fill("Markt"); pg.wait_for_timeout(300); q.press("Enter")
+        pg.wait_for_url(f"https://{H}/markt", timeout=8000); pg.locator(".win.live").wait_for(timeout=10000)
+        assert len(ctx.pages) == 1 and pg.locator(".win").count() == 1, f"{tag}: search 'Markt' loads /markt in this tab, one window"
+        if phone:
+            pg.locator("[data-quick]").click(); pg.locator('.qs a[data-qopen][href$="/changelog"]').click()
+            pg.wait_for_url(f"https://{H}/changelog", timeout=8000); pg.locator(".win.live").wait_for(timeout=10000)
+            assert len(ctx.pages) == 1 and pg.locator(".win").count() == 1, f"{tag}: quick sheet Neuigkeiten loads /changelog, one window"
+        # the page's own address with a query opens its window, no reload loop
+        pg.goto(f"https://{H}/parkour?course=test", wait_until="load"); pg.wait_for_timeout(1500)
+        assert pg.url.endswith("/parkour?course=test") and pg.locator(".win.live").count() == 1, f"{tag}: /parkour?course=test stays, one window"
         assert not errors, f"{tag}: page errors {errors[:3]}"
         ctx.unroute_all(behavior="ignoreErrors"); ctx.close()   # in-flight requests (/api/mc-status) may still be routed
         print(f"PASS {tag}: Block Edition windows, shell look kept, no overflow")

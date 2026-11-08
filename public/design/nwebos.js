@@ -208,8 +208,16 @@
   function openUrl(url, opt) {
     opt = opt || {};
     var u = new URL(url, location.href), b = bare(u.pathname);
-    if (b === "/" && !u.search) return Promise.resolve(null);   /* "/" is the plain desktop: never fall through to the first app */
     var have = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === b) have = k; });
+    /* edition (data-os-nav="page"): only the page's own window opens in place; any other address loads its page
+       (no fetched copies of other pages: their scripts would not run) */
+    if (OSNAV) {
+      var here = u.origin === location.origin && u.pathname + u.search === location.pathname + location.search;
+      if (have && (!u.search || here)) { openWin(have, opt); return Promise.resolve(have); }
+      if (!here && !opt.restore) location.href = u.href;   // never reload the page it is already on
+      return Promise.resolve(null);
+    }
+    if (b === "/" && !u.search) return Promise.resolve(null);   /* "/" is the plain desktop: never fall through to the first app */
     if (have && !u.search && !opt.fresh) { openWin(have, opt);   /* fresh: reload its content (a filtered window back to all) */
       return Promise.resolve(have); }
     var key = u.pathname + u.search; if (pending[key]) return pending[key];
@@ -356,7 +364,7 @@
     /* phone audit A1: header "N Treffer", icon tile, the query marked, a kind chip (App / Blog / Wiki ↗ / Link ↗),
        a chevron; no hits = an empty card with chips; focused but empty (home only) = "Schnell öffnen" chips */
     var EN = L.lang === "en", home = list.id === "hres";
-    var SUG = [["blog", EN ? "Blog" : "Blog", "/blog"], ["guestbook", EN ? "Guestbook" : "Gästebuch", "/guestbook"], ["music", EN ? "Music" : "Musik", "/music"], ["changelog", EN ? "What's new" : "Neuigkeiten", "/changelog"], ["minecraft", "Minecraft", "https://mc.nwebnotfound.dev/"]];
+    var SUG = L.sug || [["blog", EN ? "Blog" : "Blog", "/blog"], ["guestbook", EN ? "Guestbook" : "Gästebuch", "/guestbook"], ["music", EN ? "Music" : "Musik", "/music"], ["changelog", EN ? "What's new" : "Neuigkeiten", "/changelog"], ["minecraft", "Minecraft", "https://mc.nwebnotfound.dev/"]];
     var el = function (tag, cls, txt) { var x = document.createElement(tag); if (cls) x.className = cls; if (txt != null) x.textContent = txt; return x; };
     var chips = function (n) {
       var li = el("li", "sugg");
@@ -417,7 +425,15 @@
       if (/^https?:/.test(c.dataset.sug)) window.open(c.dataset.sug, "_blank", "noopener"); else openUrl((EN ? "/en" : "") + c.dataset.sug);
       leave(); if (after) after();
     });
-    var go = function (r) { if (!r) return; if (r.url) window.open(r.url, "_blank", "noopener"); else if (r.k) openWin(r.k); else openUrl(r.p); if (form) leave(); else { inp.value = ""; draw(); } if (after) after(); };
+    /* a search row with an address: another site opens in a new tab; in an edition (data-os-nav="page") a same-site
+       address loads its page and a row with `sw` switches OS (public/design/nwebos-mc.js) */
+    var openRow = function (r) {
+      var u = new URL(r.url, location.href);
+      if (OSNAV && u.origin === location.origin) location.href = u.href;
+      else if (OSNAV && r.sw && window.NwebOSSwitch) window.NwebOSSwitch(u.href, r.sw);
+      else window.open(r.url, "_blank", "noopener");
+    };
+    var go = function (r) { if (!r) return; if (r.url) openRow(r); else if (r.k) openWin(r.k); else openUrl(r.p); if (form) leave(); else { inp.value = ""; draw(); } if (after) after(); };
     inp.addEventListener("focus", function () { loadBlog().then(function () { if (inp.value.trim()) draw(); }); });
     inp.addEventListener("input", function () { sel = 0; draw(); });
     inp.addEventListener("keydown", function (e) {
