@@ -50,7 +50,7 @@ export const EXTRA = [
   { k: "blog-edit", icon: "blog", re: /^\/blog\/admin(?:\/([0-9a-f-]{36}))?$/, de: "Blog-Editor", en: "Blog editor", w: 920, h: 580, x: 180, y: 20, menu: "no", module: "/design/nwebos-editor.js" },
   // Verwaltung (mockups/nwebos/apps/admin): admin only, checked by the worker on every request; client
   // public/design/nwebos-admin.js on /api/admin. /admin/<section>[/<id>|/new] opens that view.
-  { k: "admin", icon: "admin", re: /^\/admin(?:\/(home|projects|changelog|guestbook)(?:\/(\d{1,9}|new))?)?$/, de: "Verwaltung", en: "Admin", w: 980, h: 640, x: 150, y: 24, menu: "no", module: "/design/nwebos-admin.js" },
+  { k: "admin", icon: "admin", re: /^\/admin(?:\/(home|projects|changelog|guestbook|writing|series)(?:\/(\d{1,9}|new))?)?$/, de: "Verwaltung", en: "Admin", w: 980, h: 640, x: 150, y: 24, menu: "no", module: "/design/nwebos-admin.js" },
   { k: "blog-post", icon: "blog", re: /^\/blog\/([a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?)$/, de: "Beitrag", en: "Post", w: 820, h: 560, x: 240, y: 30, menu: "no" },
   { k: "profile", icon: "profile", path: "/profile", de: "Mein Profil", en: "My profile", w: 820, h: 620, x: 260, y: 30, menu: "no" },
   { k: "changelog", icon: "changelog", path: "/changelog", de: "Neuigkeiten", en: "What's new", w: 560, h: 520, x: 420, y: 40, menu: "no" },

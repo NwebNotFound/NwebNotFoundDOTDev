@@ -35,6 +35,8 @@ SELECT id, sort, status, progress, href, icon, title_de, title_en, text_de, text
 SELECT id, day, area, title_de, title_en, text_de, text_en, status, sort, version FROM changelog LIMIT 0;
 SELECT hidden, reported FROM entries LIMIT 0;
 SELECT at, discord_id, section, item, action, before_json FROM admin_log LIMIT 0;
+SELECT id, slug, title_de, title_en, status, sort, version FROM writing_series LIMIT 0;
+SELECT id, series_id, kind, chapter, slug, title_de, title_en, body_de, body_en, tags, status, published_at, version FROM writing_items LIMIT 0;
 SELECT source, edited, pr_url FROM changelog LIMIT 0;"
 if out=$(npx wrangler d1 execute "$DB" "$@" --command "$CHECK" 2>&1); then
   echo "Schema-Check ok"
