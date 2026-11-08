@@ -222,6 +222,7 @@
         $(".tt", o.el).textContent = title(k); $("span", o.btn).textContent = title(k); o.el.setAttribute("aria-label", title(k));
         document.dispatchEvent(new CustomEvent("nwebos:content", { detail: o.el }));
         restore(k); focus(k, !opt.noPush);
+        if (opt.fresh && !u.search && location.search && location.pathname === pathOf(k).split("?")[0]) history.replaceState({ k: k }, "", pathOf(k));   /* × on a filter: same path, so push() skips it — drop the query (reload must show all) */
       } else openWin(k, opt);
       return k;
     }).catch(function () { delete pending[key]; if (!opt.restore) location.href = u.href; return null; }));
