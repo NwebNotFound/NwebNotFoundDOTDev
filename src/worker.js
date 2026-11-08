@@ -25,6 +25,7 @@ import { makeBlog } from "./blog.js";
 import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { epubPath, seriesEpubPath } from "./epub.js";
+import { makeProfile } from "./profile-v3.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
 import { safeDecode } from "./safe-decode.js";
 import { verifyTurnstile } from "./turnstile.js";
@@ -419,6 +420,8 @@ async function profileDelete(req, env) {
     env.DB.prepare("DELETE FROM blog_reads WHERE discord_id = ?").bind(String(u.id)),
     env.DB.prepare("DELETE FROM blog_reactions WHERE discord_id = ?").bind(String(u.id)),
   ]);
+  // profile v3 (migration 0018): settings, game stats, badges — own batch, so the old deletes never depend on it
+  await env.DB.batch(["user_prefs", "game_stats", "user_badges"].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE discord_id = ?`).bind(String(u.id)))).catch(() => {});
   return json({ ok: true }, 200, { "set-cookie": sessCookie("", 0) });
 }
 
@@ -436,7 +439,8 @@ async function profileApi(req, env) {
     minecraft = { visible: true, mc_name: link.mc_name, mc_uuid: link.mc_uuid, stats: ps ? JSON.parse(ps.stats) : {}, details: ps && ps.details ? JSON.parse(ps.details) : null, updated_at: ps ? new Date(ps.updated_at).toISOString() : null };
   } else if (link && !link.verified) minecraft.hint = "Bestätige die Verknüpfung im Discord mit deinem Code (/link).";
   else if (link && !link.has_role) minecraft.hint = "Dir fehlt noch die Server-Rolle im Discord. Danach erscheinen hier deine Stats.";
-  return json({ user: { id: u.id, name: u.name, username: u.username, avatar: u.avatar, member_since: since?.c || null }, guestbook: gb, minecraft }, 200, cors);
+  const v3 = await P3().data(env, u).catch(() => ({}));
+  return json({ user: { id: u.id, name: u.name, username: u.username, avatar: u.avatar, member_since: since?.c || null }, guestbook: gb, minecraft, ...v3 }, 200, cors);
 }
 
 /* ---------- Status-API ---------- */
@@ -803,7 +807,8 @@ async function mcIngest(req, env) {
 }
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
-let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, chapterExists: (s, n) => osSeries("de").some((se) => se.slug === s && se.chapters.some((c) => c.n === n)) }));
+let _p3; const P3 = () => _p3 || (_p3 = makeProfile({ json, getUser, MAIN }));   // "Mein Profil" v3 (src/profile-v3.js)
+let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, onReadEnd: (env, id) => P3().award(env, id, "leseratte"), chapterExists: (s, n) => osSeries("de").some((se) => se.slug === s && se.chapters.some((c) => c.n === n)) }));
 let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
   const row = await env.DB.prepare("SELECT data, updated_at FROM mc_snapshot WHERE id = 1").first().catch(() => null);
@@ -1039,7 +1044,13 @@ async function osResponse(req, env, url, lang, route) {
         const [, s, n] = r.post_id.split(":"); const se = ser.find((x) => x.slug === s); const c = se && se.chapters.find((x) => String(x.n) === n);
         return c && { kind: de ? "Roman" : "Novel", title: `${se.title} · ${de ? "Kapitel" : "Chapter"} ${c.n}`, pct: r.pct, href: (de ? "" : "/en") + `/writing/${s}/${n}` };
       }).filter(Boolean);
-      content.profile = osProfile(lang, { user: u, gbCount: cnt?.n || 0, entries: entries || [], reads });
+      const [v3, link] = await Promise.all([P3().data(env, u).catch(() => ({})), env.DB.prepare("SELECT mc_name, verified, has_role FROM mc_links WHERE discord_id = ?").bind(u.id).first().catch(() => null)]);
+      /* badges for things done before profile v3 existed: awarded once, the first time the profile is opened */
+      const has = new Set((v3.badges || []).map((b) => b.badge)), late = [];
+      if ((cnt?.n || 0) > 0 && !has.has("gruss")) late.push("gruss");
+      if (rows.some((r) => r.pct >= 100) && !has.has("leseratte")) late.push("leseratte");
+      for (const b of late) { await P3().award(env, u.id, b); (v3.badges = v3.badges || []).push({ badge: b, earned_at: Date.now() }); }
+      content.profile = osProfile(lang, { user: u, gbCount: cnt?.n || 0, entries: entries || [], reads, link, ...v3 });
     } else content.profile = osProfile(lang, null);
   } else if (k === "changelog") content.changelog = osChangelog(lang);
   else if (k === "writing") {
@@ -1075,6 +1086,7 @@ async function guestbookApi(req, env) {
     if (!(await verifyTurnstile(env, b?.token, { ip: req.headers.get("CF-Connecting-IP") || "", hosts: [MAIN, MCD] }))) return json({ error: "Captcha fehlgeschlagen" }, 403);
     const row = await env.DB.prepare("SELECT avatar FROM sessions WHERE id = ?").bind(user.sid).first();
     await env.DB.prepare("INSERT INTO entries (name, message, discord_id, avatar) VALUES (?, ?, ?, ?)").bind(user.name.slice(0, 50), message, user.id, row?.avatar || null).run();
+    await P3().award(env, user.id, "gruss");   // profile v3 badge "Erster Gruß"
     return json({ ok: true }, 201);
   }
   return json({ error: "Method not allowed" }, 405);
@@ -1085,7 +1097,8 @@ async function me(req, env) {
   const cors = origin === `https://${MCD}` || origin === `https://${MAIN}` ? { "access-control-allow-origin": origin, "access-control-allow-credentials": "true", vary: "origin" } : {};
   const u = await getUser(req, env).catch(() => null);
   const l = u ? await env.DB.prepare("SELECT mc_name FROM mc_links WHERE discord_id = ? AND verified = 1").bind(String(u.id)).first().catch(() => null) : null;
-  return json({ available: authReady(env), user: u ? { id: u.id, name: u.name, username: u.username, avatar: u.avatar, mc_name: l?.mc_name || null } : null }, 200, cors);
+  const prefs = u ? await env.DB.prepare("SELECT lang, theme, sound, boot, reduced_motion FROM user_prefs WHERE discord_id = ?").bind(String(u.id)).first().catch(() => null) : null;
+  return json({ available: authReady(env), user: u ? { id: u.id, name: u.name, username: u.username, avatar: u.avatar, mc_name: l?.mc_name || null, prefs: prefs || null } : null }, 200, cors);
 }
 
 // Letztes Netz: jeder ungefangene Fehler im Routing wird geloggt und als sauberes 500 beantwortet
@@ -1126,6 +1139,11 @@ async function route(req, env, ctx) {
     if (p === "/api/mc-data") return mcData(env);
     if (p === "/api/profile") return profileApi(req, env);
     if (p === "/api/profile/delete") return profileDelete(req, env);
+    if (p === "/api/profile/prefs") return P3().prefs(req, env);
+    if (p === "/api/profile/games/run") return P3().run(req, env);
+    if (p === "/api/profile/games/merge") return P3().merge(req, env);
+    if (p === "/api/profile/badges/night") return P3().night(req, env);
+    if (p === "/api/profile/export") return P3().exportData(req, env);
     if (p === "/api/mc-players") return json({ players: await playersApi(env, url) });
     if (p.startsWith("/api/mc-players/")) { const n = safeDecode(p.slice(16)); if (n == null) return json({ error: "Spieler nicht gefunden" }, 404); const u = await getUser(req, env).catch(() => null); const o = await playerApi(env, n, u); return o ? json(o) : json({ error: "Spieler nicht gefunden" }, 404); }
     if (p === "/api/mc-leaderboards") return mcLeaderboards(env);

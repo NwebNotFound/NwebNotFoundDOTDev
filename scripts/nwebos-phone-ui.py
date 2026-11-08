@@ -105,7 +105,7 @@ with sync_playwright() as p:
         for width in (375, 390, 430):
             c = ctx_for(br, width, True, COOKIE); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
             pg.goto(f"https://{H}/profile", wait_until="load"); pg.locator(".win.focus .pf").wait_for(); pg.wait_for_timeout(500)
-            low = pg.evaluate(CONTRAST, [".win.focus .tagst .nm", ".win.focus .pft p", ".win.focus .pft mark", ".win.focus .pf h3", ".win.focus .utabs button", ".win.focus .paper a"])
+            low = pg.evaluate(CONTRAST, [".win.focus .p3-tag b", ".win.focus .p3-stat", ".win.focus .p3-priv", ".win.focus .p3-card h3", ".win.focus .p3-tabs button", ".win.focus .p3-card h3 a"])   # profile v3
             assert not low, ("profile night contrast", width, low)
             if SHOTS: pg.screenshot(path=os.path.join(SHOTS, f"phone-profile-signedin-night-{width}.png"))
             pg.goto(f"https://{H}/guestbook", wait_until="load"); pg.locator(".win.focus .msgs").wait_for(); pg.wait_for_timeout(400)

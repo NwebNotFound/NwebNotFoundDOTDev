@@ -121,7 +121,7 @@ const fmtDate = (ms, lang) => (ms ? new Date(ms).toLocaleDateString(lang === "en
 /** Most reading-progress rows one user can have (every post and chapter they open; Gatekeeper #115). */
 export const READS_CAP = 500;
 
-export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, chapterExists = () => false }) {
+export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, chapterExists = () => false, onReadEnd = async () => {} }) {
   const SITE = `https://${MAIN}`;
   // ---- admin check (fails closed) ----
   async function admin(req, env) {
@@ -421,6 +421,7 @@ export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, no
       if ((c?.n || 0) >= READS_CAP) return deny(429, "too_many_reads");
     }
     await env.DB.prepare("INSERT INTO blog_reads (discord_id, post_id, pct, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(discord_id, post_id) DO UPDATE SET pct = MAX(pct, excluded.pct), updated_at = excluded.updated_at").bind(String(u.id), key, pct, Date.now()).run();
+    if (pct >= 100) await onReadEnd(env, u.id).catch(() => {});   // profile v3 badge "Leseratte"
     return json({ ok: true });
   }
 

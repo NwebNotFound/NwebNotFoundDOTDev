@@ -225,24 +225,111 @@ export function soon(lang) {
 }
 
 // ---------------- Profile (private) ----------------
-/** d: { user: { name, avatar }, gbCount, entries: [{ message, created_at }], reads: [{ title, kind, pct, href }] } or null for guests */
+// ---------------- Mein Profil v3 (mockups/nwebos/apps/profile-v3/notes.md) ----------------
+const R3 = (x, y, w, h, c) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`;
+const PX = (r, n = 16) => `<svg viewBox="0 0 16 16" width="${n}" height="${n}" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${r}</svg>`;
+const ART = {
+  heart: R3(3, 3, 4, 2, "#e2483d") + R3(9, 3, 4, 2, "#e2483d") + R3(2, 5, 12, 3, "#e2483d") + R3(3, 8, 10, 2, "#e2483d") + R3(5, 10, 6, 2, "#e2483d") + R3(7, 12, 2, 1, "#e2483d") + R3(4, 4, 2, 1, "#fff"),
+  book: R3(2, 3, 6, 10, "#1b2238") + R3(8, 3, 6, 10, "#1b2238") + R3(3, 4, 4, 8, "#fff") + R3(9, 4, 4, 8, "#fff") + R3(4, 6, 2, 1, "#7a5fd6") + R3(10, 6, 2, 1, "#7a5fd6") + R3(4, 8, 2, 1, "#7a5fd6") + R3(10, 8, 2, 1, "#7a5fd6"),
+  five: R3(1, 4, 3, 3, "#2bb3a3") + R3(5, 4, 3, 3, "#2bb3a3") + R3(9, 4, 3, 3, "#f2a33a") + R3(13, 4, 2, 3, "#2bb3a3") + R3(1, 9, 3, 3, "#2bb3a3") + R3(5, 9, 3, 3, "#2bb3a3") + R3(9, 9, 3, 3, "#2bb3a3") + R3(13, 9, 2, 3, "#2bb3a3"),
+  mine: R3(5, 4, 6, 8, "#1b2238") + R3(4, 5, 8, 6, "#1b2238") + R3(7, 2, 2, 12, "#1b2238") + R3(2, 7, 12, 2, "#1b2238") + R3(6, 6, 2, 2, "#fff"),
+  pixel: R3(2, 2, 4, 4, "#ff7fb6") + R3(6, 2, 4, 4, "#7ad3ff") + R3(10, 2, 4, 4, "#ffd23f") + R3(2, 6, 4, 4, "#5fbf4f") + R3(6, 6, 4, 4, "#1b2238") + R3(10, 6, 4, 4, "#7a5fd6") + R3(2, 10, 4, 4, "#ffd23f") + R3(6, 10, 4, 4, "#ff8a6b") + R3(10, 10, 4, 4, "#7ad3ff"),
+  note: R3(6, 2, 7, 2, "#1b2238") + R3(11, 2, 2, 8, "#1b2238") + R3(6, 2, 2, 10, "#1b2238") + R3(2, 10, 5, 4, "#1b2238") + R3(9, 8, 4, 4, "#1b2238"),
+  sun: R3(5, 5, 6, 6, "#1b2238") + R3(6, 6, 4, 4, "#fff6dc") + R3(7, 1, 2, 2, "#1b2238") + R3(7, 13, 2, 2, "#1b2238") + R3(1, 7, 2, 2, "#1b2238") + R3(13, 7, 2, 2, "#1b2238"),
+  lock: R3(5, 2, 6, 2, "#d9452f") + R3(4, 4, 2, 3, "#d9452f") + R3(10, 4, 2, 3, "#d9452f") + R3(3, 7, 10, 7, "#d9452f"),
+  rss: R3(0, 0, 16, 16, "#f2a33a") + R3(3, 11, 2, 2, "#fff") + R3(3, 7, 2, 1, "#fff") + R3(5, 8, 2, 1, "#fff") + R3(7, 9, 1, 2, "#fff") + R3(8, 11, 1, 2, "#fff") + R3(3, 3, 3, 1, "#fff") + R3(6, 4, 2, 1, "#fff") + R3(8, 5, 2, 1, "#fff") + R3(10, 6, 1, 2, "#fff") + R3(11, 8, 1, 2, "#fff") + R3(12, 10, 1, 3, "#fff"),
+  mc: R3(1, 1, 14, 5, "#5fbf4f") + R3(1, 6, 14, 9, "#8a5a2b") + R3(3, 8, 2, 2, "#6b4520") + R3(9, 10, 2, 2, "#6b4520") + R3(12, 7, 2, 2, "#6b4520") + R3(1, 5, 3, 2, "#5fbf4f") + R3(8, 5, 2, 2, "#5fbf4f"),
+};
+const DISCORD_W = '<svg viewBox="0 0 71 55" width="40" height="40" fill="#fff" aria-hidden="true" focusable="false"><path d="M60.1 4.9A58.5 58.5 0 0045.4.4a40 40 0 00-1.9 3.8 54 54 0 00-16.2 0A40 40 0 0025.4.4 58.4 58.4 0 0010.7 4.9C1.4 18.7-1.1 32.2.1 45.5a59 59 0 0018 9.1 43 43 0 003.8-6.2 38 38 0 01-6-2.9l1.5-1.1a42 42 0 0036 0l1.5 1.1a38 38 0 01-6 2.9 43 43 0 003.8 6.2 58.7 58.7 0 0018-9.1c1.5-15.4-2.5-28.8-10.6-40.6zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2z"/></svg>';
+/* badge set 1: id, art, sticker colour, DE/EN name, DE/EN condition */
+const BADGE_SET = [
+  ["gruss", "heart", "#ff9ec7", ["Erster Gruß", "First hello"], ["ins Gästebuch geschrieben", "signed the guestbook"]],
+  ["leseratte", "book", "#b9a8ff", ["Leseratte", "Bookworm"], ["einen Beitrag bis zum Ende gelesen", "read a post to the end"]],
+  ["fuenf5", "five", "#7fe0d3", ["Fünf am Stück", "Five in a row"], ["Fünf-Serie von 5", "a Fünf streak of 5"]],
+  ["minen", "mine", "#ffd23f", ["Minenräumer", "Minesweeper"], ["Pixelminen gewonnen", "won Pixel Mines"]],
+  ["pixel", "pixel", "#7ad3ff", ["Pixelkünstler", "Pixel artist"], ["10 Pixel auf der Pixelwand", "10 pixels on the pixel wall"], ["kommt mit der Pixelwand", "comes with the pixel wall"]],
+  ["ohrwurm", "note", "#ffe27a", ["Ohrwurm", "Earworm"], ["einen Loop geladen", "downloaded a loop"], ["kommt mit dem Studio", "comes with the Studio"]],
+  ["nacht", "sun", "#ffd23f", ["???", "???"], ["geheim", "secret"]],
+];
+const day = (ms, de) => { const d = new Date(Number(ms) || 0); return de ? `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.` : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" }); };
+const mmss = (s) => (s == null ? "–" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+const pctOf = (a, b) => (b ? Math.round((a / b) * 100) + " %" : "–");
+
+/** d (signed in): { user: { name, username, avatar }, gbCount, entries: [{ message, created_at }], reads: [{ title, kind,
+ *  pct, href }], link: { mc_name, verified, has_role } | null, prefs, games: { "mines:9x9": row, "five:de": row, … },
+ *  badges: [{ badge, earned_at }], session: { created_at, expires_at } } — or null for guests. */
 export function profile(lang, d) {
-  const de = lang !== "en";
-  if (!d) return `<div class="nf">${ic("profile", 48)}<div><b>${de ? "Dein Profil ist privat." : "Your profile is private."}</b><p>${de ? "Melde dich mit Discord an, dann siehst du hier deine Gästebuch-Einträge und was du gerade liest." : "Sign in with Discord to see your guestbook entries and what you're reading."}</p><p class="btns"><a class="xpbtn discord" href="/auth/discord/login?next=${encodeURIComponent("https://nwebnotfound.dev" + href(lang, "/profile"))}">${de ? "Mit Discord anmelden" : "Sign in with Discord"}</a></p></div></div>`;
-  const av = /^https:\/\//.test(d.user.avatar || "") ? `<img class="dav" src="${esc(d.user.avatar)}" width="40" height="40" alt="">` : ic("cat", 40, "ic dav");
-  const n = d.gbCount, r = d.reads.length;
-  const sentence = de ? `Du hast <mark>${n} ${n === 1 ? "Gruß" : "Grüße"}</mark> ins Gästebuch geschrieben und <mark>${r} ${r === 1 ? "Text" : "Texte"}</mark> angefangen zu lesen.` : `You wrote <mark>${n} ${n === 1 ? "greeting" : "greetings"}</mark> in the guestbook and started reading <mark>${r} ${r === 1 ? "text" : "texts"}</mark>.`;
-  const bookm = r ? `<ul class="bmk">${d.reads.map((x) => `<li><a href="${esc(x.href)}"><i class="rib"></i><span><small>${esc(x.kind)}</small><b>${esc(x.title)}</b><span class="pg"><i style="width:${Math.max(0, Math.min(100, x.pct))}%"></i></span><small>${x.pct} % ${de ? "gelesen · weiterlesen ›" : "read · continue ›"}</small></span></a></li>`).join("")}</ul>` : `<p class="empty">${de ? "Noch nichts angefangen. Im" : "Nothing started yet. Try the"} <a href="${href(lang, "/blog")}" data-open="blog">Blog</a> ${de ? "findest du etwas zum Lesen." : "for something to read."}</p>`;
-  const e = d.entries[0];
-  const paper = e ? `<div class="paper"><i class="tape"></i><span class="stamp">${esc(String(e.created_at).slice(0, 10).split("-").reverse().join("."))}</span><p class="hand">${esc(e.message)}</p><p class="sig">— ${esc(d.user.name)}</p><p class="ppl"><a class="lnk" href="${href(lang, "/guestbook")}" data-open="guestbook">${de ? "noch was schreiben" : "write something else"}</a></p></div>` : `<p class="empty">${de ? "Noch kein Eintrag." : "No entry yet."} <a href="${href(lang, "/guestbook")}" data-open="guestbook">${de ? "Ins Gästebuch schreiben" : "Sign the guestbook"}</a></p>`;
-  const tabs = [["o", de ? "Übersicht" : "Overview"], ["r", de ? "Lesen" : "Reading"], ["g", de ? "Gästebuch" : "Guestbook"], ["s", de ? "Einstellungen" : "Settings"]];
-  return `<div class="pf"><header class="pfh"><div class="tagst"><span class="hi">${de ? "HALLO, ICH BIN" : "HELLO, I AM"}</span><span class="nm">${av} ${esc(d.user.name)}</span></div>
-<div class="pft"><p>${sentence}</p><p class="hint">${de ? "Nur du siehst diese Seite." : "Only you can see this page."} · <a href="https://mc.nwebnotfound.dev/profile">${de ? "Minecraft-Profil auf mc.nwebnotfound.dev ›" : "Minecraft profile on mc.nwebnotfound.dev ›"}</a></p></div></header>
-<nav class="utabs" aria-label="${de ? "Profil" : "Profile"}">${tabs.map(([k, t], i) => `<button type="button" data-pane="pf-${k}"${i === 0 ? ' class="on"' : ""}>${t}</button>`).join("")}</nav>
-<section class="pfp" data-panel="pf-o"><div class="pfcols"><div><h3>${de ? "Weiterlesen" : "Continue reading"}</h3>${bookm}</div><div><h3>${de ? "Dein Gästebuch-Eintrag" : "Your guestbook entry"}</h3>${paper}</div></div></section>
-<section class="pfp" data-panel="pf-r" hidden><h3>${de ? "Weiterlesen" : "Continue reading"}</h3>${bookm}</section>
-<section class="pfp" data-panel="pf-g" hidden>${paper}</section>
-<section class="pfp" data-panel="pf-s" hidden><ul class="dash"><li><b>${de ? "Anzeigename" : "Display name"}</b><small>${esc(d.user.name)} · ${de ? "kommt von Discord" : "from Discord"}</small></li><li><b>${de ? "Sprache" : "Language"}</b><span class="seg"><a class="${de ? "on" : ""}" href="/profile">Deutsch</a><a class="${de ? "" : "on"}" href="/en/profile">English</a></span></li>
-<li><b>${de ? "Sichtbarkeit" : "Visibility"}</b><small>${de ? "Nur für dich. Profile sind privat." : "Only you. Profiles are private."}</small></li><li><b>${de ? "Meine Daten" : "My data"}</b><span><button type="button" class="lnk danger" data-pf-delete>${de ? "Gästebuch-Einträge, Lesefortschritt, Reaktionen und Sitzungen löschen" : "Delete guestbook entries, reading progress, reactions and sessions"}</button></span></li>
-<li><b>${de ? "Abmelden" : "Sign out"}</b><button type="button" class="xpbtn" data-egg="logout">${de ? "Abmelden" : "Sign out"}</button></li></ul></section></div>`;
+  const de = lang !== "en", L = (pair) => pair[de ? 0 : 1], T = (a, b) => (de ? a : b);
+  if (!d) {
+    return `<div class="pf p3"><div class="p3-out"><span class="big">${DISCORD_W}</span><h2>${T("Dein Profil", "Your profile")}</h2><p>${T("Mit Discord anmelden, und NwebOS merkt sich ein paar Dinge für dich:", "Sign in with Discord and NwebOS remembers a few things for you:")}</p>
+<ul><li>${ic("blog", 22)}${T("wo du beim Lesen warst", "where you stopped reading")}</li><li>${PX(ART.five, 22)}${T("deine Spiele-Bestwerte, auf jedem Gerät", "your game records, on every device")}</li><li>${PX(ART.sun, 22)}${T("Abzeichen für kleine Erfolge", "badges for small wins")}</li><li>${ic("guestbook", 22)}${T("deinen Gästebuch-Eintrag", "your guestbook entry")}</li></ul>
+<a class="xpbtn discord" href="/auth/discord/login?next=${encodeURIComponent(href(lang, "/profile"))}">${T("Mit Discord anmelden", "Sign in with Discord")}</a><p class="small">${T("Nur Name und Bild. Keine E-Mail, kein Tracking.", "Name and picture only. No email, no tracking.")}</p></div></div>`;
+  }
+  const av = /^https:\/\//.test(d.user.avatar || "") ? d.user.avatar : "";
+  const avImg = (cls, n) => (av ? `<img class="${cls}" src="${esc(av)}" width="${n}" height="${n}" alt="">` : ic("cat", n, "ic " + cls));
+  const games = d.games || {}, mines = games["mines:9x9"] || null;
+  const fv = ["five:de", "five:en"].map((k) => games[k]).filter(Boolean);
+  const five = fv.length ? fv.reduce((a, r) => ({ played: a.played + r.played, won: a.won + r.won, streak: Math.max(a.streak, r.streak), best_streak: Math.max(a.best_streak, r.best_streak), dist: [0, 1, 2, 3, 4, 5].map((i) => (a.dist[i] || 0) + ((r.dist || [])[i] || 0)) }), { played: 0, won: 0, streak: 0, best_streak: 0, dist: [0, 0, 0, 0, 0, 0] }) : null;
+  const got = new Map((d.badges || []).map((b) => [b.badge, b.earned_at]));
+  const nGot = BADGE_SET.filter((b) => got.has(b[0])).length;
+  const readDone = (d.reads || []).filter((r) => r.pct >= 100).length;
+  const progress = { leseratte: [readDone, 1], fuenf5: [Math.min(5, five ? five.streak : 0), 5], minen: [mines && mines.won ? 1 : 0, 1], gruss: [d.gbCount ? 1 : 0, 1] };
+  const sticker = (b, small) => {
+    const [id, art, col, name, cond, later] = b, at = got.get(id), secret = id === "nacht" && !at, pr = progress[id];
+    const bar = !at && pr && pr[1] > 1 ? `<span class="bar" style="--p:${Math.round((pr[0] / pr[1]) * 100)}%"></span><small>${pr[0]} / ${pr[1]}</small>` : "";
+    return `<div class="p3-bdg${at ? "" : " lock"}${secret ? " secret" : ""}" style="--c:${col}"><span class="st">${secret ? "?" : PX(ART[art], 34)}</span><b>${secret ? "???" : L(name)}</b>${small ? "" : `<small>${at ? T("bekommen am ", "earned ") + day(at, de) : later ? L(later) : L(cond)}</small>${bar}`}</div>`;
+  };
+  const newest = [...BADGE_SET].filter((b) => got.has(b[0])).sort((a, b) => got.get(b[0]) - got.get(a[0])).slice(0, 3);
+  const stat = (n, label) => `<span class="p3-stat"><b>${n}</b>${label}</span>`;
+  const head = `<header class="p3-hd"><div class="tagst p3-tag"><span class="hi top">${T("HALLO, ICH BIN", "HELLO, MY NAME IS")}</span><span class="nm mid">${avImg("dav", 40)}<b>${esc(d.user.name)}</b></span></div>
+<div><div class="p3-facts">${stat(d.gbCount, d.gbCount === 1 ? T("Gruß", "hello") : T("Grüße", "hellos"))}${stat(readDone, T("Texte gelesen", "texts read"))}${stat(nGot, `/ ${BADGE_SET.length} ${T("Abzeichen", "badges")}`)}${stat(five ? five.streak : 0, T("Fünf-Serie", "Fünf streak"))}</div><p class="p3-priv"><i aria-hidden="true"></i>${T("Nur du siehst diese Seite.", "Only you can see this page.")}</p></div></header>`;
+  const tabs = [["over", T("Übersicht", "Overview")], ["games", T("Spiele", "Games")], ["badges", T("Abzeichen", "Badges"), `${nGot}/${BADGE_SET.length}`], ["set", T("Einstellungen", "Settings")]];
+  const tabBar = `<nav class="p3-tabs" role="tablist" aria-label="${T("Profil", "Profile")}">${tabs.map(([k, t, em], i) => `<button type="button" role="tab" data-pane="p3-${k}" aria-selected="${i === 0}"${i === 0 ? ' class="on"' : ""}>${t}${em ? `<em>${em}</em>` : ""}</button>`).join("")}</nav>`;
+  const r0 = (d.reads || [])[0];   /* the last post or chapter (newest first) */
+  const readCard = r0 ? `<a class="p3-row p3-read" href="${esc(r0.href)}">${ic("blog", 28)}<span><b>${esc(r0.title)}</b><small>${esc(r0.kind)} · ${r0.pct} % ${T("gelesen", "read")}</small><span class="bar" style="--p:${Math.max(0, Math.min(100, r0.pct))}%"></span></span><em>›</em></a>`
+    : `<div class="p3-empty">${PX(ART.book, 40)}${T("Noch nichts angefangen.", "Nothing started yet.")}<a class="xpbtn" href="${href(lang, "/blog")}" data-open="blog">${T("Zum Blog", "Go to the blog")}</a></div>`;
+  const e = (d.entries || [])[0];
+  const gbCard = e ? `<div class="p3-paper paper"><span class="stamp">${esc(String(e.created_at).slice(0, 10).split("-").reverse().join("."))}</span><p>${esc(e.message)}</p><small>– ${esc(d.user.name)}</small></div>`
+    : `<div class="p3-empty">${PX(ART.heart, 40)}${T("Du hast noch nicht ins Gästebuch geschrieben.", "You haven’t signed the guestbook yet.")}<a class="xpbtn" href="${href(lang, "/guestbook")}" data-open="guestbook">${T("Gästebuch öffnen", "Open the guestbook")}</a></div>`;
+  const link = d.link && d.link.verified ? d.link : null;
+  const mcCard = link ? `<div class="p3-row">${'<span class="p3-ok">✓</span>'}<span><b>${esc(link.mc_name)}</b><small>${T("verknüpft · Rang, Stats und VIP-Welten auf mc.nwebnotfound.dev", "linked · rank, stats and VIP worlds on mc.nwebnotfound.dev")}</small></span><a class="xpbtn" href="https://mc.nwebnotfound.dev/profile" rel="noopener">${T("Öffnen ↗", "Open ↗")}</a></div>`
+    : `<p class="p3-mut">${T("Noch nicht verknüpft. Auf dem Server <b>/link</b> eingeben, dann im Discord bestätigen.", "Not linked yet. Type <b>/link</b> on the server, then confirm in Discord.")}</p><a class="xpbtn" href="https://mc.nwebnotfound.dev/profile" rel="noopener">${T("Verknüpfen auf mc ↗", "Link on mc ↗")}</a>`;
+  const over = `<div class="p3-grid"><section class="p3-card"><h3>${ic("blog", 22)}${T("Weiterlesen", "Continue reading")}</h3>${readCard}</section>
+<section class="p3-card"><h3>${ic("guestbook", 22)}${T("Dein Gästebuch-Eintrag", "Your guestbook entry")}<a href="${href(lang, "/guestbook")}" data-open="guestbook">${T("schreiben", "write")}</a></h3>${gbCard}</section>
+<section class="p3-card"><h3>${PX(ART.five, 22)}${T("Spiele", "Games")}<a href="#p3-games" data-p3-tab="games">${T("alle Werte", "all stats")}</a></h3><div class="p3-mini"><div><b>${mmss(mines ? mines.best : null)}</b><small>${T("Pixelminen-Bestzeit", "Pixel Mines best")}</small></div><div><b>${five ? five.streak : 0}</b><small>${T("Fünf-Serie", "Fünf streak")}</small></div><div><b>${five ? pctOf(five.won, five.played) : "–"}</b><small>${T("Fünf gewonnen", "Fünf won")}</small></div></div></section>
+<section class="p3-card"><h3>${PX(ART.sun, 22)}${T("Abzeichen", "Badges")} <span class="p3-cnt">${nGot} / ${BADGE_SET.length}</span><a href="#p3-badges" data-p3-tab="badges">${T("alle ansehen", "see all")}</a></h3><div class="p3-strip">${newest.length ? newest.map((b) => sticker(b, 1)).join("") : `<p class="p3-mut">${T("Noch keine – schau mal in den Abzeichen-Tab.", "None yet – have a look at the badges tab.")}</p>`}</div></section>
+<section class="p3-card wide"><h3>${PX(ART.mc, 22)}Minecraft</h3>${mcCard}</section></div>`;
+  const dist = five ? five.dist : [0, 0, 0, 0, 0, 0], dmax = Math.max(1, ...dist), dtop = dist.indexOf(Math.max(...dist));
+  const sync = (t) => `<span class="p3-sync"><i aria-hidden="true"></i>${t}</span>`;
+  const gm = (cells) => `<div class="p3-gm">${cells.map(([n, l]) => `<div><b>${n}</b><small>${l}</small></div>`).join("")}</div>`;
+  const gamesV = `<div class="p3-grid"><section class="p3-card"><h3>${ic("mines", 22)}Pixelminen${sync(T("mit Konto synchronisiert", "synced to your account"))}</h3>${gm([[mines ? mines.played : 0, T("gespielt", "played")], [mines ? mines.won : 0, T("gewonnen", "won")], [mines ? pctOf(mines.won, mines.played) : "–", T("Quote", "win rate")], [mmss(mines ? mines.best : null), T("Bestzeit", "best time")]])}
+<div class="p3-sizes"><div><span>9 × 9 · 10 ${T("Minen", "mines")}</span><b>${mmss(mines ? mines.best : null)}</b></div><div class="soon"><span>16 × 16 · 40 ${T("Minen", "mines")}</span><b>–</b><small>${T("kommt", "soon")}</small></div></div></section>
+<section class="p3-card"><h3>${ic("five", 22)}Fünf${sync(T("synchronisiert", "synced"))}</h3>${gm([[five ? five.played : 0, T("gespielt", "played")], [five ? pctOf(five.won, five.played) : "–", T("gewonnen", "won")], [five ? five.streak : 0, T("Serie", "streak")], [five ? five.best_streak : 0, T("beste Serie", "best streak")]])}
+<p class="p3-cap">${T("Versuche bis zum Wort", "Guesses to solve")}</p><div class="p3-dist">${dist.map((n, i) => `<div${n && i === dtop ? ' class="on"' : ""}><span>${i + 1}</span><i style="--w:${Math.max(8, Math.round((n / dmax) * 100))}%">${n}</i></div>`).join("")}</div></section>
+<section class="p3-card wide p3-merge" data-p3-merge hidden><h3>${T("Auf diesem Gerät gespeichert", "Saved on this device")}</h3><p class="p3-mut" data-p3-merge-text></p><div class="p3-acts"><button type="button" class="xpbtn go" data-p3-merge-yes>${T("Übernehmen", "Add them")}</button><button type="button" class="xpbtn" data-p3-merge-no>${T("Verwerfen", "Discard")}</button></div></section></div>`;
+  const badgesV = `<p class="p3-mut">${T("Kleine Sticker für Dinge, die du auf der Seite machst. Graue fehlen noch.", "Little stickers for things you do on the site. Grey ones are still missing.")}</p><div class="p3-badges">${BADGE_SET.map((b) => sticker(b)).join("")}</div>`;
+  const p = d.prefs || {};
+  const sw = (key, on, label) => `<button type="button" class="p3s" role="switch" aria-checked="${!!on}" aria-label="${esc(label)}" data-p3-pref="${key}"></button>`;
+  const row = (icon, t, sub, end, opt = {}) => { const tag = opt.href ? "a" : "div"; return `<li><${tag} class="p3-row${opt.cls ? " " + opt.cls : ""}"${opt.href ? ` href="${esc(opt.href)}"` : ""}${opt.attrs || ""}><span class="ri">${icon}</span><span><b>${t}</b>${sub ? `<small>${sub}</small>` : ""}</span>${end}</${tag}></li>`; };
+  const grp = (h, rows) => `<div class="p3-grp"><h4>${h}</h4><ul class="p3-list">${rows.join("")}</ul></div>`;
+  const days = d.session && d.session.expires_at ? Math.max(0, Math.ceil((Date.parse(String(d.session.expires_at).replace(" ", "T") + "Z") - Date.now()) / 864e5)) : null;
+  const since = d.session && d.session.created_at ? String(d.session.created_at).slice(0, 10).split("-").reverse().join(".") : "";
+  const setV = `<div class="p3-set">${grp(T("Darstellung", "Display"), [
+    row(ic("about", 24), T("Sprache", "Language"), "", `<span class="p3-seg" role="group" aria-label="${T("Sprache", "Language")}"><a href="/profile" hreflang="de" aria-pressed="${de}" data-p3-lang="de">DE</a><a href="/en/profile" hreflang="en" aria-pressed="${!de}" data-p3-lang="en">EN</a></span>`),
+    row(PX(ART.sun, 24), T("Design", "Theme"), T("Automatisch folgt deinem Gerät", "Auto follows your device"), `<span class="p3-seg" role="group" aria-label="${T("Design", "Theme")}">${[["day", T("Tag", "Day")], ["night", T("Nacht", "Night")], ["auto", "Auto"]].map(([k, t]) => `<button type="button" data-p3-theme="${k}" aria-pressed="${(p.theme || "day") === k}">${t}</button>`).join("")}</span>`),
+    row(ic("about", 24), T("Start-Animation", "Boot animation"), T("NwebOS-Startbildschirm beim ersten Besuch am Tag", "NwebOS boot screen on the first visit of the day"), sw("boot", p.boot !== 0, T("Start-Animation", "Boot animation"))),
+    row(PX(ART.pixel, 24), T("Bewegung reduzieren", "Reduce motion"), T("keine Fenster-, Wolken- und Pop-Animationen", "no window, cloud and pop animations"), sw("reduced_motion", p.reduced_motion === 1, T("Bewegung reduzieren", "Reduce motion"))),
+  ])}${grp(T("Ton", "Sound"), [row(PX(ART.note, 24), T("Klänge", "Sounds"), T("Klicks, Start-Jingle, Spiele", "clicks, start jingle, games"), sw("sound", p.sound !== 0, T("Klänge", "Sounds")))])}
+${grp(T("Neues mitbekommen", "Stay updated"), [row(PX(ART.rss, 24), T("Per RSS abonnieren", "Subscribe via RSS"), T("Blog, Neuigkeiten, Texte", "blog, what’s new, writing"), "<em>›</em>", { href: "/blog/feed.xml", attrs: ' data-sub="blog" role="button"' })])}
+${grp(T("Verbundene Konten", "Connected accounts"), [
+    row(avImg("p3-acc", 24), `Discord · @${esc(d.user.username || d.user.name)}`, T("Name und Bild kommen von Discord", "name and picture come from Discord"), `<span class="p3-ok">✓ ${T("verbunden", "connected")}</span>`),
+    link ? row(PX(ART.mc, 24), `Minecraft · ${esc(link.mc_name)}`, T("verknüpft · auf mc verwalten", "linked · manage on mc"), "<em>↗</em>", { href: "https://mc.nwebnotfound.dev/profile" }) : row(PX(ART.mc, 24), "Minecraft", T("noch nicht verknüpft", "not linked yet"), `<em>${T("Verknüpfen ↗", "Link ↗")}</em>`, { href: "https://mc.nwebnotfound.dev/profile" }),
+  ])}
+${grp(T("Sitzung", "Session"), [row(ic("profile", 24), T("Angemeldet auf diesem Gerät", "Signed in on this device"), since ? `${T("seit", "since")} ${since}${days != null ? ` · ${T("läuft ab in", "expires in")} ${days} ${days === 1 ? T("Tag", "day") : T("Tagen", "days")}` : ""}` : "", `<button type="button" class="xpbtn" data-egg="logout">${T("Abmelden", "Sign out")}</button>`)])}
+${grp(T("Deine Daten", "Your data"), [
+    row(ic("writing", 24), T("Meine Daten herunterladen", "Download my data"), T("alles, was wir über dich speichern, als JSON", "everything we store about you, as JSON"), "<em>↓</em>", { href: "/api/profile/export", attrs: " download" }),
+    `<li><button type="button" class="p3-row dz" data-pf-delete><span class="ri">${PX(ART.lock, 24)}</span><span><b>${T("Daten löschen", "Delete my data")}</b><small>${T("Gästebuch, Lesefortschritt, Reaktionen, Spiele, Abzeichen, Sitzungen", "guestbook, reading progress, reactions, games, badges, sessions")}</small></span><em>›</em></button></li>`,
+  ])}</div>`;
+  const panel = (k, html, on) => `<section class="p3-pane" data-panel="p3-${k}" id="p3-${k}" role="tabpanel"${on ? "" : " hidden"}>${html}</section>`;
+  return `<div class="pf p3" data-p3>${head}${tabBar}${panel("over", over, 1)}${panel("games", gamesV)}${panel("badges", badgesV)}${panel("set", setV)}</div>`;
 }

@@ -298,7 +298,7 @@ try {
   const mm = inventorySlotMap(mixed);
   ok(mm[0]?.item === "bread" && mm[1]?.item === "diamond" && mm[9]?.item === "oak_log", "Gemischtes Inventar: slotted zuerst, Rest in freie Slots", JSON.stringify(mm));
   const mainProf = await req("/profile", { cookie: c1, testHost: "nwebnotfound.dev" });
-  ok(mainProf.s === 200 && mainProf.t.includes('data-app="profile"') && mainProf.t.includes('class="tagst"') && mainProf.h.get("x-robots-tag") === "noindex" && /private/.test(mainProf.h.get("cache-control") || ""), "Hauptdomain-Profil (privat): Profil-Fenster mit Namensschild, noindex, private no-store");
+  ok(mainProf.s === 200 && mainProf.t.includes('data-app="profile"') && mainProf.t.includes('class="tagst p3-tag"') && mainProf.h.get("x-robots-tag") === "noindex" && /private/.test(mainProf.h.get("cache-control") || ""), "Hauptdomain-Profil (privat): Profil-Fenster mit Namensschild, noindex, private no-store");
   ok(!/inventory\.js|pbal|Kontostand|Inventar/.test(mainProf.t) && mainProf.t.includes("https://mc.nwebnotfound.dev/profile"), "Hauptdomain-Profil: keine Minecraft-Stats/Inventar, nur Textlink zum MC-Profil");
   ok(!mainProf.t.includes("bearbeiten") && !/seit \d+\. \w+ \d{4} da/.test(mainProf.t), "Profil: kein totes bearbeiten-Link, kein Sitzungsdatum als Mitglied-seit");
   { const anon = await req("/profile", { testHost: "nwebnotfound.dev" }); ok(anon.s === 200 && anon.t.includes('data-app="profile"') && !anon.t.includes('class="tagst"') && anon.t.includes("/auth/discord/login?next=") && /private/.test(anon.h.get("cache-control") || ""), "Profil ohne Login: Fenster ohne Daten, Discord-Login-Link, private"); }
@@ -306,13 +306,43 @@ try {
     ok(noOrigin.s === 403 && anonDel.s === 401, "Profil löschen: ohne Origin 403, ohne Login 401"); }
   { const DD = "999000111222333444"; sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('sdel','${DD}','deleter','Deleter',datetime('now','+1 day'))`); sql(`INSERT INTO entries (name, message, discord_id) VALUES ('Deleter','zum-loeschen-e2e','${DD}')`);
     const cd = await cookieFor("sdel"); const pg = await req("/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
-    ok(pg.s === 200 && pg.t.includes("zum-loeschen-e2e") && pg.t.includes("1 Gruß"), "Profil zeigt eigenen Gästebucheintrag und Zähler");
+    ok(pg.s === 200 && pg.t.includes("zum-loeschen-e2e") && pg.t.includes("<b>1</b>Gruß"), "Profil zeigt eigenen Gästebucheintrag und Zähler");
     const noConfirm = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
     const stillThere = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
     ok(noConfirm.s === 400 && stillThere.j?.user?.id === DD, "Profil löschen: ohne ausdrückliche Bestätigung 400, nichts gelöscht");
+    // profile v3 (migration 0018): game runs, badges, settings, merge, export — then the delete removes them too
+    { const P = (path, body, o = {}) => req(path, { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body, ...o });
+      const five = []; for (const g of [3, 2, 4, 1, 5]) five.push(await P("/api/profile/games/run", { game: "five", variant: "de", won: true, guesses: g }));
+      const lost = await P("/api/profile/games/run", { game: "five", variant: "de", won: false });
+      const mine = await P("/api/profile/games/run", { game: "mines", variant: "9x9", won: true, time_s: 95 }), mine2 = await P("/api/profile/games/run", { game: "mines", variant: "9x9", won: true, time_s: 120 });
+      const bad = await P("/api/profile/games/run", { game: "five", variant: "fr", won: true }), noOrigin = await P("/api/profile/games/run", { game: "five", variant: "de", won: true, guesses: 1 }, { origin: null }), anon = await req("/api/profile/games/run", { method: "POST", testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { game: "five", variant: "de", won: true, guesses: 1 } });
+      const st = sqlRows(`SELECT game, variant, played, won, best, streak, best_streak, dist FROM game_stats WHERE discord_id='${DD}' ORDER BY game`);
+      const bd = sqlRows(`SELECT badge FROM user_badges WHERE discord_id='${DD}' ORDER BY badge`).map((r) => r.badge);
+      ok(five.every((r) => r.s === 200) && lost.s === 200 && mine.s === 200 && st.length === 2 && st[0].game === "five" && st[0].played === 6 && st[0].won === 5 && st[0].streak === 0 && st[0].best_streak === 5 && st[0].dist === "[1,1,1,1,1,0]"
+        && st[1].best === 95 && st[1].played === 2 && mine2.j?.stats?.best === 95, "Profil v3: Spielrunden zählen (Fünf-Serie, Verteilung, Pixelminen-Bestzeit)", JSON.stringify(st));
+      ok(bd.join(",") === "fuenf5,gruss,minen" || bd.join(",") === "fuenf5,minen", "Profil v3: Abzeichen Fünf am Stück + Minenräumer serverseitig vergeben", bd.join(","));
+      ok(bad.s === 400 && noOrigin.s === 403 && anon.s === 401, "Profil v3: falsche Runde 400, ohne Origin 403, ohne Login 401", `${bad.s} ${noOrigin.s} ${anon.s}`);
+      const pr = await P("/api/profile/prefs", { theme: "night", sound: false, lang: "xx" }), pr2 = await P("/api/profile/prefs", { reduced_motion: true });
+      ok(pr.s === 200 && pr2.j?.prefs?.theme === "night" && pr2.j?.prefs?.sound === 0 && pr2.j?.prefs?.reduced_motion === 1 && pr2.j?.prefs?.lang === null, "Profil v3: Einstellungen gespeichert, ungültige Werte ignoriert, Teil-Updates behalten den Rest", JSON.stringify(pr2.j));
+      const meP = await req("/api/me", { cookie: cd, testHost: "nwebnotfound.dev" });
+      ok(meP.j?.user?.prefs?.theme === "night", "Profil v3: /api/me liefert die gespeicherten Einstellungen (Server gewinnt beim Laden)");
+      const mg = await P("/api/profile/games/merge", { stats: { mines: { played: 3, won: 1, best: 80 }, five: { played: 2, won: 2, best: 7 } } });
+      const st2 = sqlRows(`SELECT game, played, best, best_streak FROM game_stats WHERE discord_id='${DD}' ORDER BY game`);
+      ok(mg.s === 200 && st2[0].played === 8 && st2[0].best_streak === 7 && st2[1].played === 5 && st2[1].best === 80, "Profil v3: lokale Werte zusammenführen (Summe gespielt, bester Wert)", JSON.stringify(st2));
+      const mgAgain = await P("/api/profile/games/merge", { stats: { mines: { played: 3, won: 1, best: 80 }, five: { played: 2, won: 9, best: 7 } } });
+      const st3 = sqlRows(`SELECT game, played, won, best, best_streak FROM game_stats WHERE discord_id='${DD}' ORDER BY game`);
+      ok(mgAgain.s === 409 && JSON.stringify(st3.map(({ game, played, best, best_streak }) => ({ game, played, best, best_streak }))) === JSON.stringify(st2) && st3.every((r) => r.won <= r.played), "Profil v3: zweites Zusammenführen (Wiederholung) 409, nichts doppelt gezählt, gewonnen ≤ gespielt", `${mgAgain.s} ${JSON.stringify(st3)}`);
+      const meB = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
+      ok(!JSON.stringify(meB.j).includes("_merged"), "Profil v3: interne Markierung erscheint nicht als Abzeichen");
+      const ex = await req("/api/profile/export", { cookie: cd, testHost: "nwebnotfound.dev" });
+      ok(ex.s === 200 && /attachment/.test(ex.h.get("content-disposition") || "") && ex.j?.games?.length === 2 && ex.j?.prefs?.theme === "night" && !ex.t.includes("sdel") && !ex.t.includes("_merged") && ex.j?.guestbook?.[0]?.message === "zum-loeschen-e2e", "Profil v3: Export als JSON-Download, ohne Sitzungs-ID", ex.t.slice(0, 160));
+      const win = await req("/profile", { testHost: "nwebnotfound.dev", os: true, cookie: cd + "; nnf_os=1" });
+      ok(win.t.includes('data-p3') && win.t.includes('<span class="p3-stat"><b>1</b>Gruß</span>') && win.t.includes("Minenräumer") && win.t.includes('data-pf-delete') && win.t.includes('href="/api/profile/export"'), "Profil v3: Fenster mit Kennzahlen, Abzeichen, Export und Löschen", win.s);
+      ok(sqlRows(`SELECT badge FROM user_badges WHERE discord_id='${DD}' AND badge='gruss'`).length === 1, "Profil v3: Erster Gruß beim Öffnen nachgetragen (Eintrag von vor v3)"); }
     const del = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { confirm: "delete" } });
     const after = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const me2 = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
-    ok(del.s === 200 && !JSON.stringify(after.j).includes("zum-loeschen-e2e") && me2.j?.user === null, "Profil löschen: Einträge und Sitzung entfernt"); }
+    ok(del.s === 200 && !JSON.stringify(after.j).includes("zum-loeschen-e2e") && me2.j?.user === null, "Profil löschen: Einträge und Sitzung entfernt");
+    ok(["user_prefs", "game_stats", "user_badges"].every((t) => sqlRows(`SELECT COUNT(*) AS n FROM ${t} WHERE discord_id='${DD}'`)[0].n === 0), "Profil löschen: auch Einstellungen, Spiele und Abzeichen entfernt"); }
   // Isolation: A can neither delete nor view B's data, even when B's id is supplied in body or query.
   { const DA = "999000111222333555", DB_ = "999000111222333666"; const TOK_B = "b-privat-e2e", TOK_A = "a-privat-e2e";
     sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('siA','${DA}','usera','User A',datetime('now','+1 day')),('siB','${DB_}','userb','User B',datetime('now','+1 day'))`);
@@ -321,7 +351,7 @@ try {
     const viewA = await req("/api/profile?discord_id=" + DB_, { cookie: cA, testHost: "nwebnotfound.dev" });
     ok(viewA.j?.user?.id === DA && JSON.stringify(viewA.j).includes(TOK_A) && !JSON.stringify(viewA.j).includes(TOK_B) && !JSON.stringify(viewA.j).includes(DB_), "ansehen (/api/profile): nur die Daten des Sitzungsinhabers, ?discord_id wird ignoriert");
     const pageA = await req("/profile?discord_id=" + DB_, { cookie: cA, testHost: "nwebnotfound.dev" });
-    { const sec = pageA.t.slice(pageA.t.indexOf('id="app-profile"'), pageA.t.indexOf("</section>", pageA.t.indexOf('id="app-profile"')));   // the guestbook window on the same page is public
+    { const at = pageA.t.indexOf('id="app-profile"'), nx = pageA.t.indexOf('<section class="app"', at + 1), sec = pageA.t.slice(at, nx < 0 ? undefined : nx);   // up to the next window: the guestbook window on the same page is public
       ok(pageA.s === 200 && sec.includes(TOK_A) && !sec.includes(TOK_B), "Profil-Fenster: nur eigene Einträge"); }
     const delA = await req("/api/profile/delete?discord_id=" + DB_, { method: "POST", cookie: cA, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { confirm: "delete", discord_id: DB_, id: DB_, target: DB_, user: DB_ } });
     const gbAfter = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const viewB = await req("/api/profile", { cookie: cB, testHost: "nwebnotfound.dev" });
@@ -1358,6 +1388,7 @@ try {
   py("NwebOS-Apps im Browser fehlgeschlagen", "scripts/nwebos-apps-ui.py", BASE, c1);
   py("NwebOS-Handy-Feinschliff im Browser fehlgeschlagen", "scripts/nwebos-phone-ui.py", BASE, c1);
   py("NwebOS-Handy-Sweep (Suche, Sheets, Toasts, Abonnieren) im Browser fehlgeschlagen", "scripts/nwebos-sweep-ui.py", BASE, c1);
+  py("Mein Profil v3 (Tabs, Einstellungen, Spiele, Abzeichen, Einstiege) im Browser fehlgeschlagen", "scripts/nwebos-profile-ui.py", BASE, c1);
   py("NwebOS-Stil-Wächter (Tippflächen, Browser-Look, alte Leiste, Überlauf) fehlgeschlagen", "scripts/nwebos-guard-ui.py", BASE, c1);
   py("Fünf-Wortprüfung (DE/EN, ungültige Wörter, Umlaute) im Browser fehlgeschlagen", "scripts/fuenf-ui.py", BASE);
   py("Logo-Seitenwechsel „Wohin?“ fehlgeschlagen", "scripts/site-switch-ui.py", BASE);

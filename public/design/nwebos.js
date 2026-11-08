@@ -17,6 +17,7 @@
   /* phone audit A8: /auth/discord/logout (GET) lands on /?logout=1; read it now, before restored windows rewrite the address */
   var askLogout = /[?&]logout=1(&|$)/.test(location.search);
   if (askLogout) history.replaceState(history.state, "", location.pathname + location.search.replace(/[?&]logout=1/, "").replace(/^&/, "?") + location.hash);
+  try { var rmSet = localStorage.getItem("nwebos.rm"); if (rmSet === "1") RM = true; else if (rmSet === "0") RM = false; if (RM) document.documentElement.classList.add("rm"); } catch (e) {}
   var PHONE = function () { return matchMedia("(max-width:700px)").matches; };
   var store = {
     get: function (k) { try { return localStorage.getItem("nwebos." + k); } catch (e) { return null; } },
@@ -96,6 +97,30 @@
   }
   window.NwebOS.sheet = sheet; window.NwebOS.closeSheet = closeSheet; window.NwebOS.toast = toast; window.NwebOS.ask = ask;
 
+  /* ---------- profile v3: settings (theme day/night/auto, sound, boot, reduced motion) ----------
+     localStorage stays the source for guests; signed in, the server row wins on load and every change writes both. */
+  function prefsNow() {
+    var t = null; try { t = localStorage.getItem("summer-theme"); } catch (e) {}
+    return { theme: t === "summer-night" ? "night" : t === "summer-day" ? "day" : "auto", sound: !muted, boot: store.get("noboot") !== "1", reduced_motion: document.documentElement.classList.contains("rm") };
+  }
+  function applyPrefs(pr, save) {
+    if (!pr) return;
+    if (pr.theme === "day" || pr.theme === "night" || pr.theme === "auto") {
+      var v = pr.theme === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "summer-night" : "summer-day") : "summer-" + pr.theme;
+      R.dataset.theme = v; try { if (pr.theme === "auto") localStorage.removeItem("summer-theme"); else localStorage.setItem("summer-theme", v); } catch (e) {}
+      if (typeof syncTheme === "function") syncTheme();
+    }
+    if (pr.sound != null) setMute(!(pr.sound === true || pr.sound === 1));
+    if (pr.boot != null) store.set("noboot", pr.boot === false || pr.boot === 0 ? "1" : null);
+    if (pr.reduced_motion != null) { var on = pr.reduced_motion === true || pr.reduced_motion === 1; document.documentElement.classList.toggle("rm", on); try { localStorage.setItem("nwebos.rm", on ? "1" : "0"); } catch (e) {} }
+    if (save) savePref(pr);
+  }
+  /* signed in: a changed setting goes to the account (taskbar toggles, quick sheet, profile); guests keep it local */
+  function savePref(pr) {
+    if (me && store.get("user") !== "gast") fetch("/api/profile/prefs", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(pr) }).catch(function () {});
+  }
+  window.NwebOS.prefs = prefsNow; window.NwebOS.setPref = function (pr) { applyPrefs(pr, true); };
+
   /* phone audit A14: "Abonnieren" pills (a.subb[data-sub], the feed link without JS) open one subscribe sheet.
      iOS has no RSS handler, so copying the URL is the first and biggest action. */
   var RSSI = '<svg viewBox="0 0 16 16" width="48" height="48" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><rect width="16" height="16" rx="3" fill="#f2a33a"/><rect x="3" y="11" width="2" height="2" fill="#fff"/><path d="M3 7h2v1h1v1h1v1h1v3H6v-2H5v-1H4V9H3zM3 3h4v1h2v1h1v1h1v1h1v2h1v4h-2V9h-1V8h-1V7H9V6H8V5H6V4H3z" fill="#fff"/></svg>';
@@ -160,7 +185,7 @@
   var snd = $("#snd");
   function setMute(m) { muted = m; store.set("mute", m ? "1" : null); snd.setAttribute("aria-pressed", m ? "false" : "true"); if (m && ac) ac.suspend(); }
   setMute(muted);
-  snd.addEventListener("click", function () { setMute(!muted); if (!muted) sound.click(); });
+  snd.addEventListener("click", function () { setMute(!muted); if (!muted) sound.click(); savePref({ sound: !muted }); });
 
   /* ---------- window state in localStorage ---------- */
   function save() {
@@ -477,7 +502,7 @@
   var thm = $("#thm");
   var night = function () { var t = R.dataset.theme; return t === "summer-night" || (!t && matchMedia("(prefers-color-scheme: dark)").matches); };
   function syncTheme() { thm.setAttribute("aria-pressed", String(night())); R.toggleAttribute("data-night", night()); }
-  thm.onclick = function () { var n = night() ? "summer-day" : "summer-night"; R.dataset.theme = n; try { localStorage.setItem("summer-theme", n); } catch (e) {} syncTheme(); sound.click(); };
+  thm.onclick = function () { var n = night() ? "summer-day" : "summer-night"; R.dataset.theme = n; try { localStorage.setItem("summer-theme", n); } catch (e) {} syncTheme(); sound.click(); savePref({ theme: n === "summer-night" ? "night" : "day" }); };
   syncTheme();
   var tick = function () { var t = new Date().toLocaleTimeString(lang === "en" ? "en-GB" : "de-DE", { hour: "2-digit", minute: "2-digit" }); $("#clock").textContent = t; $("#mclock").textContent = t; var qc = $("[data-qclock]"); if (qc) qc.textContent = t; };
   tick(); setTimeout(function () { tick(); setInterval(tick, 60000); }, 60000 - (Date.now() % 60000));
@@ -489,9 +514,19 @@
     $("#smname").textContent = useMe ? me.name : L.guest;
     var av = $("#smav"); av.src = useMe && /^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV;
     var qa = $("[data-qav]"); if (qa) qa.src = av.src;
+    /* profile v3 entry points: the first home icon and the start-menu tile say "Mein Profil" or "Anmelden" */
+    var en = lang === "en", pi = $("[data-p3i]"), ps = $("[data-p3sub]");
+    if (ps) ps.textContent = useMe ? (en ? "My profile ›" : "Mein Profil ›") : (en ? "Sign in ›" : "Anmelden ›");
+    if (pi) {
+      pi.lastElementChild.textContent = useMe ? (en ? "My profile" : "Mein Profil") : (en ? "Sign in" : "Anmelden");
+      var dsc = $(".dsc", pi), img = $("img", pi);
+      if (useMe) { if (!img) { img = document.createElement("img"); img.alt = ""; img.width = img.height = 48; pi.insertBefore(img, pi.firstChild); } img.src = av.src; if (dsc) dsc.hidden = true; }
+      else { if (img) img.remove(); if (dsc) dsc.hidden = false; }
+    }
   }
   var meP = fetch("/api/me", { credentials: "include" }).then(function (r) { return r.json(); }).then(function (d) {
     me = d && d.user ? d.user : null; window.__me = d;
+    if (me && me.prefs) applyPrefs(me.prefs, false);   /* profile v3: settings follow the account */
     var li = $("[data-login-me]"), dl = $("[data-login-discord]");
     if (me) { li.hidden = false; dl.hidden = true; $("[data-me-name]").textContent = me.name; if (/^https:\/\//.test(me.avatar || "")) $("[data-me-av]").src = me.avatar; }
     else if (d && !d.available) dl.hidden = true;
@@ -574,7 +609,7 @@
   // address (deep link, also the 404 window) opens it at once and counts as seen, so the boot does not play later
   // (Planner 07.11.). Reduced motion skips the boot.
   if (deep || !atDesk) { if (firstVisit) store.set("booted", "1"); showDesk(false); }
-  else if (firstVisit && !RM) boot();
+  else if (firstVisit && !RM && store.get("noboot") !== "1") boot();
   else if (firstVisit || store.get("loggedout")) { store.set("booted", "1"); showLogin(); }
   else showDesk(false);
 })();
