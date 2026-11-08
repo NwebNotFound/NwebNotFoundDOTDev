@@ -106,6 +106,13 @@
     if ((b = t.closest("[data-fs]"))) { var rd = b.closest(".rd"), cur = parseFloat(getComputedStyle(rd).getPropertyValue("--fs")) || 14; rd.style.setProperty("--fs", Math.max(12, Math.min(20, cur + +b.dataset.fs)) + "px"); return; }
     if ((b = t.closest("[data-paper]"))) { var rd2 = b.closest(".rd"), on2 = rd2.classList.toggle("npaper"); b.setAttribute("aria-pressed", String(on2)); return; }
     if ((b = t.closest("[data-jump]"))) { e.preventDefault(); var rd3 = b.closest(".rd"), h = rd3.querySelector("#" + CSS.escape(b.dataset.jump)), sc = $(".rscroll", rd3); if (h) sc.scrollTo({ top: h.offsetTop - sc.offsetTop - 8, behavior: RM ? "auto" : "smooth" }); return; }
+    if ((b = t.closest("[data-print]"))) { if (window.NwebOS && NwebOS.closeSheet) NwebOS.closeSheet(); window.print(); return; }
+    if ((b = t.closest("[data-rexp]"))) {   /* phone: EPUB + print as sheet actions (Planner 08.11.) */
+      var ex = b.closest(".page") && $(".rexp", b.closest(".page")); if (!ex) return;
+      if (!(window.NwebOS && NwebOS.sheet)) { ex.style.display = "flex"; b.parentNode.hidden = true; return; }   /* before the sheet component (#123): show the actions inline */
+      NwebOS.sheet({ cls: "rexps", label: b.textContent, html: '<h2>' + b.textContent + "</h2>" + ex.innerHTML.replace(/class="xpbtn"/g, 'class="xpbtn wide"') + '<p class="acts"><button type="button" class="xpbtn" data-x>' + T("Schließen", "Close") + "</button></p>" });
+      return;
+    }   /* chapter window: print the page (print CSS shows only it) */
     if ((b = t.closest("[data-copy]"))) { if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).catch(function () {}); if (window.NwebOS && NwebOS.toast) NwebOS.toast("ok", T("Link kopiert", "Link copied"), b.dataset.copy); return; }   /* phone audit A4 */
     if ((b = t.closest(".mctl [aria-disabled=true]"))) return;   /* no tracks yet: the controls do nothing */
     if ((b = t.closest(".mctl [data-toggle]"))) { b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); return; }

@@ -190,4 +190,23 @@ with sync_playwright() as p:
     c.unroute_all(behavior="ignoreErrors"); c.close()
     assert not errs, errs
     print("PASS guest profile private, guest guestbook footer")
+
+    # Texte filter chip: only old shared links set it (/writing/series/<slug>, /writing?tag=<t>); ✕ goes to the full
+    # library. Night reader toolbar title >= 4.5:1.
+    LUM = """(sel) => { const L = (c) => { const m = c.match(/[\\d.]+/g).map(Number); const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); };
+      const el = document.querySelector(sel); let bg = "rgb(255,255,255)"; for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c.startsWith("rgb(")) { bg = c; break; } }
+      const a = L(getComputedStyle(el).color), b = L(bg); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); }"""
+    for width in (375, 1280):
+        c = ctx_for(br, width, night=True); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+        for path, label in (("/writing/series/test-fixture-serie", "Test Fixture Series"), ("/writing?tag=fiction", "#fiction")):
+            pg.goto(f"https://{H}{path}", wait_until="load"); chip = pg.locator(".win.focus .lib .fchip"); chip.wait_for(timeout=10000)
+            assert label in chip.inner_text(), (path, chip.inner_text())
+            shot(pg, f"x-writing-chip-{'series' if 'series' in path else 'tag'}-{width}-night.png")
+            chip.locator("a").click(); pg.wait_for_timeout(400)
+            assert pg.locator(".win.focus .lib .fchip").count() == 0 and pg.locator(".win.focus .lib").count() == 1, (path, "✕ -> full library")
+        pg.goto(f"https://{H}/writing/test-fixture-serie/1", wait_until="load"); pg.locator(".win.focus .rtitle").wait_for(timeout=10000)
+        r = pg.evaluate(LUM, ".win.focus .rtitle"); assert r >= 4.5, ("night reader title", round(r, 2))
+        c.unroute_all(behavior="ignoreErrors"); c.close()
+    assert not errs, errs
+    print("PASS Texte filter chip (series + tag link, ✕ back to all) at 375/1280 night; night reader title >= 4.5:1")
     br.close()

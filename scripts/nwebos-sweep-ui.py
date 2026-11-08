@@ -184,9 +184,15 @@ with sync_playwright() as p:
         pg.locator("[data-quick]").click(); pg.locator(".shx.qs [data-qlogout]").click()
         lo = pg.locator(".shx.ask"); lo.wait_for()
         assert "Abmelden?" in lo.inner_text(), "logout asks first"
-        lo.locator("[data-x]").click()
+        lo.locator("[data-x]").click(); pg.wait_for_timeout(200)
+        # A8: the logout address (GET) is the desktop with the logout sheet; Abbrechen keeps the session
+        # (the GET answers 302 → /?logout=1, checked in e2e.mjs; a routed 302 is not followed by Chromium, so open the target)
+        pg.goto(f"https://{H}/?logout=1", wait_until="load"); lo = pg.locator(".shx.ask"); lo.wait_for(timeout=10000)
+        assert "Abmelden?" in lo.inner_text() and "logout=" not in pg.url, pg.url
+        lo.locator("[data-x]").click(); pg.wait_for_timeout(200)
+        assert pg.evaluate("fetch('/api/me').then(r => r.json()).then(j => !!j.user)"), "still signed in after Abbrechen"
         c.unroute_all(behavior="ignoreErrors"); c.close()
-        print("PASS 375 signed in: guestbook counter, profile delete sheet (kept), logout sheet (cancelled)")
+        print("PASS 375 signed in: guestbook counter, profile delete sheet (kept), logout sheet (cancelled), GET logout = NwebOS sheet")
 
     # #123 review round 1
     # (2) short laptop screen: the bigger Fünf window fits above the taskbar, its keyboard reachable by scrolling

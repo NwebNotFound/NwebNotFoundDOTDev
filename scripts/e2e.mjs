@@ -19,7 +19,7 @@ import "./nwebos-unit.mjs";
 import "./blog-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
-import { hubPage } from "../src/hub.js";
+import { writing as osWritingWin } from "../src/nwebos-apps.js";
 // `new URL(...).pathname` keeps the leading slash on Windows ("/C:/…"), which every fs call then
 // resolved to "C:\C:\…" — the suite could not start there. fileURLToPath gives the native path.
 // Every request in this file (req() and the direct ones): one retry when the dev server reset a reused keep-alive
@@ -71,14 +71,12 @@ const py = (label, script, ...args) => {
 };
 const b64u = (b) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 async function cookieFor(sid) { const k = await C.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); return "nnf_session=" + encodeURIComponent(sid + "." + b64u(await C.subtle.sign("HMAC", k, new TextEncoder().encode(sid)))); }
-// Main-site requests run opted out of NwebOS (nnf_os=0) unless `os: true`: the checks below test the current pages,
-// which stay reachable via ?nwebos=0 and for paths without an NwebOS app; NwebOS itself is checked in its own block.
+// Main-site pages are NwebOS windows (no opt-out since fix/nwebos-no-optout); `os` is kept as a no-op for old call sites.
 const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10.0.0.1", headers = {}, host = HOST, testHost, os = false } = {}) => {
   const h = { host, "cf-connecting-ip": ip, ...headers };
   if (testHost) h["x-nnf-test-host"] = testHost;
   if (body) h["content-type"] = "application/json";
   if (token) h["x-ingest-token"] = token;
-  if (testHost === "nwebnotfound.dev" && !os && !/(^|;\s*)nnf_os=/.test(cookie || "")) cookie = cookie ? cookie + "; nnf_os=0" : "nnf_os=0";
   if (cookie) h.cookie = cookie;
   if (origin) h.origin = origin;
   const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
@@ -127,7 +125,7 @@ try {
   { const r = await req("/changelog"); ok(r.s === 200 && r.t.includes("Changelog.") && r.t.includes("Stack für Stack") && r.t.includes("/mc/changelog.css"), "GET /changelog → 200 mit Spieler-Einträgen", r.t.slice(0, 200));
     ok(!r.t.includes("creepy_ro") && !r.t.includes("PR #28") && !r.t.includes("Website PR #23") && !/<h[1-4][^>]*>\s*Admin\s*</.test(r.t), "Changelog zeigt keinen Admin-Teil (das Wort Admin im Spielertext ist erlaubt: Rang)");
     const body = r.t.slice(r.t.indexOf('id="changelog"')); ok(!/<script|<style| style=/.test(body.slice(0, body.indexOf("</section>"))), "Changelog-Inhalt ohne Inline-Script/-Style");
-    { const m = await req("/changelog", { testHost: "nwebnotfound.dev" }); ok(!m.t.includes("Stack für Stack"), "Changelog nicht auf der persönlichen Seite", String(m.s)); } }
+    { const m = await req("/changelog", { testHost: "nwebnotfound.dev" }); ok(m.s === 200 && m.t.includes('data-app="changelog"') && !m.t.includes("/mc/changelog.css"), "Hauptdomain /changelog ist das Neuigkeiten-Fenster, nicht die MC-Seite", String(m.s)); } }
   { const r = await req("/api/mc-parkour"); ok(r.s === 200 && r.j && Object.keys(r.j.courses).length === 0, "Parkour-API leer → courses {}", r.t); const pg = await req("/parkour"); ok(pg.s === 200 && pg.t.includes("/api/mc-parkour") && pg.t.includes("Noch keine Zeiten"), "GET /parkour leer → 200 mit Leerzustand"); }
   console.log("1) Ingest");
   ok((await req("/api/mc-ingest", { method: "POST", body: {} })).s === 401, "Ingest ohne Token → 401");
@@ -300,15 +298,15 @@ try {
   const mm = inventorySlotMap(mixed);
   ok(mm[0]?.item === "bread" && mm[1]?.item === "diamond" && mm[9]?.item === "oak_log", "Gemischtes Inventar: slotted zuerst, Rest in freie Slots", JSON.stringify(mm));
   const mainProf = await req("/profile", { cookie: c1, testHost: "nwebnotfound.dev" });
-  ok(mainProf.s === 200 && mainProf.t.includes("p3-tagcard") && mainProf.t.includes("/design/profile.css?v=") && mainProf.t.includes('content="noindex"') && /private/.test(mainProf.h.get("cache-control") || ""), "Hauptdomain-Profil (privat): Namensschild, noindex, private no-store");
+  ok(mainProf.s === 200 && mainProf.t.includes('data-app="profile"') && mainProf.t.includes('class="tagst p3-tag"') && mainProf.h.get("x-robots-tag") === "noindex" && /private/.test(mainProf.h.get("cache-control") || ""), "Hauptdomain-Profil (privat): Profil-Fenster mit Namensschild, noindex, private no-store");
   ok(!/inventory\.js|pbal|Kontostand|Inventar/.test(mainProf.t) && mainProf.t.includes("https://mc.nwebnotfound.dev/profile"), "Hauptdomain-Profil: keine Minecraft-Stats/Inventar, nur Textlink zum MC-Profil");
   ok(!mainProf.t.includes("bearbeiten") && !/seit \d+\. \w+ \d{4} da/.test(mainProf.t), "Profil: kein totes bearbeiten-Link, kein Sitzungsdatum als Mitglied-seit");
-  { const anon = await req("/profile", { testHost: "nwebnotfound.dev" }); ok(anon.s === 302 && (anon.h.get("location") || "").startsWith("/auth/discord/login?next=") && !anon.t.includes("p3-tagcard"), "Profil ohne Login: Weiterleitung zum Discord-Login, kein Inhalt"); }
+  { const anon = await req("/profile", { testHost: "nwebnotfound.dev" }); ok(anon.s === 200 && anon.t.includes('data-app="profile"') && !anon.t.includes('class="tagst"') && anon.t.includes("/auth/discord/login?next=") && /private/.test(anon.h.get("cache-control") || ""), "Profil ohne Login: Fenster ohne Daten, Discord-Login-Link, private"); }
   { const noOrigin = await req("/api/profile/delete", { method: "POST", cookie: c2, testHost: "nwebnotfound.dev", body: {} }); const anonDel = await req("/api/profile/delete", { method: "POST", testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
     ok(noOrigin.s === 403 && anonDel.s === 401, "Profil löschen: ohne Origin 403, ohne Login 401"); }
   { const DD = "999000111222333444"; sql(`INSERT INTO sessions (id, discord_id, username, global_name, expires_at) VALUES ('sdel','${DD}','deleter','Deleter',datetime('now','+1 day'))`); sql(`INSERT INTO entries (name, message, discord_id) VALUES ('Deleter','zum-loeschen-e2e','${DD}')`);
     const cd = await cookieFor("sdel"); const pg = await req("/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
-    ok(pg.s === 200 && pg.t.includes("zum-loeschen-e2e") && pg.t.includes("1 Gruß"), "Profil zeigt eigenen Gästebucheintrag und Zähler");
+    ok(pg.s === 200 && pg.t.includes("zum-loeschen-e2e") && pg.t.includes("<b>1</b>Gruß"), "Profil zeigt eigenen Gästebucheintrag und Zähler");
     const noConfirm = await req("/api/profile/delete", { method: "POST", cookie: cd, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: {} });
     const stillThere = await req("/api/profile", { cookie: cd, testHost: "nwebnotfound.dev" });
     ok(noConfirm.s === 400 && stillThere.j?.user?.id === DD, "Profil löschen: ohne ausdrückliche Bestätigung 400, nichts gelöscht");
@@ -353,7 +351,8 @@ try {
     const viewA = await req("/api/profile?discord_id=" + DB_, { cookie: cA, testHost: "nwebnotfound.dev" });
     ok(viewA.j?.user?.id === DA && JSON.stringify(viewA.j).includes(TOK_A) && !JSON.stringify(viewA.j).includes(TOK_B) && !JSON.stringify(viewA.j).includes(DB_), "ansehen (/api/profile): nur die Daten des Sitzungsinhabers, ?discord_id wird ignoriert");
     const pageA = await req("/profile?discord_id=" + DB_, { cookie: cA, testHost: "nwebnotfound.dev" });
-    ok(pageA.s === 200 && pageA.t.includes(TOK_A) && !pageA.t.includes(TOK_B), "Profilseite: nur eigene Einträge");
+    { const at = pageA.t.indexOf('id="app-profile"'), nx = pageA.t.indexOf('<section class="app"', at + 1), sec = pageA.t.slice(at, nx < 0 ? undefined : nx);   // up to the next window: the guestbook window on the same page is public
+      ok(pageA.s === 200 && sec.includes(TOK_A) && !sec.includes(TOK_B), "Profil-Fenster: nur eigene Einträge"); }
     const delA = await req("/api/profile/delete?discord_id=" + DB_, { method: "POST", cookie: cA, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { confirm: "delete", discord_id: DB_, id: DB_, target: DB_, user: DB_ } });
     const gbAfter = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }); const viewB = await req("/api/profile", { cookie: cB, testHost: "nwebnotfound.dev" });
     const pageB = await req("/profile?discord_id=" + DA, { cookie: cB, testHost: "nwebnotfound.dev" });
@@ -563,9 +562,8 @@ try {
   console.log("9c) Navigation, Theme, Seiten");
   const home = (await req("/")).t; ok(!/<ul class="u-links">[^]*?href="\/profile"[^]*?<\/ul>/.test(home), "kein doppelter Profil-Tab in der Nav");
   // The account slot of the unified nav is filled by the external /design/unav.js (no inline script).
-  { const port = await req("/portfolio", { testHost: "nwebnotfound.dev" }); const js = fs.readFileSync(ROOT + "public/design/unav.js", "utf8"); const chip = js.slice(js.indexOf("function render(d)"), js.indexOf("} else if (d && d.available)"));
-    ok(port.s === 200 && port.t.includes('<script src="/design/unav.js?v=') && js.includes('x.protocol === "https:"') && js.includes('var i = el("img")') && chip.includes("img(pic, fb)") && chip.includes("httpsUrl(d.user.avatar)") && !chip.includes("innerHTML") && !/onerror\s*=\s*["']/.test(port.t.slice(port.t.indexOf("<header"), port.t.indexOf("</header>"))), "Portfolio-Chip: Avatar nur als DOM-Property, nur https", chip.slice(0, 160));
-    ok(chip.includes('isMc ? (nm ? "/mc-head/" + nm + "/64?v=5" : "") : httpsUrl(d.user.avatar)') && !chip.includes("src = d.user.avatar"), "Konto: MC-Kopf auf mc.*, sonst nur https-Discord-Avatar", chip.slice(0, 180)); }
+  { const port = await req("/portfolio", { testHost: "nwebnotfound.dev" }); const os = fs.readFileSync(ROOT + "public/design/nwebos.js", "utf8");
+    ok(port.s === 200 && port.t.includes('class="no-js nwebos"') && !port.t.includes("/design/unav.js") && os.includes(String.raw`/^https:\/\//.test(me.avatar`), "Hauptdomain: NwebOS statt Portfolio-Chip; Avatar nur https (Regel 10)"); }
   ok(home.includes("&quot;/bestellungen&quot;") && fs.readFileSync(ROOT + "public/design/unav.js", "utf8").includes("L.menu"), "Dropdown verlinkt zusammengelegte Bestellungen");
   for (const p of ["/bestellungen", "/abholungen"]) { const x = await req(p); ok(x.s === 200 && x.t.includes("/mc/orders.js"), p + " → 200, gemeinsame Liste"); }
   ok((await req("/markt/diamond")).t.includes('id="bbuy"'), "Item-Seite hat Bank-Kauf");
@@ -671,40 +669,37 @@ try {
     const extUrls = (html) => [...html.matchAll(/(?:href|src)="(https?:\/\/[^"]+)"/g)].map((m) => m[1])
       .filter((u) => !/^https:\/\/(github\.com\/NwebNotFound|x\.com\/NwebNotFound|mc\.nwebnotfound\.dev|nwebnotfound\.dev)(\/|$)/.test(u));
     const home = await hub("/", { headers: { "accept-language": "de-DE,de;q=0.9,en;q=0.8" } });
-    ok(home.s === 200 && /<html lang="de" class="sm-root">/.test(home.t), "GET / → 200, <html lang=de> aus Accept-Language", home.s);
-    ok(home.t.includes("/design/summer.css?v=") && home.t.includes('src="/design/summer-theme.js?v=') && home.t.indexOf("summer-theme.js") < home.t.indexOf("summer.css?v="), "Hub lädt das Phase-1-Theme (Themeskript vor dem Stylesheet)");
-    ok(home.t.includes('class="sm-skip-link"') && home.t.includes('<main id="main">') && home.t.includes('<footer class="sm-footer"'), "Skip-Link und Landmarks vorhanden");
-    ok(home.t.includes('hreflang="de"') && home.t.includes('hreflang="en"') && home.t.includes('hreflang="x-default"'), "hreflang de/en/x-default gesetzt");
-    ok(home.t.includes('href="https://github.com/NwebNotFound" target="_blank" rel="noopener noreferrer"') && home.t.includes('href="https://x.com/NwebNotFound" target="_blank" rel="noopener noreferrer"'), "Footer: GitHub und X als normale Links mit rel=noopener noreferrer");
-    ok(extUrls(home.t).length === 0, "keine fremden Requests (kein CDN, kein Tracker, keine externen Schriften)", extUrls(home.t).slice(0, 3).join(" "));
-    { const nav = home.t.slice(home.t.indexOf("<header"), home.t.indexOf("</header>"));
-      ok(/class="u-link u-soon" href="\/(?:de\/)?music"/.test(nav) && nav.includes(">Musik<") && home.t.includes("h2-st is-soon") && home.t.includes(">bald<"), "noch leere Bereiche: in der Navigation als 'bald' (Nav v2, Nils 06.11.), 'bald' auf den Projektkarten"); }
+    ok(home.s === 200 && /<html lang="de" class="no-js nwebos">/.test(home.t), "GET / → 200, NwebOS, <html lang=de> aus Accept-Language", home.s);
+    ok(home.t.includes('src="/design/summer-theme.js?v=') && home.t.indexOf("summer-theme.js") < home.t.indexOf("/design/nwebos.css?v="), "NwebOS lädt das Themeskript vor dem Stylesheet (Nacht ohne Aufblitzen)");
+    ok(home.t.includes('<a class="skip" href="#apps">') && home.t.includes('<main id="apps">'), "Skip-Link und Hauptbereich vorhanden");
+    ok(home.t.includes('hreflang="de"') && home.t.includes('hreflang="en"') && home.t.includes('hreflang="x-default" href="https://nwebnotfound.dev/"'), "hreflang de/en/x-default gesetzt");
+    { const ext = extUrls(home.t).filter((u) => !/^https:\/\/cdn\.discordapp\.com\/(avatars|embed\/avatars)\//.test(u));   // Discord avatars of guestbook entries (rule 10)
+      ok(ext.length === 0, "keine fremden Requests (kein CDN, kein Tracker, keine externen Schriften; nur Discord-Avatare)", ext.slice(0, 3).join(" ")); }
     const en = await hub("/", { headers: { "accept-language": "en-GB,en;q=0.9" } });
-    ok(/<html lang="en" class="sm-root">/.test(en.t) && en.t.includes("What I&#39;m building"), "Accept-Language en → englische Oberfläche");
-    ok(en.t.includes('href="/de"') && en.t.includes('href="/en"') && en.t.includes('aria-current="true"'), "Sprachumschalter verlinkt beide Sprachen und markiert die aktuelle");
+    ok(/<html lang="en" class="no-js nwebos">/.test(en.t) && en.t.includes("What's new"), "Accept-Language en → englische Oberfläche");
+    ok(en.t.includes('<a href="/" hreflang="de" lang="de">DE</a>') && en.t.includes('<a href="/en" hreflang="en" lang="en" aria-current="true">EN</a>'), "Sprachumschalter verlinkt beide Sprachen und markiert die aktuelle");
     const bare = await hub("/");
     ok(/<html lang="de"/.test(bare.t), "ohne Accept-Language → Deutsch als Standard");
     ok(bare.s === 200, "/ leitet nicht um (kein Redirect-Loop)", bare.s);
     ok(/<html lang="en"/.test((await hub("/", { cookie: "nnf_lang=en", headers: { "accept-language": "de-DE,de;q=0.9" } })).t), "Cookie nnf_lang=en schlägt Accept-Language");
     const deAbout = await hub("/de/about"), enAbout = await hub("/en/about");
-    ok(deAbout.s === 200 && /<html lang="de"/.test(deAbout.t) && deAbout.t.includes("Platzhalter"), "/de/about → 200, deutsch, klar als Platzhalter markiert", deAbout.s);
+    ok(deAbout.s === 200 && /<html lang="de"/.test(deAbout.t) && deAbout.t.includes('data-app="about"'), "/de/about → 200, deutsch, Über-mich-Fenster", deAbout.s);
     ok(enAbout.s === 200 && /<html lang="en"/.test(enAbout.t) && enAbout.t.includes("placeholder"), "/en/about → 200, englisch");
     ok((deAbout.h.get("set-cookie") || "").includes("nnf_lang=de") && (enAbout.h.get("set-cookie") || "").includes("nnf_lang=en"), "Sprachpräfix setzt das Cookie nnf_lang", deAbout.h.get("set-cookie"));
     ok((await hub("/en")).s === 200 && /<html lang="en"/.test((await hub("/en")).t), "/en (ohne Schluss-Slash) → 200, englisch");
-    for (const p of ["/de/guestbook", "/en/guestbook", "/en/portfolio", "/de/unbekannt"]) {
+    // Windows answer under both prefixes (no more 302 to an old page); an unknown prefixed path goes to its bare 404.
+    for (const p of ["/de/guestbook", "/en/guestbook", "/en/portfolio"]) {
+      const r = await hub(p);
+      ok(r.s === 200 && r.t.includes(`<html lang="${p.slice(1, 3)}" class="no-js nwebos">`) && (r.h.get("set-cookie") || "").includes(`nnf_lang=${p.slice(1, 3)}`), `${p} → 200 Fenster in der Sprache, merkt sie sich`, `${r.s} ${r.h.get("set-cookie")}`);
+    }
+    for (const p of ["/de/unbekannt"]) {
       const r = await hub(p), want = p.slice(3);
       ok(r.s === 302 && (r.h.get("location") || "") === `https://nwebnotfound.dev${want}` && /no-store/.test(r.h.get("cache-control") || ""), `${p} → 302 no-store ${want} (Hub-fremde Route ohne Präfix, nie aus dem Cache)`, `${r.s} ${r.h.get("location")} ${r.h.get("cache-control")}`);
       ok((r.h.get("set-cookie") || "").includes(`nnf_lang=${p.slice(1, 3)}`), `${p} merkt sich die Sprache (DE/EN-Schalter bleibt auf der Seite)`, r.h.get("set-cookie"));
     }
-    // Unified nav on the German-only pages: EN stays on the page and the nav follows the cookie.
-    { const gde = await hub("/guestbook"), gen = await hub("/guestbook", { cookie: "nnf_lang=en" });
-      const nav = (t) => t.slice(t.indexOf("<header"), t.indexOf("</header>"));
-      ok(nav(gde.t).includes('href="/en/guestbook"') && nav(gde.t).includes('href="/de/guestbook" hreflang="de" lang="de" aria-current="true"'), "/guestbook: EN-Link bleibt auf der Seite, DE markiert", nav(gde.t).slice(0, 120));
-      ok(nav(gen.t).includes('href="/en/guestbook" hreflang="en" lang="en" aria-current="true"') && nav(gen.t).includes(">Guestbook<") && /aria-current="page">(?:(?!<\/a>)[\s\S])*<span class="u-lt">Guestbook</.test(nav(gen.t)), "/guestbook mit nnf_lang=en: EN markiert, Navigation englisch");
-      ok(!/<img[^>]*class="[^"]*u-acct/.test(nav(gde.t)) && nav(gde.t).includes("data-u-acct></div>"), "kein Avatar im HTML, bevor die Sitzung bekannt ist"); }
     for (const p of ["/", "/about", "/music", "/writing"]) {
       const r = await hub(p);
-      ok(r.s === 200 && r.t.includes("/design/summer.css?v="), `Hub-Route ${p} → 200`, r.s);
+      ok(r.s === 200 && r.t.includes("/design/nwebos.css?v="), `NwebOS-Route ${p} → 200`, r.s);
     }
     // Rezensionen wurden am 04.11.2026 entfernt: die Route liefert die normale 404-Seite, die
     // Sprachvarianten laufen über den üblichen 302 (no-store) auf den präfixlosen Pfad.
@@ -718,11 +713,11 @@ try {
       ok(!gone.t.includes("Rezensionen") && !(await hub("/")).t.includes("Rezensionen") && !(await hub("/about")).t.includes("Rezensionen"), "nirgends mehr ein Rezensionen-Link");
     }
     const soon = await hub("/en/music");
-    ok(soon.s === 200 && soon.t.includes("sm-hammer") && soon.t.includes("(◕‿◕)"), "/en/music → Leerzustand mit Maskottchen-Platzhalter");
-    ok(!/undefined|\{[a-z_]+\}/.test(deAbout.t) && !/undefined|\{[a-z_]+\}/.test(soon.t), "keine Rohkeys oder {Platzhalter} im Hub-HTML");
+    ok(soon.s === 200 && soon.t.includes('<html lang="en"') && soon.t.includes('data-app="music"'), "/en/music → 200, Musik-Fenster auf Englisch");
+    ok(!/>[^<]*(undefined|\{[a-z_]+\})[^<]*</.test(deAbout.t) && !/>[^<]*(undefined|\{[a-z_]+\})[^<]*</.test(soon.t), "keine Rohkeys oder {Platzhalter} im sichtbaren Text");
     const port = await hub("/portfolio");
-    ok(port.s === 200 && port.t.includes('id="projekte"') && !port.t.includes("sm-root"), "/portfolio → 200, frühere Startseite im Portfolio-Design");
-    ok((await hub("/guestbook")).s === 200 && (await hub("/guestbook")).t.includes("<title>Gästebuch · NwebNotFound</title>"), "/guestbook bleibt erreichbar (Portfolio-Design)");
+    ok(port.s === 200 && port.t.includes('data-app="portfolio"') && !port.t.includes('id="projekte"'), "/portfolio → 200, Projekte-Fenster (keine alte Seite)");
+    { const gb = await hub("/guestbook"); ok(gb.s === 200 && gb.t.includes('data-app="guestbook"') && !gb.t.includes("u-bar"), "/guestbook → 200, Gästebuch-Fenster (keine alte Seite)"); }
     const mcHome = await req("/");
     ok(mcHome.s === 200 && mcHome.t.includes("Kein offizielles Minecraft-Produkt") && !mcHome.t.includes("sm-root"), "mc.nwebnotfound.dev / unverändert (kein Hub-Theme, Regression)");
   }
@@ -732,49 +727,46 @@ try {
     // The committed index (no real content yet) must render the mascot empty state. `CONTENT` was
     // imported before the fixture build overwrote the file, so this is the committed state.
     const committed = CONTENT.writing.filter((w) => !w.draft && !w.archived).length;
-    if (committed === 0) {
-      const empty = hubPage("/writing", "de");
-      ok(empty.includes("sm-hammer") && empty.includes("sm-soon") && empty.includes("Texte kommt bald"), "Leerzustand /writing (committed build, kein Inhalt)");
-    } else {
-      ok(hubPage("/writing", "de").includes("sm-post-grid"), "Liste /writing mit Inhalt (committed build)");
+    if (committed === 0) {   // the Texte window's empty state (no real content yet)
+      const empty = osWritingWin("de", [], []);
+      ok(empty.includes("Der Roman entsteht gerade") && empty.includes("Noch keine Kurztexte."), "Leerzustand Texte-Fenster (committed build, kein Inhalt)");
     }
-    ok(!hubPage("/writing/does-not-exist", "de") && !hubPage("/writing/series/does-not-exist", "de"), "hubPage: unbekannter Slug/Serie → null");
+    ok((await hub("/writing/does-not-exist")).s === 404, "unbekannter Text → 404-Fenster");
 
     const list = await hub("/writing");
-    ok(list.s === 200 && list.t.includes("sm-post-grid") && list.t.includes("TEST FIXTURE Hello world"), "GET /writing → 200, Liste mit Beiträgen", list.s);
-    ok(list.t.includes("TEST FIXTURE English post") && !list.t.includes("TEST FIXTURE Draft post") && !list.t.includes("Chapter three"), "Liste: draft und archived fehlen");
-    ok(list.t.includes('href="/de/writing?kind=story"') && list.t.includes('href="/de/writing?tag=fixtures"'), "Liste: Filterlinks nach Art und Stichwort");
+    // Texte window (NwebOS only since fix/nwebos-no-optout): the series with its chapters, short texts below; no
+    // kind/tag filters any more (Planner default), drafts never.
+    ok(list.s === 200 && list.t.includes('data-app="writing"') && list.t.includes("TEST FIXTURE Chapter one") && list.t.includes("TEST FIXTURE Hello world"), "GET /writing → 200, Texte-Fenster mit Serie und Kurztexten", list.s);
+    ok(list.t.includes("TEST FIXTURE English post") && !list.t.includes("TEST FIXTURE Draft post"), "Texte: kein draft");
     const en = await hub("/en/writing");
-    ok(en.s === 200 && /<html lang="en"/.test(en.t) && en.t.includes("Stories and blog"), "/en/writing → englische Oberfläche", en.s);
-    const kind = await hub("/writing?kind=story");
-    ok(kind.s === 200 && kind.t.includes("TEST FIXTURE Chapter one") && !kind.t.includes("TEST FIXTURE Hello world"), "Filter ?kind=story zeigt nur Kapitel", kind.s);
-    const tag = await hub("/writing?tag=fixtures");
-    ok(tag.s === 200 && tag.t.includes("TEST FIXTURE Hello world"), "Filter ?tag=fixtures", tag.s);
-    const none = await hub("/writing?tag=kein-treffer");
-    ok(none.s === 200 && none.t.includes("Zu diesem Filter"), "Filter ohne Treffer erklärt das", none.s);
+    ok(en.s === 200 && /<html lang="en"/.test(en.t) && en.t.includes("Short texts"), "/en/writing → englische Oberfläche", en.s);
 
     const post = await hub("/writing/test-fixture-hello");
-    ok(post.s === 200 && post.t.includes("TEST FIXTURE Hello world") && post.t.includes('class="sm-prose"') && post.t.includes("Min. Lesezeit"), "Beitragsseite → 200 mit Reader und Lesezeit", post.s);
-    ok(post.t.includes('rel="canonical" href="https://nwebnotfound.dev/de/writing/test-fixture-hello"') && !/rel="alternate" hreflang=/.test(post.t), "Beitrag: canonical auf die Originalsprache, kein hreflang");
+    ok(post.s === 200 && post.t.includes('data-app="text"') && post.t.includes("TEST FIXTURE Hello world") && post.t.includes('<article class="page"') && post.t.includes("Min. Lesezeit"), "Text → 200 im Text-Fenster mit Reader und Lesezeit", post.s);
     ok(post.t.includes("<h2>Eine Zwischenüberschrift</h2>") && post.t.includes("<ul><li>erster Punkt</li>") && post.t.includes("<pre><code"), "Markdown ist vorgerendert (h2, Liste, Codeblock)");
-    ok(post.t.includes('href="/de/writing?tag=fixtures"') && post.t.includes('class="sm-prose" lang="de"'), "Beitrag: Tag-Link und Reader-Sprache");
+    ok(post.t.includes('<article class="page" lang="de">'), "Text: Reader-Sprache");
     ok(!post.t.includes("Original auf") && !post.t.includes("Original in"), "deutscher Text, deutsche Hülle → kein Original-Hinweis");
     const enPostDe = await hub("/de/writing/test-fixture-english");
     ok(enPostDe.s === 200 && enPostDe.t.includes("Original auf Englisch."), "englischer Text in deutscher Hülle → Hinweis", enPostDe.s);
-    ok(!/class="sm-note"/.test((await hub("/en/writing/test-fixture-english")).t), "englischer Text in englischer Hülle → kein Hinweis-Banner");
+    ok(!(await hub("/en/writing/test-fixture-english")).t.includes('<p class="arch" role="note" lang='), "englischer Text in englischer Hülle → kein Hinweis-Banner");
     ok((await hub("/writing/test-fixture-draft")).s === 404, "draft ist auch über den direkten Link nicht erreichbar");
-    const arch = await hub("/writing/test-fixture-chapter-3");
-    ok(arch.s === 200 && arch.t.includes("Archiviert") && arch.t.includes("wurde archiviert"), "archived: direkter Link erreichbar + Hinweis-Banner", arch.s);
+    const arch0 = await hub("/writing/test-fixture-chapter-3"), arch = await hub("/writing/test-fixture-serie/3");
+    ok(arch0.s === 302 && arch0.h.get("location") === "/writing/test-fixture-serie/3" && arch.s === 200 && arch.t.includes("wurde archiviert"), "archived: direkter Link führt zum Kapitel-Fenster + Hinweis", `${arch0.s} ${arch0.h.get("location")} ${arch.s}`);
 
+    // Planner 08.11.: shared series/tag links open the Texte window pre-filtered, with a clearable chip (one filter)
     const series = await hub("/writing/series/test-fixture-serie");
-    ok(series.s === 200 && series.t.includes("Test Fixture Series") && series.t.includes("TEST FIXTURE Chapter one") && series.t.includes("Chapter three (archived)"), "Serienseite: Kapitelliste inkl. archiviertem Kapitel", series.s);
-    const ch2 = await hub("/writing/test-fixture-chapter-2");
-    ok(ch2.t.includes('href="/de/writing/test-fixture-chapter-1"') && ch2.t.includes('href="/de/writing/test-fixture-chapter-3"'), "Kapitel: Vorheriges/Nächstes");
-    ok((await hub("/de/writing/test-fixture-chapter-2")).s === 200, "/de/writing/<slug> rendert (kein Redirect)");
+    ok(series.s === 200 && series.t.includes('data-app="writing"') && series.t.includes('<p class="fchip" role="status"><span>Serie: Test Fixture Series</span><a href="/writing"') && series.t.includes("Chapter three (archived)") && !series.t.includes("TEST FIXTURE Hello world"), "Serien-Link → Texte-Fenster gefiltert auf die Serie, Chip zum Entfernen, inkl. archiviertem Kapitel", series.s);
+    ok((await hub("/writing/series/gibt-es-nicht")).s === 404, "unbekannte Serie → 404-Fenster");
+    const tagged = await hub("/writing?tag=fixtures"), notag = await hub("/writing?tag=kein-treffer");
+    ok(tagged.s === 200 && tagged.t.includes("<span>#fixtures</span>") && tagged.t.includes("TEST FIXTURE Hello world") && notag.t.includes("Nichts mit diesem Stichwort."), "?tag= → Texte-Fenster gefiltert, Chip; ohne Treffer erklärt", tagged.s);
+    ok((await hub("/writing?tag=%3Cscript%3E")).t.includes("<span>#&lt;script&gt;</span>"), "Tag im Chip ist escaped");
+    const ch2 = await hub("/writing/test-fixture-serie/2");
+    ok(ch2.s === 200 && ch2.t.includes('href="/writing/test-fixture-serie/1"') && ch2.t.includes('href="/writing/test-fixture-serie/3"'), "Kapitel: Vorheriges/Nächstes", ch2.s);
+    { const r = await hub("/de/writing/test-fixture-chapter-2"); ok(r.s === 302 && r.h.get("location") === "/de/writing/test-fixture-serie/2", "/de/writing/<kapitel-slug> → 302 Kapitel-Fenster, Präfix bleibt", `${r.s} ${r.h.get("location")}`); }
 
     const unsafe = await hub("/writing/test-fixture-unsafe");
     ok(unsafe.s === 200 && unsafe.t.includes("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;"), "unsafe: Rohes HTML ist escaped", unsafe.s);
-    ok(!/<script(?![^>]*\ssrc=)/i.test(unsafe.t) && !/<img[^>]*\son[a-z]+\s*=/i.test(unsafe.t), "unsafe: kein Live-Script, kein Event-Handler");
+    ok(!/<script(?![^>]*\ssrc=)(?![^>]*type="application\/json")/i.test(unsafe.t) && !/<img[^>]*\son[a-z]+\s*=/i.test(unsafe.t), "unsafe: kein Live-Script, kein Event-Handler");
     ok(!/href="javascript:/i.test(unsafe.t) && !/href="data:/i.test(unsafe.t), "unsafe: kein javascript:-/data:-Link");
     ok(unsafe.t.includes('<img src="/content-assets/placeholder.svg"'), "unsafe: erlaubtes lokales Bild wird gerendert");
     ok(!/evil\.example/.test(unsafe.t), "unsafe: externes Bild wird verworfen");
@@ -815,35 +807,27 @@ try {
     ok((await hub("/writing/notes/feed.xml")).s === 404 && (await hub("/writing/unbekannt/feed.xml")).s === 404, "unbekannter Feed → 404");
     ok(!(await req("/writing/feed.xml")).t.includes("<rss"), "kein Feed auf mc.nwebnotfound.dev");
 
-    const list = await hub("/writing");
-    ok(list.t.includes('class="sm-feed-note"') && list.t.includes('href="/writing/feed.xml"') && list.t.includes('href="/writing/atom.xml"'), "Fußnote mit RSS/Atom-Link in der Liste");
-    ok(list.t.includes('<link rel="alternate" type="application/rss+xml" title="NwebNotFound – Texte" href="/writing/feed.xml">'), "Autodiscovery im Head der Liste");
-    const post = await hub("/writing/test-fixture-hello");
-    ok(post.t.includes('type="application/rss+xml" title="NwebNotFound – Blog" href="/writing/blog/feed.xml"') && !post.t.includes("/writing/stories/feed.xml"), "Blog-Beitrag wirbt nur für den Blog-Feed");
-    const chapter = await hub("/writing/test-fixture-chapter-2");
-    ok(chapter.t.includes('href="/writing/series/test-fixture-serie/feed.xml"') && chapter.t.includes('href="/writing/stories/feed.xml"'), "Kapitel wirbt für Story- und Serien-Feed");
-    const seriesPage = await hub("/writing/series/test-fixture-serie");
-    ok(seriesPage.t.includes('href="/writing/series/test-fixture-serie/atom.xml"'), "Serienseite wirbt für ihren Feed");
+    // Feed links on the pages: the NwebOS head and the Abonnieren pills (#123); the old list footnote and the per-page
+    // series/story links went with the old pages.
     ok(!/utm_|feedburner|feedproxy/i.test(rss.t), "Feed ohne Tracking-Parameter und ohne Drittanbieter-Dienst");
   }
   console.log("7e) Hub: Export (EPUB + Druckansicht)");
   {
     const hub = (path, opt = {}) => req(path, { testHost: "nwebnotfound.dev", ...opt });
     const asset = (path) => fetch(BASE + path, { headers: { host: "nwebnotfound.dev" }, redirect: "manual" });
-    const chapter = await hub("/writing/test-fixture-chapter-2");
-    ok(chapter.t.includes('href="/downloads/story-test-fixture-chapter-2.epub"') && chapter.t.includes("EPUB herunterladen"), "Kapitel: EPUB-Download-Button", chapter.s);
+    const chapter = await hub("/writing/test-fixture-serie/2");
+    ok(chapter.t.includes('href="/downloads/story-test-fixture-chapter-2.epub"') && chapter.t.includes("EPUB herunterladen"), "Kapitel-Fenster: EPUB-Download-Button", chapter.s);
     ok(chapter.t.includes('href="/downloads/series-test-fixture-serie.epub"'), "Kapitel: Serien-EPUB verlinkt");
-    ok(chapter.t.includes("data-sm-print") && /<script src="\/design\/summer-print\.js\?v=[0-9a-f]+" defer><\/script>/.test(chapter.t), "Kapitel: Druck-Button mit externem Skript");
+    ok(chapter.t.includes('<button type="button" class="xpbtn" data-rexp aria-haspopup="dialog">Herunterladen &amp; drucken</button>') || chapter.t.includes('data-rexp aria-haspopup="dialog">Herunterladen & drucken</button>'), "Kapitel: auf dem Handy ein Knopf für EPUB/Druck als Sheet");
+    ok(chapter.t.includes("data-print") && chapter.t.includes('src="/design/nwebos-apps.js?v='), "Kapitel: Druck-Button, gedruckt wird aus dem externen nwebos-apps.js");
     ok(chapter.t.includes("© Nils, nur zum persönlichen Lesen."), "Kapitel: Rechte-Zeile auf der Seite");
-    ok(!/onclick=/.test(chapter.t) && !/<script(?![^>]*\ssrc=)/i.test(chapter.t), "Kapitel: kein Inline-Handler, kein Inline-Skript");
+    ok(!/onclick=/.test(chapter.t) && !/<script(?![^>]*\ssrc=)(?![^>]*type="application\/json")/i.test(chapter.t), "Kapitel: kein Inline-Handler, kein Inline-Skript (nur JSON-Daten)");
     const blog = await hub("/writing/test-fixture-hello");
-    ok(!blog.t.includes("/downloads/") && !blog.t.includes("data-sm-print") && !blog.t.includes("summer-print.js"), "Blog-Beitrag: kein Download, kein Druck-Button (Entscheidung Nils)");
-    ok(!(await hub("/writing/test-fixture-chapter-3")).t.includes("/downloads/"), "archiviertes Kapitel: kein Download (wird nicht exportiert)");
-    const seriesPage = await hub("/writing/series/test-fixture-serie");
-    ok(seriesPage.t.includes('href="/downloads/series-test-fixture-serie.epub"') && seriesPage.t.includes("data-sm-print"), "Serienseite: Serien-EPUB und Drucken");
+    ok(!blog.t.includes("/downloads/") && !blog.t.includes("data-print"), "Text (Blog-Art): kein Download, kein Druck-Button (Entscheidung Nils)");
+    ok(!(await hub("/writing/test-fixture-serie/3")).t.includes("/downloads/"), "archiviertes Kapitel: kein Download (wird nicht exportiert)");
     const list = await hub("/writing");
-    ok(!list.t.includes("/downloads/") && !list.t.includes("data-sm-print"), "Liste: keine Download-/Druck-Buttons");
-    ok((await hub("/en/writing/test-fixture-chapter-2")).t.includes("Download EPUB"), "/en: englischer Button-Text");
+    ok(!list.t.includes("/downloads/") && !list.t.includes("data-print"), "Texte-Fenster: keine Download-/Druck-Buttons");
+    ok((await hub("/en/writing/test-fixture-serie/2")).t.includes("Download EPUB"), "/en: englischer Button-Text");
 
     const dl = await asset("/downloads/story-test-fixture-chapter-2.epub");
     const bytes = new Uint8Array(await dl.arrayBuffer());
@@ -884,8 +868,6 @@ try {
     const kf = [...css.matchAll(/@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g)];
     const slow = kf.filter((m) => [...m[2].matchAll(/([a-z-]+)\s*:/g)].some((p) => !["transform", "opacity"].includes(p[1]))).map((m) => m[1]);
     ok(kf.length > 20 && slow.length === 0, "Keyframes animieren nur transform/opacity (kein box-shadow etc. pro Frame)", slow.join(","));
-    const gb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev", cookie: "nnf_os=0" } }).then((r) => r.text());   // the current page (opted out)
-    ok(!/<script[^>]+turnstile\/v0\/api\.js/.test(gb) && /render=explicit/.test(gb), "Gästebuch: Turnstile erst beim Formular (kein api.js im Kopf)");
     const osGb = await fetch(BASE + "/guestbook", { headers: { "x-nnf-test-host": "nwebnotfound.dev" } }).then((r) => r.text());
     ok(osGb.includes('class="no-js nwebos"') && !/<script[^>]+turnstile\/v0\/api\.js/.test(osGb) && /render=explicit/.test(fs.readFileSync(ROOT + "public/design/nwebos.js", "utf8")), "NwebOS-Gästebuch: Turnstile erst beim Formular (nwebos.js, kein api.js im Kopf)");
     const mi = await fetch(BASE + "/markt/diamond", { headers: { host: HOST } }).then((r) => r.text());
@@ -1077,7 +1059,7 @@ try {
       sql(`INSERT INTO sessions (id, discord_id, username, expires_at) VALUES ('slo', '100000000000000001', 'Nils', datetime('now', '+1 day'))`);
       const ck = await cookieFor("slo"), has = () => sqlRows("SELECT id FROM sessions WHERE id = 'slo'").length === 1, NX = "?next=" + encodeURIComponent("https://mc.nwebnotfound.dev/vip");
       const g = await req("/auth/discord/logout" + NX, { cookie: ck, testHost: "nwebnotfound.dev" });
-      ok(g.s === 200 && /<form method="post" action="\/auth\/discord\/logout\?next=/.test(g.t) && has(), "GET-Logout meldet nicht ab, zeigt POST-Formular", g.s);
+      ok(g.s === 302 && g.h.get("location") === "/?logout=1" && has(), "GET-Logout meldet nicht ab, führt zum NwebOS-Abmelde-Sheet (A8)", `${g.s} ${g.h.get("location")}`);
       ok(!g.t.includes("{{"), "Logout-Seite ohne unersetzte {{…}}-Marker");
       const ev = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, origin: "https://evil.example", testHost: "nwebnotfound.dev" });
       const no = await req("/auth/discord/logout" + NX, { method: "POST", cookie: ck, testHost: "nwebnotfound.dev" });
@@ -1323,7 +1305,7 @@ try {
     const bd = await b("/blog"), be = await b("/en/blog"), bp = await b("/en/blog/e2e-beitrag");
     const can = (t) => (/<link rel="canonical" href="([^"]+)"/.exec(t) || [])[1], hl = (t) => [...t.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"/g)].map((m) => m[1] + " " + m[2]).sort().join("|");
     ok(can(bd.t) === "https://nwebnotfound.dev/blog" && can(be.t) === "https://nwebnotfound.dev/en/blog" && hl(bd.t) === hl(be.t) && hl(be.t) === ["de https://nwebnotfound.dev/blog", "en https://nwebnotfound.dev/en/blog", "x-default https://nwebnotfound.dev/blog"].sort().join("|"), "Blog: canonical je Sprache selbstreferenzierend, hreflang de/en/x-default", `${can(bd.t)} ${can(be.t)} ${hl(be.t)}`);
-    ok(be.t.includes('aria-label="Categories"') && be.t.includes(">Build</a>") && !be.t.includes("Kategorien") && !be.t.includes(">Bauen</a>") && bd.t.includes('aria-label="Kategorien"') && bd.t.includes(">Bauen</a>"), "Blog: /en/blog hat englische Kategorien + aria-label, /blog deutsche");
+    ok(be.t.includes('<nav class="cats" aria-label="Categories">') && !be.t.includes('aria-label="Kategorien"') && bd.t.includes('<nav class="cats" aria-label="Kategorien">'), "Blog: /en/blog hat englische Kategorien + aria-label, /blog deutsche");
     ok(bp.s === 200 && can(bp.t) === "https://nwebnotfound.dev/blog/e2e-beitrag" && hl(bp.t) === "", "Blog: Beitrag nur auf Deutsch → canonical auf die deutsche URL, kein hreflang", `${bp.s} ${can(bp.t)}`);
     await b(`/api/blog/admin/posts/${cr.j?.id}/status`, { method: "POST", cookie: c1, origin: MO, body: { status: "withdrawn", base: pb.j?.updated_at } });
     const adm = await b("/blog/admin", { cookie: c1, os: true });
@@ -1352,10 +1334,13 @@ try {
     const MH = "nwebnotfound.dev", n = (path, o = {}) => req(path, { testHost: MH, os: true, ...o });
     const home = await n("/"), de = await n("/de"), en = await n("/en"), gb = await n("/guestbook");
     ok([home, de, en, gb].every((r) => r.s === 200 && r.t.includes('class="no-js nwebos"')) && gb.t.includes('id="app-guestbook"') && en.t.includes('<html lang="en" class="no-js nwebos">'), "NwebOS: Standard auf /, /de, /en und /guestbook (ohne Cookie)", [home, de, en, gb].map((r) => r.s).join(" "));
-    const out = await n("/about?nwebos=0"), back = await n("/about?nwebos=1", { cookie: "nnf_os=0" });
-    ok(out.s === 302 && out.h.get("location") === "/about" && /^nnf_os=0;.*Max-Age=31536000/.test(out.h.get("set-cookie") || "") && back.s === 302 && /^nnf_os=1;/.test(back.h.get("set-cookie") || ""), "NwebOS: ?nwebos=0 merkt das Opt-out, ?nwebos=1 holt zurück, beide zur sauberen URL", `${out.s} ${back.s}`);
-    const old = await n("/guestbook", { cookie: "nnf_os=0" }), oldHome = await n("/", { cookie: "nnf_os=0" });
-    ok(old.s === 200 && !old.t.includes("nwebos") && oldHome.s === 200 && !oldHome.t.includes('class="no-js nwebos"'), "NwebOS: mit Opt-out die bisherigen Seiten", `${old.s} ${oldHome.s}`);
+    // fix/nwebos-no-optout: no old pages any more. A left-over opt-out link goes to the clean URL and clears the old
+    // cookie; the old cookie itself changes nothing.
+    const out = await n("/about?nwebos=0"), back = await n("/about?nwebos=1");
+    ok(out.s === 302 && out.h.get("location") === "/about" && /^nnf_os=; Path=\/; Max-Age=0/.test(out.h.get("set-cookie") || "") && back.s === 302 && /Max-Age=0/.test(back.h.get("set-cookie") || ""), "NwebOS: ?nwebos=0|1 → saubere URL, altes Opt-out-Cookie gelöscht", `${out.s} ${back.s} ${out.h.get("set-cookie")}`);
+    const old = await n("/guestbook", { cookie: "nnf_os=0" }), oldHome = await n("/", { cookie: "nnf_os=0" }), head = await n("/about", { method: "HEAD" });
+    ok(old.s === 200 && old.t.includes('class="no-js nwebos"') && oldHome.t.includes('class="no-js nwebos"') && !old.t.includes("u-bar"), "NwebOS: altes Opt-out-Cookie zeigt trotzdem NwebOS (keine alten Seiten)", `${old.s} ${oldHome.s}`);
+    ok(head.s === 200 && head.t === "", "NwebOS: HEAD antwortet wie GET, ohne Body", `${head.s} ${head.t.length}`);
     // #nwebos-apps: every main-site page is a window; HTTP status and caching stay honest.
     const osOn = (r) => r.t.includes('class="no-js nwebos"');
     const blog = await n("/blog"), post = await n("/blog/eine-navigation-fuer-zwei-seiten"), miss = await n("/blog/gibt-es-nicht"), prof = await n("/profile"), profIn = await n("/profile", { cookie: c1 }), chl = await n("/changelog"), mc = await req("/");
@@ -1363,7 +1348,7 @@ try {
     ok(/private/.test(prof.h.get("cache-control") || "") && prof.h.get("x-robots-tag") === "noindex" && !prof.t.includes("Weiterlesen") && profIn.t.includes("Nils"), "NwebOS: Profil privat (private, noindex), Gast ohne Daten");
     const other = await Promise.all(["/music", "/writing", "/trash", "/pixelwand", "/en/blog", "/de/blog"].map((p) => n(p)));
     const unk = await n("/sommerfest"), ws = await n("/writing/series/x"), w1 = await n("/writing/gibt-es-nicht"), feed = await n("/blog/feed.xml"), css = await n("/design/nwebos-apps.css");
-    ok(other.every((r) => r.s === 200 && osOn(r)) && unk.s === 404 && osOn(unk) && ws.s === 302 && ws.h.get("location") === "/writing" && w1.s === 404 && osOn(w1) && feed.s === 200 && !osOn(feed) && css.s === 200, "NwebOS: Musik, Texte, Papierkorb, Kommt bald, /de /en, 404-Fenster, alte /writing-Adressen, Feed und Assets unberührt", [...other, unk, ws, w1, feed, css].map((r) => r.s).join(" "));
+    ok(other.every((r) => r.s === 200 && osOn(r)) && unk.s === 404 && osOn(unk) && ws.s === 404 && osOn(ws) && w1.s === 404 && osOn(w1) && feed.s === 200 && !osOn(feed) && css.s === 200, "NwebOS: Musik, Texte, Papierkorb, Kommt bald, /de /en, 404-Fenster, alte /writing-Adressen, Feed und Assets unberührt", [...other, unk, ws, w1, feed, css].map((r) => r.s).join(" "));
     // phone audit A14: the changelog as RSS per language, autodiscovery in every NwebOS head
     const clf = await n("/changelog/feed.xml"), clfEn = await n("/en/changelog/feed.xml"), osHome = await n("/");
     ok(clf.s === 200 && /application\/rss\+xml/.test(clf.h.get("content-type") || "") && clf.t.includes("<item>") && clf.t.includes("<language>de</language>") && clfEn.s === 200 && clfEn.t.includes("<language>en</language>")

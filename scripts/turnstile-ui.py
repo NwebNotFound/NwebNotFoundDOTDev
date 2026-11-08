@@ -23,10 +23,10 @@ with sync_playwright() as p:
     chrome = "/usr/bin/google-chrome"  # CI container; elsewhere Playwright's own Chromium
     browser = p.chromium.launch(executable_path=chrome) if os.path.exists(chrome) else p.chromium.launch()
     for width in (375, 1280):
-        for surface, eligible in (("guest", False), ("guest", True), ("bank", False), ("bank", True)):
+        # the main-site guestbook is the NwebOS window now; its Turnstile flow is in nwebos-ui.py / nwebos-sweep-ui.py
+        for surface, eligible in (("bank", False), ("bank", True)):
             host = "nwebnotfound.dev" if surface == "guest" else "mc.nwebnotfound.dev"
             context = browser.new_context(viewport={"width": width, "height": 900})
-            context.add_cookies([{"name": "nnf_os", "value": "0", "domain": "nwebnotfound.dev", "path": "/", "secure": True}])  # the current guestbook page (NwebOS has its own test)
             page = context.new_page()
             scripts, submissions = [], []
 

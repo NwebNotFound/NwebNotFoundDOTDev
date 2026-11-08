@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Logo site switcher "Wohin?" on both sites at 375/1280: click and keyboard open it, the current
+"""Logo site switcher "Wohin?" on mc.nwebnotfound.dev at 375/1280 (the main site is NwebOS): click and keyboard open it, the current
 site is marked, Esc closes it with focus back on the logo, a click outside closes it.
 Optional second argument: a folder for screenshots of the open switcher."""
 import os
@@ -10,7 +10,7 @@ from playwright.sync_api import sync_playwright
 BASE = sys.argv[1]
 SHOTS = sys.argv[2] if len(sys.argv) > 2 else ""
 SITES = {
-    "main": ("nwebnotfound.dev", "/portfolio", "Hauptseite", "https://mc.nwebnotfound.dev/"),
+    # the main site is NwebOS (no logo switcher; the desktop has a Minecraft-Server icon), only mc.* keeps the nav
     "mc": ("mc.nwebnotfound.dev", "/markt", "Minecraft-Server", "https://nwebnotfound.dev/"),
 }
 
@@ -20,7 +20,6 @@ with sync_playwright() as p:
     for width in (375, 1280):
         for site, (host, path, here, other) in SITES.items():
             context = browser.new_context(viewport={"width": width, "height": 800})
-            context.add_cookies([{"name": "nnf_os", "value": "0", "domain": "nwebnotfound.dev", "path": "/", "secure": True}])  # current nav (NwebOS has its own test)
             page = context.new_page()
 
             def intercept(route):

@@ -14,6 +14,9 @@
   var $ = function (s, el) { return (el || document).querySelector(s); };
   var $$ = function (s, el) { return [].slice.call((el || document).querySelectorAll(s)); };
   var RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* phone audit A8: /auth/discord/logout (GET) lands on /?logout=1; read it now, before restored windows rewrite the address */
+  var askLogout = /[?&]logout=1(&|$)/.test(location.search);
+  if (askLogout) history.replaceState(history.state, "", location.pathname + location.search.replace(/[?&]logout=1/, "").replace(/^&/, "?") + location.hash);
   try { var rmSet = localStorage.getItem("nwebos.rm"); if (rmSet === "1") RM = true; else if (rmSet === "0") RM = false; if (RM) document.documentElement.classList.add("rm"); } catch (e) {}
   var PHONE = function () { return matchMedia("(max-width:700px)").matches; };
   var store = {
@@ -199,7 +202,8 @@
     var u = new URL(url, location.href), b = bare(u.pathname);
     if (b === "/" && !u.search) return Promise.resolve(null);   /* "/" is the plain desktop: never fall through to the first app */
     var have = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === b) have = k; });
-    if (have && !u.search) { openWin(have, opt); return Promise.resolve(have); }
+    if (have && !u.search && !opt.fresh) { openWin(have, opt);   /* fresh: reload its content (a filtered window back to all) */
+      return Promise.resolve(have); }
     var key = u.pathname + u.search; if (pending[key]) return pending[key];
     return (pending[key] = fetch(u.pathname + u.search, { credentials: "include", headers: { accept: "text/html" } }).then(function (r) { return r.text(); }).then(function (txt) {
       delete pending[key];
@@ -417,14 +421,14 @@
     if (op && !op.classList.contains("dicon") && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); if (APPS[op.dataset.open]) openWin(op.dataset.open); else if (op.href || ROUTES[op.dataset.open]) openUrl(op.href || ROUTES[op.dataset.open]); return; }
     /* an internal link inside the desktop opens its window instead of reloading the page */
     var a = e.target.closest("#desk a[href]");
-    if (a && !a.classList.contains("dicon") && !a.hasAttribute("data-close") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href); return; } }
+    if (a && !a.classList.contains("dicon") && !a.hasAttribute("data-close") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href, a.hasAttribute("data-fresh") ? { fresh: true } : null); return; } }
     var cl = e.target.closest("[data-close]"); if (cl && cl.closest(".win")) { e.preventDefault(); var w0 = cl.closest(".win"); open.forEach(function (o, k) { if (o.el === w0) close(k); }); return; }
     var cw = e.target.closest("[data-closewin]"); if (cw) { var w = cw.closest(".win"); open.forEach(function (o, k) { if (o.el === w) close(k, true); }); return; }
     var egg = e.target.closest("[data-egg]"); if (egg) { closeStart(); if (eggs[egg.dataset.egg]) eggs[egg.dataset.egg](); }
     if (!e.target.closest(".dicon")) $$(".dicon.sel").forEach(function (d) { d.classList.remove("sel"); });
   });
-  function logoutSheet() {
-    var useMe = me && store.get("user") !== "gast";
+  function logoutSheet(ask) {   /* ask: always show the sheet for a real session (a GET of the logout address never signs out by itself) */
+    var useMe = me && (ask || store.get("user") !== "gast");
     if (!useMe) { eggs.logout(); return; }
     var en = lang === "en";
     var s = sheet({ cls: "ask", label: en ? "Sign out?" : "Abmelden?", html: '<div class="hero"><img alt="" width="56" height="56" style="border-radius:50%;border:2px solid var(--edge)" src="' + escH(/^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV) + '"><h2>' + (en ? "Sign out?" : "Abmelden?") + "</h2><p>" + escH((en ? "You are signed in as " : "Du bist als ") + me.name + (en ? "." : " angemeldet.")) + '</p></div><div class="acts two"><button type="button" class="xpbtn" data-x>' + (en ? "Cancel" : "Abbrechen") + '</button><button type="button" class="xpbtn go" data-yes>' + (en ? "Sign out" : "Abmelden") + "</button></div>" });
@@ -527,6 +531,7 @@
     if (me) { li.hidden = false; dl.hidden = true; $("[data-me-name]").textContent = me.name; if (/^https:\/\//.test(me.avatar || "")) $("[data-me-av]").src = me.avatar; }
     else if (d && !d.available) dl.hidden = true;
     setUser();
+    if (askLogout && me) logoutSheet(true);   /* phone audit A8 */
 
     return me;
   }).catch(function () { return null; });
