@@ -67,6 +67,21 @@ with sync_playwright() as p:
         # a page script still works in its window: the market search filters (markt.js)
         pg.goto(f"https://{H}/markt", wait_until="load"); pg.locator(".win").first.wait_for(timeout=10000)
         assert pg.locator(".win .wc input[type=search], .win .wc input").count() >= 1, f"{tag}: market search field in the window"
+        # Design QA #144: 44px tap targets (week/total switch, feedback category labels); at 1280 the window opens right of both icon columns
+        if phone:
+            pg.goto(f"https://{H}/leaderboards", wait_until="load"); pg.locator(".win .seg button").first.wait_for(timeout=10000)
+            hs = pg.locator(".win .seg button").evaluate_all("els => els.map(e => e.getBoundingClientRect().height)")
+            assert hs and min(hs) >= 44, f"{tag}: Woche/Gesamt >= 44px {hs}"
+            # the form needs a session; the guest page gets the same fieldset markup (mc-feedback.js) to measure the CSS
+            pg.goto(f"https://{H}/feedback", wait_until="load"); pg.locator(".win.live").wait_for(timeout=10000)
+            pg.evaluate("""() => document.querySelector('.win.live .wc').insertAdjacentHTML('beforeend', '<form id="fbqa"><fieldset class="fbt"><legend>Kategorie</legend><label><input type="radio" name="c"> Bug</label><label><input type="radio" name="c"> Idee</label><label><input type="checkbox"> Anonym</label></fieldset></form>')""")
+            hs = pg.locator("#fbqa .fbt label").evaluate_all("els => els.map(e => e.getBoundingClientRect().height)")
+            assert hs and min(hs) >= 44, f"{tag}: feedback labels >= 44px {hs}"
+        else:
+            pg.goto(f"https://{H}/", wait_until="load"); pg.locator(".win.live").wait_for(timeout=10000); pg.wait_for_timeout(400)
+            wx = pg.locator(".win.live").bounding_box()["x"]
+            icons = pg.locator(".dicons .dicon").evaluate_all("els => Math.max(...els.map(e => e.getBoundingClientRect().right))")
+            assert wx >= 200 and icons <= wx, f"{tag}: window at x={wx} leaves the icon columns (right edge {icons}) visible"
         # review #144: search hits and quick-sheet rows load their page in this tab (no new tab, no fetched copy window)
         pg.goto(f"https://{H}/vip", wait_until="load"); pg.locator(".win.live").wait_for(timeout=10000)
         if phone:
