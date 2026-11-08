@@ -5,7 +5,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { parseChangelog, rowFromEvent, makeChangelogIngest, berlinDay } from "../src/changelog-ingest.js";
-import { rowsToMd, latestEntries, playerSections } from "../src/mc-changelog.js";
+import { rowsToMd, latestEntries, playerSections, entryKey } from "../src/mc-changelog.js";
+import { changelog, changelogFeed } from "../src/nwebos-apps.js";
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 // ---- the block ----
 const tpl = fs.readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
@@ -38,6 +40,25 @@ assert.equal(playerSections(md).length, 2);
 assert.equal(latestEntries(4, md, "en")[0].title, "New world");
 assert.equal(latestEntries(4, md, "de")[0].title, "Neue Welt", "markdown/comment characters from a title can't break the format");
 
+// ---- #143 review: the static history stays next to D1 rows ----
+const base = "## Für Spieler\n### 01.11.2026\n- **Alter Eintrag** – bleibt\n- **Schon importiert** – doppelt\n### Ohne Datum\n- Undatiert\n## Für Admins\n- intern\n";
+const merged = rowsToMd([{ day: "2026-11-08", title_de: "Neu per PR", text_de: "x" }, { day: "2026-11-01", title_de: "Schon importiert", text_de: "aus D1" }], base);
+const mergedTitles = latestEntries(20, merged).map((e) => e.title);
+assert.deepEqual(mergedTitles, ["Neu per PR", "Schon importiert", "Alter Eintrag", "Undatiert"], "one ingested row + the static history: all shown, a same-day same-title entry once");
+assert.ok(merged.includes("aus D1") && !merged.includes("– doppelt") && !merged.includes("intern"), "the D1 copy wins; the admin part stays out");
+assert.equal(entryKey("2026-11-01", "Neue Welt!"), entryKey("2026-11-01", "neue  welt"));
+const wDe = changelog("de", new Date("2026-11-08T12:00:00Z"), [{ day: "2026-11-08", area: "server", title_de: "Nur in D1", text_de: "neu" }]);
+assert.ok(wDe.includes("Nur in D1") && latestEntries(1).every((e) => wDe.includes(esc(e.title))), "the Neuigkeiten window: D1 server row and the CHANGELOG.md history together");
+// an EN title without its own subline never shows the German one
+const wEn = changelogFeed("en", new Date("2026-11-08T12:00:00Z"), [{ day: "2026-11-08", area: "website", title_de: "Neue Welt", text_de: "mit Kirschbäumen", title_en: "New world", text_en: null }]);
+assert.ok(wEn.includes("New world") && !wEn.includes("Kirschbäumen"), "EN: no German subline under an English title");
+assert.ok(changelogFeed("en", new Date("2026-11-08T12:00:00Z"), [{ day: "2026-11-08", area: "website", title_de: "Nur DE", text_de: "Unterzeile", title_en: null, text_en: null }]).includes("Unterzeile"), "EN without any English: the German row as it is");
+// control characters can't reach the feed
+const ctl = parseChangelog("## Changelog\narea: site\nde: Titel\u0001mit\u0007Steuerzeichen – Zeile\u001fzwei\u007f");
+assert.equal(ctl.de.title, "Titel mit Steuerzeichen"); assert.equal(ctl.de.sub, "Zeile zwei");
+const feed = changelogFeed("de", new Date("2026-11-08T12:00:00Z"), [{ day: "2026-11-08", area: "website", title_de: ctl.de.title, text_de: ctl.de.sub }]);
+assert.ok(!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(feed), "feed: no control characters");
+
 // ---- the endpoint on SQLite ----
 let sqlite = null;
 try { sqlite = await import("node:sqlite"); } catch { console.log("changelog-unit: node:sqlite unavailable, endpoint part skipped"); }
@@ -64,5 +85,10 @@ if (sqlite) {
   assert.equal(row().title_de, "Von Nils", "an edited row is never overwritten");
   assert.equal((await post(ev({ body: "## Changelog\nnone" }))).s, 202);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM changelog").get().n, 1, "one row per PR");
+  // before migration 0022: 503 migration_missing (the workflow retries), not a 500
+  const D1old2 = { prepare() { const o = { bind() { return o; }, run: async () => { throw new Error("D1_ERROR: no such column: source"); } }; return o; } };
+  const pre = await post(ev(), "Bearer t0k", { DB: D1old2, CHANGELOG_TOKEN: "t0k" });
+  assert.equal(pre.s, 503); assert.equal(pre.j.error, "migration_missing");
+  await assert.rejects(post(ev(), "Bearer t0k", { DB: { prepare() { const o = { bind() { return o; }, run: async () => { throw new Error("D1 down"); } }; return o; } }, CHANGELOG_TOKEN: "t0k" }), /D1 down/, "other errors are not hidden");
 }
 console.log("changelog-unit ok");

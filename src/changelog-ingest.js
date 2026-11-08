@@ -14,7 +14,8 @@ export const REPOS = ["NwebNotFound/NwebNotFoundDOTDev", "NwebNotFound/NwebNotFo
 export const MAX_EVENT = 512 * 1024;
 const PLACEHOLDER = /<[^>]*>|^\s*(?:kurzer titel|short title)\b/i;
 
-const clean = (s) => String(s || "").replace(/<!--[\s\S]*?-->/g, "").replace(/[*`]/g, "").replace(/\s+/g, " ").trim();
+// C0 controls and DEL out first: one in a PR body would make /changelog/feed.xml invalid XML
+const clean = (s) => String(s || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/<!--[\s\S]*?-->/g, "").replace(/[*`]/g, "").replace(/\s+/g, " ").trim();
 /** "Title – subline" (en dash, em dash or " - "); the subline is optional. */
 function titleSub(v) {
   const s = clean(v);
@@ -81,13 +82,19 @@ export function makeChangelogIngest({ json, safeEq, onWrite = () => {}, logWrite
     if (r.skip) return json({ ok: true, skipped: r.skip }, 202);
     const x = r.row;
     // one row per PR; an edited row (Verwaltung) is never overwritten; an identical re-send writes nothing
-    const res = logWrites("changelog-ingest", await env.DB.prepare(`INSERT INTO changelog (day, area, title_de, title_en, text_de, text_en, status, sort, version, updated_at, source, pr_url)
+    let res;
+    try {
+    res = logWrites("changelog-ingest", await env.DB.prepare(`INSERT INTO changelog (day, area, title_de, title_en, text_de, text_en, status, sort, version, updated_at, source, pr_url)
       VALUES (?, ?, ?, ?, ?, ?, 'live', 0, 1, ?, ?, ?)
       ON CONFLICT(source) WHERE source IS NOT NULL DO UPDATE SET area = excluded.area, title_de = excluded.title_de, title_en = excluded.title_en,
         text_de = excluded.text_de, text_en = excluded.text_en, pr_url = excluded.pr_url, version = version + 1, updated_at = excluded.updated_at
       WHERE changelog.edited = 0 AND (changelog.area IS NOT excluded.area OR changelog.title_de IS NOT excluded.title_de OR changelog.title_en IS NOT excluded.title_en
         OR changelog.text_de IS NOT excluded.text_de OR changelog.text_en IS NOT excluded.text_en)`)
       .bind(x.day, x.area, x.title_de, x.title_en, x.text_de, x.text_en, now, x.source, x.pr_url).run());
+    } catch (e) {   // before migration 0022 (no source column): a clear 503 the workflow retries, not a 500 with a stack
+      if (/no such (table|column)/i.test(String(e?.message || ""))) return json({ error: "migration_missing" }, 503);
+      throw e;
+    }
     const changed = !!(res && res.meta && res.meta.changes);
     if (changed) onWrite();
     return json({ ok: true, source: x.source, changed }, changed ? 201 : 200);

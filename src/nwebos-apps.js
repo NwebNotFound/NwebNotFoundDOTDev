@@ -86,10 +86,10 @@ function changelogDays(lang, today, rows = null) {
   // one row per change: the mc changelog repeats some website changes of the same day (Design QA #115)
   const key = (x) => String(x).toLowerCase().replace(/[^a-z0-9äöüß]+/g, " ").trim();
   const add = (iso, t, title, text) => { if (!groups.has(iso)) groups.set(iso, []); const g = groups.get(iso); if (g.some((x) => key(x.title) === key(title))) return; g.push({ t, title, text }); };
-  if (rows) for (const r of rows) add(r.day, r.area, de ? r.title_de : r.title_en || r.title_de, de ? r.text_de : r.text_en || r.text_de);   // D1 (Verwaltung), live rows
+  if (rows) for (const r of rows) add(r.day, r.area, de ? r.title_de : r.title_en || r.title_de, de ? r.text_de : r.title_en ? r.text_en || "" : r.text_de);   // EN title without subline: no German subline under it   // D1 (Verwaltung), live rows
   else for (const [iso, t, tde, ten, xde, xen] of SITE_LOG) add(iso, t, de ? tde : ten, de ? xde : xen);
   const year = today.getUTCFullYear();
-  for (const e of rows && rows.some((r) => r.area === "server") ? [] : latestEntries(24, undefined, lang)) {   // D1 has the server entries (ingest/import)
+  for (const e of latestEntries(24, undefined, lang)) {   // the CHANGELOG.md history next to the D1 server rows; add() drops a same-day same-title double
     if (!e.date) continue;
     const [dd, mm] = e.date.split(".");
     const iso = `${year}-${mm}-${dd}`;

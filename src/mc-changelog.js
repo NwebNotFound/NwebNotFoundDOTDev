@@ -85,14 +85,28 @@ export function latestEntries(limit = 4, md = CHANGELOG_MD, lang = "de") {
   return out;
 }
 
-/** D1 changelog rows (area server; automatic + imported) as the CHANGELOG.md player part, newest day first. */
-export function rowsToMd(rows) {
+/** Same change, same day: compared by its title, case and punctuation ignored. */
+export const entryKey = (day, title) => day + "|" + String(title || "").toLowerCase().replace(/[^a-z0-9äöüß]+/g, " ").trim();
+/** D1 changelog rows (area server; automatic + imported) as the CHANGELOG.md player part, newest day first, merged with
+ *  the dated entries of `base` (the built CHANGELOG.md): that history stays; an entry D1 already has (same day + title,
+ *  e.g. after the import) is shown once, from D1. Undated sections of `base` follow at the end. */
+export function rowsToMd(rows, base = "") {
   const safe = (s) => String(s || "").replace(/<!--|-->/g, "").replace(/[*`\r\n]/g, " ").replace(/\s+/g, " ").trim();
-  const byDay = new Map();
-  for (const r of rows) { if (!byDay.has(r.day)) byDay.set(r.day, []); byDay.get(r.day).push(r); }
+  const byDay = new Map(), head = new Map(), seen = new Set(), undated = [];
+  const push = (d, line) => { if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(line); };
+  for (const r of rows) {
+    push(r.day, `- **${safe(r.title_de)}**${r.text_de ? " – " + safe(r.text_de) : ""}${r.title_en ? ` <!-- en: **${safe(r.title_en)}**${r.text_en ? " – " + safe(r.text_en) : ""} -->` : ""}`);
+    seen.add(entryKey(r.day, safe(r.title_de)));
+  }
+  for (const sec of base ? rawSections(base) : []) {
+    const d = sectionDate(sec.title);
+    if (!d) { undated.push(sec); continue; }
+    if (!dateOnly(sec.title) && !head.has(d.iso)) head.set(d.iso, sec.title);
+    for (const it of sec.items) { const e = latestEntries(1, "## Für Spieler\n- " + it)[0]; if (!e || !seen.has(entryKey(d.iso, e.title))) push(d.iso, "- " + it); }
+  }
   const days = [...byDay.keys()].sort().reverse();
-  const item = (r) => `- **${safe(r.title_de)}**${r.text_de ? " – " + safe(r.text_de) : ""}${r.title_en ? ` <!-- en: **${safe(r.title_en)}**${r.text_en ? " – " + safe(r.text_en) : ""} -->` : ""}`;
-  return "## Für Spieler\n" + days.map((d) => `### ${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}\n` + byDay.get(d).map(item).join("\n")).join("\n") + "\n";
+  return "## Für Spieler\n" + days.map((d) => `### ${head.get(d) || `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`}\n` + byDay.get(d).join("\n")).join("\n")
+    + undated.map((sec) => "\n" + (sec.title ? `### ${sec.title}\n` : "") + sec.items.map((it) => "- " + it).join("\n")).join("") + "\n";
 }
 
 export const changelogBody = (md = CHANGELOG_MD, source = null) => {

@@ -15,6 +15,7 @@ import { makeFeedback, feedbackBody } from "./mc-feedback.js";
 import { makeTrade, cleanShops, cleanAuctions, blobStatement } from "./mc-trade.js";
 import { normInv, renderInventoryCard } from "./mc-inventory.js";
 import { changelogBody, rowsToMd } from "./mc-changelog.js";
+import { CHANGELOG_MD } from "./generated/changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
 import { navReady, sitePage } from "./hub.js";
 import { nwebosPage, nwebosChoice, nwebosRoute, DEFAULT_BLOCKS } from "./nwebos.js";
@@ -1183,7 +1184,7 @@ async function route(req, env, ctx) {
       if (p === "/leaderboards") return html(LEADERBOARDS_MC());
       if (p === "/pvp") return html(mcPage("PvP · NwebNotFound MC", "PvP-Rangliste der Arena: Siege, Niederlagen und Siegquote", pvpBody()));
       if (p === "/vip") return html(mcPage("VIP · NwebNotFound MC", "VIP- und MVP-Panel: eigener Rang, Vorteile, Welten und Stats", vipBody()));
-      if (p === "/changelog") { const rows = ((await siteData(env)).changelog || []).filter((r) => r.area === "server"); return html(mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", rows.length ? changelogBody(rowsToMd(rows), "D1") : changelogBody())); }
+      if (p === "/changelog") { const rows = ((await siteData(env)).changelog || []).filter((r) => r.area === "server"); return html(mcPage("Changelog · NwebNotFound MC", "Neuigkeiten und Änderungen auf dem Minecraft-Server", rows.length ? changelogBody(rowsToMd(rows, CHANGELOG_MD), "D1") : changelogBody())); }
       if (p === "/parkour") return html(mcPage("Parkour · NwebNotFound MC", "Parkour-Bestzeiten aus der Lobby: Top 10 pro Kurs", parkourBody()));
       if (p === "/bestellungen" || p === "/abholungen") return html(mcPage("Bestellungen · NwebNotFound MC", "Deine Bestellungen, Bank-Käufe und dein Abholfach", PICKUP_BODY));
       if (p === "/feedback") return html(shell({ title: "Feedback · NwebNotFound MC", desc: "Bug melden oder Idee einreichen", css: MC_CSS, nav: mNav, footer: mFoot, themeColor: "#0b0f0c", head: `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`, body: feedbackBody(SITEKEY, MAIN) }));
