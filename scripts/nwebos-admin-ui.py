@@ -58,7 +58,7 @@ with sync_playwright() as p:
     shot(pg, "admin-1280-overview.png")
 
     # projects: create -> visible in the window -> delete -> fallback again
-    pg.locator('.win.focus .ad-tile[data-go="projects"]').click(); pg.locator(".win.focus [data-new]").wait_for(); pg.wait_for_timeout(300)
+    pg.locator('.win.focus .ad-tile[data-go="projects"]').click(); pg.locator(".win.focus .ad-h").wait_for(); pg.wait_for_timeout(600)
     assert pg.url.endswith("/admin/projects")
     API = lambda m, path, body=None: pg.evaluate("([m, p, b]) => fetch(p, { method: m, credentials: 'include', headers: b ? { 'content-type': 'application/json' } : {}, body: b ? JSON.stringify(b) : undefined }).then(r => r.json())", [m, path, body])
     seeded = []
@@ -81,7 +81,7 @@ with sync_playwright() as p:
     shot(pg, "admin-1280-edit-project.png")
     with pg.expect_response(lambda r: "/api/admin/projects" in r.url and r.request.method == "POST") as rp:
         pg.locator(".win.focus [data-primary]").click()
-    assert rp.value.status == 201
+    assert rp.value.status == 201, ("create", rp.value.status, rp.value.text())
     pg.wait_for_timeout(400)
     assert "/admin/projects/" in pg.url and "Gespeichert" in save_text(pg), ("created", pg.url, save_text(pg))
     pid = pg.url.rsplit("/", 1)[1]

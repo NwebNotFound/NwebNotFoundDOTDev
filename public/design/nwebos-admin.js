@@ -310,7 +310,12 @@
 
     /* one project or news entry. `item` = the saved row (null fields while new), `work` = what the form holds (both
        languages); dirty = they differ. */
-    function editItem(k, idv) {
+    function editItem(k, idv, checked) {
+      if (idv === "new" && !checked) {   // the start-data check comes before the form, so nothing typed can be overwritten
+        frame(k, '<div class="ad-scroll"><p class="ad-empty">' + T("Lädt …", "Loading …") + "</p></div>");
+        call("GET", "/" + k).then(function (r) { if (r.s === 200 && (r.j.items || []).length) editItem(k, idv, true); else frame(k, '<div class="ad-scroll">' + seedMissing() + "</div>"); });
+        return;
+      }
       var isNew = idv === "new", news = k === "changelog", item = null, work = null, L = "de", store = local(k + "." + idv), t = null;
       var today = new Date(Date.now() + 3600e3).toISOString().slice(0, 10);
       var FIELDS = news ? ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"] : ["sort", "status", "progress", "href", "icon", "title_de", "title_en", "text_de", "text_en"];
@@ -390,7 +395,7 @@
         show(); saveState(isNew ? "dirty" : auto() ? "auto" : "saved", item.updated_at);
         if (ld && ld.data && !same(Object.assign({}, item, ld.data), item)) banner(T("Ungespeicherte Änderungen von ", "Unsaved changes from ") + hm(ld.at) + ".", T("Wiederherstellen", "Restore"), function () { work = Object.assign({}, item, ld.data); show(); onInput(); var b = $(".ad-banner"); if (b) b.remove(); });
       };
-      if (isNew) call("GET", "/" + k).then(function (r) { if (r.s === 200 && (r.j.items || []).length) start(blank); else frame(k, '<div class="ad-scroll">' + seedMissing() + "</div>"); });
+      if (isNew) start(blank);
       else call("GET", "/" + k + "/" + idv).then(function (r) { if (r.s === 200) start(r.j.item); else frame(k, '<div class="ad-scroll"><p class="ad-err">' + T("Nicht gefunden", "Not found") + "</p></div>"); });
     }
 
