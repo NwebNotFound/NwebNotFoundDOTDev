@@ -199,3 +199,9 @@
  .ad-facts .ad-in{min-height:44px}
  .ad-rng{height:44px}
 }
+/* Design QA #135: day pills >= 4.5:1 on the panel (night keeps its lighter set) */
+.ad-pill.live{color:#2b7a26}.ad-pill.draft{color:#9a5a0c}.ad-pill.off{color:#5e6472}.ad-pill.rep{color:#b8321e}
+/* Design QA #135: forms never wider than the window (the 6-button icon picker wraps on phones) */
+.ad-f,.ad-fl,.ad-2>*{min-width:0}
+@media (max-width:700px){.ad-seg{display:inline-flex;flex-wrap:wrap;width:auto;max-width:100%}.ad-seg button{flex:1 0 auto}}
+@media (max-width:700px){.ad-seg button{min-height:44px}.ad-seg button::after{display:none}}   /* wrapped picker rows: real 44px buttons, no overlapping hit areas */

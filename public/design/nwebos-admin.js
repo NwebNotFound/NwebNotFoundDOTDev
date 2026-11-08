@@ -37,7 +37,12 @@
       mc: { icon: "minecraft", t: T("Minecraft-Admin", "Minecraft admin"), out: "https://mc.nwebnotfound.dev/vip" },
     };
     var ORDER = ["home", "projects", "blog", "writing", "studio", "changelog", "guestbook", "pixelwand", "mc"];
-    var counts = null, cur = null;   // cur = the open editor: { dirty(), save(), publish(), back() }
+    var counts = null, countsAt = 0, cur = null;
+    var stale = function () { countsAt = 0; };   // after a write the tiles/badges are refetched on the next overview
+    function loadCounts(then) {
+      if (counts && Date.now() - countsAt < 60000) { if (then) then(); return; }
+      call("GET", "/overview").then(function (r) { if (r.s === 200) { counts = r.j; countsAt = Date.now(); } if (then) then(r.s); });
+    }   // cur = the open editor: { dirty(), save(), publish(), back() }
     var me = (window.__me && window.__me.user) || {};
 
     function nav(active) {
@@ -70,9 +75,10 @@
     function frame(active, main) {
       el.innerHTML = '<div class="ad">' + nav(active) + '<div class="ad-main">' + main + "</div></div>";
     }
-    function leave(fn) {   // unsaved changes stay in the local draft; just make sure nothing is lost silently
-      if (cur && cur.dirty && cur.dirty() && !cur.localOnly) { cur.flush && cur.flush(); }
-      cur = null; fn();
+    function leave(fn) {   // live content keeps its local draft; a dirty news draft is saved now (its timer is stopped first)
+      var c = cur; cur = null;
+      if (c) { if (c.stop) c.stop(); if (c.flush) c.flush(); }
+      fn();
     }
     function open(p) {
       var m = /^(home|projects|changelog|guestbook)(?:\/(\d{1,9}|new))?$/.exec(p || "");
@@ -93,13 +99,18 @@
       if (a.hasAttribute("data-open-item")) return open(a.getAttribute("data-open-item"));
       open(a.getAttribute("data-go"));
     });
-    el.addEventListener("keydown", function (e) {
-      if (document.querySelector(".shx")) return;
+    /* shortcuts at the window level (Design QA #135): they work wherever focus is while this window is in front, also
+       after a clicked button was disabled; Esc in an editor goes back, on a list/overview the shell closes the window */
+    var win0 = el.closest(".win");
+    var keys = function (e) {
+      if (!el.isConnected) { document.removeEventListener("keydown", keys, true); return; }
+      if (!win0 || !win0.classList.contains("focus") || document.querySelector(".shx")) return;
       var mod = e.ctrlKey || e.metaKey;
       if (mod && (e.key === "s" || e.key === "S") && cur && cur.save) { e.preventDefault(); e.stopPropagation(); cur.save(true); }
       else if (mod && e.key === "Enter" && cur && cur.publish) { e.preventDefault(); e.stopPropagation(); cur.publish(); }
       else if (e.key === "Escape" && cur && cur.back) { e.preventDefault(); e.stopPropagation(); cur.back(); }
-    });
+    };
+    document.addEventListener("keydown", keys, true);
 
     /* ---------- overview ---------- */
     function overview() {
@@ -117,8 +128,10 @@
             return row(ic(s.icon, 28), t, s.t + " · " + when(r.updated_at), pill(r.status === "published" || r.status === "live" ? "live" : r.status === "withdrawn" ? "off" : "draft"), target);
           }).join("") + "</ul>" : "") + "</div>");
       };
+      var me0 = {}; cur = me0;   // the overview is "current" until something else opens
+      if (counts && Date.now() - countsAt < 60000) return paint(counts.recent);
       paint(null);
-      call("GET", "/overview").then(function (r) { if (r.s === 200) { counts = r.j; paint(r.j.recent); } else if (r.s === 503) paint(null); });
+      loadCounts(function () { if (cur === me0 && counts) paint(counts.recent); });
     }
 
     /* ---------- lists ---------- */
@@ -148,7 +161,7 @@
         var j = i + d; if (j < 0 || j >= items.length) return;
         var a = items.slice(); var t = a[i]; a[i] = a[j]; a[j] = t;
         var jobs = a.map(function (r, n) { return r.sort === n + 1 ? null : function () { return call("PATCH", "/projects/" + r.id, { sort: n + 1, version: r.version }).then(function (x) { if (x.s === 200) { r.sort = n + 1; r.version = x.j.item.version; } else throw x; }); }; }).filter(Boolean);
-        jobs.reduce(function (p, f) { return p.then(f); }, Promise.resolve()).then(function () { items = a; draw(); toast("ok", T("Reihenfolge gespeichert", "Order saved")); }, function () { toast("err", T("Nicht gespeichert – lade die Liste neu.", "Not saved – reload the list.")); load(); });
+        jobs.reduce(function (p, f) { return p.then(f); }, Promise.resolve()).then(function () { stale(); items = a; draw(); toast("ok", T("Reihenfolge gespeichert", "Order saved")); }, function () { toast("err", T("Nicht gespeichert – lade die Liste neu.", "Not saved – reload the list.")); load(); });
       };
       var load = function () { call("GET", "/" + k).then(function (r) { if (r.s === 200) { items = r.j.items || []; draw(); } else frame(k, '<div class="ad-scroll"><p class="ad-err">' + T("Konnte nicht laden", "Could not load") + (r.s === 503 ? T(" (Migration 0019 fehlt)", " (migration 0019 missing)") : "") + "</p></div>"); }); };
       frame(k, '<div class="ad-scroll"><p class="ad-empty">' + T("Lädt …", "Loading …") + "</p></div>");
@@ -166,11 +179,11 @@
               '<div class="act"><button type="button" class="xpbtn" data-gh="' + (x.hidden ? "unhide" : "hide") + '">' + spr("c-eye", 16) + " " + (x.hidden ? T("Einblenden", "Show") : T("Ausblenden", "Hide")) + '</button><button type="button" class="xpbtn dzo" data-gd>' + spr("c-del", 16) + " " + T("Löschen", "Delete") + "</button></div></div></div>";
           }).join("") + "</div>" : '<p class="ad-empty">' + T("Keine Einträge in dieser Ansicht.", "No entries in this view.") + "</p>") + "</div>");
         $$("[data-gf]").forEach(function (b) { b.onclick = function () { f = b.getAttribute("data-gf"); load(); }; });
-        $$("[data-gh]").forEach(function (b) { b.onclick = function () { var id = b.closest("[data-id]").getAttribute("data-id"), a = b.getAttribute("data-gh"); b.disabled = true; call("POST", "/guestbook/" + id + "/" + a).then(function (r) { if (r.s === 200) { toast("ok", a === "hide" ? T("Ausgeblendet", "Hidden") : T("Wieder sichtbar", "Visible again")); load(); } else { b.disabled = false; toast("err", T("Nicht geändert", "Not changed")); } }); }; });
+        $$("[data-gh]").forEach(function (b) { b.onclick = function () { var id = b.closest("[data-id]").getAttribute("data-id"), a = b.getAttribute("data-gh"); b.disabled = true; call("POST", "/guestbook/" + id + "/" + a).then(function (r) { if (r.s === 200) { stale(); toast("ok", a === "hide" ? T("Ausgeblendet", "Hidden") : T("Wieder sichtbar", "Visible again")); load(); } else { b.disabled = false; toast("err", T("Nicht geändert", "Not changed")); } }); }; });
         $$("[data-gd]").forEach(function (b) { b.onclick = function () {
           var box = b.closest("[data-id]"), id = box.getAttribute("data-id"), who = $("b", box).textContent;
           NwebOS.ask({ title: T("Eintrag löschen?", "Delete this entry?"), text: T("Der Eintrag von „" + who + "“ wird gelöscht. Das geht nicht rückgängig. Tipp: „Ausblenden“ nimmt ihn nur offline.", "The entry by “" + who + "” is deleted. This can't be undone. Tip: “Hide” only takes it offline."), yes: T("Endgültig löschen", "Delete for good"), no: T("Behalten", "Keep"), danger: true, stack: true, icon: spr("c-del", 48) })
-            .then(function (ok) { if (!ok) return; call("DELETE", "/guestbook/" + id).then(function (r) { if (r.s === 200) { toast("ok", T("Gelöscht", "Deleted")); load(); } else toast("err", T("Nicht gelöscht", "Not deleted")); }); });
+            .then(function (ok) { if (!ok) return; call("DELETE", "/guestbook/" + id).then(function (r) { if (r.s === 200) { stale(); toast("ok", T("Gelöscht", "Deleted")); load(); } else toast("err", T("Nicht gelöscht", "Not deleted")); }); });
         }; });
       };
       var load = function () { call("GET", "/guestbook?filter=" + f).then(function (r) { if (r.s === 200) paint(r.j); else frame("guestbook", '<div class="ad-scroll"><p class="ad-err">' + T("Konnte nicht laden", "Could not load") + "</p></div>"); }); };
@@ -290,7 +303,7 @@
         if (!todo.length) { saveState("saved"); return Promise.resolve(true); }
         saveState("ing"); fieldErr(null);
         return todo.reduce(function (p, k) { return p.then(function (ok) { if (!ok) return false; var i = id(k[0], k[1]); return call("PATCH", "/home/" + k[0], { lang: k[1], version: ver[i] || 0, data: data[i] }).then(function (r) {
-          if (r.s === 200) { ver[i] = r.j.version; srv[i] = JSON.parse(JSON.stringify(data[i])); dirty[i] = false; return true; }
+          if (r.s === 200) { stale(); ver[i] = r.j.version; srv[i] = JSON.parse(JSON.stringify(data[i])); dirty[i] = false; return true; }
           if (r.s === 409) { saveState("err"); banner(T("In einem anderen Tab geändert.", "Changed in another tab."), T("Neu laden", "Reload"), function () { store.clear(); editHome(); }); return false; }
           saveState("err"); fieldErr(r.j.error === "invalid" ? [k[0] === "home.hero" ? "lead" : k[0]] : null); return false;
         }); }); }, Promise.resolve(true)).then(function (ok) { if (ok) { store.clear(); saveState("saved"); toast("ok", T("Aktualisiert", "Updated"), T("Die Texte sind jetzt live.", "The texts are live now.")); } return ok; });
@@ -353,14 +366,25 @@
         saveState("dirty");
         if (auto() && (!isNew || work.title_de)) { clearTimeout(t); t = setTimeout(function () { save(false); }, 1500); }
       };
-      var save = function (manual, status) {
-        clearTimeout(t); fieldErr(null); read();
+      var busy = null, me = null;
+      var alive = function () { return cur === me; };
+      var buttons = function (on) { $$("[data-primary],[data-withdraw]").forEach(function (b) { b.disabled = !on; }); };
+      var save = function (manual, status) {   // serialised: a save while one runs waits, then sends the current version
+        clearTimeout(t);
+        var run = function () { busy = doSave(manual, status).then(function (ok) { busy = null; if (alive()) buttons(true); return ok; }, function () { busy = null; if (alive()) buttons(true); return false; }); return busy; };
+        if (busy) return busy.then(function () { return alive() || !manual ? run() : false; });
+        return run();
+      };
+      var doSave = function (manual, status) {
+        if (alive()) { fieldErr(null); read(); buttons(false); }
         if (!isNew && !status && same(work, item)) { saveState(auto() ? "auto" : "saved", item.updated_at); return Promise.resolve(true); }
         var body = pick(work); if (status) body.status = status; if (body.sort == null) delete body.sort;
         var sent = pick(work);   // what went out; anything typed while the request runs stays in the form
         saveState("ing");
         var req = isNew ? call("POST", "/" + k, body) : call("PATCH", "/" + k + "/" + item.id, Object.assign(body, { version: item.version }));
         return req.then(function (r) {
+          if (r.s === 200 || r.s === 201) stale();
+          if (!alive()) { if (r.s === 200 || r.s === 201) { item = r.j.item; isNew = false; store.clear(); } return r.s === 200 || r.s === 201; }   // the editor was left: no DOM, no address change
           if (r.s === 200 || r.s === 201) {
             read(); var now = pick(work); item = r.j.item; store.clear();
             work = Object.assign({}, item); FIELDS.forEach(function (f) { if (f !== "status" && f !== "sort" && now[f] !== sent[f]) work[f] = now[f]; });
@@ -372,6 +396,7 @@
         });
       };
       var publish = function () {
+        if (busy) return busy;   // a second click / Ctrl+Enter while saving does nothing
         if (!news) { var created = isNew; return save(true).then(function (ok) { if (ok) toast("ok", created ? T("Angelegt", "Created") : T("Aktualisiert", "Updated"), T("Die Projekte-Liste zeigt es jetzt.", "The projects list shows it now.")); }); }
         var wasLive = item.status === "live";
         return save(true, "live").then(function (ok) { if (ok) toast("ok", wasLive ? T("Aktualisiert", "Updated") : T("Veröffentlicht", "Published"), T("Der Eintrag ist jetzt in den Neuigkeiten und im RSS-Feed.", "The entry is now in What's new and the RSS feed.")); });
@@ -381,14 +406,15 @@
       var pg = $('[name="progress"]'); if (pg) pg.addEventListener("input", function () { pg.style.setProperty("--v", pg.value * 10); $("[data-pgl] em").textContent = "· " + pg.value + " / 10"; });
       $$("[data-lt]").forEach(function (b) { b.onclick = function () { if (work) read(); L = b.getAttribute("data-lt"); $$("[data-lt]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); }); if (work) show(); }; });
       $("[data-primary]").onclick = publish;
-      var wd = $("[data-withdraw]"); if (wd) wd.onclick = function () { save(true, "draft").then(function (ok) { if (ok) toast("ok", T("Zurückgezogen", "Withdrawn"), T("Der Eintrag ist offline, als Entwurf.", "The entry is offline, as a draft.")); }); };
+      var wd = $("[data-withdraw]"); if (wd) wd.onclick = function () { if (busy) return; save(true, "draft").then(function (ok) { if (ok) toast("ok", T("Zurückgezogen", "Withdrawn"), T("Der Eintrag ist offline, als Entwurf.", "The entry is offline, as a draft.")); }); };
       $("[data-back]").onclick = function () { open(k); };
       var pvb = $("[data-pv]"); if (pvb) pvb.onclick = function () { go((en ? "/en" : "") + (news ? "/changelog" : "/portfolio")); };
       var del = $("[data-del]"); if (del) del.onclick = function () {
         NwebOS.ask({ title: news ? T("Eintrag löschen?", "Delete this entry?") : T("Projekt löschen?", "Delete this project?"), text: (news ? T("„" + item.title_de + "“ wird gelöscht. Das geht nicht rückgängig. Tipp: „Zurückziehen“ nimmt ihn nur offline.", "“" + item.title_de + "” is deleted. This can't be undone. Tip: “Withdraw” only takes it offline.") : T("Die Karte „" + item.title_de + "“ wird gelöscht; verlinkte Inhalte bleiben. Das geht nicht rückgängig.", "The card “" + item.title_de + "” is deleted; linked content stays. This can't be undone.")), yes: T("Endgültig löschen", "Delete for good"), no: T("Behalten", "Keep"), danger: true, stack: true, icon: spr("c-del", 48) })
-          .then(function (ok) { if (!ok) return; call("DELETE", "/" + k + "/" + item.id).then(function (r) { if (r.s === 200) { store.clear(); toast("ok", T("Gelöscht", "Deleted")); open(k); } else toast("err", T("Nicht gelöscht", "Not deleted")); }); });
+          .then(function (ok) { if (!ok) return; call("DELETE", "/" + k + "/" + item.id).then(function (r) { if (r.s === 200) { stale(); store.clear(); toast("ok", T("Gelöscht", "Deleted")); open(k); } else toast("err", T("Nicht gelöscht", "Not deleted")); }); });
       };
-      cur = { dirty: dirty, save: function () { return save(true); }, publish: publish, back: function () { open(k); }, localOnly: true, flush: function () { if (item && auto() && dirty() && !isNew) save(false); } };
+      me = cur = { dirty: dirty, save: function () { return save(true); }, publish: publish, back: function () { open(k); }, localOnly: true,
+        stop: function () { clearTimeout(t); }, flush: function () { if (item && auto() && dirty() && (!isNew || work.title_de)) save(false); } };
       var start = function (it) {
         item = it; work = Object.assign({}, it);
         var ld = store.get();
@@ -402,9 +428,10 @@
     var win = el.closest(".win"), tt = win && win.querySelector(".wt .tt");
     if (tt && !tt.querySelector(".ad-tag-adm")) tt.insertAdjacentHTML("beforeend", '<span class="ad-tag-adm">ADMIN</span>');   /* mockup: the red tag in the title bar */
     var p0 = ((document.getElementById("app-admin") || {}).dataset || {}).path || "/admin";
-    open(p0.replace(/^\/admin\/?/, ""));
-    call("GET", "/overview").then(function (r) { if (r.s === 200 && !counts) { counts = r.j; var n = $(".ad-nav"); if (n) { var act = $(".ad-nav [aria-current]"); n.outerHTML = nav(act ? (act.getAttribute("data-go") || "") : ""); } } });
-    return { unmount: function () { if (cur && cur.flush) cur.flush(); cur = null; } };
+    var first = p0.replace(/^\/admin\/?/, "");
+    open(first);
+    if (first) loadCounts(function () { var n = $(".ad-nav"); if (n && counts) { var act = $(".ad-nav [aria-current]"); n.outerHTML = nav(act ? (act.getAttribute("data-go") || "") : ""); } });   // the overview fetches its own
+    return { unmount: function () { document.removeEventListener("keydown", keys, true); var c = cur; cur = null; if (c) { if (c.stop) c.stop(); if (c.flush) c.flush(); } } };
   }
   var live = null;
   window.NwebOS.register("admin", { mount: function (el, ctx) { live = mountAdmin(el, ctx); }, unmount: function () { if (live) live.unmount(); live = null; } });

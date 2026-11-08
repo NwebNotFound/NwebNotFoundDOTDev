@@ -52,7 +52,11 @@ with sync_playwright() as p:
 
     # ---- desktop, admin ----
     c = ctx_for(br, 1280, ADMIN); pg = c.new_page(); pg.on("pageerror", on_err)
+    ov = []; pg.on("request", lambda q: ov.append(q.url) if "/api/admin/overview" in q.url else None)
     pg.goto(f"https://{H}/admin", wait_until="load"); pg.locator(".win.focus .ad-tiles").wait_for(timeout=10000); pg.wait_for_timeout(600)
+    assert len(ov) == 1, ("overview fetched once on mount", len(ov))
+    pg.locator('.win.focus .ad-tile[data-go="guestbook"]').click(); pg.locator(".win.focus [data-gf]").first.wait_for(); pg.locator('.win.focus .ad-back').click(); pg.locator(".win.focus .ad-tiles").wait_for(); pg.wait_for_timeout(300)
+    assert len(ov) == 1, ("Übersicht again reuses the counts", len(ov))
     assert pg.locator(".win.focus .ad-tile").count() == 9 and pg.locator(".win.focus .wt .ad-tag-adm").count() == 1, "overview: 9 tiles, ADMIN tag in the title"
     assert pg.locator(".win.focus .ad-tile.soon").count() == 3, "Texte, Studio, Pixelwand say 'kommt'"
     shot(pg, "admin-1280-overview.png")
@@ -79,12 +83,15 @@ with sync_playwright() as p:
     pg.locator('.win.focus [name="href"]').fill("/blog"); pg.locator('.win.focus [name="text"]').fill("aus dem Browser-Test")
     assert "Nicht gespeichert" in save_text(pg), "typing a live item only keeps a local draft"
     shot(pg, "admin-1280-edit-project.png")
+    posts = []; pg.on("request", lambda q: posts.append(q.url) if q.method == "POST" and q.url.endswith("/api/admin/projects") else None)
     with pg.expect_response(lambda r: "/api/admin/projects" in r.url and r.request.method == "POST") as rp:
-        pg.locator(".win.focus [data-primary]").click()
+        pg.locator(".win.focus [data-primary]").dblclick()
     assert rp.value.status == 201, ("create", rp.value.status, rp.value.text())
     pg.wait_for_timeout(400)
     assert "/admin/projects/" in pg.url and "Gespeichert" in save_text(pg), ("created", pg.url, save_text(pg))
     pid = pg.url.rsplit("/", 1)[1]
+    pg.wait_for_timeout(500)
+    assert len(posts) == 1 and len([x for x in API("GET", "/api/admin/projects")["items"] if x["title_de"] == "UI-Projekt"]) == 1, ("double-click Anlegen: one row", len(posts))
     pg.goto(f"https://{H}/portfolio", wait_until="load"); pg.wait_for_timeout(300)
     assert "UI-Projekt" in pg.locator(".win.focus").inner_text(), "the projects window shows it at once"
     pg.goto(f"https://{H}/admin/projects/{pid}", wait_until="load"); pg.locator(".win.focus [data-del]").wait_for(timeout=10000); pg.wait_for_timeout(300)
@@ -92,7 +99,7 @@ with sync_playwright() as p:
     assert "UI-Projekt" in sh.inner_text(); shot(pg, "admin-1280-delete-sheet.png")
     sh.locator("[data-yes]").click(); pg.wait_for_timeout(600)
     assert pg.url.endswith("/admin/projects") and pg.locator(".win.focus .ad-row").count() == n0
-    print("PASS 1280 admin: overview, project created (window shows it), delete sheet, deleted")
+    print("PASS 1280 admin: overview fetched once (reused on Übersicht), double-click Anlegen = one project, window shows it, delete sheet, deleted")
 
     # news: draft autosaves after 1.5 s, publish -> window, a stale tab gets the banner, withdraw, delete
     pg.goto(f"https://{H}/admin/changelog/new", wait_until="load"); pg.locator('.win.focus [name="title"]').wait_for(timeout=10000)
@@ -114,10 +121,19 @@ with sync_playwright() as p:
     pg.locator(".win.focus .ad-banner button").click(); pg.locator('.win.focus [name="title"]').wait_for(); pg.wait_for_timeout(500)
     assert pg.locator('.win.focus [name="text"]').input_value() == "aus einem anderen Tab"
     pg.locator(".win.focus [data-withdraw]").click(); pg.wait_for_timeout(700)
+    pg.keyboard.press("Escape"); pg.wait_for_timeout(400)
+    assert pg.url.endswith("/admin/changelog") and pg.locator(".win.focus .ad-list").count() == 1, ("Esc with focus on a button: back to the list, window open", pg.url)
+    pg.goto(f"https://{H}/admin/changelog/{nid}", wait_until="load"); pg.locator('.win.focus [name="title"]').wait_for(timeout=10000); pg.wait_for_timeout(300)
     assert pg.locator(".win.focus [data-pill]").inner_text().strip() == "Entwurf"
     pg.locator(".win.focus [data-del]").click(); pg.locator(".shx.ask [data-yes]").click(); pg.wait_for_timeout(600)
     assert pg.url.endswith("/admin/changelog")
-    print("PASS 1280 news: draft autosave, publish (window), 409 banner + reload, withdraw, delete")
+    pg.goto(f"https://{H}/admin/changelog/new", wait_until="load"); pg.locator('.win.focus [name="title"]').wait_for(timeout=10000)
+    pg.locator('.win.focus [name="title"]').fill("UI-Esc-Entwurf"); pg.keyboard.press("Escape"); pg.wait_for_timeout(2500)
+    assert pg.url.endswith("/admin/changelog") and pg.locator('.win.focus [name="title"]').count() == 0, ("left the editor; address stays on the list", pg.url)
+    esc_rows = [x for x in API("GET", "/api/admin/changelog")["items"] if x["title_de"] == "UI-Esc-Entwurf"]
+    assert len(esc_rows) == 1 and esc_rows[0]["status"] == "draft", "the draft typed before Esc was saved once (flush), not lost"
+    API("DELETE", f"/api/admin/changelog/{esc_rows[0]['id']}")
+    print("PASS 1280 news: draft autosave, publish (window), 409 banner + reload, withdraw, delete; Esc within 1.5 s keeps the draft, no stray address/DOM")
     for sec, sid in seeded:
         API("DELETE", f"/api/admin/{sec}/{sid}")   # back to the empty tables (code fallback) for the later checks
 
@@ -146,12 +162,26 @@ with sync_playwright() as p:
     print(f"PASS 1280 Startseite form (DE/EN), guestbook hide/unhide ({n} entries), ✎ About -> Verwaltung, icon + start menu")
 
     # ---- phones, admin: no horizontal scroll, quick sheet row, the main views ----
-    for width, night in ((375, False), (375, True), (430, False)):
+    WIDE = """() => { const W = innerWidth, out = []; for (const e of document.querySelectorAll('.win.focus .ad-main *')) { const r = e.getBoundingClientRect(); if (!r.width || r.right <= W + 0.5) continue;
+      let sc = false; for (let a = e.parentElement; a && !a.classList.contains('ad-main'); a = a.parentElement) { const ox = getComputedStyle(a).overflowX; if ((ox === 'auto' || ox === 'scroll') && !a.classList.contains('ad-scroll')) { sc = true; break; } }
+      if (!sc) out.push((e.className || e.tagName) + ' ' + Math.round(r.right)); } return out.slice(0, 5); }"""
+    PILLS = r"""() => { const L = (c) => { const m = c.match(/[\d.]+/g).map(Number); const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); };
+      const bg = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; const a = (c.match(/[\d.]+/g) || [0, 0, 0, 0]).map(Number); if (c.startsWith('rgb(') || (a[3] || 0) > 0.5) return c; } return 'rgb(255,255,255)'; };
+      return [...document.querySelectorAll('.win.focus .ad-pill')].filter((p) => p.offsetParent).map((p) => { const a = L(getComputedStyle(p).color), b = L(bg(p)); return [p.textContent, ((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)).toFixed(2)]; }).filter((x) => +x[1] < 4.5); }"""
+    c = ctx_for(br, 1280, ADMIN); pg = c.new_page()
+    pg.goto(f"https://{H}/admin", wait_until="load"); pg.locator(".win.focus .ad-tiles").wait_for(timeout=10000)
+    seedP = API("POST", "/api/admin/projects", {"title_de": "Phone-Projekt", "status": "live", "progress": 7, "href": "/about", "icon": "portfolio"})["item"]["id"]
+    seedN = API("POST", "/api/admin/changelog", {"day": "2026-11-02", "area": "blog", "title_de": "Phone-Neuigkeit", "status": "live"})["item"]["id"]
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    for width, night in ((375, False), (375, True), (390, False), (430, False)):
         c = ctx_for(br, width, ADMIN, night); pg = c.new_page(); pg.on("pageerror", on_err)
         tag = f"{width}-{'night' if night else 'day'}"
-        for path, sel, name in (("/admin", ".ad-tiles", "overview"), ("/admin/home", '[name="name"]', "edit-home"), ("/admin/projects", ".ad-h", "projects"), ("/admin/changelog/new", ".ad-scroll", "edit-news"), ("/admin/guestbook", "[data-gf]", "guestbook")):
+        for path, sel, name in (("/admin", ".ad-tiles", "overview"), ("/admin/home", '[name="name"]', "edit-home"), ("/admin/projects", ".ad-h", "projects"), (f"/admin/projects/{seedP}", '[name="title"]', "edit-project"), ("/admin/changelog", ".ad-h", "news"), (f"/admin/changelog/{seedN}", '[name="title"]', "edit-news"), ("/admin/guestbook", "[data-gf]", "guestbook")):
             pg.goto(f"https://{H}{path}", wait_until="load"); pg.locator(f".win.focus {sel}").first.wait_for(timeout=10000); pg.wait_for_timeout(500)
             assert pg.evaluate("document.documentElement.scrollWidth") <= width, (tag, path, "horizontal scroll")
+            wide = pg.evaluate(WIDE); assert not wide, (tag, path, "wider than the window", wide)
+            if not night:
+                low = pg.evaluate(PILLS); assert not low, (tag, path, "pill contrast", low)
             shot(pg, f"admin-{tag}-{name}.png")
         if not night:
             pg.goto(f"https://{H}/about", wait_until="load"); pg.wait_for_timeout(500)
@@ -160,7 +190,11 @@ with sync_playwright() as p:
             assert pg.locator(".shx.qs .rows li").first.get_attribute("class") == "adm-q", "quick sheet: Verwaltung first"
             shot(pg, f"admin-{tag}-quick-sheet.png")
         c.unroute_all(behavior="ignoreErrors"); c.close()
-    print("PASS 375/430 admin: overview, Startseite, projects, news, guestbook without horizontal scroll; ✎ and quick-sheet row")
+    c = ctx_for(br, 1280, ADMIN); pg = c.new_page()
+    pg.goto(f"https://{H}/admin", wait_until="load"); pg.locator(".win.focus .ad-tiles").wait_for(timeout=10000)
+    API("DELETE", f"/api/admin/projects/{seedP}"); API("DELETE", f"/api/admin/changelog/{seedN}")
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 375/390/430 admin: every view incl. project + news edit inside the window (no element wider), day pills >= 4.5:1; ✎ and quick-sheet row")
 
     # ---- anyone else: no window, no entry points, no admin CSS ----
     c = ctx_for(br, 1280, OTHER); pg = c.new_page(); pg.on("pageerror", on_err)
