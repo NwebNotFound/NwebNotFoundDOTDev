@@ -1097,6 +1097,11 @@ try {
     ok(slot0?.label === "Insel" && slot0?.online === true && slot0?.max === 10 && slot0?.players === 2 && slot0?.members?.some((m) => m.name === null && m.role === "member"), "VIP-Seite: online aus status running, max aus player_limit, name aus name", JSON.stringify(seen0.j?.worlds));
     // Panel v2: ein siebter Regel-Schlüssel im Plugin darf die Welt nicht aus dem Panel werfen.
     await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ settings: { gamemode: "creative", pvp: true, weather: "rain" } })] }, { token: TOK, origin: null, cookie: null });
+    { // D1 write budget: the same world list again writes 0 rows (updated_at stays)
+      const at = () => sqlRows("SELECT updated_at FROM mc_blobs WHERE kind='vip_worlds'")[0]?.updated_at; const a0 = at(); await new Promise((r) => setTimeout(r, 20));
+      const again = await post("/api/mc-vip-worlds", { vip_worlds: [CWORLD({ settings: { gamemode: "creative", pvp: true, weather: "rain" } })] }, { token: TOK, origin: null, cookie: null });
+      ok(again.s === 200 && a0 != null && at() === a0, "VIP-Sync: gleiche Liste noch einmal schreibt nichts", `${again.s} ${a0} ${at()}`);
+    }
     const exSeen = await req("/api/mc-vip", { cookie: c1 });
     const exSlot = exSeen.j?.worlds?.slots?.find((x) => x.id === WID);
     ok(exSlot && exSlot.settings?.pvp === true && exSlot.settings?.gamemode === "creative" && !("weather" in (exSlot.settings || {})), "Sync: unbekannter Regel-Schlüssel wirft die Welt nicht raus", JSON.stringify(exSlot?.settings));
