@@ -1021,6 +1021,14 @@ async function osResponse(req, env, url, lang, route) {
   const de = lang !== "en";
   let k = route.k, content = {}, title = "", status = 200, priv = false, oneLang = "";
   const u = ["profile", "blog-post"].includes(k) ? await getUser(req, env).catch(() => null) : null;
+  // Verwaltung: the window and every entry point (icon, start menu, quick sheet, ✎) exist only for admins. Only a
+  // session cookie costs the check (no cookie: no D1 read).
+  const adm = k === "admin" || /(?:^|;\s*)nnf_session=/.test(req.headers.get("cookie") || "") ? await ADMIN().isAdmin(req, env).catch(() => ({ err: 500 })) : { err: 401 };
+  if (k === "admin") {
+    if (adm.err === 401) return new Response(null, { status: 302, headers: { location: `/auth/discord/login?next=${encodeURIComponent("https://" + MAIN + route.path)}`, "cache-control": "no-store" } });
+    if (adm.err) k = "notfound";
+    else { priv = true; content.admin = `<p class="pad">${de ? "Die Verwaltung braucht JavaScript." : "The admin needs JavaScript."}</p>`; }
+  }
   if (k === "blog-edit") {
     // admin only (server-side, as the #106 page): guests sign in first, everyone else gets the 404 window
     const a = await BLOG().admin(req, env).catch(() => ({ err: 500 }));
@@ -1067,7 +1075,8 @@ async function osResponse(req, env, url, lang, route) {
   else if (k === "text") { content.text = osText(lang, route.item, route.item.html || ""); title = route.item.title; }
   if (k === "notfound") { content.notfound = osNotfound(lang, route.path); status = 404; }
   const [entries, site] = await Promise.all([guestEntries(env).catch(() => []), siteData(env)]);
-  const page = nwebosPage({ lang, app: k, path: route.path, entries, sitekey: SITEKEY, content, title, status, oneLang, site });
+  if (adm.user) priv = true;   // the page carries admin-only markup: never shared
+  const page = nwebosPage({ lang, app: k, path: route.path, entries, sitekey: SITEKEY, content, title, status, oneLang, site, admin: !!adm.user });
   return html(page, status, { "cache-control": priv ? "private, no-store" : "no-store", vary: "cookie, accept-language", ...(priv ? { "x-robots-tag": "noindex" } : {}) });
 }
 

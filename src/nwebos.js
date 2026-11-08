@@ -48,6 +48,9 @@ export const EXTRA = [
   // Blog editor (admin only, the server checks; mockups/nwebos/apps "Editor"): a module window, its client is
   // public/design/nwebos-editor.js on the #106 admin API.
   { k: "blog-edit", icon: "blog", re: /^\/blog\/admin(?:\/([0-9a-f-]{36}))?$/, de: "Blog-Editor", en: "Blog editor", w: 920, h: 580, x: 180, y: 20, menu: "no", module: "/design/nwebos-editor.js" },
+  // Verwaltung (mockups/nwebos/apps/admin): admin only, checked by the worker on every request; client
+  // public/design/nwebos-admin.js on /api/admin. /admin/<section>[/<id>|/new] opens that view.
+  { k: "admin", icon: "admin", re: /^\/admin(?:\/(home|projects|changelog|guestbook)(?:\/(\d{1,9}|new))?)?$/, de: "Verwaltung", en: "Admin", w: 980, h: 640, x: 150, y: 24, menu: "no", module: "/design/nwebos-admin.js" },
   { k: "blog-post", icon: "blog", re: /^\/blog\/([a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?)$/, de: "Beitrag", en: "Post", w: 820, h: 560, x: 240, y: 30, menu: "no" },
   { k: "profile", icon: "profile", path: "/profile", de: "Mein Profil", en: "My profile", w: 820, h: 620, x: 260, y: 30, menu: "no" },
   { k: "changelog", icon: "changelog", path: "/changelog", de: "Neuigkeiten", en: "What's new", w: 560, h: 520, x: 420, y: 40, menu: "no" },
@@ -101,6 +104,8 @@ const PROJ = {
     ["writing", "Writing & novel", "soon", 3, "A story in chapters.", "/writing"],
     ["portfolio", "Pixel wall", "idea", 1, "A shared canvas where everyone sets a few pixels.", "/pixelwand"]],
 };
+/* ✎ Bearbeiten in a window title bar opens the Verwaltung at its content (admins only) */
+const EDIT_AT = { about: "/admin/home", portfolio: "/admin/projects", changelog: "/admin/changelog", guestbook: "/admin/guestbook", blog: "/blog/admin" };
 const STATE_CLASS = { live: "live", neu: "neu", new: "neu", bald: "bald", soon: "bald", Idee: "Idee", idea: "Idee" };
 
 /* The Über-mich texts, Steckbrief and XP: D1 site_blocks (Verwaltung) when a row exists, else these (today's texts). */
@@ -167,7 +172,7 @@ function searchIndex(lang) {
     ...WIKI.map((w) => ({ t: `Wiki: ${w.title}`, d: `${MC_HOST}/wiki · ${t.newTab}`, url: `${mc}/wiki/${w.slug}`, ic: "minecraft", kw: `wiki minecraft ${w.sum || ""}` })),
     { t: "GitHub · NwebNotFound", d: t.newTab, url: GITHUB, ic: "portfolio", kw: "github code" }];
 }
-export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries = [], sitekey = "", content: extra = {}, title: winTitle = "", status = 200, oneLang = "", site = null } = {}) {
+export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries = [], sitekey = "", content: extra = {}, title: winTitle = "", status = 200, oneLang = "", site = null, admin = false } = {}) {
   lang = lang === "en" ? "en" : "de";
   const t = T[lang];
   const cur = ALL.find((a) => a.k === app) || null;
@@ -183,14 +188,18 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
   const inl = ALL.filter((a) => a.inline && content[a.k] !== undefined);
   const ordered = cur ? [cur, ...inl.filter((a) => a !== cur)] : inl;
   const sec = (a) => { const isCur = a === cur; const p = isCur ? path : a.path || ""; const tt = isCur ? curTitle : a[lang];
-    return `<section class="app" id="app-${a.k}" data-app="${a.k}" data-path="${esc(p)}"${a.module ? ` data-module="${esc(a.module)}?v=${AV}"` : ""} data-title-de="${esc(isCur && winTitle ? winTitle : a.de)}" data-title-en="${esc(isCur && winTitle ? winTitle : a.en)}" data-w="${a.w}" data-h="${a.h}"${a.x != null ? ` data-x="${a.x}" data-y="${a.y}"` : ""}${a.menu ? ` data-menu="${a.menu}"` : ""}${a.icon ? ` data-icon="${a.icon}"` : ""} aria-labelledby="h-${a.k}"><h2 class="nojs-h" id="h-${a.k}">${esc(tt)}</h2>${content[a.k] ?? ""}</section>`; };
+    const edit = admin && EDIT_AT[a.k];
+    return `<section class="app" id="app-${a.k}" data-app="${a.k}" data-path="${esc(p)}"${edit ? ` data-edit="${esc(href(lang, edit))}"` : ""}${a.module ? ` data-module="${esc(a.module)}?v=${AV}"` : ""} data-title-de="${esc(isCur && winTitle ? winTitle : a.de)}" data-title-en="${esc(isCur && winTitle ? winTitle : a.en)}" data-w="${a.w}" data-h="${a.h}"${a.x != null ? ` data-x="${a.x}" data-y="${a.y}"` : ""}${a.menu ? ` data-menu="${a.menu}"` : ""}${a.icon ? ` data-icon="${a.icon}"` : ""} aria-labelledby="h-${a.k}"><h2 class="nojs-h" id="h-${a.k}">${esc(tt)}</h2>${content[a.k] ?? ""}</section>`; };
   const sections = ordered.filter((a) => content[a.k] !== undefined).map(sec).join("\n");
   // routes the shell may open without a full page load (fetches their section from the address)
   const routes = ALL.filter((a) => a.path).map((a) => [a.k, a.path]);
   const iconHref = (a) => (a.win ? href(lang, a.path) : a.href.startsWith("/") ? href(lang, a.href) : a.href);
   /* profile v3 (row 56): the first home icon is the profile — Discord tile "Anmelden" until the client knows the user */
   const p3i = `<li><a class="dicon p3i" href="${esc(href(lang, "/profile"))}" data-open="profile" data-p3i><span class="dsc">${'<svg viewBox="0 0 71 55" width="30" height="30" fill="#fff" aria-hidden="true" focusable="false"><path d="M60.1 4.9A58.5 58.5 0 0045.4.4a40 40 0 00-1.9 3.8 54 54 0 00-16.2 0A40 40 0 0025.4.4 58.4 58.4 0 0010.7 4.9C1.4 18.7-1.1 32.2.1 45.5a59 59 0 0018 9.1 43 43 0 003.8-6.2 38 38 0 01-6-2.9l1.5-1.1a42 42 0 0036 0l1.5 1.1a38 38 0 01-6 2.9 43 43 0 003.8 6.2 58.7 58.7 0 0018-9.1c1.5-15.4-2.5-28.8-10.6-40.6zM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2z"/></svg>'}</span><span>${lang === "en" ? "Sign in" : "Anmelden"}</span></a></li>`;
-  const dicons = p3i + APPS.map((a) => `<li><a class="dicon" href="${esc(iconHref(a))}"${a.win ? ` data-open="${a.k}"` : ""} data-de="${esc(a.de)}" data-en="${esc(a.en)}">${icon(a.k, 40)}<span>${esc(a[lang])}</span></a></li>`).join("");
+  const dicons = p3i + APPS.map((a) => `<li><a class="dicon" href="${esc(iconHref(a))}"${a.win ? ` data-open="${a.k}"` : ""} data-de="${esc(a.de)}" data-en="${esc(a.en)}">${icon(a.k, 40)}<span>${esc(a[lang])}</span></a></li>`).join("")
+    + (admin ? `<li><a class="dicon adm" href="${esc(href(lang, "/admin"))}" data-open="admin" data-de="Verwaltung" data-en="Admin">${icon("admin", 40)}<span>${lang === "en" ? "Admin" : "Verwaltung"}</span></a></li>` : "");
+  // the phone quick sheet (built by the shell) takes this row first when it exists: admins only
+  const admQ = admin ? `<template id="adm-q"><li class="adm-q"><a href="${esc(href(lang, "/admin"))}" data-qopen>${ic("admin", 16)}<b>${lang === "en" ? "Admin" : "Verwaltung"}</b><span class="ad-tag-adm">ADMIN</span><em>›</em></a></li></template>` : "";
   const progs = APPS.map((a) => `<li><a href="${esc(iconHref(a))}"${a.win ? ` data-open="${a.k}"` : ""}>${icon(a.k, 24)}<span>${esc(a[lang])}</span></a></li>`).join("");
   const tpl = [...APPS.map((a) => [a.k, a.k]), ...EXTRA.map((a) => [a.k, a.icon])].map(([k, i]) => `<template id="ic-${k}">${icon(i, 16)}</template>`).join("");
   const other = lang === "en" ? "de" : "en";
@@ -204,7 +213,7 @@ ${oneLang ? "" : `<link rel="alternate" hreflang="${lang}" href="${alt(lang)}"><
 <link rel="alternate" type="application/rss+xml" title="Blog · NwebNotFound" href="/blog/feed.xml"><link rel="alternate" type="application/rss+xml" title="${lang === "en" ? "What's new" : "Neuigkeiten"} · NwebNotFound" href="${lang === "en" ? "/en" : ""}/changelog/feed.xml">${path === "/writing" || path.startsWith("/writing/") ? `<link rel="alternate" type="application/rss+xml" title="NwebNotFound – Texte" href="/writing/feed.xml">` : ""}
 <meta name="theme-color" content="#2463d6"><link rel="icon" href="/favicon.ico">
 <script src="/design/summer-theme.js?v=${AV}"></script><link rel="preload" href="/design/fonts/pixelify-sans-latin-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-polish.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-phone.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-profile.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script><script src="/design/nwebos-apps.js?v=${AV}" defer></script></head><body>
+<link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-polish.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-phone.css?v=${AV}">${admin ? `<link rel="stylesheet" href="/design/nwebos-admin.css?v=${AV}">` : ""}<link rel="stylesheet" href="/design/nwebos-profile.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script><script src="/design/nwebos-apps.js?v=${AV}" defer></script></head><body>
 <a class="skip" href="#apps">${t.skip}</a>
 <div id="boot" class="scr" hidden><div class="bootin"><div class="blogo">${ic("cat", 72)}<span><b>Nweb</b>OS</span></div><small>${t.edition}</small><div class="bbar"><i></i><i></i><i></i></div><p>${t.boot}</p></div><span class="bcopy">© {{Y}} Nils Weberruß</span></div>
 <div id="login" class="scr" hidden role="dialog" aria-modal="true" aria-label="NwebOS"><div class="lgtop"></div><div class="lgmid"><div class="lgl">${ic("cat", 64)}<b><span>Nweb</span>OS</b><p><span class="ptr-m">${t.loginHint}</span><span class="ptr-t">${t.loginHintT}</span></p></div>
@@ -216,14 +225,14 @@ ${oneLang ? "" : `<link rel="alternate" hreflang="${lang}" href="${alt(lang)}"><
 <div id="desk" hidden><form class="hsearch" role="search"><div class="fld"><input id="hq" type="search" placeholder="${t.search} …" aria-label="${t.search}" autocomplete="off" enterkeyhint="go" autocapitalize="off" spellcheck="false"><button type="button" class="clr" aria-label="${lang === "en" ? "Clear search" : "Suche leeren"}"><i></i></button></div><button type="button" class="cnl">${lang === "en" ? "Cancel" : "Abbrechen"}</button><ul class="results" id="hres" hidden></ul></form><ul class="dicons" aria-label="${t.desktop}">${dicons}</ul><div id="wins"></div>
 <div id="startm" hidden role="menu" aria-label="${t.start}"><div class="smtop" data-open="profile" title="${lang === "en" ? "My profile" : "Mein Profil"}"><img id="smav" src="data:," width="44" height="44" alt=""><b id="smname">${t.guest}</b><span class="p3sub" data-p3sub>${lang === "en" ? "Sign in ›" : "Anmelden ›"}</span></div>
 <div class="smsearch"><input id="smq" type="search" placeholder="${t.searchPh}" aria-label="${t.search}" autocomplete="off"></div><ul class="results" id="smres" hidden></ul>
-<div class="smmid"><ul class="progs">${progs}</ul><ul class="side"><li><a href="${href(lang, "/profile")}" data-open="profile">${ic("profile", 20)}<span>${lang === "en" ? "My profile" : "Mein Profil"}</span></a></li><li><a href="${href(lang, "/changelog")}" data-open="changelog">${ic("changelog", 20)}<span>${lang === "en" ? "What's new" : "Neuigkeiten"}</span></a></li><li><a href="${GITHUB}" rel="noopener"><span>GitHub</span></a></li><li><button type="button" data-egg="about-os"><span>${t.aboutOs}</span></button></li></ul></div>
+<div class="smmid"><ul class="progs">${progs}</ul><ul class="side">${admin ? `<li class="adm-sm"><a href="${href(lang, "/admin")}" data-open="admin">${ic("admin", 20)}<span>${lang === "en" ? "Admin" : "Verwaltung"}</span></a></li>` : ""}<li><a href="${href(lang, "/profile")}" data-open="profile">${ic("profile", 20)}<span>${lang === "en" ? "My profile" : "Mein Profil"}</span></a></li><li><a href="${href(lang, "/changelog")}" data-open="changelog">${ic("changelog", 20)}<span>${lang === "en" ? "What's new" : "Neuigkeiten"}</span></a></li><li><a href="${GITHUB}" rel="noopener"><span>GitHub</span></a></li><li><button type="button" data-egg="about-os"><span>${t.aboutOs}</span></button></li></ul></div>
 <div class="smbot"><button type="button" data-egg="logout">${t.logout}</button><button type="button" data-egg="shutdown" class="sd">${t.shutdown}</button></div></div>
 <footer class="task"><button id="startb" type="button" aria-expanded="false" aria-controls="startm" aria-label="${t.start}">${ic("cat", 22)}<span>NwebOS</span></button><div id="tbtns" role="tablist" aria-label="${t.openWins}"></div>
 <div class="tray"><nav class="lang" data-lang="${lang}" aria-label="${t.lang}"><a href="${esc(href("de", path))}" hreflang="de" lang="de"${lang === "de" ? ' aria-current="true"' : ""}>DE</a><a href="${esc(href("en", path))}" hreflang="en" lang="en"${lang === "en" ? ' aria-current="true"' : ""}>EN</a></nav>
 
 <button id="thm" type="button" aria-label="${t.theme}" aria-pressed="false"><i></i></button><button id="snd" type="button" aria-pressed="true" aria-label="${t.sound}"><svg viewBox="0 0 12 12" width="14" height="14" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="4" width="3" height="4" fill="#fff"/><rect x="4" y="3" width="1" height="6" fill="#fff"/><rect x="5" y="2" width="1" height="8" fill="#fff"/><rect class="w1" x="8" y="4" width="1" height="4" fill="#fff"/><rect class="w2" x="10" y="3" width="1" height="6" fill="#fff"/><rect class="mx" x="7" y="3" width="5" height="1" fill="#ff8a6b" transform="rotate(45 9 6)"/></svg></button><time id="clock"></time></div>
 <nav class="mbar" aria-label="NwebOS"><button type="button" data-home aria-label="${t.home}">${ic("cat", 22)}</button><span id="mtitle">NwebOS</span><button type="button" class="msrch" data-msearch aria-label="${t.search}">${ic2("search")}</button><button type="button" class="mme" data-quick aria-haspopup="dialog" aria-label="${lang === "en" ? "Quick menu: account, day/night, language" : "Schnellmenü: Konto, Tag/Nacht, Sprache"}"><i class="mi" aria-hidden="true"></i><time data-qclock></time><img alt="" src="data:," width="30" height="30" data-qav></button><time id="mclock"></time></nav></footer></div>
-<main id="apps">${sections}</main>${tpl}
+<main id="apps">${sections}</main>${tpl}${admQ}
 <script type="application/json" id="os-l">${JSON.stringify(L).replace(/</g, "\\u003c")}</script>
 <noscript><p class="nojs-note">${t.nojs}</p></noscript>
 </body></html>`;
