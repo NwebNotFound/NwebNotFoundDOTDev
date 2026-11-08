@@ -58,7 +58,7 @@ with sync_playwright() as p:
     pg.locator('.win.focus .ad-tile[data-go="guestbook"]').click(); pg.locator(".win.focus [data-gf]").first.wait_for(); pg.locator('.win.focus .ad-back').click(); pg.locator(".win.focus .ad-tiles").wait_for(); pg.wait_for_timeout(300)
     assert len(ov) == 1, ("Übersicht again reuses the counts", len(ov))
     assert pg.locator(".win.focus .ad-tile").count() == 9 and pg.locator(".win.focus .wt .ad-tag-adm").count() == 1, "overview: 9 tiles, ADMIN tag in the title"
-    assert pg.locator(".win.focus .ad-tile.soon").count() == 3, "Texte, Studio, Pixelwand say 'kommt'"
+    assert pg.locator(".win.focus .ad-tile.soon").count() == 2, "Studio and Pixelwand say 'kommt' (Texte is live since PR C)"
     shot(pg, "admin-1280-overview.png")
 
     # projects: create -> visible in the window -> delete -> fallback again
@@ -152,6 +152,42 @@ with sync_playwright() as p:
         shot(pg, "admin-1280-guestbook.png")
         pg.locator('.win.focus .ad-msg [data-gh="unhide"]').first.click(); pg.wait_for_timeout(600)
         assert pg.locator(".win.focus .ad-msg.hid").count() == 0
+    # Texte & Kapitel (PR C): a series, a chapter written as a draft (autosave), published -> the public chapter window,
+    # withdrawn -> gone, then both deleted again
+    pg.goto(f"https://{H}/admin/writing", wait_until="load"); pg.locator(".win.focus [data-newseries]").wait_for(timeout=10000)
+    shot(pg, "admin-1280-writing-empty.png")
+    pg.locator(".win.focus [data-newseries]").click(); pg.locator('.win.focus [name="title"]').wait_for(timeout=10000)
+    pg.locator('.win.focus [name="title"]').fill("UI Sommerfunken")
+    assert pg.locator('.win.focus [name="slug"]').input_value() == "ui-sommerfunken", "address follows the title while new"
+    pg.locator(".win.focus [data-primary]").click(); pg.wait_for_timeout(700)
+    assert "/admin/series/" in pg.url, ("series created", pg.url)
+    ser_id = pg.url.rsplit("/", 1)[1]
+    pg.goto(f"https://{H}/admin/writing/new", wait_until="load"); pg.locator('.win.focus [name="title"]').wait_for(timeout=10000); pg.wait_for_timeout(300)
+    assert pg.locator('.win.focus [data-seg="series"] button[aria-pressed="true"]').inner_text() == "UI Sommerfunken", "the first series is preselected"
+    pg.locator('.win.focus [name="chapter"]').fill("1"); pg.locator('.win.focus [name="title"]').fill("Der erste Tag")
+    pg.locator('.win.focus [data-md="body"] textarea').fill("Es war **heiß**. Ein Test-Kapitel.")
+    pg.wait_for_timeout(2600)
+    assert "Automatisch gespeichert" in save_text(pg) and "/admin/writing/" in pg.url and not pg.url.endswith("/new"), ("chapter draft autosaved", save_text(pg), pg.url)
+    wid = pg.url.rsplit("/", 1)[1]
+    pg.goto(f"https://{H}/writing/ui-sommerfunken/1", wait_until="load"); pg.wait_for_timeout(300)
+    assert "Es war" not in pg.locator(".win.focus").inner_text(), "a draft is not public"
+    pg.goto(f"https://{H}/admin/writing/{wid}", wait_until="load"); pg.locator('.win.focus [name="title"]').wait_for(timeout=10000); pg.wait_for_timeout(500)
+    shot(pg, "admin-1280-edit-chapter.png")
+    pg.locator(".win.focus [data-primary]").click(); pg.wait_for_timeout(800)
+    assert pg.locator(".win.focus [data-pill]").inner_text().strip() == "Live" and "Veröffentlicht" in pg.locator(".toast").inner_text()
+    pg.goto(f"https://{H}/writing/ui-sommerfunken/1", wait_until="load"); pg.wait_for_timeout(300)
+    txt = pg.locator(".win.focus").inner_text()
+    assert "Der erste Tag" in txt and "heiß" in txt, "published chapter in its window"
+    pg.goto(f"https://{H}/admin/writing", wait_until="load"); pg.locator(".win.focus .ad-row").first.wait_for(timeout=10000); pg.wait_for_timeout(300)
+    shot(pg, "admin-1280-writing-list.png")
+    pg.goto(f"https://{H}/admin/writing/{wid}", wait_until="load"); pg.locator(".win.focus [data-withdraw]").wait_for(timeout=10000); pg.wait_for_timeout(300)
+    pg.locator(".win.focus [data-withdraw]").click(); pg.wait_for_timeout(700)
+    pg.goto(f"https://{H}/writing/ui-sommerfunken/1", wait_until="load"); pg.wait_for_timeout(300)
+    assert "Es war" not in pg.locator(".win.focus").inner_text(), "withdrawn: offline again"
+    sdel = API("DELETE", f"/api/admin/series/{ser_id}")
+    assert sdel.get("error") == "not_empty", "a series with chapters stays"
+    API("DELETE", f"/api/admin/writing/{wid}"); API("DELETE", f"/api/admin/series/{ser_id}")
+    print("PASS 1280 Texte: series (address from title), chapter draft autosave (not public), publish -> chapter window, withdraw, delete")
     # ✎ Bearbeiten on About -> the Verwaltung at the texts; desktop icon + start menu entry
     pg.goto(f"https://{H}/about", wait_until="load"); pg.locator(".win.focus .wb.ed").wait_for(timeout=10000)
     assert pg.locator(".dicon.adm").count() == 1 and pg.locator("#startm .adm-sm").count() == 1
@@ -176,7 +212,7 @@ with sync_playwright() as p:
     for width, night in ((375, False), (375, True), (390, False), (430, False)):
         c = ctx_for(br, width, ADMIN, night); pg = c.new_page(); pg.on("pageerror", on_err)
         tag = f"{width}-{'night' if night else 'day'}"
-        for path, sel, name in (("/admin", ".ad-tiles", "overview"), ("/admin/home", '[name="name"]', "edit-home"), ("/admin/projects", ".ad-h", "projects"), (f"/admin/projects/{seedP}", '[name="title"]', "edit-project"), ("/admin/changelog", ".ad-h", "news"), (f"/admin/changelog/{seedN}", '[name="title"]', "edit-news"), ("/admin/guestbook", "[data-gf]", "guestbook")):
+        for path, sel, name in (("/admin", ".ad-tiles", "overview"), ("/admin/home", '[name="name"]', "edit-home"), ("/admin/projects", ".ad-h", "projects"), (f"/admin/projects/{seedP}", '[name="title"]', "edit-project"), ("/admin/changelog", ".ad-h", "news"), (f"/admin/changelog/{seedN}", '[name="title"]', "edit-news"), ("/admin/guestbook", "[data-gf]", "guestbook"), ("/admin/writing", "[data-newseries]", "writing"), ("/admin/writing/new", '[name="title"]', "edit-text")):
             pg.goto(f"https://{H}{path}", wait_until="load"); pg.locator(f".win.focus {sel}").first.wait_for(timeout=10000); pg.wait_for_timeout(500)
             assert pg.evaluate("document.documentElement.scrollWidth") <= width, (tag, path, "horizontal scroll")
             wide = pg.evaluate(WIDE); assert not wide, (tag, path, "wider than the window", wide)

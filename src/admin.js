@@ -289,10 +289,17 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
           UNION ALL SELECT 'blog', id, title_de, status, updated_at FROM blog_posts) ORDER BY updated_at DESC LIMIT 3`),
     ]);
     const one = (r) => r.results?.[0] || {};
+    /* Texte (migration 0021) on its own, so the overview still works before that migration */
+    const wr = await env.DB.batch([
+      q("SELECT (SELECT COUNT(*) FROM writing_series) AS series, SUM(status = 'live') AS live, SUM(status = 'draft') AS drafts FROM writing_items"),
+      q("SELECT 'writing' AS section, id, title_de AS title, status, updated_at FROM writing_items ORDER BY updated_at DESC LIMIT 3"),
+    ]).catch(() => null);
+    const recent = [...(rec.results || []), ...(wr ? wr[1].results || [] : [])].sort((a, b) => b.updated_at - a.updated_at).slice(0, 3);
     return out({
+      writing: wr ? { series: one(wr[0]).series || 0, live: one(wr[0]).live || 0, drafts: one(wr[0]).drafts || 0 } : { series: 0, live: 0, drafts: 0 },
       projects: one(pr).n || 0, changelog: { all: one(cl).n || 0, drafts: one(cl).drafts || 0 },
       guestbook: { new: one(gb).new || 0, reported: one(gb).reported || 0 }, blog: { drafts: one(bl).drafts || 0, live: one(bl).live || 0 },
-      recent: rec.results || [],
+      recent,
     });
   }
 

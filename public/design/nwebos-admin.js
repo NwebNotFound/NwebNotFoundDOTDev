@@ -29,7 +29,7 @@
       home: { icon: "about", t: T("Startseite & Über mich", "Home & About me") },
       projects: { icon: "portfolio", t: T("Projekte", "Projects") },
       blog: { icon: "blog", t: "Blog", url: (en ? "/en" : "") + "/blog/admin" },
-      writing: { icon: "writing", t: T("Texte & Kapitel", "Writing & chapters"), soon: T("kommt mit den Texten in D1", "comes with writing in D1") },
+      writing: { icon: "writing", t: T("Texte & Kapitel", "Writing & chapters") },
       studio: { icon: "music", t: "Studio", soon: T("kommt mit dem Studio", "comes with the Studio") },
       changelog: { icon: "changelog", t: T("Neuigkeiten", "What's new") },
       guestbook: { icon: "guestbook", t: T("Gästebuch", "Guestbook") },
@@ -58,6 +58,7 @@
       if (k === "blog") return c.blog.drafts + T(c.blog.drafts === 1 ? " Entwurf" : " Entwürfe", c.blog.drafts === 1 ? " draft" : " drafts") + " · " + c.blog.live + " live";
       if (k === "changelog") return c.changelog.all + T(" Einträge", " entries") + (c.changelog.drafts ? " · " + c.changelog.drafts + T(" Entwurf", " draft") : "");
       if (k === "guestbook") return c.guestbook.new + T(" neu · ", " new · ") + c.guestbook.reported + T(" gemeldet", " reported");
+      if (k === "writing" && c.writing) return c.writing.series + T(c.writing.series === 1 ? " Serie · " : " Serien · ", " series · ") + c.writing.live + T(" live", " live") + (c.writing.drafts ? " · " + c.writing.drafts + T(" Entwurf", " draft") : "");
       return "";
     }
     function pill(k) { return '<span class="ad-pill ' + k + '">' + ({ live: "Live", draft: T("Entwurf", "Draft"), off: T("Zurückgezogen", "Withdrawn"), rep: T("Gemeldet", "Reported"), hid: T("Ausgeblendet", "Hidden") })[k] + "</span>"; }
@@ -81,12 +82,13 @@
       fn();
     }
     function open(p) {
-      var m = /^(home|projects|changelog|guestbook)(?:\/(\d{1,9}|new))?$/.exec(p || "");
+      var m = /^(home|projects|changelog|guestbook|writing|series)(?:\/(\d{1,9}|new))?$/.exec(p || "");
       leave(function () {
         setAddr(m ? p : "");
         if (!m) return overview();
         if (m[1] === "home") return editHome();
         if (m[1] === "guestbook") return guestbook("new");
+        if (m[1] === "writing" || m[1] === "series") return m[2] ? editText(m[1], m[2]) : writingList();
         if (m[2]) return editItem(m[1], m[2]);
         return list(m[1]);
       });
@@ -318,6 +320,148 @@
         var ld = store.get(); show();
         if (ld && ld.data && JSON.stringify(ld.data) !== JSON.stringify(data)) banner(T("Ungespeicherte Änderungen von ", "Unsaved changes from ") + hm(ld.at) + ".", T("Wiederherstellen", "Restore"), function () { data = ld.data; show(); grab(); var b = $(".ad-banner"); if (b) b.remove(); });
         saveState("saved", Date.now());
+      });
+    }
+
+    /* ---------- Texte & Kapitel (PR C): one list of series -> chapters + short texts; editors for a text and a series ---------- */
+    function writingList() {
+      var series = [], items = [], filter = "";
+      var draw = function () {
+        var vis = items.filter(function (r) { return !filter || r.status === filter; });
+        var rowOf = function (r) { var st = r.status === "live" ? "live" : r.status === "archived" ? "off" : "draft";
+          return row(ic(r.kind === "story" ? "book" : "writing", 28), (r.kind === "story" ? T("Kapitel ", "Chapter ") + r.chapter + " · " : "") + r.title_de, (r.published_at ? when(r.published_at) : T("noch nie veröffentlicht", "never published")) + " · /writing/" + r.slug, langs(1, r.title_en && r.body_en) + pill(st) + ib("pen", T("Bearbeiten", "Edit"), ' data-open-item="writing/' + r.id + '"'), ' data-open-item="writing/' + r.id + '"'); };
+        var groups = series.map(function (s) { var ch = vis.filter(function (r) { return r.series_id === s.id; });
+          return '<p class="ad-sec">' + esc(s.title_de) + ' <button type="button" class="ad-ib" style="display:inline-grid;vertical-align:middle;margin-left:6px" aria-label="' + T("Serie bearbeiten", "Edit series") + '" data-open-item="series/' + s.id + '">' + spr("pen", 16) + "</button></p>" +
+            (ch.length ? '<ul class="ad-list">' + ch.map(rowOf).join("") + "</ul>" : '<p class="ad-empty">' + T("Noch keine Kapitel.", "No chapters yet.") + "</p>"); }).join("");
+        var shorts = vis.filter(function (r) { return r.series_id == null; });
+        frame("writing", '<div class="ad-scroll">' + head(T("Texte & Kapitel", "Writing & chapters"), series.length + T(" Serien · ", " series · ") + items.filter(function (r) { return r.status === "live"; }).length + T(" live", " live"), T("Neuer Text", "New text")) +
+          '<div class="ad-tools"><button type="button" class="xpbtn" data-newseries>' + spr("c-plus", 16) + " " + T("Neue Serie", "New series") + "</button></div>" +
+          '<div class="ad-chips" style="margin-bottom:10px">' + [["", T("Alle", "All")], ["draft", T("Entwurf", "Draft")], ["live", "Live"], ["archived", T("Archiviert", "Archived")]].map(function (c) { var n = c[0] ? items.filter(function (r) { return r.status === c[0]; }).length : items.length; return '<button type="button" class="ad-chip" data-f="' + c[0] + '" aria-pressed="' + (filter === c[0]) + '">' + c[1] + " <em>" + n + "</em></button>"; }).join("") + "</div>" +
+          groups + '<p class="ad-sec">' + T("Kurztexte", "Short texts") + "</p>" + (shorts.length ? '<ul class="ad-list">' + shorts.map(rowOf).join("") + "</ul>" : '<p class="ad-empty">' + T("Noch keine Kurztexte.", "No short texts yet.") + "</p>") + "</div>");
+        $$("[data-f]").forEach(function (b) { b.onclick = function () { filter = b.getAttribute("data-f"); draw(); }; });
+        $("[data-new]").onclick = function () { open("writing/new"); };
+        $("[data-newseries]").onclick = function () { open("series/new"); };
+      };
+      frame("writing", '<div class="ad-scroll"><p class="ad-empty">' + T("Lädt …", "Loading …") + "</p></div>");
+      Promise.all([call("GET", "/series"), call("GET", "/writing")]).then(function (r) {
+        if (r[0].s !== 200 || r[1].s !== 200) return frame("writing", '<div class="ad-scroll"><p class="ad-err">' + T("Konnte nicht laden", "Could not load") + (r[0].s === 503 ? T(" (Migration 0021 fehlt)", " (migration 0021 missing)") : "") + "</p></div>");
+        series = r[0].j.items || []; items = r[1].j.items || []; draw();
+      });
+    }
+
+    /* one text (k = "writing": a chapter or a short text) or one series (k = "series"). Same save rules as editItem:
+       drafts autosave to D1 1.5 s after the last change (only when changed), live content saves on the button, saves are
+       serialised, a 409 shows the banner, leaving stops the timer and flushes a draft. */
+    function editText(k, idv) {
+      var isNew = idv === "new", wr = k === "writing", item = null, work = null, L = "de", store = local(k + "." + idv), t = null, seriesList = [], mdBody = null, slugTouched = !isNew;
+      var FIELDS = wr ? ["series_id", "kind", "chapter", "slug", "title_de", "title_en", "body_de", "body_en", "tags", "status"] : ["slug", "title_de", "title_en", "status", "sort"];
+      var blank = wr ? { series_id: null, kind: "story", chapter: 1, slug: "", title_de: "", title_en: null, body_de: "", body_en: null, tags: "[]", status: "draft", version: 0 } : { slug: "", title_de: "", title_en: null, status: "live", sort: 0, version: 0 };
+      var pick = function (o) { var p = {}; FIELDS.forEach(function (f) { p[f] = o[f] == null || o[f] === "" && /_en$/.test(f) ? null : o[f]; }); return p; };
+      var same = function (a, b) { var x = pick(a), y = pick(b); return FIELDS.every(function (f) { return x[f] === y[f]; }); };
+      var slugify = function (s) { return String(s || "").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80); };
+      var form = function () {
+        frame("writing", bar({ back: T("Texte & Kapitel", "Writing & chapters"), primary: "…", pv: wr && !isNew, extra: wr ? '<button type="button" class="xpbtn" data-withdraw hidden>' + T("Zurückziehen", "Withdraw") + "</button>" : "" }) + '<div class="ad-scroll">' + tabs() + '<div class="ad-f">' +
+          (wr ? '<div class="ad-2">' + fl(T("Art", "Type"), seg("kind", [["story", T("Kapitel", "Chapter")], ["short", T("Kurztext", "Short text")]], "story")) + fl(T("Kapitel", "Chapter"), '<input class="ad-in" name="chapter" inputmode="numeric" maxlength="3">', "", " data-chf") + "</div>" +
+              fl(T("Serie", "Series"), seriesList.length ? seg("series", seriesList.map(function (s) { return [String(s.id), s.title_de]; }), "") : '<small class="ad-empty" style="display:block;padding:6px 0;text-align:left">' + T("Noch keine Serie – lege zuerst eine an.", "No series yet – create one first.") + "</small>", "", " data-serf") : "") +
+          fl(T("Titel", "Title"), '<input class="ad-in big" name="title" maxlength="' + (wr ? 120 : 80) + '">') +
+          fl(T("Adresse", "Address"), '<input class="ad-in" name="slug" maxlength="80" spellcheck="false" autocapitalize="off">', wr ? "nwebnotfound.dev/writing/…" : "nwebnotfound.dev/writing/series/…") +
+          (wr ? md("body", T("Text", "Text"), false) + fl("Tags", '<input class="ad-in" name="tags" maxlength="250" placeholder="' + T("Komma-getrennt, max. 8", "comma-separated, max 8") + '">') :
+            fl("Status", seg("status", [["live", "live"], ["draft", T("Entwurf", "draft")]], "live"))) +
+          (isNew ? "" : danger(wr ? T("Nur dieser Text; die Serie bleibt.", "Only this text; the series stays.") : T("Nur die Serie, wenn sie keine Kapitel mehr hat.", "Only the series, once it has no chapters left."))) + "</div></div>");
+        if (wr) mdBody = wireMd($('[data-md="body"]'), function () { onInput(); });
+      };
+      var tagsIn = function (j) { try { return JSON.parse(j || "[]").join(", "); } catch (e) { return ""; } };
+      var tagsOut = function (s) { return JSON.stringify(String(s || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean)); };
+      var read = function () {
+        work["title_" + L] = $('[name="title"]').value; work.slug = $('[name="slug"]').value.trim();
+        if (wr) { work["body_" + L] = mdBody.get(); work.kind = segVal($('[data-seg="kind"]')) || "story"; var sb = $('[data-seg="series"]');
+          work.series_id = work.kind === "story" && sb && segVal(sb) ? +segVal(sb) : null; work.chapter = work.kind === "story" ? (parseInt($('[name="chapter"]').value, 10) || null) : null; work.tags = tagsOut($('[name="tags"]').value); }
+        else work.status = segVal($('[data-seg="status"]'));
+      };
+      var show = function () {
+        $('[name="title"]').value = work["title_" + L] || ""; $('[name="slug"]').value = work.slug || "";
+        if (wr) { mdBody.set(work["body_" + L] || ""); setSeg($('[data-seg="kind"]'), work.kind); var sb = $('[data-seg="series"]'); if (sb) setSeg(sb, work.series_id == null ? "" : String(work.series_id));
+          $('[name="chapter"]').value = work.chapter || ""; $("[data-chf]").hidden = work.kind !== "story"; $("[data-serf]").hidden = work.kind !== "story"; $('[name="tags"]').value = tagsIn(work.tags); }
+        else setSeg($('[data-seg="status"]'), work.status);
+        $("[data-enmiss]").hidden = !!work.title_en;
+        $("[data-pill]").innerHTML = pill(!wr ? (work.status === "live" ? "live" : "draft") : item.status === "live" ? "live" : item.status === "archived" ? "off" : "draft");
+        $("[data-primary]").textContent = !wr ? (isNew ? T("Anlegen", "Create") : T("Aktualisieren", "Update")) : item.status === "live" ? T("Aktualisieren", "Update") : T("Veröffentlichen", "Publish");
+        var wd = $("[data-withdraw]"); if (wd) wd.hidden = item.status !== "live";
+      };
+      var dirty = function () { return !!item && !same(work, item); };
+      var auto = function () { return wr && item.status === "draft"; };
+      var onInput = function () {
+        if (!item) return;
+        read();
+        if (isNew && !slugTouched) { work.slug = slugify(work.title_de); $('[name="slug"]').value = work.slug; }
+        store.set(pick(work)); $("[data-enmiss]").hidden = !!work.title_en;
+        if (wr) { $("[data-chf]").hidden = work.kind !== "story"; $("[data-serf]").hidden = work.kind !== "story"; }
+        if (!dirty()) { saveState(isNew ? "dirty" : auto() ? "auto" : "saved", item.updated_at); return; }
+        saveState("dirty");
+        if (auto() && work.title_de && work.slug && (work.kind === "short" || (work.series_id && work.chapter))) { clearTimeout(t); t = setTimeout(function () { save(false); }, 1500); }
+      };
+      var busy = null, me = null;
+      var alive = function () { return cur === me; };
+      var buttons = function (on) { $$("[data-primary],[data-withdraw]").forEach(function (b) { b.disabled = !on; }); };
+      var save = function (manual, status) {
+        clearTimeout(t);
+        var run = function () { busy = doSave(manual, status).then(function (ok) { busy = null; if (alive()) buttons(true); return ok; }, function () { busy = null; if (alive()) buttons(true); return false; }); return busy; };
+        if (busy) return busy.then(function () { return alive() || !manual ? run() : false; });
+        return run();
+      };
+      var doSave = function (manual, status) {
+        if (alive()) { fieldErr(null); read(); buttons(false); }
+        if (!isNew && !status && same(work, item)) { saveState(auto() ? "auto" : "saved", item.updated_at); return Promise.resolve(true); }
+        var body = pick(work); if (status) body.status = status; var sent = pick(work);
+        saveState("ing");
+        var req = isNew ? call("POST", "/" + k, body) : call("PATCH", "/" + k + "/" + item.id, Object.assign(body, { version: item.version }));
+        return req.then(function (r) {
+          if (r.s === 200 || r.s === 201) stale();
+          if (!alive()) { if (r.s === 200 || r.s === 201) { item = r.j.item; isNew = false; store.clear(); } return r.s === 200 || r.s === 201; }
+          if (r.s === 200 || r.s === 201) {
+            read(); var now = pick(work); item = r.j.item; store.clear();
+            work = Object.assign({}, item); FIELDS.forEach(function (f) { if (f !== "status" && now[f] !== sent[f]) work[f] = now[f]; });
+            if (isNew) { isNew = false; slugTouched = true; idv = String(item.id); store = local(k + "." + idv); setAddr(k + "/" + item.id); var pb = $("[data-pv]"); if (pb) pb.hidden = false; }
+            show(); saveState(dirty() ? "dirty" : auto() && !manual ? "auto" : "saved", item.updated_at); return true;
+          }
+          if (r.s === 409) { saveState("err"); banner(T("In einem anderen Tab geändert.", "Changed in another tab."), T("Neu laden", "Reload"), function () { store.clear(); editText(k, idv); }); return false; }
+          saveState("err"); if (r.s === 400) fieldErr(r.j.fields || []); else if (r.s === 413) toast("err", T("Zu lang zum Speichern", "Too long to save")); else toast("err", T("Nicht gespeichert", "Not saved")); return false;
+        });
+      };
+      var publish = function () {
+        if (busy) return busy;
+        if (!wr) { var created = isNew; return save(true).then(function (ok) { if (ok) toast("ok", created ? T("Angelegt", "Created") : T("Aktualisiert", "Updated")); }); }
+        var wasLive = item.status === "live";
+        return save(true, "live").then(function (ok) { if (ok) toast("ok", wasLive ? T("Aktualisiert", "Updated") : T("Veröffentlicht", "Published"), T("Der Text ist jetzt im Texte-Fenster und im Feed.", "The text is now in the Writing window and the feed.")); });
+      };
+      var wire = function () {
+        $$("input", $(".ad-f")).forEach(function (x) { x.addEventListener("input", function () { if (x.name === "slug") slugTouched = true; onInput(); }); });
+        $$("[data-seg]").forEach(function (b) { wireSeg(b, onInput); });
+        $$("[data-lt]").forEach(function (b) { b.onclick = function () { if (work) read(); L = b.getAttribute("data-lt"); $$("[data-lt]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); }); if (work) show(); }; });
+        $("[data-primary]").onclick = publish;
+        var wd = $("[data-withdraw]"); if (wd) wd.onclick = function () { if (busy) return; save(true, "draft").then(function (ok) { if (ok) toast("ok", T("Zurückgezogen", "Withdrawn"), T("Der Text ist offline, als Entwurf.", "The text is offline, as a draft.")); }); };
+        $("[data-back]").onclick = function () { open("writing"); };
+        var pvb = $("[data-pv]"); if (pvb) pvb.onclick = function () { go((en ? "/en" : "") + (item.series_id ? "/writing/" + ((seriesList.filter(function (s) { return s.id === item.series_id; })[0] || {}).slug || "") + "/" + item.chapter : "/writing/" + item.slug)); };
+        var del = $("[data-del]"); if (del) del.onclick = function () {
+          NwebOS.ask({ title: wr ? T("Text löschen?", "Delete this text?") : T("Serie löschen?", "Delete this series?"), text: T("„" + item.title_de + "“ wird gelöscht. Das geht nicht rückgängig.", "“" + item.title_de + "” is deleted. This can't be undone.") + (wr ? T(" Tipp: „Zurückziehen“ nimmt ihn nur offline.", " Tip: “Withdraw” only takes it offline.") : ""), yes: T("Endgültig löschen", "Delete for good"), no: T("Behalten", "Keep"), danger: true, stack: true, icon: spr("c-del", 48) })
+            .then(function (ok) { if (!ok) return; call("DELETE", "/" + k + "/" + item.id).then(function (r) { if (r.s === 200) { stale(); store.clear(); toast("ok", T("Gelöscht", "Deleted")); open("writing"); } else toast("err", r.s === 409 ? T("Die Serie hat noch Kapitel.", "The series still has chapters.") : T("Nicht gelöscht", "Not deleted")); }); });
+        };
+      };
+      me = cur = { dirty: dirty, save: function () { return save(true); }, publish: publish, back: function () { open("writing"); }, localOnly: true,
+        stop: function () { clearTimeout(t); }, flush: function () { if (item && auto() && dirty() && !isNew) save(false); } };
+      var start = function (it) {
+        item = it; work = Object.assign({}, it);
+        form(); wire();
+        var ld = store.get();
+        show(); saveState(isNew ? "dirty" : auto() ? "auto" : "saved", item.updated_at);
+        if (ld && ld.data && !same(Object.assign({}, item, ld.data), item)) banner(T("Ungespeicherte Änderungen von ", "Unsaved changes from ") + hm(ld.at) + ".", T("Wiederherstellen", "Restore"), function () { work = Object.assign({}, item, ld.data); show(); onInput(); var b = $(".ad-banner"); if (b) b.remove(); });
+      };
+      frame("writing", '<div class="ad-scroll"><p class="ad-empty">' + T("Lädt …", "Loading …") + "</p></div>");
+      var p = wr ? call("GET", "/series").then(function (r) { seriesList = r.s === 200 ? r.j.items || [] : []; }) : Promise.resolve();
+      p.then(function () {
+        if (cur !== me) return;
+        if (isNew) { var b = Object.assign({}, blank); if (wr && seriesList.length) b.series_id = seriesList[0].id; return start(b); }
+        call("GET", "/" + k + "/" + idv).then(function (r) { if (cur !== me) return; if (r.s === 200) start(r.j.item); else frame("writing", '<div class="ad-scroll"><p class="ad-err">' + T("Nicht gefunden", "Not found") + "</p></div>"); });
       });
     }
 

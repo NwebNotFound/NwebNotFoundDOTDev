@@ -84,7 +84,7 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   // one retry when the pooled keep-alive socket was already closed by wrangler (long browser runs in between with no
   // requests from here; CI: "fetch failed", cause write EPIPE). The request never left, so nothing runs twice.
   const go = () => fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" });
-  const r = await go().catch((e) => (/EPIPE|ECONNRESET|UND_ERR_SOCKET|other side closed/.test(String(e?.cause?.code || e?.cause?.message || e?.cause)) ? go() : Promise.reject(e))); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
+  const r = await go().catch((e) => (/EPIPE|ECONNRESET|ECONNABORTED|UND_ERR_SOCKET|other side closed/.test(String(e?.cause?.code || e?.cause?.message || e?.cause)) ? go() : Promise.reject(e))); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
 };
 const TS_OK = "XXXX.DUMMY.TOKEN.XXXX"; // Turnstile test secret: every token passes
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
@@ -1439,7 +1439,7 @@ try {
   // the guard sees the full forms only with start data (an empty table shows "Startdaten fehlen"): one row each, removed after
   sql("INSERT INTO projects (sort, status, progress, href, icon, title_de, text_de, version, updated_at) VALUES (1, 'live', 10, '/about', 'about', 'Guard-Projekt', 'x', 1, 0)");
   sql("INSERT INTO changelog (day, area, title_de, text_de, status, sort, version, updated_at) VALUES ('2026-11-01', 'website', 'Guard-Neuigkeit', 'x', 'live', 0, 1, 0)");
-  process.env.GUARD_ROUTES = "/admin,/admin/home,/admin/projects,/admin/projects/new,/admin/changelog,/admin/changelog/new,/admin/guestbook,/about"; process.env.GUARD_WHO = "signed-in";
+  process.env.GUARD_ROUTES = "/admin,/admin/home,/admin/projects,/admin/projects/new,/admin/changelog,/admin/changelog/new,/admin/guestbook,/admin/writing,/admin/writing/new,/admin/series/new,/about"; process.env.GUARD_WHO = "signed-in";
   py("NwebOS-Stil-Wächter Verwaltung (Tippflächen) fehlgeschlagen", "scripts/nwebos-guard-ui.py", BASE, c1);
   delete process.env.GUARD_ROUTES; delete process.env.GUARD_WHO;
   sql("DELETE FROM projects WHERE title_de = 'Guard-Projekt'"); sql("DELETE FROM changelog WHERE title_de = 'Guard-Neuigkeit'");
