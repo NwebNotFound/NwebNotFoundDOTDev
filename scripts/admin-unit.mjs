@@ -96,7 +96,7 @@ if (sqlite) {
   // news: drafts are not public; publish -> live in siteData (purged at once), withdraw -> draft again
   const n1 = await call("POST", "/api/admin/changelog", { body: { day: "2026-11-08", area: "website", title_de: "Verwaltung", text_de: "Neu." } });
   purgeSite(); let sd = await siteData(env, clock);
-  assert.deepEqual(sd.changelog, [], "a draft is not public, but the table is no longer empty (no fallback)");
+  assert.equal(sd.changelog, null, "only a draft: the window keeps SITE_LOG (a first draft must not empty it)");
   const pub = await call("POST", `/api/admin/changelog/${n1.j.item.id}/publish`, { body: { version: 1 } });
   assert.equal(pub.j.item.status, "live");
   sd = await siteData(env, clock);
@@ -104,6 +104,14 @@ if (sqlite) {
   assert.equal((await call("POST", `/api/admin/changelog/${n1.j.item.id}/withdraw`, { body: { version: 1 } })).s, 409, "withdraw with the old version");
   sd = await siteData(env, clock + 1000);
   assert.equal(sd.projects[0].title_de, "Eins");
+  // going live is logged however it is sent: PATCH status, or created straight as live; withdraw via PATCH too
+  const pubs = () => db.prepare("SELECT action FROM admin_log WHERE section = 'changelog' ORDER BY id").all().map((r) => r.action).join(",");
+  const n2 = await call("POST", "/api/admin/changelog", { body: { day: "2026-11-07", area: "blog", title_de: "Zwei", status: "draft" } });
+  await call("PATCH", `/api/admin/changelog/${n2.j.item.id}`, { body: { status: "live", version: 1 } });
+  await call("PATCH", `/api/admin/changelog/${n2.j.item.id}`, { body: { status: "draft", version: 2 } });
+  await call("POST", "/api/admin/changelog", { body: { day: "2026-11-06", area: "blog", title_de: "Drei", status: "live" } });
+  await call("PATCH", `/api/admin/changelog/${n2.j.item.id}`, { body: { text_de: "nur Text", version: 3 } });
+  assert.equal(pubs(), "publish,publish,withdraw,publish", "publish (URL), publish + withdraw (PATCH status), publish (created live); a text save adds nothing");
 
   // text blocks: create needs version 0, then each save the current version
   const h0 = await call("GET", "/api/admin/home");
@@ -129,6 +137,8 @@ if (sqlite) {
   assert.equal(gb.j.items[0].message, "spam");
   assert.equal((await call("POST", `/api/admin/guestbook/${spam}/unhide`)).s, 200);
   assert.equal((await call("DELETE", `/api/admin/guestbook/${spam}`)).s, 200);
+  const gdel = JSON.parse(db.prepare("SELECT before_json FROM admin_log WHERE section = 'guestbook' AND action = 'delete'").get().before_json);
+  assert.ok(!("message" in gdel) && !("discord_id" in gdel) && !("name" in gdel) && gdel.id === spam, "a deleted entry leaves no message or Discord id in admin_log");
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM entries").get().n, 1);
   assert.equal((await call("GET", "/api/admin/guestbook?filter=x")).s, 400);
 

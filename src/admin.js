@@ -80,7 +80,7 @@ export function cleanNews(b) {
 let SITE = null;
 export const SITE_TTL_MS = 60000;
 export function purgeSite() { SITE = null; }
-/** { blocks: { key: { lang: data } }, projects: rows | null, changelog: live rows | null }. null = table empty or
+/** { blocks: { key: { lang: data } }, projects: rows | null, changelog: live rows | null }. null = no (live) rows or table
  *  missing (before migration 0019 / the seed): the windows use their code fallback. */
 export function siteData(env, now = Date.now()) {
   if (SITE && now - SITE.at < SITE_TTL_MS) return SITE.p;
@@ -92,7 +92,7 @@ export function siteData(env, now = Date.now()) {
     const blocks = {};
     for (const r of b.results || []) { try { (blocks[r.key] ||= {})[r.lang] = JSON.parse(r.json); } catch { /* skip a broken row */ } }
     const news = cl.results || [];
-    return { blocks, projects: (pr.results || []).length ? pr.results : null, changelog: news.length ? news.filter((r) => r.status === "live") : null };
+    return { blocks, projects: (pr.results || []).length ? pr.results : null, changelog: news.some((r) => r.status === "live") ? news.filter((r) => r.status === "live") : null };
   }).catch(() => ({ blocks: {}, projects: null, changelog: null }));
   SITE = { at: now, p };
   return p;
@@ -101,7 +101,7 @@ export function siteData(env, now = Date.now()) {
 // ---------------- the router ----------------
 const SECTIONS = {
   projects: { table: "projects", cols: ["sort", "status", "progress", "href", "icon", "title_de", "title_en", "text_de", "text_en"], clean: cleanProject, order: "sort, id" },
-  changelog: { table: "changelog", cols: ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"], clean: cleanNews, order: "day DESC, sort, id" },
+  changelog: { publish: true, table: "changelog", cols: ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"], clean: cleanNews, order: "day DESC, sort, id" },
 };
 const ROUTE = /^\/api\/admin\/(home|projects|changelog|guestbook)(?:\/([a-z0-9.]{1,40}))?(?:\/(publish|withdraw|hide|unhide))?$/;
 export const ADMIN_RATE = { max: 120, windowMs: 60000 };
@@ -170,6 +170,7 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
       if (name === "projects" && r.b.sort == null) c.val.sort = ((await env.DB.prepare("SELECT MAX(sort) AS m FROM projects").first())?.m ?? 0) + 1;
       const [ins] = logWrites("admin-" + name, await env.DB.batch([env.DB.prepare(`INSERT INTO ${S.table} (${S.cols.join(", ")}, version, updated_at) VALUES (${S.cols.map(() => "?").join(", ")}, 1, ?) RETURNING *`).bind(...S.cols.map((k) => c.val[k]), now)]));
       const row = ins.results[0];
+      if (S.publish && row.status === "live") logWrites("admin-" + name, await log(env, who, name, row.id, "publish", null, now).run());   // created straight to live
       purgeSite();
       return out({ ok: true, item: row }, 201);
     }
@@ -195,7 +196,8 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
     const c = S.clean(merged); if (c.err) return out({ error: "invalid", fields: c.err }, 400);
     if (S.cols.every((k) => c.val[k] === cur[k])) return out({ ok: true, item: cur, unchanged: true });   // nothing to write
     const upd = env.DB.prepare(`UPDATE ${S.table} SET ${S.cols.map((k) => `${k} = ?`).join(", ")}, version = version + 1, updated_at = ? WHERE id = ? AND version = ?`).bind(...S.cols.map((k) => c.val[k]), now, +id, cur.version);
-    const [res] = logWrites("admin-" + name, await env.DB.batch(action ? [upd, log(env, who, name, id, action, cur, now)] : [upd]));
+    const vis = S.publish && c.val.status !== cur.status ? (c.val.status === "live" ? "publish" : "withdraw") : null;   // going live or offline is logged however it is sent
+    const [res] = logWrites("admin-" + name, await env.DB.batch(vis ? [upd, log(env, who, name, id, vis, cur, now)] : [upd]));
     if (!res.meta?.changes) return out({ error: "conflict", item: await one(+id) }, 409);
     purgeSite();
     return out({ ok: true, item: { ...cur, ...c.val, version: cur.version + 1, updated_at: now } });
@@ -223,7 +225,7 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
       return out({ ok: true, hidden: h });
     }
     if (req.method === "DELETE" && !action) {
-      logWrites("admin-guestbook", await env.DB.batch([env.DB.prepare("DELETE FROM entries WHERE id = ?").bind(+id), log(env, who, "guestbook", id, "delete", cur, now)]));
+      logWrites("admin-guestbook", await env.DB.batch([env.DB.prepare("DELETE FROM entries WHERE id = ?").bind(+id), log(env, who, "guestbook", id, "delete", { id: cur.id, created_at: cur.created_at, hidden: cur.hidden, reported: cur.reported }, now)]));
       return out({ ok: true });
     }
     return out({ error: "method_not_allowed" }, 405);
