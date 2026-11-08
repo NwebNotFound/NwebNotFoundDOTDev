@@ -31,7 +31,30 @@
     sc.addEventListener("scroll", upd, { passive: true }); upd();
     if (rd.classList.contains("rbook") && document.documentElement.hasAttribute("data-night")) { rd.classList.add("npaper"); var pb = $("[data-paper]", rd); if (pb) pb.setAttribute("aria-pressed", "true"); }
   }
-  function initWin(w) { $$(".rd", w).forEach(initReader); }
+  function initWin(w) { $$(".rd", w).forEach(initReader); $$("[data-p3]", w).forEach(initProfile); }
+
+  /* ---------- Mein Profil v3: switches show this device's settings, the guest-stats card, the secret badge ---------- */
+  var GUEST = [["mines", "nwebos.mines.stats.guest"], ["five", "nwebos.five.stats.guest"]];
+  function guestStats() { var o = {}; GUEST.forEach(function (g) { try { var v = JSON.parse(localStorage.getItem(g[1])); if (v && v.played > 0) o[g[0]] = v; } catch (e) {} }); return o; }
+  function initProfile(root) {
+    var pr = window.NwebOS && NwebOS.prefs ? NwebOS.prefs() : null;
+    if (pr) {
+      $$("[data-p3-pref]", root).forEach(function (s) { s.setAttribute("aria-checked", String(!!pr[s.dataset.p3Pref])); });
+      $$("[data-p3-theme]", root).forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.p3Theme === pr.theme)); });
+    }
+    var gs = guestStats(), card = $("[data-p3-merge]", root);
+    if (card && (gs.mines || gs.five)) {
+      var parts = []; if (gs.five) parts.push(gs.five.played + T(gs.five.played === 1 ? " Runde Fünf" : " Runden Fünf", gs.five.played === 1 ? " round of Fünf" : " rounds of Fünf"));
+      if (gs.mines) parts.push(gs.mines.played + T(gs.mines.played === 1 ? " Runde Pixelminen" : " Runden Pixelminen", gs.mines.played === 1 ? " round of Pixel Mines" : " rounds of Pixel Mines"));
+      $("[data-p3-merge-text]", card).textContent = T("Du hast vor dem Anmelden ", "Before signing in you played ") + parts.join(T(" und ", " and ")) + T(" gespielt. Sollen sie zu deinem Konto?", ". Add them to your account?");
+      card.hidden = false;
+    }
+    /* the secret badge: night theme on, signed in; the server checks the Berlin clock (once per device and night) */
+    try {
+      var k = "nwebos.p3night." + new Date().toISOString().slice(0, 10);
+      if (document.documentElement.dataset.theme === "summer-night" && !localStorage.getItem(k)) { localStorage.setItem(k, "1"); post("/api/profile/badges/night", {}); }
+    } catch (e) {}
+  }
   new MutationObserver(function (ms) { ms.forEach(function (m) { [].forEach.call(m.addedNodes, function (n) { if (n.classList && n.classList.contains("win")) initWin(n); }); }); }).observe($("#wins"), { childList: true });
   document.addEventListener("nwebos:content", function (e) { initWin(e.detail); });   /* a window got new content (another post) */
 
@@ -39,10 +62,32 @@
     var t = e.target, win = t.closest(".win"), b;
     if ((b = t.closest("[data-pane]"))) {
       var scope = win || document, grp = b.closest("nav, ul") || scope, names = $$("[data-pane]", grp).map(function (x) { return x.dataset.pane; });
-      $$("[data-pane]", grp).forEach(function (x) { x.classList.toggle("on", x === b); });
+      $$("[data-pane]", grp).forEach(function (x) { x.classList.toggle("on", x === b); if (x.getAttribute("role") === "tab") x.setAttribute("aria-selected", String(x === b)); });
+      if (b.getAttribute("role") === "tab" && b.scrollIntoView) b.scrollIntoView({ block: "nearest", inline: "nearest" });
       $$("[data-panel]", scope).filter(function (s) { return names.indexOf(s.dataset.panel) >= 0; }).forEach(function (s) { s.hidden = s.dataset.panel !== b.dataset.pane; });
       return;
     }
+    if ((b = t.closest("[data-p3-tab]"))) { e.preventDefault(); var tb = $('.p3-tabs [data-pane="p3-' + b.dataset.p3Tab + '"]', b.closest("[data-p3]")); if (tb) tb.click(); return; }
+    if ((b = t.closest("[data-p3-pref]"))) {
+      var on = b.getAttribute("aria-checked") !== "true", pr = {}; pr[b.dataset.p3Pref] = on; b.setAttribute("aria-checked", String(on));
+      if (window.NwebOS && NwebOS.setPref) NwebOS.setPref(pr);
+      return;
+    }
+    if ((b = t.closest("[data-p3-theme]"))) {
+      $$("[data-p3-theme]", b.parentElement).forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      if (window.NwebOS && NwebOS.setPref) NwebOS.setPref({ theme: b.dataset.p3Theme });
+      return;
+    }
+    if ((b = t.closest("[data-p3-merge-yes]"))) {
+      var gs = guestStats(), body = { stats: gs, variant: gs.five && gs.five.variant === "en" ? "en" : "de" };
+      b.disabled = true;
+      post("/api/profile/games/merge", body).then(function (r) {
+        if (r.s === 200) { GUEST.forEach(function (g) { try { localStorage.removeItem(g[1]); } catch (e) {} }); if (window.NwebOS && NwebOS.toast) NwebOS.toast("ok", T("Übernommen", "Added"), T("Deine Spiele zählen jetzt für dein Konto.", "Your games now count for your account.")); setTimeout(function () { location.reload(); }, 600); }
+        else { b.disabled = false; if (window.NwebOS && NwebOS.toast) NwebOS.toast("err", T("Nicht übernommen – nochmal versuchen.", "Not added – try again.")); }
+      });
+      return;
+    }
+    if ((b = t.closest("[data-p3-merge-no]"))) { GUEST.forEach(function (g) { try { localStorage.removeItem(g[1]); } catch (e) {} }); var mc = b.closest("[data-p3-merge]"); if (mc) mc.hidden = true; return; }
     if ((b = t.closest(".cats [data-cat]"))) { var bl = b.closest(".bl"); $$(".cats button", bl).forEach(function (x) { x.classList.toggle("on", x === b); }); filter(bl); return; }
     if ((b = t.closest(".tagc [data-tag]"))) { var bl2 = b.closest(".bl"), on = !b.classList.contains("on"); $$(".tagc button", bl2).forEach(function (x) { x.classList.remove("on"); }); b.classList.toggle("on", on); filter(bl2); return; }
     if ((b = t.closest(".arch [data-month]"))) { var bl4 = b.closest(".bl"), on4 = !b.classList.contains("on"); $$(".arch button", bl4).forEach(function (x) { x.classList.remove("on"); x.setAttribute("aria-pressed", "false"); }); b.classList.toggle("on", on4); b.setAttribute("aria-pressed", String(on4)); filter(bl4); return; }
@@ -84,7 +129,7 @@
     if ((b = t.closest("[data-pf-delete]"))) {   /* phone audit A3: a danger sheet, not window.confirm() */
       var go = function () { post("/api/profile/delete", { confirm: "delete" }).then(function (r) { if (r.s === 200) { try { sessionStorage.setItem("nwebos.deleted", "1"); } catch (e) {} location.href = EN ? "/en" : "/"; } else if (window.NwebOS) NwebOS.toast("err", T("Nicht gelöscht – nochmal versuchen.", "Not deleted – try again.")); }); };
       if (!(window.NwebOS && NwebOS.ask)) { if (confirm(T("Wirklich alle deine Gästebuch-Einträge, deinen Lesefortschritt, deine Reaktionen und Sitzungen löschen?", "Really delete all your guestbook entries, reading progress, reactions and sessions?"))) go(); return; }
-      NwebOS.ask({ title: T("Alle deine Daten löschen?", "Delete all your data?"), text: T("Deine Gästebuch-Einträge, dein Lesefortschritt, deine Reaktionen und alle Anmeldungen werden gelöscht. Das geht nicht rückgängig.", "Your guestbook entries, reading progress, reactions and all sessions are deleted. This can’t be undone."), yes: T("Ja, alles löschen", "Yes, delete everything"), no: T("Behalten", "Keep my data"), danger: true, stack: true })
+      NwebOS.ask({ title: T("Alle deine Daten löschen?", "Delete all your data?"), text: T("Deine Gästebuch-Einträge, dein Lesefortschritt, deine Reaktionen, Spiele-Werte, Abzeichen, Einstellungen und alle Anmeldungen werden gelöscht. Das geht nicht rückgängig.", "Your guestbook entries, reading progress, reactions, game stats, badges, settings and all sessions are deleted. This can’t be undone."), yes: T("Ja, alles löschen", "Yes, delete everything"), no: T("Behalten", "Keep my data"), danger: true, stack: true })
         .then(function (ok) { if (ok) go(); });
       return;
     }

@@ -50,6 +50,13 @@
     l.id = "nwebos-games-css"; l.rel = "stylesheet"; l.href = "/design/nwebos-games.css?v=" + ver;
     document.head.appendChild(l);
   }
+  /* profile v3: a finished game goes to the account when signed in; signed out it is also counted in "stats.guest"
+     (same shape), which the profile offers to merge after the next sign-in */
+  function signedIn() { try { return !!(window.__me && window.__me.user) && localStorage.getItem("nwebos.user") !== "gast"; } catch (e) { return false; } }
+  function record(ctx, run, guestAdd) {
+    if (signedIn()) { fetch("/api/profile/games/run", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(run) }).catch(function () {}); return; }
+    var g = load(ctx, "stats.guest", {}); guestAdd(g); ctx.store.set("stats.guest", JSON.stringify(g));
+  }
   function load(ctx, name, fb) { try { return JSON.parse(ctx.store.get(name)) || fb; } catch (e) { return fb; } }
   function pad3(n) { return String(Math.max(0, Math.min(999, n))).padStart(3, "0"); }
   function lang(ctx) { return ctx.lang === "en" ? "en" : "de"; }
@@ -103,6 +110,7 @@
       var s = load(ctx, "stats", {}); s.played = (s.played || 0) + 1;
       if (good) { s.won = (s.won || 0) + 1; if (!s.best || secs < s.best) s.best = secs; }
       ctx.store.set("stats", JSON.stringify(s));
+      record(ctx, { game: "mines", variant: "9x9", won: good, time_s: good ? secs : null }, function (g) { g.played = (g.played || 0) + 1; if (good) { g.won = (g.won || 0) + 1; if (!g.best || secs < g.best) g.best = secs; } });
       if (!good) { cells[j].boom = true; cells.forEach(function (c, k) { if (c.mine && !c.flag) { c.show = true; paint(k); } }); paint(j); }
       face.className = "face " + (good ? "cool" : "dead"); st.textContent = good ? t.won + " " + secs + " s" : t.lost; showStats();
       if (good) { ctx.sound.tone(660, 0, .12, "square", .08); ctx.sound.tone(880, .12, .12, "square", .08); ctx.sound.tone(1175, .24, .2, "square", .08); }
@@ -192,7 +200,9 @@
       done = true;
       var s = load(ctx, "stats", {}); s.played = (s.played || 0) + 1;
       if (good) { s.won = (s.won || 0) + 1; s.streak = (s.streak || 0) + 1; if (s.streak > (s.best || 0)) s.best = s.streak; } else s.streak = 0;
+      if (good) { s.dist = (s.dist || [0, 0, 0, 0, 0, 0]).slice(0, 6); s.dist[row] = (s.dist[row] || 0) + 1; }   /* guesses to solve (profile v3) */
       ctx.store.set("stats", JSON.stringify(s)); showStats();
+      record(ctx, { game: "five", variant: L, won: good, guesses: good ? row + 1 : null }, function (g) { g.played = (g.played || 0) + 1; if (good) { g.won = (g.won || 0) + 1; g.streak = (g.streak || 0) + 1; if (g.streak > (g.best || 0)) g.best = g.streak; g.dist = (g.dist || [0, 0, 0, 0, 0, 0]).slice(0, 6); g.dist[row] = (g.dist[row] || 0) + 1; } else g.streak = 0; g.variant = L; });
       say(good ? t.got : t.was + ans);
       if (good) { ctx.sound.tone(660, 0, .12, "square", .08); ctx.sound.tone(880, .12, .12, "square", .08); ctx.sound.tone(1175, .24, .2, "square", .08); }
     }
