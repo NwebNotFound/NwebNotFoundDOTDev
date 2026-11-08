@@ -265,3 +265,12 @@
 @media (max-width:700px){
  .ed .tabs button,.edl .lfil button,.edl .xtbl td.acts .xpbtn,.edl .xpbtn{min-height:44px}
 }
+/* #123 Design QA r2: the last small tap areas and two day contrasts */
+.toast .xpbtn{min-height:44px}
+.cover .new{background:#c4302a}                                  /* "Neu" white on red >= 4.5:1 */
+.st.live{color:#23711f}[data-theme=summer-night] .st.live{color:#7fdc6a}   /* "live" day >= 4.5:1 */
+@media (max-width:700px){
+ .pf .dash .seg a{display:inline-grid;place-items:center;min-height:44px;min-width:44px;padding:0 12px}
+ .pf .dash .xpbtn{min-height:44px}
+ .props dd a{min-height:44px;min-width:44px}
+}
