@@ -1464,6 +1464,6 @@ try {
   py("Turnstile-Challenge-Ablauf fehlgeschlagen", "scripts/turnstile-ui.py", BASE);
   py("UI-Prüfung fehlgeschlagen", "scripts/e2e_ui.py", BASE, c1);
 
-} catch (e) { fail++; console.log("Fehler:", e.stack); console.log(wdTail()); }
+} catch (e) { fail++; console.log("Fehler:", e.stack, e.cause ? " | Ursache: " + (e.cause.stack || e.cause) : "", " | wrangler:", wd.exitCode == null ? "läuft" : "beendet " + wd.exitCode + " " + (wd.signalCode || "")); console.log(wdTail()); }
 console.log(`\n${pass} bestanden, ${fail} fehlgeschlagen`);
 process.exit(fail ? 1 : 0);
