@@ -14,6 +14,10 @@
   "workers_dev": false,
   "preview_urls": false,
   // Retired: ai.nwebnotfound.dev is detached. To restore, re-add "routes": [{ "pattern": "ai.nwebnotfound.dev", "custom_domain": true }].
+  // The origin side is NOT retired by this: the hermes.nwebnotfound.dev tunnel, the origin proxy and
+  // the AIPanel_* scheduled tasks keep running until they are stopped, the tunnel DNS route is removed
+  // and PANEL_SECRET, the gateway keys and the dashboard token are rotated. See README.md
+  // "Retiring the origin side". PANEL_HOST / HERMES_ORIGIN below still name the live hosts.
   "observability": {
     "enabled": true
   },

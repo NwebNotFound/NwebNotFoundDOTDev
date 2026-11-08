@@ -21,7 +21,10 @@ The panel Worker must reach the Hermes gateway (`127.0.0.1:8642`) and the dashbo
   client cannot smuggle its own credential through,
 - rewrites `Host` to `127.0.0.1:9119` for dashboard routes (the dashboard's loopback bind only
   accepts loopback `Host` values),
-- maps `/gw/*` → `127.0.0.1:8642` and `/dash/*` → `127.0.0.1:9119`.
+- maps `/gw/*` → `127.0.0.1:8642` and `/dash/*` → `127.0.0.1:9119`, but only for the
+  method + path pairs the Worker calls (`ROUTES` in `proxy.mjs`): anything else is 404/405
+  before a credential is attached, and non-canonical paths (`%`, `//`, `.`/`..` segments,
+  characters outside `[A-Za-z0-9/_.-]`) are 400.
 
 Without that header the tunnel hostname is useless to anyone who finds it.
 
