@@ -40,8 +40,8 @@ export const APPS = [
   { k: "guestbook", path: "/guestbook", de: "Gästebuch", en: "Guestbook", w: 460, h: 420, win: true, inline: true },
   { k: "minecraft", path: "", de: "Minecraft-Server", en: "Minecraft server", href: `https://${MC_HOST}/` },
   { k: "trash", path: "/trash", de: "Papierkorb", en: "Recycle bin", w: 560, h: 340, x: 520, y: 220, win: true, inline: true },
-  { k: "mines", path: "", de: "Pixelminen", en: "Pixel Mines", w: 300, h: 456, x: 560, y: 60, win: true, inline: true, module: "/design/nwebos-games.js" },
-  { k: "five", path: "", de: "Fünf", en: "Five", w: 340, h: 580, x: 880, y: 30, win: true, inline: true, module: "/design/nwebos-games.js" },
+  { k: "mines", path: "", de: "Pixelminen", en: "Pixel Mines", w: 300, h: 528, x: 560, y: 60, win: true, inline: true, module: "/design/nwebos-games.js" },
+  { k: "five", path: "", de: "Fünf", en: "Five", w: 340, h: 600, x: 880, y: 30, win: true, inline: true, module: "/design/nwebos-games.js" },
 ];
 /** Windows without a desktop icon: opened from links, the start menu or their address. `re` matches the bare path. */
 export const EXTRA = [
@@ -61,7 +61,7 @@ export const OS_PATHS = ["/", ...ALL.filter((a) => a.path).map((a) => a.path)];
 const T = {
   de: {
     skip: "Zum Inhalt springen", boot: "Klick oder Taste zum Überspringen", edition: "Sommer Edition",
-    loginHint: "Klick auf deinen Namen, um anzufangen.", viaDiscord: "über Discord angemeldet", signIn: "Mit Discord anmelden", signInSub: "Name und Avatar im Gästebuch",
+    loginHint: "Klick auf deinen Namen, um anzufangen.", loginHintT: "Tipp auf deinen Namen, um anzufangen.", offSubT: "(oder einfach tippen, dann geht's weiter)", viaDiscord: "über Discord angemeldet", signIn: "Mit Discord anmelden", signInSub: "Name und Avatar im Gästebuch",
     guest: "Gast", guestSub: "ohne Anmeldung umsehen", loginFoot: "Nach dem Anmelden kannst du Fenster ziehen, schließen und stapeln.",
     search: "Suchen", searchPh: "Suchen: Apps, Blog, Wiki …", noHit: "Nichts gefunden für", newTab: "neuer Tab",
     desktop: "Desktop", openWins: "Offene Fenster", start: "Startmenü", lang: "Sprache", theme: "Tag oder Nacht", sound: "Ton an oder aus",
@@ -73,7 +73,7 @@ const T = {
   },
   en: {
     skip: "Skip to content", boot: "Click or press a key to skip", edition: "Summer Edition",
-    loginHint: "Click your name to begin.", viaDiscord: "signed in with Discord", signIn: "Sign in with Discord", signInSub: "name and avatar in the guestbook",
+    loginHint: "Click your name to begin.", loginHintT: "Tap your name to start.", offSubT: "(or tap, and it starts again)", viaDiscord: "signed in with Discord", signIn: "Sign in with Discord", signInSub: "name and avatar in the guestbook",
     guest: "Guest", guestSub: "look around without signing in", loginFoot: "Once you're in, drag, close and stack windows.",
     search: "Search", searchPh: "Search: apps, blog, wiki …", noHit: "Nothing found for", newTab: "new tab",
     desktop: "Desktop", openWins: "Open windows", start: "Start menu", lang: "Language", theme: "Day or night", sound: "Sound on or off",
@@ -179,18 +179,19 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
 <html lang="${lang}" class="no-js nwebos"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="description" content="${esc(t.desc)}"><link rel="canonical" href="${alt(lang)}">
 <link rel="alternate" hreflang="${lang}" href="${alt(lang)}"><link rel="alternate" hreflang="${other}" href="${alt(other)}">
+<link rel="alternate" type="application/rss+xml" title="Blog · NwebNotFound" href="/blog/feed.xml"><link rel="alternate" type="application/rss+xml" title="${lang === "en" ? "What's new" : "Neuigkeiten"} · NwebNotFound" href="${lang === "en" ? "/en" : ""}/changelog/feed.xml">${path === "/writing" || path.startsWith("/writing/") ? `<link rel="alternate" type="application/rss+xml" title="NwebNotFound – Texte" href="/writing/feed.xml">` : ""}
 <meta name="theme-color" content="#2463d6"><link rel="icon" href="/favicon.ico">
 <script src="/design/summer-theme.js?v=${AV}"></script><link rel="preload" href="/design/fonts/pixelify-sans-latin-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-polish.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script><script src="/design/nwebos-apps.js?v=${AV}" defer></script></head><body>
+<link rel="stylesheet" href="/design/nwebos.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-apps.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-polish.css?v=${AV}"><link rel="stylesheet" href="/design/nwebos-phone.css?v=${AV}"><script src="/design/nwebos.js?v=${AV}" defer></script><script src="/design/nwebos-apps.js?v=${AV}" defer></script></head><body>
 <a class="skip" href="#apps">${t.skip}</a>
 <div id="boot" class="scr" hidden><div class="bootin"><div class="blogo">${ic("cat", 72)}<span><b>Nweb</b>OS</span></div><small>${t.edition}</small><div class="bbar"><i></i><i></i><i></i></div><p>${t.boot}</p></div><span class="bcopy">© {{Y}} Nils Weberruß</span></div>
-<div id="login" class="scr" hidden role="dialog" aria-modal="true" aria-label="NwebOS"><div class="lgtop"></div><div class="lgmid"><div class="lgl">${ic("cat", 64)}<b><span>Nweb</span>OS</b><p>${t.loginHint}</p></div>
+<div id="login" class="scr" hidden role="dialog" aria-modal="true" aria-label="NwebOS"><div class="lgtop"></div><div class="lgmid"><div class="lgl">${ic("cat", 64)}<b><span>Nweb</span>OS</b><p><span class="ptr-m">${t.loginHint}</span><span class="ptr-t">${t.loginHintT}</span></p></div>
 <ul class="users"><li data-login-me hidden><button type="button" data-user="me"><img data-me-av src="data:," width="56" height="56" alt=""><span><b data-me-name></b><small>${t.viaDiscord}</small></span></button></li>
 <li data-login-discord><a class="ubtn" data-login-link href="/auth/discord/login"><span class="dc">${DISCORD}</span><span><b>${t.signIn}</b><small>${t.signInSub}</small></span></a></li>
 <li><button type="button" data-user="gast"><span class="guest">${ic("about", 40)}</span><span><b>${t.guest}</b><small>${t.guestSub}</small></span></button></li></ul></div>
 <div class="lgbot"><span>NwebOS · ${t.edition}</span><span>${t.loginFoot}</span></div></div>
-<div id="off" class="scr" hidden><div class="offin">${ic("cat", 56)}<p>${t.offText}</p><small>${t.offSub}</small></div></div>
-<div id="desk" hidden><form class="hsearch" role="search"><input id="hq" type="search" placeholder="${t.search} …" aria-label="${t.search}" autocomplete="off"><ul class="results" id="hres" hidden></ul></form><ul class="dicons" aria-label="${t.desktop}">${dicons}</ul><div id="wins"></div>
+<div id="off" class="scr" hidden><div class="offin">${ic("cat", 56)}<p>${t.offText}</p><small><span class="ptr-m">${t.offSub}</span><span class="ptr-t">${t.offSubT}</span></small></div></div>
+<div id="desk" hidden><form class="hsearch" role="search"><div class="fld"><input id="hq" type="search" placeholder="${t.search} …" aria-label="${t.search}" autocomplete="off" enterkeyhint="go" autocapitalize="off" spellcheck="false"><button type="button" class="clr" aria-label="${lang === "en" ? "Clear search" : "Suche leeren"}"><i></i></button></div><button type="button" class="cnl">${lang === "en" ? "Cancel" : "Abbrechen"}</button><ul class="results" id="hres" hidden></ul></form><ul class="dicons" aria-label="${t.desktop}">${dicons}</ul><div id="wins"></div>
 <div id="startm" hidden role="menu" aria-label="${t.start}"><div class="smtop" data-open="profile" title="${lang === "en" ? "My profile" : "Mein Profil"}"><img id="smav" src="data:," width="44" height="44" alt=""><b id="smname">${t.guest}</b></div>
 <div class="smsearch"><input id="smq" type="search" placeholder="${t.searchPh}" aria-label="${t.search}" autocomplete="off"></div><ul class="results" id="smres" hidden></ul>
 <div class="smmid"><ul class="progs">${progs}</ul><ul class="side"><li><a href="${href(lang, "/profile")}" data-open="profile">${ic("profile", 20)}<span>${lang === "en" ? "My profile" : "Mein Profil"}</span></a></li><li><a href="${href(lang, "/changelog")}" data-open="changelog">${ic("changelog", 20)}<span>${lang === "en" ? "What's new" : "Neuigkeiten"}</span></a></li><li><a href="${GITHUB}" rel="noopener"><span>GitHub</span></a></li><li><button type="button" data-egg="about-os"><span>${t.aboutOs}</span></button></li></ul></div>
@@ -199,7 +200,7 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
 <div class="tray"><nav class="lang" data-lang="${lang}" aria-label="${t.lang}"><a href="${esc(href("de", path))}" hreflang="de" lang="de"${lang === "de" ? ' aria-current="true"' : ""}>DE</a><a href="${esc(href("en", path))}" hreflang="en" lang="en"${lang === "en" ? ' aria-current="true"' : ""}>EN</a></nav>
 
 <button id="thm" type="button" aria-label="${t.theme}" aria-pressed="false"><i></i></button><button id="snd" type="button" aria-pressed="true" aria-label="${t.sound}"><svg viewBox="0 0 12 12" width="14" height="14" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="4" width="3" height="4" fill="#fff"/><rect x="4" y="3" width="1" height="6" fill="#fff"/><rect x="5" y="2" width="1" height="8" fill="#fff"/><rect class="w1" x="8" y="4" width="1" height="4" fill="#fff"/><rect class="w2" x="10" y="3" width="1" height="6" fill="#fff"/><rect class="mx" x="7" y="3" width="5" height="1" fill="#ff8a6b" transform="rotate(45 9 6)"/></svg></button><time id="clock"></time></div>
-<nav class="mbar" aria-label="NwebOS"><button type="button" data-home aria-label="${t.home}">${ic("cat", 22)}</button><span id="mtitle">NwebOS</span><button type="button" class="msrch" data-msearch aria-label="${t.search}">${ic2("search")}</button><time id="mclock"></time></nav></footer></div>
+<nav class="mbar" aria-label="NwebOS"><button type="button" data-home aria-label="${t.home}">${ic("cat", 22)}</button><span id="mtitle">NwebOS</span><button type="button" class="msrch" data-msearch aria-label="${t.search}">${ic2("search")}</button><button type="button" class="mme" data-quick aria-haspopup="dialog" aria-label="${lang === "en" ? "Quick menu: account, day/night, language" : "Schnellmenü: Konto, Tag/Nacht, Sprache"}"><i class="mi" aria-hidden="true"></i><time data-qclock></time><img alt="" src="data:," width="30" height="30" data-qav></button><time id="mclock"></time></nav></footer></div>
 <main id="apps">${sections}</main>${tpl}
 <script type="application/json" id="os-l">${JSON.stringify(L).replace(/</g, "\\u003c")}</script>
 <noscript><p class="nojs-note">${t.nojs}</p></noscript>
