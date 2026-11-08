@@ -151,6 +151,7 @@
     e.preventDefault(); e.stopPropagation(); subscribe(b.getAttribute("data-sub"), b.getAttribute("href"));
   }, true);
   window.NwebOS.subscribe = subscribe;
+  window.NwebOS.open = function (url) { return openUrl(url); };   /* modules open other windows by address (the Verwaltung) */
   function ctxFor(k, el) { return { key: k, lang: lang, window: el, sound: { click: function () { sound.click(); }, open: function () { sound.open(); }, close: function () { sound.close(); }, tone: tone },
     store: { get: function (x) { return store.get(k + "." + x); }, set: function (x, v) { store.set(k + "." + x, v); } }, close: function () { close(k); } }; }
   function mount(k, el) {
@@ -190,7 +191,7 @@
   /* ---------- window state in localStorage ---------- */
   function save() {
     var list = [];
-    open.forEach(function (o, k) { if (!APPS[k] || k === "notfound" || k === "blog-edit") return;   /* the editor is admin-only: never restored (Gatekeeper #119) */ list.push({ k: k, p: APPS[k].dataset.path || "", x: parseFloat(o.el.style.getPropertyValue("--x")) || 0, y: parseFloat(o.el.style.getPropertyValue("--y")) || 0, w: o.el.offsetWidth || parseFloat(o.el.style.width), h: o.el.offsetHeight || parseFloat(o.el.style.height), min: o.el.classList.contains("min"), max: o.el.classList.contains("max"), z: +o.el.style.zIndex || 0 }); });
+    open.forEach(function (o, k) { if (!APPS[k] || k === "notfound" || k === "blog-edit" || k === "admin") return;   /* the editor is admin-only: never restored (Gatekeeper #119) */ list.push({ k: k, p: APPS[k].dataset.path || "", x: parseFloat(o.el.style.getPropertyValue("--x")) || 0, y: parseFloat(o.el.style.getPropertyValue("--y")) || 0, w: o.el.offsetWidth || parseFloat(o.el.style.width), h: o.el.offsetHeight || parseFloat(o.el.style.height), min: o.el.classList.contains("min"), max: o.el.classList.contains("max"), z: +o.el.style.zIndex || 0 }); });
     store.set("wins", JSON.stringify(list));
   }
   function saved() { try { return JSON.parse(store.get("wins") || "[]").filter(function (w) { return w && w.k && (APPS[w.k] || w.p); }); } catch (e) { return []; } }
@@ -250,6 +251,7 @@
     el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = Math.min(h, innerHeight - 46) + "px";   /* short laptop screens: the window fits above the taskbar, its content scrolls */
     var ico = opt.icon || icon16(k), tt = esc(opt.title || title(k));
     el.innerHTML = '<header class="wt"><button type="button" class="wb back" aria-label="' + esc(L.back) + '"><span class="wbt">‹</span>' + ic2("back") + '</button>' + ico + '<span class="tt">' + tt + '</span>' +
+      (src && src.dataset.edit ? '<button type="button" class="wb ed" data-editgo="' + esc(src.dataset.edit) + '" aria-label="' + (lang === "en" ? "Edit" : "Bearbeiten") + '">' + '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><use href="' + (L.sprite || "/design/nwebos-icons.svg") + '#i-pen"/></svg>' + '<span>' + (lang === "en" ? "Edit" : "Bearbeiten") + "</span></button>" : "") +
       '<button type="button" class="wb mn" aria-label="' + esc(L.minimize) + '">–</button><button type="button" class="wb mx" aria-label="' + esc(L.maximize) + '">' + ic2("max") + '</button><button type="button" class="wb x" aria-label="' + esc(L.close) + '"><span class="wbt">×</span>' + ic2("close") + '</button></header>' + (opt.menu === false ? '' : '<nav class="wm" aria-hidden="true">' + (L.menu || []).map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</nav>') + '<div class="wc"></div><span class="wr" aria-hidden="true"></span>';
     var wc = $(".wc", el);
     if (src) [].slice.call(src.cloneNode(true).childNodes).forEach(function (n) { if (!(n.classList && n.classList.contains("nojs-h"))) wc.appendChild(n); });
@@ -262,6 +264,7 @@
     el.addEventListener("pointerdown", function () { focus(k, !el.classList.contains("focus") && !!APPS[k]); }, true);
     btn.onclick = function () { sound.click(); if (el.classList.contains("min")) { restore(k); focus(k); } else if (el.classList.contains("focus")) minimize(k); else focus(k); };
     $(".x", el).onclick = function () { close(k); };
+    var edb = $(".wb.ed", el); if (edb) edb.onclick = function () { sound.click(); openUrl(edb.getAttribute("data-editgo")); };   /* opens the Verwaltung at this content */
     $(".back", el).onclick = function () { close(k); };
     $(".mn", el).onclick = function () { minimize(k); };
     var mxb = $(".mx", el), mxSet = function () { var m = el.classList.contains("max"); mxb.setAttribute("aria-label", m ? L.restoreWin : L.maximize); mxb.title = m ? L.restoreWin : ""; mxb.innerHTML = ic2(m ? "restore" : "max"); };
@@ -445,7 +448,7 @@
       '<div class="tiles"><button type="button" class="tile2" data-qtheme aria-pressed="' + n + '"><span>' + (n ? (en ? "Night" : "Nacht") : (en ? "Day" : "Tag")) + "<small>" + (en ? "Tap to switch" : "Tippen zum Wechseln") + '</small></span></button>' +
       '<button type="button" class="tile2" data-qsound aria-pressed="' + (!muted) + '"><span>' + (muted ? (en ? "Sound off" : "Ton aus") : (en ? "Sound on" : "Ton an")) + "<small>" + (en ? "Clicks and start jingle" : "Klicks und Start-Jingle") + "</small></span></button>" +
       '<div class="seg3"><span>' + (en ? "Language" : "Sprache") + '</span><a href="' + escH(path) + '" hreflang="de"' + (en ? "" : ' aria-current="true"') + '>Deutsch</a><a href="' + escH("/en" + (path === "/" ? "" : path)) + '" hreflang="en"' + (en ? ' aria-current="true"' : "") + ">English</a></div></div>" +
-      '<ul class="rows"><li><a href="' + (en ? "/en" : "") + '/changelog" data-qopen>'  + icon16("changelog") + (en ? "What's new" : "Neuigkeiten") + "<em>›</em></a></li>" +
+      '<ul class="rows">' + ($("#adm-q") ? $("#adm-q").innerHTML : "") + '<li><a href="' + (en ? "/en" : "") + '/changelog" data-qopen>'  + icon16("changelog") + (en ? "What's new" : "Neuigkeiten") + "<em>›</em></a></li>" +
       '<li><button type="button" data-qabout>' + icon16("about") + (en ? "About NwebOS" : "Über NwebOS") + "<em>›</em></button></li>" +
       '<li><a href="https://github.com/NwebNotFound" rel="noopener" target="_blank">' + icon16("portfolio") + "GitHub<em>↗</em></a></li></ul>" +
       '<div class="bot">' + (useMe ? '<button type="button" class="xpbtn dz" data-qlogout>' + (en ? "Sign out" : "Abmelden") + "</button>" : '<button type="button" class="xpbtn ghost" data-x>' + (en ? "Close" : "Schließen") + "</button>") + '<button type="button" class="xpbtn ghost" data-qoff>' + (en ? "Shut down" : "Ausschalten") + "</button></div>" });
@@ -600,7 +603,7 @@
   var firstVisit = !store.get("booted");
   // restore the saved windows quietly (no sound, no animation), the deep-linked app goes on top
   var restoring = [];
-  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { if (w.k === "blog-edit") return; if (deep && w.k === deep && w.p !== APPS[deep].dataset.path) return;   /* same app as the deep link (another post): the deep link wins */ var o = { quiet: true, noPush: true, restore: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
+  saved().sort(function (a, b) { return a.z - b.z; }).forEach(function (w) { if (w.k === "blog-edit" || w.k === "admin") return; if (deep && w.k === deep && w.p !== APPS[deep].dataset.path) return;   /* same app as the deep link (another post): the deep link wins */ var o = { quiet: true, noPush: true, restore: true, pos: [w.x, w.y], w: w.w, h: w.h, min: w.min, max: w.max }; if (APPS[w.k] && (!w.p || APPS[w.k].dataset.path === w.p)) openWin(w.k, o); else if (w.p) restoring.push(openUrl(w.p, o)); });
   if (deep) openWin(deep, { noPush: true, quiet: open.has(deep) });
   /* windows restored from their address arrive later: the deep-linked window stays on top */
   if (deep && restoring.length) Promise.all(restoring).then(function () { if (open.has(deep)) { focus(deep, false); open.get(deep).el.focus({ preventScroll: true }); } });

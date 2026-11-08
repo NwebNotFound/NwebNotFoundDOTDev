@@ -114,7 +114,7 @@ with sync_playwright() as p:
     chrome = "/usr/bin/google-chrome"
     br = p.chromium.launch(executable_path=chrome) if os.path.exists(chrome) else p.chromium.launch()
     found = []
-    for who in (["guest", "signed-in"] if COOKIE else ["guest"]):
+    for who in (["signed-in"] if os.environ.get("GUARD_WHO") == "signed-in" else ["guest", "signed-in"] if COOKIE else ["guest"]):
         for width in (375, 430):
             for night in (False, True):
                 c = ctx_for(br, width, night, COOKIE if who == "signed-in" else ""); pg = c.new_page()
@@ -124,6 +124,8 @@ with sync_playwright() as p:
                     pg.goto(f"https://{H}{path}", wait_until="load")
                     if path != "/":
                         pg.locator(".win.focus .wc").first.wait_for(timeout=10000)
+                    if path.startswith("/admin"):   # the Verwaltung renders after its module loaded its data
+                        pg.locator(".win.focus .ad-scroll").first.wait_for(timeout=10000); pg.wait_for_timeout(500)
                     pg.wait_for_timeout(500)
                     for kind, what, info in pg.evaluate(PROBE, MIN):
                         found.append((path, f"{who} {width} {'night' if night else 'day'}", kind, what, info))

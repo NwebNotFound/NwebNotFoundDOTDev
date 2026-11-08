@@ -103,7 +103,7 @@ const SECTIONS = {
   projects: { table: "projects", cols: ["sort", "status", "progress", "href", "icon", "title_de", "title_en", "text_de", "text_en"], clean: cleanProject, order: "sort, id" },
   changelog: { publish: true, table: "changelog", cols: ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"], clean: cleanNews, order: "day DESC, sort, id" },
 };
-const ROUTE = /^\/api\/admin\/(home|projects|changelog|guestbook)(?:\/([a-z0-9.]{1,40}))?(?:\/(publish|withdraw|hide|unhide))?$/;
+const ROUTE = /^\/api\/admin\/(overview|home|projects|changelog|guestbook)(?:\/([a-z0-9.]{1,40}))?(?:\/(publish|withdraw|hide|unhide))?$/;
 export const ADMIN_RATE = { max: 120, windowMs: 60000 };
 const MAX_BODY = 32000;
 
@@ -231,6 +231,27 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
     return out({ error: "method_not_allowed" }, 405);
   }
 
+  /** The overview tiles (open work per section) and the three most recently edited items. Reads only. */
+  async function overview(env) {
+    const q = (sql) => env.DB.prepare(sql);
+    const [pr, cl, gb, bl, rec] = await env.DB.batch([
+      q("SELECT COUNT(*) AS n FROM projects"),
+      q("SELECT COUNT(*) AS n, SUM(status = 'draft') AS drafts FROM changelog"),
+      q("SELECT SUM(hidden = 0 AND created_at >= datetime('now', '-7 days')) AS new, SUM(reported = 1) AS reported FROM entries"),
+      q("SELECT SUM(status = 'draft') AS drafts, SUM(status = 'published') AS live FROM blog_posts"),
+      q(`SELECT * FROM (SELECT 'home' AS section, key || ':' || lang AS id, key AS title, 'live' AS status, updated_at FROM site_blocks
+          UNION ALL SELECT 'projects', id, title_de, 'live', updated_at FROM projects
+          UNION ALL SELECT 'changelog', id, title_de, status, updated_at FROM changelog
+          UNION ALL SELECT 'blog', id, title_de, status, updated_at FROM blog_posts) ORDER BY updated_at DESC LIMIT 3`),
+    ]);
+    const one = (r) => r.results?.[0] || {};
+    return out({
+      projects: one(pr).n || 0, changelog: { all: one(cl).n || 0, drafts: one(cl).drafts || 0 },
+      guestbook: { new: one(gb).new || 0, reported: one(gb).reported || 0 }, blog: { drafts: one(bl).drafts || 0, live: one(bl).live || 0 },
+      recent: rec.results || [],
+    });
+  }
+
   return {
     isAdmin: (req, env) => isAdmin(req, env, getUser),
     /** /api/admin/*: null when the path is not ours. Anyone but an admin gets a 404 (the route doesn't reveal itself). */
@@ -245,6 +266,7 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
       }
       const [, section, id, action] = m;
       try {
+        if (section === "overview") return id || action || req.method !== "GET" ? out({ error: "not_found" }, 404) : await overview(env);
         if (section === "home") return action ? out({ error: "not_found" }, 404) : await home(req, env, a.user, id, now);
         if (section === "guestbook") return await guestbook(req, env, a.user, id, action, url, now);
         return await table(req, env, a.user, section, id, action, now);

@@ -1332,6 +1332,17 @@ try {
     sql("DELETE FROM site_blocks");
     const back = await req("/portfolio", { testHost: "nwebnotfound.dev", os: true });
     ok(back.t.includes("Diese Website"), "Verwaltung: leere Tabelle = wieder die Code-Texte"); }
+  // Verwaltung window + entry points (server-rendered for admins only)
+  { const W = (path, cookie) => req(path, { cookie, testHost: "nwebnotfound.dev", os: true });
+    const anonW = await W("/admin"), otherW = await W("/admin/projects", c2), admW = await W("/admin/projects/12", c1);
+    ok(anonW.s === 302 && /\/auth\/discord\/login\?next=/.test(anonW.h.get("location") || "") && otherW.s === 404 && otherW.t.includes('data-app="notfound"') && !otherW.t.includes("nwebos-admin"), "Verwaltung-Fenster: ohne Login → Anmelden, ohne Admin-Rang 404 ohne Spur", `${anonW.s} ${otherW.s}`);
+    ok(admW.s === 200 && admW.t.includes('data-app="admin"') && admW.t.includes('data-module="/design/nwebos-admin.js') && admW.t.includes('data-path="/admin/projects/12"') && /private/.test(admW.h.get("cache-control") || ""), "Verwaltung-Fenster für den Admin, privat, mit Unterseite", admW.s);
+    const aboutA = await W("/about", c1), aboutO = await W("/about", c2), aboutG = await W("/about");
+    const marks = ['data-edit="/admin/home"', 'class="dicon adm"', 'id="adm-q"', 'class="adm-sm"', "nwebos-admin.css"];
+    ok(marks.every((m) => aboutA.t.includes(m)) && /private/.test(aboutA.h.get("cache-control") || ""), "Verwaltung-Einstiege (✎, Symbol, Schnellmenü, Startmenü) nur für den Admin", marks.filter((m) => !aboutA.t.includes(m)).join(" "));
+    ok(marks.every((m) => !aboutO.t.includes(m) && !aboutG.t.includes(m)), "Verwaltung-Einstiege fehlen für Nicht-Admins und Gäste");
+    const ov = await req("/api/admin/overview", { cookie: c1, testHost: "nwebnotfound.dev" }), ovO = await req("/api/admin/overview", { cookie: c2, testHost: "nwebnotfound.dev" });
+    ok(ov.s === 200 && typeof ov.j?.projects === "number" && Array.isArray(ov.j?.recent) && ovO.s === 404, "Verwaltung-Übersicht: Zähler für den Admin, 404 sonst", `${ov.s} ${ovO.s}`); }
     ok((await b("/api/blog/admin/posts")).s === 401 && (await b("/api/blog/admin/posts", { cookie: c2 })).s === 403, "Blog-Admin: ohne Login 401, Nicht-Admin 403");
     ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c2, origin: MO, body: { title_de: "x" } })).s === 403 && (await b("/blog/admin", { cookie: c2 })).s === 404, "Blog: Nicht-Admin kann nichts anlegen, Editor 404");
     ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: "https://evil.example", body: { title_de: "x" } })).s === 403, "Blog: fremde Origin → 403");
@@ -1370,6 +1381,15 @@ try {
     }
   }
   py("NwebOS-Blog-Editor im Browser fehlgeschlagen", "scripts/nwebos-editor-ui.py", BASE, c1, c2);
+  // Verwaltung (still admin here): the browser flows, then the tap guard on its views (signed-in only)
+  py("NwebOS-Verwaltung im Browser fehlgeschlagen", "scripts/nwebos-admin-ui.py", BASE, c1, c2);
+  // the guard sees the full forms only with start data (an empty table shows "Startdaten fehlen"): one row each, removed after
+  sql("INSERT INTO projects (sort, status, progress, href, icon, title_de, text_de, version, updated_at) VALUES (1, 'live', 10, '/about', 'about', 'Guard-Projekt', 'x', 1, 0)");
+  sql("INSERT INTO changelog (day, area, title_de, text_de, status, sort, version, updated_at) VALUES ('2026-11-01', 'website', 'Guard-Neuigkeit', 'x', 'live', 0, 1, 0)");
+  process.env.GUARD_ROUTES = "/admin,/admin/home,/admin/projects,/admin/projects/new,/admin/changelog,/admin/changelog/new,/admin/guestbook,/about"; process.env.GUARD_WHO = "signed-in";
+  py("NwebOS-Stil-Wächter Verwaltung (Tippflächen) fehlgeschlagen", "scripts/nwebos-guard-ui.py", BASE, c1);
+  delete process.env.GUARD_ROUTES; delete process.env.GUARD_WHO;
+  sql("DELETE FROM projects WHERE title_de = 'Guard-Projekt'"); sql("DELETE FROM changelog WHERE title_de = 'Guard-Neuigkeit'");
   sql("DELETE FROM mc_player_ranks WHERE name = 'Nils' AND rank = 'admin' AND weight = 100 AND updated_at = 0");
   // NwebOS (src/nwebos.js) is the default (Nils 07.11.); ?nwebos=0 opts out to the current pages, which stay for
   // paths without an NwebOS app yet.
