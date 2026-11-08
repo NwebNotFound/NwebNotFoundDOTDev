@@ -101,8 +101,13 @@ fs.writeFileSync(DV, `MC_INGEST_TOKEN=${TOK}\nSESSION_SECRET=${SECRET}\nDISCORD_
 console.log("Schema …"); execSync(`npx wrangler d1 execute DB --local --persist-to ${PERSIST} --file schema.sql`, { cwd: ROOT, stdio: "ignore" });
 { let okS = true; try { execSync(`bash scripts/schema-check.sh --local --persist-to ${PERSIST}`, { cwd: ROOT, stdio: "ignore" }); } catch { okS = false; } ok(okS, "schema.sql erfüllt scripts/schema-check.sh (deploy.sh-Vorabprüfung)"); }
 console.log((await localDb()) ? "Fixture-SQL: node:sqlite direkt auf die lokale D1" : "Fixture-SQL: wrangler d1 execute (node:sqlite fehlt)");
-const wd = spawn(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", ...NPX.opts });
-let log = ""; wd.stdout.on("data", (d) => (log += d)); wd.stderr.on("data", (d) => (log += d));
+// wrangler's output goes to a file, not a pipe: py() runs the browser scripts with spawnSync, which stops this
+// process from draining a pipe; on Linux node writes to a full pipe synchronously, so wrangler stalled once the
+// browser tests had logged ~64 KB (CI: "fetch failed" right after the long admin UI run).
+fs.mkdirSync(ROOT + ".wrangler", { recursive: true });
+const WD_LOG = ROOT + ".wrangler/e2e-wrangler.log", wdFd = fs.openSync(WD_LOG, "w");
+const wd = spawn(NPX.cmd, [...NPX.args, "wrangler", "dev", "--port", String(PORT), "--ip", "127.0.0.1", "--local-upstream", HOST, "--persist-to", PERSIST], { cwd: ROOT, stdio: ["ignore", wdFd, wdFd], detached: process.platform !== "win32", ...NPX.opts });
+const wdTail = () => { try { return fs.readFileSync(WD_LOG, "utf8").slice(-2000); } catch { return ""; } };
 // Writing fixtures (phase 3a/3b): the committed src/generated/{content,feeds}.js carry Nils' real
 // content (currently none). For the e2e run we build the index *and* the feeds from
 // scripts/fixtures/content so the writing routes and the feeds have something to render; the
@@ -1459,6 +1464,6 @@ try {
   py("Turnstile-Challenge-Ablauf fehlgeschlagen", "scripts/turnstile-ui.py", BASE);
   py("UI-Prüfung fehlgeschlagen", "scripts/e2e_ui.py", BASE, c1);
 
-} catch (e) { fail++; console.log("Fehler:", e.stack); console.log(log.slice(-2000)); }
+} catch (e) { fail++; console.log("Fehler:", e.stack); console.log(wdTail()); }
 console.log(`\n${pass} bestanden, ${fail} fehlgeschlagen`);
 process.exit(fail ? 1 : 0);
