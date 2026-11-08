@@ -142,6 +142,21 @@ with sync_playwright() as p:
     c.unroute_all(behavior="ignoreErrors"); c.close()
     print("PASS search: start menu (blog post opens, wiki new tab, no hit) and phone home")
 
+    # #128 / #129: "Zum Desktop" on the 404 window leaves the plain desktop; the maximise button flips its label.
+    c = ctx_for(br, 1280, signed=True)
+    pg = c.new_page()
+    pg.goto(f"https://{H}/nope-404", wait_until="load"); pg.locator(".win.focus .nf").wait_for(timeout=10000)
+    pg.locator(".win.focus [data-close]").click(); pg.wait_for_timeout(500)
+    assert pg.locator(".win").count() == 0, ("Zum Desktop opens no window", pg.locator(".win .tt").all_inner_texts())
+    pg.locator('.dicon[data-open="about"]').dblclick(); pg.locator(".win.focus .mx").wait_for()
+    assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Maximieren"
+    pg.locator(".win.focus .mx").click()
+    assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Wiederherstellen", "label flips when maximised"
+    pg.locator(".win.focus .mx").click()
+    assert pg.locator(".win.focus .mx").get_attribute("aria-label") == "Maximieren", "label flips back"
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 404 Zum Desktop leaves no window; maximise label flips")
+
     # Deep links (Gatekeeper #115): /de/… opens its window; a draft's ?preview= token stays in the address after the boot.
     c = ctx_for(br, 1280)
     pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))

@@ -257,12 +257,13 @@
     $(".x", el).onclick = function () { close(k); };
     $(".back", el).onclick = function () { close(k); };
     $(".mn", el).onclick = function () { minimize(k); };
-    $(".mx", el).onclick = function () { el.classList.toggle("max"); save(); };
+    var mxb = $(".mx", el), mxSet = function () { var m = el.classList.contains("max"); mxb.setAttribute("aria-label", m ? L.restoreWin : L.maximize); mxb.title = m ? L.restoreWin : ""; mxb.textContent = m ? "❐" : "□"; };
+    mxb.onclick = function () { el.classList.toggle("max"); mxSet(); save(); };
     var bar = $(".wt", el);
-    bar.addEventListener("dblclick", function (e) { if (!e.target.closest(".wb")) { el.classList.toggle("max"); save(); } });
+    bar.addEventListener("dblclick", function (e) { if (!e.target.closest(".wb")) { el.classList.toggle("max"); mxSet(); save(); } });
     drag(bar, el, false); drag($(".wr", el), el, true);
     if (opt.min) el.classList.add("min");
-    if (opt.max) el.classList.add("max");
+    if (opt.max) { el.classList.add("max"); mxSet(); }
     if (!opt.quiet) sound.open();
     if (!opt.min) focus(k, !opt.noPush);
     if (!opt.quiet && !opt.min) el.focus({ preventScroll: true });
@@ -413,7 +414,7 @@
     if (op && !op.classList.contains("dicon") && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); if (APPS[op.dataset.open]) openWin(op.dataset.open); else if (op.href || ROUTES[op.dataset.open]) openUrl(op.href || ROUTES[op.dataset.open]); return; }
     /* an internal link inside the desktop opens its window instead of reloading the page */
     var a = e.target.closest("#desk a[href]");
-    if (a && !a.classList.contains("dicon") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href); return; } }
+    if (a && !a.classList.contains("dicon") && !a.hasAttribute("data-close") && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) { var lu = new URL(a.href, location.href); if (osPath(lu) && !a.closest(".lang")) { e.preventDefault(); closeStart(); openUrl(lu.href); return; } }
     var cl = e.target.closest("[data-close]"); if (cl && cl.closest(".win")) { e.preventDefault(); var w0 = cl.closest(".win"); open.forEach(function (o, k) { if (o.el === w0) close(k); }); return; }
     var cw = e.target.closest("[data-closewin]"); if (cw) { var w = cw.closest(".win"); open.forEach(function (o, k) { if (o.el === w) close(k, true); }); return; }
     var egg = e.target.closest("[data-egg]"); if (egg) { closeStart(); if (eggs[egg.dataset.egg]) eggs[egg.dataset.egg](); }
