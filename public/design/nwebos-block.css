@@ -3,6 +3,8 @@
 .edb{--tb1:#5aa83a;--tb2:#3f8a2a;--tb3:#2a6a1c;--start1:#9a6a3e;--start2:#6b4524;--frame:#3d7a2a;--frame2:#7cc35a;--tray:#2f7a24;--sel:#3d7a2a;--win:#c6c6c6;--panel:#f4f4f0;
  --wall:url(/design/nwebos-mc-sky-day.svg)}
 .edb[data-theme=summer-night]{--tb1:#2d4a2a;--tb2:#1f3a1d;--tb3:#142a13;--start1:#6b4524;--start2:#4a2f18;--frame:#2a4a26;--frame2:#4f7a44;--tray:#1f3a1d;--win:#a8a8a8;--wall:url(/design/nwebos-mc-sky-night.svg)}
+/* "auto" night (dark scheme, no stored choice): nwebos.css sets its blue night colours with :root:not([data-theme=summer-day]) (0,2,0), which beats .edb */
+@media (prefers-color-scheme:dark){html.edb:not([data-theme=summer-day]){--tb1:#2d4a2a;--tb2:#1f3a1d;--tb3:#142a13;--start1:#6b4524;--start2:#4a2f18;--frame:#2a4a26;--frame2:#4f7a44;--tray:#1f3a1d;--win:#a8a8a8;--wall:url(/design/nwebos-mc-sky-night.svg)}}
 /* wallpaper: own sky + a row of real grass/dirt/stone textures */
 .edb #desk{background:url(/mc-icon/v2/grass_block) 0 calc(100% - 100px)/64px 64px repeat-x,url(/mc-icon/v2/dirt) 0 calc(100% - 36px)/64px 64px repeat-x,url(/mc-icon/v2/stone) 0 100%/64px 64px repeat-x,var(--wall) center top/cover;image-rendering:pixelated}
 .edb .wt{font-family:var(--px);font-size:12px;letter-spacing:.02em}

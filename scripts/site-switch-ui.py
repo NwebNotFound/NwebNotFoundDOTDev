@@ -62,7 +62,7 @@ with sync_playwright() as p:
             assert text in bar.inner_text(), f"{tag}: bar names the target edition"
             if SHOTS:
                 os.makedirs(SHOTS, exist_ok=True)
-                page.screenshot(path=os.path.join(SHOTS, f"switch-{'mc' if target == MC else 'main'}-{width}.png"))
+                page.wait_for_timeout(350); page.screenshot(path=os.path.join(SHOTS, f"switch-{'mc' if target == MC else 'main'}-{width}.png"))
             page.wait_for_url(f"https://{target}/", timeout=5000)
             page.wait_for_load_state("load")
             assert page.locator("html.nwebos").count() == 1, f"{tag}: the target edition loaded"

@@ -25,6 +25,7 @@ def route_for(ctx):
             return
         h = {k: v for k, v in route.request.all_headers().items() if not k.startswith(":")}
         h["host"] = H
+        h["x-nnf-test-host"] = H
         route.fulfill(response=route.fetch(url=BASE + u.path + ("?" + u.query if u.query else ""), headers=h, max_redirects=0))
     ctx.route("**/*", intercept)
 
@@ -55,6 +56,8 @@ with sync_playwright() as p:
             assert tt.evaluate("e => getComputedStyle(e).boxShadow") == "none", f"{t}: window title is the shell's, not an mc tooltip"
             task = pg.locator(".task")
             assert task.evaluate("e => getComputedStyle(e).position") in ("fixed", "absolute") and task.bounding_box()["y"] > 700, f"{t}: taskbar at the bottom"
+            frame = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--frame').trim()")
+            assert frame == ("#2a4a26" if night else "#3d7a2a"), f"{t}: Block colours (window frame {frame}), not main's blue night"
             if phone:
                 hb = pg.locator(".win .wt").bounding_box(); mb = pg.locator(".mbar").bounding_box()
                 assert mb["y"] >= hb["y"] + hb["height"], f"{t}: phone bar does not cover the title bar"
