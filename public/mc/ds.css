@@ -106,7 +106,7 @@ html.mc .btn[disabled]{background:var(--c-s2);border-color:var(--c-line);color:v
 html.mc .tabs,html.mc .seg{display:inline-flex;gap:2px;padding:3px;background:var(--c-s1);border:var(--b) solid var(--c-line);border-radius:var(--r);box-shadow:none;max-width:100%;overflow-x:auto;scrollbar-width:none}
 html.mc .tabs{display:flex}
 html.mc .tabs::-webkit-scrollbar,html.mc .seg::-webkit-scrollbar{display:none}
-html.mc .tabs button,html.mc .seg button{flex:none;min-height:40px;padding:0 var(--s4);border:0;border-radius:var(--r-sm);background:transparent;color:var(--c-mut);font-family:var(--f-body);font-size:var(--t-sm);font-weight:600;box-shadow:none;cursor:pointer;transition:background var(--t-dur-fast) var(--t-ease),color var(--t-dur-fast) var(--t-ease)}
+html.mc .tabs button,html.mc .seg button{flex:none;min-height:44px;padding:0 var(--s4);border:0;border-radius:var(--r-sm);background:transparent;color:var(--c-mut);font-family:var(--f-body);font-size:var(--t-sm);font-weight:600;box-shadow:none;cursor:pointer;transition:background var(--t-dur-fast) var(--t-ease),color var(--t-dur-fast) var(--t-ease)}
 html.mc .tabs button:hover,html.mc .seg button:hover{color:var(--c-fg);background:var(--c-s2)}
 html.mc .tabs button[aria-selected=true],html.mc .seg button[aria-pressed=true]{background:var(--c-s3);color:var(--c-fg);box-shadow:inset 0 -2px 0 var(--c-acc)}
 html.mc .seg{margin-top:var(--s3)}
@@ -313,7 +313,7 @@ html.mc .fbf input:not([type=radio]),html.mc .fbf textarea{width:100%;box-sizing
 html.mc .fbf textarea{resize:vertical;min-height:7rem}
 html.mc .fbt{border:0;padding:0;margin:0;display:flex;gap:1.2rem;flex-wrap:wrap}
 html.mc .fbt legend{font-size:.9rem;margin-bottom:.35rem}
-html.mc .fbt label{flex-direction:row;align-items:center;gap:.4rem}
+html.mc .fbt label{flex-direction:row;align-items:center;gap:.4rem;min-height:44px;cursor:pointer}   /* the label is the 44px tap target for its radio/checkbox */
 html.mc #fbc .plist{list-style:none;margin:0;padding:0}
 html.mc #fbc .po{padding:.7rem 0;border-top:1px solid var(--line,#2a2f2b)}
 html.mc #fbc .pom{display:flex;flex-direction:column;gap:.2rem}
