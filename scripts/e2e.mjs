@@ -80,7 +80,10 @@ const req = async (path, { method = "GET", body, token, cookie, origin, ip = "10
   if (token) h["x-ingest-token"] = token;
   if (cookie) h.cookie = cookie;
   if (origin) h.origin = origin;
-  const r = await fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" }); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
+  // one retry when the pooled keep-alive socket was already closed by wrangler (long browser runs in between with no
+  // requests from here; CI: "fetch failed", cause write EPIPE). The request never left, so nothing runs twice.
+  const go = () => fetch(BASE + path, { method, headers: h, body: body ? JSON.stringify(body) : undefined, redirect: "manual" });
+  const r = await go().catch((e) => (/EPIPE|ECONNRESET|UND_ERR_SOCKET|other side closed/.test(String(e?.cause?.code || e?.cause?.message || e?.cause)) ? go() : Promise.reject(e))); const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {} return { s: r.status, j, t, h: r.headers };
 };
 const TS_OK = "XXXX.DUMMY.TOKEN.XXXX"; // Turnstile test secret: every token passes
 const U1 = "11111111-2222-3333-4444-555555555555", U2 = "0f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8", D1 = "100000000000000001", D2 = "100000000000000002", O = "https://" + HOST;
