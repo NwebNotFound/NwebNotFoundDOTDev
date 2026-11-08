@@ -188,7 +188,7 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
   }
 
   /* a taken slug or chapter number is a field problem, not a 500 */
-  const uniq = (run) => run().catch((e) => { const m = String(e?.message || ""); if (!/UNIQUE constraint failed/i.test(m)) throw e; return [{ dup: out({ error: "invalid", fields: [/chapter|series_id/.test(m) ? "chapter" : "slug"] }, 400) }]; });
+  const uniq = (run) => run().catch((e) => { const m = String(e?.message || ""); if (!/UNIQUE constraint failed/i.test(m)) throw e; return [{ dup: out({ error: "invalid", fields: [/chapter|series_id/.test(m) ? "chapter" : "slug"], taken: true }, 400) }]; });
   /* a chapter belongs to an existing series */
   const refProblem = async (env, name, v) => (name === "writing" && v.series_id != null && !(await env.DB.prepare("SELECT 1 FROM writing_series WHERE id = ?").bind(v.series_id).first()) ? out({ error: "invalid", fields: ["series_id"] }, 400) : null);
 

@@ -180,6 +180,25 @@ with sync_playwright() as p:
     assert "Der erste Tag" in txt and "heiß" in txt, "published chapter in its window"
     pg.goto(f"https://{H}/admin/writing", wait_until="load"); pg.locator(".win.focus .ad-row").first.wait_for(timeout=10000); pg.wait_for_timeout(300)
     shot(pg, "admin-1280-writing-list.png")
+    # Design QA #141 (day, desktop): "DE"/"EN" markers and the ADMIN title-bar tag >= 4.5:1
+    CR = r"""(sel) => { const L = (c) => { const m = c.match(/[\d.]+/g).map(Number); const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); };
+      const bg = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; const a = (c.match(/[\d.]+/g) || [0, 0, 0, 0]).map(Number); if (c.startsWith('rgb(') || (a[3] || 0) > 0.5) return c; } return 'rgb(255,255,255)'; };
+      return [...document.querySelectorAll(sel)].filter((p) => p.offsetParent).map((p) => { const a = L(getComputedStyle(p).color), b = L(bg(p)); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); }); }"""
+    crs = pg.evaluate(CR, ".win.focus .ad-lang i.ok") + pg.evaluate(CR, ".win.focus .ad-tag-adm")
+    assert crs and min(crs) >= 4.5, ("DE marker / ADMIN tag contrast", crs)
+    # a taken chapter number reads as German, with the number
+    pg.goto(f"https://{H}/admin/writing/new", wait_until="load"); pg.locator('.win.focus [name="title"]').wait_for(timeout=10000); pg.wait_for_timeout(300)
+    pg.locator('.win.focus [name="chapter"]').fill("1"); pg.locator('.win.focus [name="title"]').fill("Noch ein erster Tag")
+    pg.locator('.win.focus [data-md="body"] textarea').fill("Doppelt.")
+    pg.locator(".win.focus .ad-err").wait_for(timeout=6000)
+    err = pg.locator(".win.focus .ad-err").inner_text()
+    assert err == "Kapitel 1 gibt es in dieser Serie schon.", ("taken chapter message", err)
+    pg.locator('.win.focus [name="chapter"]').fill("")   # nothing left to autosave on the way out
+    # a series with chapters: the delete sheet says so and its confirm button is off
+    pg.goto(f"https://{H}/admin/series/{ser_id}", wait_until="load"); pg.locator(".win.focus [data-del]").wait_for(timeout=10000); pg.wait_for_timeout(300)
+    pg.locator(".win.focus [data-del]").click(); pg.locator(".ask [data-yes]").wait_for(timeout=4000)
+    assert "Die Serie hat noch 1 Kapitel – erst die Kapitel löschen." in pg.locator(".ask").inner_text() and pg.locator(".ask [data-yes]").is_disabled(), "series delete sheet: chapter count, confirm off"
+    pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
     pg.goto(f"https://{H}/admin/writing/{wid}", wait_until="load"); pg.locator(".win.focus [data-withdraw]").wait_for(timeout=10000); pg.wait_for_timeout(300)
     pg.locator(".win.focus [data-withdraw]").click(); pg.wait_for_timeout(700)
     pg.goto(f"https://{H}/writing/ui-sommerfunken/1", wait_until="load"); pg.wait_for_timeout(300)

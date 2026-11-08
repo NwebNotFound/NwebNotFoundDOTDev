@@ -1,5 +1,5 @@
 /* NwebOS · Verwaltung (admin only; mockups/nwebos/apps/admin, Designer admin.css) + in-place "Bearbeiten". Loaded only on admin pages. */
-:root{--ad-red:#d9452f;--ad-draft:#f2a33a;--ad-live:#3a9a33;--ad-off:#8e94a3}
+:root{--ad-red:#c73e29;--ad-draft:#f2a33a;--ad-live:#3a9a33;--ad-off:#8e94a3}
 .ad{display:grid;grid-template-columns:220px minmax(0,1fr);height:100%;min-height:0;background:var(--pn);color:var(--txt);font:14px/1.45 var(--f)}
 .ad *{box-sizing:border-box;text-transform:none;letter-spacing:normal}
 .ad button{font:inherit;color:inherit;cursor:pointer}
@@ -53,7 +53,7 @@
 .ad-pill::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor}
 .ad-pill.live{color:var(--ad-live)}.ad-pill.draft{color:#c47a18}.ad-pill.off{color:var(--ad-off)}.ad-pill.rep{color:var(--ad-red)}
 [data-theme=summer-night] .ad-pill.live{color:#8fe36a}[data-theme=summer-night] .ad-pill.draft{color:#ffc36b}[data-theme=summer-night] .ad-pill.rep{color:#ff8a76}
-.ad-lang{display:inline-flex;gap:3px}.ad-lang i{font:800 10px var(--f);font-style:normal;padding:1px 5px;border-radius:5px;border:1.5px solid var(--line);color:var(--mut2)}.ad-lang i.ok{border-color:var(--ad-live);color:var(--ad-live)}
+.ad-lang{display:inline-flex;gap:3px}.ad-lang i{font:800 10px var(--f);font-style:normal;padding:1px 5px;border-radius:5px;border:1.5px solid var(--line);color:var(--mut2)}.ad-lang i.ok{border-color:var(--ad-live);color:#2a7524}[data-theme=summer-night] .ad-lang i.ok{color:#8fe36a}   /* "DE"/"EN" text >= 4.5:1 (day 5.7, night as .ad-pill.live) */
 .ad-ib{display:grid;place-items:center;width:40px;height:40px;padding:0;border:2px solid var(--edge);border-radius:11px;background:var(--c-bg);color:var(--c-fg);box-shadow:0 2px 0 var(--ink)}
 .ad-ib svg{width:20px;height:20px}.ad-ib.dz{color:var(--ad-red)}
 /* edit pattern */

@@ -243,10 +243,17 @@
       sc.insertAdjacentHTML("afterbegin", '<div class="ad-banner" role="alert">⚠ ' + esc(text) + '<button type="button" class="xpbtn" data-bn>' + esc(btn) + "</button></div>");
       $("[data-bn]", sc).onclick = fn;
     }
-    function fieldErr(fields) {
+    /* `taken`: the address or chapter number is already used (the server's unique check); `chapter` the number sent */
+    function fieldErr(fields, taken, chapter) {
       var sc = $(".ad-scroll"); if (!sc) return; var old = $(".ad-err", sc); if (old) old.remove();
       if (!fields) return;
-      var N = { title_de: T("Titel (DE)", "title (DE)"), title_en: T("Titel (EN)", "title (EN)"), text_de: T("Text (DE)", "text (DE)"), text_en: T("Text (EN)", "text (EN)"), href: "Link", day: T("Datum", "date"), status: "Status", progress: T("Fortschritt", "progress"), area: T("Bereich", "area"), icon: "Icon", name: "Name", lead: T("Einleitung", "lead") };
+      if (taken) {
+        var msg = fields[0] === "chapter" ? T("Kapitel " + chapter + " gibt es in dieser Serie schon.", "Chapter " + chapter + " already exists in this series.") : T("Diese Adresse gibt es schon.", "This address is already taken.");
+        sc.insertAdjacentHTML("afterbegin", '<p class="ad-err" role="alert">' + esc(msg) + "</p>"); return;
+      }
+      var N = { title_de: T("Titel (DE)", "title (DE)"), title_en: T("Titel (EN)", "title (EN)"), text_de: T("Text (DE)", "text (DE)"), text_en: T("Text (EN)", "text (EN)"), href: "Link", day: T("Datum", "date"), status: "Status", progress: T("Fortschritt", "progress"), area: T("Bereich", "area"), icon: "Icon", name: "Name", lead: T("Einleitung", "lead"),
+        slug: T("Adresse", "address"), chapter: T("Kapitel", "chapter"), series_id: T("Serie", "series"), kind: T("Art", "kind"), body_de: T("Text (DE)", "text (DE)"), body_en: T("Text (EN)", "text (EN)"),
+        tags: T("Stichwörter", "tags"), sort: T("Reihenfolge", "order"), published_at: T("Datum", "date") };
       sc.insertAdjacentHTML("afterbegin", '<p class="ad-err" role="alert">' + T("Bitte prüfen: ", "Please check: ") + esc(fields.map(function (f) { return N[f] || f; }).join(", ")) + "</p>");
     }
     /* Planner 08.11.: while a table is empty the site shows today's texts from the code (fallback). The first new row
@@ -425,7 +432,7 @@
             show(); saveState(dirty() ? "dirty" : auto() && !manual ? "auto" : "saved", item.updated_at); return true;
           }
           if (r.s === 409) { saveState("err"); banner(T("In einem anderen Tab geändert.", "Changed in another tab."), T("Neu laden", "Reload"), function () { store.clear(); editText(k, idv); }); return false; }
-          saveState("err"); if (r.s === 400) fieldErr(r.j.fields || []); else if (r.s === 413) toast("err", T("Zu lang zum Speichern", "Too long to save")); else toast("err", T("Nicht gespeichert", "Not saved")); return false;
+          saveState("err"); if (r.s === 400) fieldErr(r.j.fields || [], r.j.taken, sent.chapter); else if (r.s === 413) toast("err", T("Zu lang zum Speichern", "Too long to save")); else toast("err", T("Nicht gespeichert", "Not saved")); return false;
         });
       };
       var publish = function () {
@@ -443,8 +450,12 @@
         $("[data-back]").onclick = function () { open("writing"); };
         var pvb = $("[data-pv]"); if (pvb) pvb.onclick = function () { go((en ? "/en" : "") + (item.series_id ? "/writing/" + ((seriesList.filter(function (s) { return s.id === item.series_id; })[0] || {}).slug || "") + "/" + item.chapter : "/writing/" + item.slug)); };
         var del = $("[data-del]"); if (del) del.onclick = function () {
-          NwebOS.ask({ title: wr ? T("Text löschen?", "Delete this text?") : T("Serie löschen?", "Delete this series?"), text: T("„" + item.title_de + "“ wird gelöscht. Das geht nicht rückgängig.", "“" + item.title_de + "” is deleted. This can't be undone.") + (wr ? T(" Tipp: „Zurückziehen“ nimmt ihn nur offline.", " Tip: “Withdraw” only takes it offline.") : ""), yes: T("Endgültig löschen", "Delete for good"), no: T("Behalten", "Keep"), danger: true, stack: true, icon: spr("c-del", 48) })
-            .then(function (ok) { if (!ok) return; call("DELETE", "/" + k + "/" + item.id).then(function (r) { if (r.s === 200) { stale(); store.clear(); toast("ok", T("Gelöscht", "Deleted")); open("writing"); } else toast("err", r.s === 409 ? T("Die Serie hat noch Kapitel.", "The series still has chapters.") : T("Nicht gelöscht", "Not deleted")); }); });
+          /* a series with chapters can't be deleted (the server answers 409): say so up front, confirm disabled */
+          (wr ? Promise.resolve(0) : call("GET", "/writing").then(function (r) { return r.s === 200 ? (r.j.items || []).filter(function (x) { return x.series_id === item.id; }).length : 0; })).then(function (n) {
+          var asked = NwebOS.ask({ title: wr ? T("Text löschen?", "Delete this text?") : T("Serie löschen?", "Delete this series?"), text: n ? T("Die Serie hat noch " + n + " Kapitel – erst die Kapitel löschen.", "The series still has " + n + (n === 1 ? " chapter" : " chapters") + " – delete the chapters first.") : T("„" + item.title_de + "“ wird gelöscht. Das geht nicht rückgängig.", "“" + item.title_de + "” is deleted. This can't be undone.") + (wr ? T(" Tipp: „Zurückziehen“ nimmt ihn nur offline.", " Tip: “Withdraw” only takes it offline.") : ""), yes: T("Endgültig löschen", "Delete for good"), no: n ? T("Schließen", "Close") : T("Behalten", "Keep"), danger: true, stack: true, icon: spr("c-del", 48) });
+          if (n) { var ys = document.querySelectorAll(".ask [data-yes]"), y = ys[ys.length - 1]; if (y) { y.disabled = true; y.setAttribute("aria-disabled", "true"); } }
+          asked.then(function (ok) { if (!ok) return; call("DELETE", "/" + k + "/" + item.id).then(function (r) { if (r.s === 200) { stale(); store.clear(); toast("ok", T("Gelöscht", "Deleted")); open("writing"); } else toast("err", r.s === 409 ? T("Die Serie hat noch Kapitel.", "The series still has chapters.") : T("Nicht gelöscht", "Not deleted")); }); });
+          });
         };
       };
       me = cur = { dirty: dirty, save: function () { return save(true); }, publish: publish, back: function () { open("writing"); }, localOnly: true,
