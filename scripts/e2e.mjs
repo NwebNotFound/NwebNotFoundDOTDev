@@ -17,6 +17,7 @@ import "./dos-unit.mjs";
 import "./queue-unit.mjs";
 import "./nwebos-unit.mjs";
 import "./blog-unit.mjs";
+import "./admin-unit.mjs";
 import { checkWellFormed } from "./xml-check.mjs";
 import { CONTENT } from "../src/generated/content.js";
 import { writing as osWritingWin } from "../src/nwebos-apps.js";
@@ -1289,6 +1290,48 @@ try {
     const blogAdminUuid = sqlRows(`SELECT mc_uuid FROM mc_links WHERE discord_id = '${D1}' AND verified = 1`)[0]?.mc_uuid;
     sql(`INSERT OR REPLACE INTO mc_player_ranks (uuid, name, rank, color, weight, updated_at) VALUES ('${String(blogAdminUuid || "").replace(/-/g, "")}', 'Nils', 'admin', 'c', 100, 0)`);
     const MH = "nwebnotfound.dev", MO = "https://" + MH, b = (path, o = {}) => req(path, { testHost: MH, ...o });
+  // Verwaltung data side (migration 0019, src/admin.js): admin only (others 404), D1 content replaces the code
+  // fallback in the windows and the feed at once (cache purged), hidden guestbook entries are not public.
+  { const AP = (method, path, body, o = {}) => req(path, { method, cookie: c1, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body, ...o });
+    const nonAdmin = await req("/api/admin/projects", { cookie: c2, testHost: "nwebnotfound.dev" }), anonA = await req("/api/admin/projects", { testHost: "nwebnotfound.dev" });
+    ok(nonAdmin.s === 404 && anonA.s === 404, "Verwaltung-API: ohne Admin-Rang und ohne Login 404", `${nonAdmin.s} ${anonA.s}`);
+    const before = await req("/portfolio", { testHost: "nwebnotfound.dev", os: true });
+    const pr = await AP("POST", "/api/admin/projects", { title_de: "E2E-Projekt", title_en: "E2E project", status: "neu", progress: 4, href: "/blog", icon: "blog", text_de: "aus D1" });
+    const after = await req("/portfolio", { testHost: "nwebnotfound.dev", os: true }), afterEn = await req("/en/portfolio", { testHost: "nwebnotfound.dev", os: true });
+    ok(before.t.includes("Diese Website") && pr.s === 201 && after.t.includes("E2E-Projekt") && after.t.includes("aus D1") && !after.t.includes("Diese Website") && afterEn.t.includes("E2E project"), "Verwaltung: Projekt aus D1 ersetzt die Code-Liste sofort (DE/EN)", `${pr.s}`);
+    const stale = await AP("PATCH", `/api/admin/projects/${pr.j?.item?.id}`, { text_de: "x", version: 0 }), noOrig = await AP("POST", "/api/admin/projects", { title_de: "x", status: "live", progress: 1 }, { origin: null });
+    ok(stale.s === 409 && noOrig.s === 403, "Verwaltung: alte Version 409, ohne Origin 403", `${stale.s} ${noOrig.s}`);
+    const nw = await AP("POST", "/api/admin/changelog", { day: "2026-11-08", area: "website", title_de: "E2E-Neuigkeit", text_de: "Ein Satz." });
+    const draftWin = await req("/changelog", { testHost: "nwebnotfound.dev", os: true });
+    const pub = await AP("POST", `/api/admin/changelog/${nw.j?.item?.id}/publish`, { version: 1 });
+    const liveWin = await req("/changelog", { testHost: "nwebnotfound.dev", os: true }), feed = await req("/changelog/feed.xml", { testHost: "nwebnotfound.dev" });
+    ok(nw.s === 201 && !draftWin.t.includes("E2E-Neuigkeit") && pub.s === 200 && liveWin.t.includes("E2E-Neuigkeit") && feed.t.includes("E2E-Neuigkeit"), "Verwaltung: Neuigkeit erst nach Veröffentlichen im Fenster und im RSS", `${nw.s} ${pub.s}`);
+    const hb = await AP("PATCH", "/api/admin/home/home.hero", { lang: "de", version: 0, data: { name: "Nils", lead: "E2E-Lead aus D1" } });
+    const ab = await req("/about", { testHost: "nwebnotfound.dev", os: true });
+    ok(hb.s === 200 && ab.t.includes("E2E-Lead aus D1"), "Verwaltung: Über-mich-Text aus D1", hb.s);
+    sql("INSERT INTO entries (name, message, discord_id) VALUES ('Spam','e2e-ausblenden','555')");
+    const sid = sqlRows("SELECT id FROM entries WHERE message='e2e-ausblenden'")[0].id;
+    const hide = await AP("POST", `/api/admin/guestbook/${sid}/hide`, {});
+    const gbPub = await req("/api/guestbook", { testHost: "nwebnotfound.dev" }), gbAdm = await AP("GET", "/api/admin/guestbook?filter=hidden");
+    ok(hide.s === 200 && !JSON.stringify(gbPub.j).includes("e2e-ausblenden") && JSON.stringify(gbAdm.j).includes("e2e-ausblenden"), "Verwaltung: ausgeblendeter Gästebucheintrag nicht öffentlich, in der Moderation sichtbar", hide.s);
+    const logged = sqlRows("SELECT section, action FROM admin_log ORDER BY id").map((r) => r.section + ":" + r.action).join(",");
+    ok(logged === "changelog:publish,guestbook:hide", "Verwaltung: admin_log nur für Veröffentlichen/Ausblenden/Löschen, nicht für Anlegen/Speichern", logged);
+    // D1 budget: public GETs of every window (signed out) write nothing. Snapshot of every table's rows (the local
+    // engine bumps its own _cf_METADATA counter on each query, so PRAGMA data_version can't tell reads from writes).
+    if (sqliteDb) {
+      const tabs = sqliteDb.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('_cf_METADATA', 'sqlite_sequence')").all().map((r) => r.name);
+      const dv = () => tabs.map((t) => JSON.stringify(sqliteDb.prepare(`SELECT * FROM "${t}"`).all())).join("|");
+      const writers = [];
+      for (const w of ["/", "/about", "/portfolio", "/blog", "/blog/eine-navigation-fuer-zwei-seiten", "/changelog", "/writing", "/guestbook", "/music", "/trash", "/profile", "/pixelwand", "/en/about", "/nope-404", "/api/guestbook", "/api/blog", "/changelog/feed.xml", "/blog/feed.xml"]) {
+        const v = dv(); await req(w, { testHost: "nwebnotfound.dev", os: !w.startsWith("/api/") && !w.endsWith(".xml") }); if (dv() !== v) writers.push(w);
+      }
+      ok(!writers.length, "D1-Budget: öffentliche Aufrufe aller Fenster schreiben 0 Zeilen", writers.join(" "));
+    } else console.log("  (D1-Budget-Prüfung übersprungen: lokale SQLite-Datei nicht gefunden)");
+    // clean up: an empty table means the code fallback again (later checks expect today's texts)
+    await AP("DELETE", `/api/admin/projects/${pr.j?.item?.id}`); await AP("DELETE", `/api/admin/changelog/${nw.j?.item?.id}`); await AP("DELETE", `/api/admin/guestbook/${sid}`);
+    sql("DELETE FROM site_blocks");
+    const back = await req("/portfolio", { testHost: "nwebnotfound.dev", os: true });
+    ok(back.t.includes("Diese Website"), "Verwaltung: leere Tabelle = wieder die Code-Texte"); }
     ok((await b("/api/blog/admin/posts")).s === 401 && (await b("/api/blog/admin/posts", { cookie: c2 })).s === 403, "Blog-Admin: ohne Login 401, Nicht-Admin 403");
     ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c2, origin: MO, body: { title_de: "x" } })).s === 403 && (await b("/blog/admin", { cookie: c2 })).s === 404, "Blog: Nicht-Admin kann nichts anlegen, Editor 404");
     ok((await b("/api/blog/admin/posts", { method: "POST", cookie: c1, origin: "https://evil.example", body: { title_de: "x" } })).s === 403, "Blog: fremde Origin → 403");

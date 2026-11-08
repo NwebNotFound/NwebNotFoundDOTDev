@@ -12,6 +12,7 @@
 import { renderMarkdown, escapeHtml as esc, htmlToText } from "./markdown.js";
 import { xmlEscape, cdata, rfc822 } from "./feed.js";
 import { AV } from "./asset-version.js";
+import { isAdmin } from "./admin.js";
 
 export const CATEGORIES = ["bauen", "server", "musik", "notizen"];
 export const STATUSES = ["draft", "published", "withdrawn"];
@@ -124,17 +125,7 @@ export const READS_CAP = 500;
 export function makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, chapterExists = () => false, onReadEnd = async () => {} }) {
   const SITE = `https://${MAIN}`;
   // ---- admin check (fails closed) ----
-  async function admin(req, env) {
-    const u = await getUser(req, env).catch(() => null);
-    if (!u) return { err: 401 };
-    try {
-      const link = await env.DB.prepare("SELECT mc_uuid, verified FROM mc_links WHERE discord_id = ?").bind(String(u.id)).first();
-      const uuid = String(link?.mc_uuid || "").toLowerCase().replace(/-/g, "");
-      if (!link || !link.verified || !/^[0-9a-f]{32}$/.test(uuid)) return { err: 403 };
-      const r = await env.DB.prepare("SELECT rank FROM mc_player_ranks WHERE lower(replace(uuid, '-', '')) = ?").bind(uuid).first();
-      return String(r?.rank || "").toLowerCase() === "admin" ? { user: u } : { err: 403 };
-    } catch { return { err: 403 }; }
-  }
+  const admin = (req, env) => isAdmin(req, env, getUser);   // shared with the Verwaltung (src/admin.js)
   const originOk = (req) => { const o = req.headers.get("origin"); if (!o) return false; try { return new URL(o).hostname === MAIN; } catch { return false; } };
   async function readJson(req) {
     if (!/^application\/json\b/i.test(req.headers.get("content-type") || "")) return { err: [415, "json_expected"] };

@@ -17,7 +17,7 @@ import { normInv, renderInventoryCard } from "./mc-inventory.js";
 import { changelogBody } from "./mc-changelog.js";
 import { cleanParkour, parkourStatements, parkourApi, parkourBody } from "./mc-parkour.js";
 import { navReady, sitePage } from "./hub.js";
-import { nwebosPage, nwebosChoice, nwebosRoute } from "./nwebos.js";
+import { nwebosPage, nwebosChoice, nwebosRoute, DEFAULT_BLOCKS } from "./nwebos.js";
 import { blogList, blogPost, changelog as osChangelog, changelogFeed as osChangelogFeed, writing as osWriting, chapter as osChapter, text as osText, profile as osProfile, notfound as osNotfound } from "./nwebos-apps.js";
 import { CONTENT } from "./generated/content.js";
 import { publishedWriting, chaptersOf, findWriting } from "./content.js";
@@ -26,6 +26,7 @@ import { FEEDS } from "./generated/feeds.js";
 import { feedFor, matchesEtag } from "./feed.js";
 import { epubPath, seriesEpubPath } from "./epub.js";
 import { makeProfile } from "./profile-v3.js";
+import { makeAdmin, siteData } from "./admin.js";
 import { LANG_COOKIE, pickLang, splitLang, langCookie, withLang } from "./i18n/index.js";
 import { safeDecode } from "./safe-decode.js";
 import { verifyTurnstile } from "./turnstile.js";
@@ -808,6 +809,7 @@ async function mcIngest(req, env) {
 let _fb; const FB = () => _fb || (_fb = makeFeedback({ json, getUser, safeEq, MAIN, MCD }));
 let _trade; const TRADE = () => _trade || (_trade = makeTrade({ json, getUser, safeEq, MAIN, MCD }));
 let _p3; const P3 = () => _p3 || (_p3 = makeProfile({ json, getUser, MAIN }));   // "Mein Profil" v3 (src/profile-v3.js)
+let _admin; const ADMIN = () => _admin || (_admin = makeAdmin({ json, getUser, MAIN, defaults: { blocks: DEFAULT_BLOCKS }, logWrites }));
 let _blog; const BLOG = () => _blog || (_blog = makeBlog({ json, getUser, html, sitePage, rand, safeEq, MAIN, notFound, onReadEnd: (env, id) => P3().award(env, id, "leseratte"), chapterExists: (s, n) => osSeries("de").some((se) => se.slug === s && se.chapters.some((c) => c.n === n)) }));
 let _vipq; const VIPQ = () => _vipq || (_vipq = makeVip({ json, getUser, safeEq, MAIN, MCD }));
 async function mcData(env) {
@@ -1052,7 +1054,7 @@ async function osResponse(req, env, url, lang, route) {
       for (const b of late) { await P3().award(env, u.id, b); (v3.badges = v3.badges || []).push({ badge: b, earned_at: Date.now() }); }
       content.profile = osProfile(lang, { user: u, gbCount: cnt?.n || 0, entries: entries || [], reads, link, ...v3 });
     } else content.profile = osProfile(lang, null);
-  } else if (k === "changelog") content.changelog = osChangelog(lang);
+  } else if (k === "changelog") content.changelog = osChangelog(lang, undefined, (await siteData(env)).changelog);
   else if (k === "writing") {
     const tag = (url.searchParams.get("tag") || "").slice(0, 40);
     content.writing = osWriting(lang, osSeries(lang), publishedWriting(WRITING_ALL).filter((w) => w.kind !== "story"), route.filter || (tag ? { tag } : {}));
@@ -1064,14 +1066,16 @@ async function osResponse(req, env, url, lang, route) {
   }
   else if (k === "text") { content.text = osText(lang, route.item, route.item.html || ""); title = route.item.title; }
   if (k === "notfound") { content.notfound = osNotfound(lang, route.path); status = 404; }
-  const entries = await guestEntries(env).catch(() => []);
-  const page = nwebosPage({ lang, app: k, path: route.path, entries, sitekey: SITEKEY, content, title, status, oneLang });
+  const [entries, site] = await Promise.all([guestEntries(env).catch(() => []), siteData(env)]);
+  const page = nwebosPage({ lang, app: k, path: route.path, entries, sitekey: SITEKEY, content, title, status, oneLang, site });
   return html(page, status, { "cache-control": priv ? "private, no-store" : "no-store", vary: "cookie, accept-language", ...(priv ? { "x-robots-tag": "noindex" } : {}) });
 }
 
 // Latest guestbook entries (Discord avatar per rule 10), for the API and the server-rendered NwebOS window.
 async function guestEntries(env) {
-  const { results } = await env.DB.prepare("SELECT name, message, created_at, discord_id, avatar FROM entries ORDER BY id DESC LIMIT 50").all();
+  // hidden = moderated in the Verwaltung (migration 0019); before that column exists, the old query
+  const { results } = await env.DB.prepare("SELECT name, message, created_at, discord_id, avatar FROM entries WHERE hidden = 0 ORDER BY id DESC LIMIT 50").all()
+    .catch((e) => /no such column/i.test(String(e?.message)) ? env.DB.prepare("SELECT name, message, created_at, discord_id, avatar FROM entries ORDER BY id DESC LIMIT 50").all() : Promise.reject(e));
   return results.map(r => ({ name: r.name, message: r.message, created_at: r.created_at, avatar: r.discord_id ? avatarUrl(r.discord_id, r.avatar) : null }));
 }
 
@@ -1192,6 +1196,7 @@ async function route(req, env, ctx) {
     }
     if (p === "/feedback") return new Response(null, { status: 301, headers: { location: `https://${MCD}/feedback`, "cache-control": "public, max-age=3600" } });
     if (p === "/api/guestbook") return guestbookApi(req, env);
+    if (p === "/api/admin" || p.startsWith("/api/admin/")) return ADMIN().api(p, req, env, url);
     if (p === "/api/blog" || p.startsWith("/api/blog/")) { const r = await BLOG().api(p, req, env, url); if (r) return r; }
     // ---- Feeds (Creative Hub, phase 3b) ----
     // Vor dem Sprach-Redirect: /de/writing/feed.xml und /writing/feed.xml liefern denselben Feed (ein
@@ -1199,7 +1204,7 @@ async function route(req, env, ctx) {
     // zur Laufzeit.
     { const feed = feedFor(FEEDS, p); if (feed) return feedResponse(req, feed); }
     // phone audit A14: the changelog window as RSS, per language (its rows exist in both)
-    if (/^\/(?:de\/|en\/)?changelog\/feed\.xml$/.test(p)) return new Response(osChangelogFeed(p.startsWith("/en/") ? "en" : "de"), { headers: { "content-type": "application/rss+xml; charset=utf-8", "cache-control": "public, max-age=300" } });
+    if (/^\/(?:de\/|en\/)?changelog\/feed\.xml$/.test(p)) return new Response(osChangelogFeed(p.startsWith("/en/") ? "en" : "de", undefined, (await siteData(env)).changelog), { headers: { "content-type": "application/rss+xml; charset=utf-8", "cache-control": "public, max-age=300" } });
     // ---- Creative Hub (nwebnotfound.dev) ----
     // Sprachpfade `/de/…` und `/en/…` plus die sprachlosen Pfade. `/` selbst rendert die gewählte
     // Sprache (Cookie → Accept-Language → Deutsch), statt umzuleiten: so kann kein Redirect-Loop

@@ -80,13 +80,14 @@ const SITE_LOG = [
   ["2026-11-06", "website", "Eine Navigation für alles", "One navigation for everything", "Hauptseite und Server-Seite teilen sich dieselbe Leiste.", "The main site and the server site share the same bar."],
 ];
 const TN = { website: ["Website", "Website"], server: ["Server", "Server"], blog: ["Blog", "Blog"] };
-function changelogDays(lang, today) {
+function changelogDays(lang, today, rows = null) {
   const de = lang !== "en";
   const groups = new Map();
   // one row per change: the mc changelog repeats some website changes of the same day (Design QA #115)
   const key = (x) => String(x).toLowerCase().replace(/[^a-z0-9äöüß]+/g, " ").trim();
   const add = (iso, t, title, text) => { if (!groups.has(iso)) groups.set(iso, []); const g = groups.get(iso); if (g.some((x) => key(x.title) === key(title))) return; g.push({ t, title, text }); };
-  for (const [iso, t, tde, ten, xde, xen] of SITE_LOG) add(iso, t, de ? tde : ten, de ? xde : xen);
+  if (rows) for (const r of rows) add(r.day, r.area, de ? r.title_de : r.title_en || r.title_de, de ? r.text_de : r.text_en || r.text_de);   // D1 (Verwaltung), live rows
+  else for (const [iso, t, tde, ten, xde, xen] of SITE_LOG) add(iso, t, de ? tde : ten, de ? xde : xen);
   const year = today.getUTCFullYear();
   for (const e of latestEntries(24, undefined, lang)) {
     if (!e.date) continue;
@@ -96,9 +97,9 @@ function changelogDays(lang, today) {
   }
   return { groups };
 }
-export function changelog(lang, today = new Date()) {
+export function changelog(lang, today = new Date(), rows = null) {
   const de = lang !== "en";
-  const { groups } = changelogDays(lang, today);
+  const { groups } = changelogDays(lang, today, rows);
   const todayIso = new Date(today.getTime() + 3600e3).toISOString().slice(0, 10);
   const days = [...groups.keys()].sort().reverse().slice(0, 8);
   const fmt = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
@@ -109,8 +110,8 @@ export function changelog(lang, today = new Date()) {
 }
 
 // A14: the changelog as RSS (/changelog/feed.xml, /en/changelog/feed.xml): the same rows as the window, newest 30
-export function changelogFeed(lang, today = new Date()) {
-  const de = lang !== "en", { groups } = changelogDays(lang, today), SITE = "https://nwebnotfound.dev", page = SITE + (de ? "" : "/en") + "/changelog";
+export function changelogFeed(lang, today = new Date(), rows = null) {
+  const de = lang !== "en", { groups } = changelogDays(lang, today, rows), SITE = "https://nwebnotfound.dev", page = SITE + (de ? "" : "/en") + "/changelog";
   const x = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]);
   const items = [];
   for (const iso of [...groups.keys()].sort().reverse()) for (const e of groups.get(iso)) items.push({ iso, ...e });
