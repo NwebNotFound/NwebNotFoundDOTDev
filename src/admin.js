@@ -133,7 +133,7 @@ const SECTIONS = {
   // a text goes live with a first-publication date (the feeds and the "date" of the item)
   writing: { publish: true, table: "writing_items", cols: ["series_id", "kind", "chapter", "slug", "title_de", "title_en", "body_de", "body_en", "tags", "status", "published_at"], clean: cleanWriting,
     order: "series_id, chapter, id", max: 2 * WRITING_BODY_MAX + 8000, stamp: (v, now) => { if (v.status !== "draft" && !v.published_at) v.published_at = now; } },
-  changelog: { publish: true, table: "changelog", cols: ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"], clean: cleanNews, order: "day DESC, sort, id" },
+  changelog: { publish: true, touch: "edited = 1", table: "changelog", cols: ["day", "area", "title_de", "title_en", "text_de", "text_en", "status", "sort"], clean: cleanNews, order: "day DESC, sort, id" },
 };
 const ROUTE = /^\/api\/admin\/(overview|home|projects|changelog|guestbook|series|writing)(?:\/([a-z0-9.]{1,40}))?(?:\/(publish|withdraw|hide|unhide))?$/;
 export const ADMIN_RATE = { max: 120, windowMs: 60000 };
@@ -238,7 +238,7 @@ export function makeAdmin({ json, getUser, MAIN, defaults = {}, logWrites = (src
     if (S.stamp) S.stamp(c.val, now);
     const ref = await refProblem(env, name, c.val); if (ref) return ref;
     if (S.cols.every((k) => c.val[k] === cur[k])) return out({ ok: true, item: cur, unchanged: true });   // nothing to write
-    const upd = env.DB.prepare(`UPDATE ${S.table} SET ${S.cols.map((k) => `${k} = ?`).join(", ")}, version = version + 1, updated_at = ? WHERE id = ? AND version = ?`).bind(...S.cols.map((k) => c.val[k]), now, +id, cur.version);
+    const upd = env.DB.prepare(`UPDATE ${S.table} SET ${S.cols.map((k) => `${k} = ?`).join(", ")}${S.touch ? ", " + S.touch : ""}, version = version + 1, updated_at = ? WHERE id = ? AND version = ?`).bind(...S.cols.map((k) => c.val[k]), now, +id, cur.version);
     const vis = S.publish && c.val.status !== cur.status ? (c.val.status === "live" ? "publish" : "withdraw") : null;   // going live or offline is logged however it is sent
     const [res] = logWrites("admin-" + name, await uniq(() => env.DB.batch(vis ? [upd, log(env, who, name, id, vis, cur, now)] : [upd])));
     if (res.dup) return res.dup;

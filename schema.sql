@@ -231,3 +231,7 @@ CREATE TABLE IF NOT EXISTS writing_items (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS writing_items_chapter ON writing_items (series_id, chapter) WHERE series_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS writing_items_status ON writing_items (status, published_at DESC);
+ALTER TABLE changelog ADD COLUMN source TEXT;
+ALTER TABLE changelog ADD COLUMN edited INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE changelog ADD COLUMN pr_url TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS changelog_source ON changelog (source) WHERE source IS NOT NULL;

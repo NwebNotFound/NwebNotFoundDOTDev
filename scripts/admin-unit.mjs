@@ -38,7 +38,9 @@ const day = new Date("2026-11-08T10:00:00Z");
 const rows = [{ day: "2026-11-08", area: "blog", title_de: "D1-Neuigkeit", title_en: "D1 news", text_de: "Satz.", text_en: null, status: "live" }];
 assert.ok(changelog("de", day, rows).includes("D1-Neuigkeit") && !changelog("de", day, rows).includes("Blog mit Editor"), "news from D1 replace SITE_LOG");
 assert.ok(changelog("de", day).includes("Blog mit Editor"), "fallback SITE_LOG");
-assert.ok(changelogFeed("en", day, rows).includes("D1 news") && changelogFeed("en", day, rows).includes("Satz."), "feed from D1, EN falls back per field");
+// #143 review: an English title never gets the German subline; a row without any English shows the German one
+assert.ok(changelogFeed("en", day, rows).includes("D1 news") && !changelogFeed("en", day, rows).includes("Satz."), "feed from D1, EN title without the German subline");
+assert.ok(changelogFeed("en", day, [{ ...rows[0], title_en: null }]).includes("Satz."), "feed from D1, no English at all: the German row");
 assert.deepEqual(DEFAULT_BLOCKS["home.xp"]["*"], { value: 0.64 });
 // before migration 0019 (no tables): the windows get nulls and keep today's texts, nothing throws
 purgeSite();
