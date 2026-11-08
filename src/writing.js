@@ -19,24 +19,26 @@ const tagsOf = (s) => { try { const a = JSON.parse(s || "[]"); return Array.isAr
 export function toItems(series, items, lang = "de") {
   const en = lang === "en";
   const byId = new Map(series.map((s) => [s.id, s]));
-  return items.filter((r) => r.status === "live" || r.status === "archived").map((r) => {
+  return items.filter((r) => (r.status === "live" || r.status === "archived") && (r.series_id == null || byId.get(r.series_id)?.status === "live")).map((r) => {   // a draft series hides its chapters
     const se = r.series_id != null ? byId.get(r.series_id) : null;
     const story = r.kind === "story" && se && r.chapter;
     const body = en && r.body_en ? r.body_en : r.body_de;
     const pub = r.published_at || r.updated_at;
+    let html;
     return {
       slug: r.slug, kind: story ? "story" : "blog", title: en && r.title_en ? r.title_en : r.title_de,
       date: day(pub), updated: r.updated_at && day(r.updated_at) > day(pub) ? day(r.updated_at) : null,
       tags: tagsOf(r.tags), draft: false, archived: r.status === "archived", lang: en && r.body_en ? "en" : "de",
       summary: null, cover: null, series: story ? se.slug : null, seriesTitle: story ? (en && se.title_en ? se.title_en : se.title_de) : null,
-      chapter: story ? r.chapter : null, wordCount: countWords(body), readingMinutes: readingTimeMinutes(body),
-      html: renderMarkdown(body), d1: true,
+      chapter: story ? r.chapter : null, wordCount: countWords(body), readingMinutes: readingTimeMinutes(body), d1: true,
+      get html() { if (html === undefined) html = renderMarkdown(body); return html; },   // rendered on first use only
     };
   }).sort(byNewest);
 }
 
-let IDX = null, FEED = null;
-export function purgeWriting() { IDX = null; FEED = null; }
+export const FAIL_RETRY_MS = 5000;
+let IDX = null, FEED = null, LAST = null, LAST_FEEDS = null;
+export function purgeWriting(all = false) { IDX = null; FEED = null; if (all) { LAST = null; LAST_FEEDS = null; } }   // keeps LAST*: a write followed by a failed read still serves the last good state
 
 async function rows(env) {
   const [s, i] = await env.DB.batch([
@@ -49,7 +51,11 @@ async function rows(env) {
 /** The writing index for `lang`: D1 when it has published rows, else `fallback` (the built CONTENT.writing).
  *  60 s isolate cache per language, cleared by every Verwaltung write (purgeWriting via purgeSite). */
 export function writingIndex(env, lang, fallback, now = Date.now()) {
-  if (!IDX || now - IDX.at >= WRITING_TTL_MS) IDX = { at: now, p: rows(env).catch(() => null), by: {} };
+  if (!IDX || now - IDX.at >= WRITING_TTL_MS) {
+    const idx = { at: now, by: {} };
+    idx.p = rows(env).then((d) => { LAST = d; return d; }, () => { idx.at = now - WRITING_TTL_MS + FAIL_RETRY_MS; return LAST; });
+    IDX = idx;
+  }
   const L = lang === "en" ? "en" : "de";
   if (!IDX.by[L]) IDX.by[L] = IDX.p.then((d) => (d && d.items.length ? toItems(d.series, d.items, L) : fallback));
   return IDX.by[L];
@@ -58,13 +64,14 @@ export function writingIndex(env, lang, fallback, now = Date.now()) {
 /** The feeds: built at request time from D1 when it has published rows (5 min cache), else `fallback` (FEEDS). */
 export function writingFeeds(env, fallback, now = Date.now()) {
   if (FEED && now - FEED.at < FEED_TTL_MS) return FEED.p;
+  const entry = { at: now };
   const p = rows(env).then((d) => {
-    if (!d || !d.items.length) return fallback;
+    if (!d.items.length) return (LAST_FEEDS = fallback);
     const writing = toItems(d.series, d.items, "de"), grouped = new Map();
     for (const w of writing) if (w.kind === "story") { if (!grouped.has(w.series)) grouped.set(w.series, []); grouped.get(w.series).push(w); }
     const series = [...grouped].map(([slug, ch]) => { const o = ch.slice().sort((a, b) => a.chapter - b.chapter); return { slug, title: o[0].seriesTitle || slug, chapters: o.map((c) => c.slug), count: o.length }; });
-    return buildFeeds({ writing, series, site: SITE, t: makeT });
-  }).catch(() => fallback);
-  FEED = { at: now, p };
+    return (LAST_FEEDS = buildFeeds({ writing, series, site: SITE, t: makeT }));
+  }).catch(() => { entry.at = now - FEED_TTL_MS + FAIL_RETRY_MS; return LAST_FEEDS || fallback; });
+  entry.p = p; FEED = entry;
   return p;
 }

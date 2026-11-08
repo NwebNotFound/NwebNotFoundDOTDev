@@ -1379,6 +1379,12 @@ try {
     const prog = await req("/api/blog/progress", { method: "POST", cookie: c1, testHost: "nwebnotfound.dev", origin: "https://nwebnotfound.dev", body: { key: "writing:test-fixture-serie:4", pct: 50 } });
     ok(ed.s === 200 && ch1b.t.includes("Kapitel eins (neu)") && dr.s === 201 && hidden.s === 404 && pub.s === 200 && pub.j?.item?.published_at > 0 && shown.s === 200 && shown.t.includes("Viertes Kapitel.") && feed4.t.includes("Vier") && prog.s === 200,
       "Texte (D1): bearbeiten wirkt sofort; Entwurf unsichtbar, veröffentlicht sichtbar (Fenster + Feed), Lesefortschritt kennt das Kapitel", `${ed.s} ${hidden.s} ${pub.s} ${shown.s} ${prog.s}`);
+    // a draft series hides its chapters everywhere (review #141): window, direct link, feed
+    const sd = await WA("PATCH", `/api/admin/series/${se.j.item.id}`, { status: "draft", version: 1 });
+    const hid4 = await W("/writing/test-fixture-serie/4"), hidList = series((await W("/writing")).t), hidFeed = await req("/writing/feed.xml", { testHost: "nwebnotfound.dev" });
+    const sl = await WA("PATCH", `/api/admin/series/${se.j.item.id}`, { status: "live", version: 2 });
+    ok(sd.s === 200 && hid4.s === 404 && !hidList.includes("Test Fixture Series") && !hidFeed.t.includes("Vier") && sl.s === 200 && (await W("/writing/test-fixture-serie/4")).s === 200,
+      "Texte (D1): Serie als Entwurf → Kapitel nicht im Fenster, nicht per Link, nicht im Feed; wieder live → sichtbar", `${sd.s} ${hid4.s} ${sl.s}`);
     const busy = await WA("DELETE", `/api/admin/series/${se.j.item.id}`);
     for (const r of [c1r, c2r, c3r, dr]) await WA("DELETE", `/api/admin/writing/${r.j.item.id}`);
     const gone = await WA("DELETE", `/api/admin/series/${se.j.item.id}`);

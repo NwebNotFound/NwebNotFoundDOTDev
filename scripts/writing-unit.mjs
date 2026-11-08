@@ -7,7 +7,7 @@ import { toItems, writingIndex, writingFeeds, purgeWriting } from "../src/writin
 import { cleanWriting, cleanSeries } from "../src/admin.js";
 import { chaptersOf, publishedWriting, findWriting } from "../src/content.js";
 
-const series = [{ id: 1, slug: "sommer", title_de: "Sommerfunken", title_en: "Summer sparks" }];
+const series = [{ id: 1, slug: "sommer", title_de: "Sommerfunken", title_en: "Summer sparks", status: "live" }];
 const at = Date.parse("2026-09-01T10:00:00Z");
 const rows = [
   { id: 1, series_id: 1, kind: "story", chapter: 1, slug: "sommer-1", title_de: "Eins", title_en: "One", body_de: "**Hallo** <script>x</script>", body_en: null, tags: '["a"]', status: "live", published_at: at, updated_at: at },
@@ -32,14 +32,31 @@ assert.deepEqual(chaptersOf(de, "sommer").map((c) => c.chapter), [1, 2]);
 assert.deepEqual(publishedWriting(de).map((x) => x.slug).sort(), ["kurz", "sommer-1"], "archived off the lists");
 assert.ok(findWriting(de, "sommer-2"), "archived reachable"); assert.equal(findWriting(de, "sommer-3"), null);
 
+// a draft series hides its chapters (window, links, feeds, progress); short texts are not affected
+const hidden = toItems([{ ...series[0], status: "draft" }], rows, "de");
+assert.deepEqual(hidden.map((x) => x.slug), ["kurz"], "draft series: no chapter anywhere");
+// html is rendered on first use only (lists need titles), and only once
+let renders = 0; const big = toItems(series, [{ ...rows[0], body_de: "x" }], "de")[0];
+assert.ok(!Object.getOwnPropertyDescriptor(big, "html").value && typeof Object.getOwnPropertyDescriptor(big, "html").get === "function", "html is a lazy getter");
+assert.equal(big.html, big.html); void renders;
+
 // fallback while nothing is published; D1 errors fall back too
 const fb = [{ slug: "built" }];
 const envOf = (items) => ({ DB: { prepare: (sql) => ({ sql }), batch: async () => [{ results: series }, { results: items }] } });
-purgeWriting(); assert.equal(await writingIndex(envOf([]), "de", fb, 1), fb);
+purgeWriting(true); assert.equal(await writingIndex(envOf([]), "de", fb, 1), fb);
 purgeWriting(); assert.equal((await writingIndex(envOf(rows.filter((r) => r.status === "live")), "de", fb, 1)).length, 2);
-purgeWriting(); assert.equal(await writingIndex({ DB: { prepare: () => ({}), batch: async () => { throw new Error("no such table: writing_items"); } } }, "en", fb, 1), fb);
+purgeWriting(true);   // before 0021 there is no last good state: assert.equal(await writingIndex({ DB: { prepare: () => ({}), batch: async () => { throw new Error("no such table: writing_items"); } } }, "en", fb, 1), fb);
+// after a good read, a failing D1 serves the last good state (not the built fallback), and retries after 5 s
+const flaky = { ok: true, DB: { prepare: (sql) => ({ sql }), batch: async () => { if (!flaky.ok) throw new Error("D1 overloaded"); return [{ results: series }, { results: rows.filter((r) => r.status === "live") }]; } } };
+purgeWriting(); assert.equal((await writingIndex(flaky, "de", fb, 1000)).length, 2);
+flaky.ok = false; purgeWriting();
+const during = await writingIndex(flaky, "de", fb, 2000);
+assert.equal(during.length, 2, "transient D1 error: last good texts, not the built (empty) index");
+flaky.ok = true;
+assert.equal(await writingIndex(flaky, "de", fb, 2000 + 4000), during, "failure is cached briefly");
+assert.notEqual(await writingIndex(flaky, "de", fb, 2000 + 5000), during, "and retried after 5 s");
 const FB = [{ path: "/writing/feed.xml", xml: "built" }];
-purgeWriting(); assert.equal(await writingFeeds(envOf([]), FB, 1), FB);
+purgeWriting(true); assert.equal(await writingFeeds(envOf([]), FB, 1), FB);
 purgeWriting(); const feeds = await writingFeeds(envOf(rows.filter((r) => r.status === "live")), FB, 1);
 assert.ok(feeds.find((f) => f.path === "/writing/feed.xml").xml.includes("Eins"), "feeds built from D1");
 purgeWriting();
