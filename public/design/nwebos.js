@@ -17,11 +17,17 @@
   /* phone audit A8: /auth/discord/logout (GET) lands on /?logout=1; read it now, before restored windows rewrite the address */
   var askLogout = /[?&]logout=1(&|$)/.test(location.search);
   if (askLogout) history.replaceState(history.state, "", location.pathname + location.search.replace(/[?&]logout=1/, "").replace(/^&/, "?") + location.hash);
-  try { var rmSet = localStorage.getItem("nwebos.rm"); if (rmSet === "1") RM = true; else if (rmSet === "0") RM = false; if (RM) document.documentElement.classList.add("rm"); } catch (e) {}
+  /* Edition patches (nwebos-mc mockup, Decisions 1-8): each acts only when its attribute is on the page. OSS = <html data-os-store="..."> */
+  var OSS = document.documentElement.dataset.osStore || "", PFX = (OSS || "nwebos") + ".";
+  try { var rmSet = localStorage.getItem(PFX + "rm"); if (rmSet === "1") RM = true; else if (rmSet === "0") RM = false; if (RM) document.documentElement.classList.add("rm"); } catch (e) {}
   var PHONE = function () { return matchMedia("(max-width:700px)").matches; };
+  /* With data-os-store the boot/login "seen" flag lives in the shared nnf_os cookie on .nwebnotfound.dev (1 = seen), so it
+     plays once across main and mc; everything else stays under the host's own prefix. Without the attribute: unchanged. */
+  var seenCookie = function () { return /(?:^|;\s*)nnf_os=1(?:;|$)/.test(document.cookie); };
+  var setSeenCookie = function () { try { document.cookie = "nnf_os=1; Path=/; Max-Age=31536000; SameSite=Lax" + (location.protocol === "https:" ? "; Secure" : "") + (/(^|\.)nwebnotfound\.dev$/.test(location.hostname) ? "; Domain=.nwebnotfound.dev" : ""); } catch (e) {} };
   var store = {
-    get: function (k) { try { return localStorage.getItem("nwebos." + k); } catch (e) { return null; } },
-    set: function (k, v) { try { if (v == null) localStorage.removeItem("nwebos." + k); else localStorage.setItem("nwebos." + k, v); } catch (e) {} }
+    get: function (k) { if (OSS && k === "booted" && seenCookie()) return "1"; try { return localStorage.getItem(PFX + k); } catch (e) { return null; } },
+    set: function (k, v) { if (OSS && k === "booted" && v != null) setSeenCookie(); try { if (v == null) localStorage.removeItem(PFX + k); else localStorage.setItem(PFX + k, v); } catch (e) {} }
   };
   var lang = L.lang === "en" ? "en" : "de";
   var desk = $("#desk"), wins = $("#wins"), tb = $("#tbtns"), sm = $("#startm"), sb = $("#startb");
@@ -112,7 +118,7 @@
     }
     if (pr.sound != null) setMute(!(pr.sound === true || pr.sound === 1));
     if (pr.boot != null) store.set("noboot", pr.boot === false || pr.boot === 0 ? "1" : null);
-    if (pr.reduced_motion != null) { var on = pr.reduced_motion === true || pr.reduced_motion === 1; document.documentElement.classList.toggle("rm", on); try { localStorage.setItem("nwebos.rm", on ? "1" : "0"); } catch (e) {} }
+    if (pr.reduced_motion != null) { var on = pr.reduced_motion === true || pr.reduced_motion === 1; document.documentElement.classList.toggle("rm", on); try { localStorage.setItem(PFX + "rm", on ? "1" : "0"); } catch (e) {} }
     if (save) savePref(pr);
   }
   /* signed in: a changed setting goes to the account (taskbar toggles, quick sheet, profile); guests keep it local */
@@ -166,7 +172,7 @@
   var title = function (k) { var a = APPS[k]; return a ? a.dataset[lang === "en" ? "titleEn" : "titleDe"] : (open.get(k) && open.get(k).title) || ""; };
   /* control icons (pixel, currentColor) from the sprite: the phone title bar and bottom bar (phone polish 4/5) */
   var ic2 = function (k) { return '<svg class="ic2" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><use href="' + (L.sprite || "/design/nwebos-icons.svg") + '#i-c-' + k + '"/></svg>'; };
-  var icon16 = function (k) { var t = $("#ic-" + k); return t ? t.innerHTML : ""; };
+  var icon16 = function (k) { var t = $("#ic-" + k) || (OSS && $("template[id^=ic-]")); return t ? t.innerHTML : ""; };
   /* a window's address; `data-q` keeps the query of the address it was opened on (a draft's ?preview= token) */
   var pathOf = function (k) { var p = k && APPS[k] ? APPS[k].dataset.path : "/", q = k && APPS[k] ? APPS[k].dataset.q || "" : ""; return (lang === "en" ? (p === "/" ? "/en" : "/en" + p) : p) + q; };
   var appOf = function (pathname) { var p = pathname.replace(/^\/(de|en)(?=\/|$)/, "") || "/"; p = p.replace(/\/$/, "") || "/"; var hit = null; Object.keys(APPS).forEach(function (k) { if (APPS[k].dataset.path === p) hit = k; }); return hit; };
@@ -246,7 +252,8 @@
     var src = APPS[k];
     var el = document.createElement("section"); el.className = "win" + (opt.quiet || RM ? "" : " opening"); el.setAttribute("role", "dialog"); el.setAttribute("aria-label", opt.title || title(k)); el.tabIndex = -1;
     var w = opt.w || +(src && src.dataset.w || 360), h = opt.h || +(src && src.dataset.h || 220);
-    var d = opt.pos || DEF[k] || (src && src.dataset.x ? [+src.dataset.x, +src.dataset.y] : [120 + 30 * (seq % 8), 60 + 24 * (seq % 8)]); seq++;
+    var dxy = src && src.dataset.x ? [+src.dataset.x, +src.dataset.y] : null;
+    var d = opt.pos || (OSS && dxy) || DEF[k] || dxy || [120 + 30 * (seq % 8), 60 + 24 * (seq % 8)]; seq++;
     if (src && src.dataset.menu === "no") opt.menu = false;
     var p = clampPos(d[0], d[1], w, h);
     el.style.setProperty("--x", p[0] + "px"); el.style.setProperty("--y", p[1] + "px"); el.style.width = w + "px"; el.style.height = Math.min(h, innerHeight - 46) + "px";   /* short laptop screens: the window fits above the taskbar, its content scrolls */
@@ -329,6 +336,8 @@
   sb.onclick = function (e) { e.stopPropagation(); sound.click(); var o = sm.hidden; sm.hidden = !o; sb.setAttribute("aria-expanded", String(o)); if (o) { var f = $("#smq", sm) || $("a,button", sm); if (f) f.focus(); } };
   /* search (start menu, phone home): windows, mc wiki and links from the page, blog posts from /api/blog on first use */
   var IDX = (L.idx || []).slice(), blogP = null;
+  /* edition: <script type="application/json" id="os-index"> = rows {t,d,p|url,ic,kw}; the page's windows come first */
+  var XI = OSS && $("#os-index"); if (XI) { try { IDX = Object.keys(APPS).map(function (k) { return { t: title(k), d: "App", p: APPS[k].dataset.path ? pathOf(k) : "", ic: k, kw: k + " " + (APPS[k].dataset.kw || ""), k: k }; }).concat(JSON.parse(XI.textContent)); } catch (e) {} }
   var norm = function (x) { return String(x).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); };
   function loadBlog() {
     return blogP || (blogP = fetch("/api/blog", { credentials: "omit" }).then(function (r) { return r.ok ? r.json() : { posts: [] }; }).then(function (j) {
@@ -473,7 +482,7 @@
       showLogin();
     },
     shutdown: function () { var off = $("#off"); off.hidden = false; desk.hidden = true; off.onclick = function () { off.hidden = true; showDesk(); }; },
-    "about-os": function () { dialog(L.aboutOs, lang === "en" ? "<b>NwebOS · Summer Edition</b><br>An operating system that only pretends. Built by Nils with HTML, CSS and a little JavaScript." : "<b>NwebOS · Sommer Edition</b><br>Ein Betriebssystem, das nur so tut. Gebaut von Nils mit HTML, CSS und ein bisschen JavaScript."); }
+    "about-os": function () { var ed = OSS && $("#boot small"); var ab = lang === "en" ? "<b>NwebOS · Summer Edition</b><br>An operating system that only pretends. Built by Nils with HTML, CSS and a little JavaScript." : "<b>NwebOS · Sommer Edition</b><br>Ein Betriebssystem, das nur so tut. Gebaut von Nils mit HTML, CSS und ein bisschen JavaScript."; if (ed) ab = ab.replace(/(Sommer|Summer) Edition/, ed.textContent); dialog(L.aboutOs, ab); }
   };
 
   /* ---------- desktop icons: click selects, double click or Enter opens; links without a window navigate ---------- */
@@ -517,6 +526,7 @@
     var useMe = me && store.get("user") !== "gast";
     $("#smname").textContent = useMe ? me.name : L.guest;
     var av = $("#smav"); av.src = useMe && /^https:\/\//.test(me.avatar || "") ? me.avatar : GUEST_AV;
+    if (OSS && !useMe) { var gt = $('[data-user="gast"]'), gb = gt && $("b", gt), gi = gt && $("img", gt); if (gb) $("#smname").textContent = gb.textContent; if (gi) av.src = gi.src; }   /* edition: guest name and avatar come from the login markup */
     var qa = $("[data-qav]"); if (qa) qa.src = av.src;
     /* profile v3 entry points: the first home icon and the start-menu tile say "Mein Profil" or "Anmelden" */
     var en = lang === "en", pi = $("[data-p3i]"), ps = $("[data-p3sub]");
@@ -609,6 +619,9 @@
   /* windows restored from their address arrive later: the deep-linked window stays on top */
   if (deep && restoring.length) Promise.all(restoring).then(function () { if (open.has(deep)) { focus(deep, false); open.get(deep).el.focus({ preventScroll: true }); } });
   else if (!deep) { var top = topWindow(); if (top) history.replaceState({ k: top }, "", pathOf(top)); }   /* a deep link keeps its address as typed */
+  /* edition: <html data-os-home="status"> opens that app on a fresh wide desktop visit; phones keep the home screen */
+  var OSH = document.documentElement.dataset.osHome;
+  if (OSH && APPS[OSH] && atDesk && !deep && !PHONE() && !saved().length) openWin(OSH, { noPush: true });
   // Boot and login: first visit to the desktop (/) only; login again after "Abmelden". A direct visit to a window's
   // address (deep link, also the 404 window) opens it at once and counts as seen, so the boot does not play later
   // (Planner 07.11.). Reduced motion skips the boot.
