@@ -127,7 +127,38 @@ with sync_playwright() as p:
     card.locator("[data-p3-merge-no]").click(); pg.wait_for_timeout(150)
     assert card.is_hidden() and pg.evaluate("localStorage.getItem('nwebos.five.stats.guest')") is None, "discard removes the local stats"
     c.unroute_all(behavior="ignoreErrors"); c.close()
-    print("PASS guest stats: merge card with the count, Verwerfen removes them")
+    # "Übernehmen": 200 (first merge of the account) or 409 (already merged) — either way the local guest stats are
+    # gone and the card does not come back after a reload
+    c = ctx_for(br, 375); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(f"https://{H}/profile", wait_until="load"); pg.locator(".win.focus [data-p3]").wait_for()
+    pg.evaluate("localStorage.setItem('nwebos.mines.stats.guest', JSON.stringify({played:2,won:1,best:70})); localStorage.setItem('nwebos.five.stats.guest', JSON.stringify({played:1,won:1,streak:1,best:1,variant:'de'}))")
+    pg.reload(wait_until="load"); pg.locator(".win.focus [data-p3]").wait_for(); tab(pg, "games")
+    card = pg.locator(".win.focus [data-p3-merge]"); card.wait_for()
+    with pg.expect_response(lambda r: r.url.endswith("/api/profile/games/merge")) as resp:
+        card.locator("[data-p3-merge-yes]").click()
+    st = resp.value.status; pg.wait_for_timeout(1200)
+    assert st in (200, 409), ("merge status", st)
+    pg.reload(wait_until="load"); pg.locator(".win.focus [data-p3]").wait_for(); tab(pg, "games"); pg.wait_for_timeout(300)
+    assert pg.locator(".win.focus [data-p3-merge]").is_hidden(), ("merge card back after reload", st)
+    assert pg.evaluate("[localStorage.getItem('nwebos.mines.stats.guest'), localStorage.getItem('nwebos.five.stats.guest')]") == [None, None], ("guest stats kept", st)
+    c.unroute_all(behavior="ignoreErrors"); c.close()
+    print(f"PASS guest stats: merge card with the count, Verwerfen removes them, Übernehmen ({st}) clears them and the card stays away after a reload")
+
+    # the guestbook paper's date stamp never covers the message (short + long text, 375/390), ink >= 4.5:1
+    for width in (375, 390):
+        c = ctx_for(br, width); pg = c.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
+        pg.goto(f"https://{H}/profile", wait_until="load"); pg.locator(".win.focus [data-p3]").wait_for()
+        if pg.locator(".win.focus .p3-paper .stamp").count() == 0:   # no entry for this account: build the card's markup
+            pg.evaluate("""(() => { const d = document.createElement('div'); d.className = 'p3-paper paper'; d.innerHTML = '<span class="stamp">07.11.2026</span><p>x</p><small>– Test</small>'; document.querySelector('.win.focus #p3-over').prepend(d); })()""")
+        for msg in ("Hi!", "Hallo Nils, das ist ein Test, ein ziemlich langer Gästebucheintrag, damit man sieht, wo der Stempel landet."):
+            hit = pg.evaluate("""(msg) => { const pp = document.querySelector('.win.focus .p3-paper'), p = pp.querySelector('p'), s = pp.querySelector('.stamp'); p.textContent = msg;
+              const a = s.getBoundingClientRect(), rg = document.createRange(); rg.selectNodeContents(p);
+              return [...rg.getClientRects()].filter((b) => b.width > 0 && b.left < a.right && b.right > a.left && b.top < a.bottom && b.bottom > a.top).length; }""", msg)
+            assert hit == 0, (width, msg[:12], "stamp covers the text")
+        low = pg.evaluate(CONTRAST, [[".win.focus .p3-paper .stamp", 4.5]]); assert not low, (width, "stamp contrast", low)
+        shot(pg, f"profile3-{width}-paper-stamp.png") if width == 375 else None
+        c.unroute_all(behavior="ignoreErrors"); c.close()
+    print("PASS 375/390: the date stamp never covers the guestbook text (short + long), ink >= 4.5:1")
 
     # signed out: the Discord tile, the home icon says Anmelden, the start-menu tile too (1280)
     for width in (375, 1280):

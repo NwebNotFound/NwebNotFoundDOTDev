@@ -16,6 +16,13 @@ from playwright.sync_api import sync_playwright
 BASE = sys.argv[1]
 COOKIE = sys.argv[2] if len(sys.argv) > 2 else ""
 MIN = int(os.environ.get("GUARD_MIN", "44"))
+# profile switches (.p3s): scrolled to the middle, the tappable height/width = how far from the centre a tap still
+# lands on the switch (elementFromPoint), so clipping or overlap counts
+SWITCHES = r"""() => [...document.querySelectorAll(".win.focus .p3s")].map((s) => { s.scrollIntoView({ block: "center" });
+  const r = s.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const on = (x, y) => { const e = document.elementFromPoint(x, y); return !!e && (e === s || s.contains(e)); };
+  const reach = (dx, dy) => { let n = 0; while (n < 60 && on(cx + dx * (n + 1), cy + dy * (n + 1))) n++; return n; };
+  return [s.dataset.p3Pref, reach(-1, 0) + reach(1, 0) + 1, reach(0, -1) + reach(0, 1) + 1]; })"""
 H = "nwebnotfound.dev"
 GIF = bytes.fromhex("47494638396101000100800000ffd23f00000021f90401000000002c000000000100010000020144003b")
 ROUTES = ["/", "/about", "/portfolio", "/blog", "/blog/eine-navigation-fuer-zwei-seiten", "/music", "/writing", "/guestbook",
@@ -125,6 +132,8 @@ with sync_playwright() as p:
                             tb.click(); pg.wait_for_timeout(250)
                             for kind, what, info in pg.evaluate(PROBE, MIN):
                                 if kind == "tap": found.append(("/profile (Einstellungen)", f"{who} {width} {'night' if night else 'day'}", kind, what, info))
+                            for key, hw, hh in pg.evaluate(SWITCHES):
+                                if hw < MIN or hh < MIN: found.append(("/profile (Einstellungen)", f"{who} {width} {'night' if night else 'day'}", "tap", f"switch {key}", f"{hw}x{hh}"))
                     if path == "/guestbook":   # the error toast of a failed Discord sign-in (?login=failed)
                         pg.goto(f"https://{H}/guestbook?login=failed", wait_until="load"); pg.locator(".toast.err").wait_for(timeout=5000); pg.wait_for_timeout(200)
                         for kind, what, info in pg.evaluate(PROBE, MIN):
