@@ -29,7 +29,12 @@ SELECT ip_hash, world_type, settings FROM mc_vip_commands LIMIT 0;
 SELECT expires_at FROM sessions LIMIT 0;
 SELECT discord_id, lang, theme, sound, boot, reduced_motion FROM user_prefs LIMIT 0;
 SELECT discord_id, game, variant, played, won, best, streak, best_streak, dist FROM game_stats LIMIT 0;
-SELECT discord_id, badge, earned_at FROM user_badges LIMIT 0;"
+SELECT discord_id, badge, earned_at FROM user_badges LIMIT 0;
+SELECT key, lang, json, version FROM site_blocks LIMIT 0;
+SELECT id, sort, status, progress, href, icon, title_de, title_en, text_de, text_en, version FROM projects LIMIT 0;
+SELECT id, day, area, title_de, title_en, text_de, text_en, status, sort, version FROM changelog LIMIT 0;
+SELECT hidden, reported FROM entries LIMIT 0;
+SELECT at, discord_id, section, item, action, before_json FROM admin_log LIMIT 0;"
 if out=$(npx wrangler d1 execute "$DB" "$@" --command "$CHECK" 2>&1); then
   echo "Schema-Check ok"
 else

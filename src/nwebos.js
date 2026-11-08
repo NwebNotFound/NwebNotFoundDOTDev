@@ -8,6 +8,7 @@
 // NwebOS is the site (Nils, 07.11.: no old pages behind NwebOS): every page address is a window or the 404 window.
 // The old `?nwebos=0` opt-out is gone; a left-over link just goes to the clean address (nwebosChoice).
 import { AV } from "./asset-version.js";
+import { renderMarkdown } from "./markdown.js";
 import { WIKI } from "./mc-hub.js";
 import { music, trash, soon, ic2 } from "./nwebos-apps.js";
 
@@ -102,15 +103,34 @@ const PROJ = {
 };
 const STATE_CLASS = { live: "live", neu: "neu", new: "neu", bald: "bald", soon: "bald", Idee: "Idee", idea: "Idee" };
 
-function about(lang) {
-  const de = lang !== "en";
-  return `<div class="pad about">${ic("cat", 72, "av")}<div><h1>${de ? "Hi, ich bin Nils." : "Hi, I'm Nils."}</h1>
-<p>${de ? "Ich baue Dinge, die mir Spaß machen: Webseiten, einen Minecraft-Server für Freunde, Musik und Geschichten. Hier landet alles, sobald es fertig genug ist." : "I build things I enjoy: websites, a Minecraft server for friends, music and stories. Everything lands here once it's ready enough."}</p></div></div>
-<dl class="props"><dt>${de ? "Baut" : "Builds"}</dt><dd>${de ? "diese Seite und einen MC-Server" : "this site and an MC server"}</dd><dt>${de ? "Macht" : "Makes"}</dt><dd>${de ? "Musik in FL Studio" : "music in FL Studio"}</dd><dt>${de ? "Schreibt" : "Writes"}</dt><dd>${de ? "einen Roman in Kapiteln" : "a novel in chapters"}</dd><dt>${de ? "Mag" : "Likes"}</dt><dd>${de ? "Pixel-Art, gemütliche Spiele, Sommer" : "pixel art, cosy games, summer"}</dd><dt>${de ? "Findest mich" : "Find me"}</dt><dd><a href="${GITHUB}" rel="noopener">GitHub</a> · <a href="${X}" rel="noopener">X</a></dd></dl>`;
+/* The Über-mich texts, Steckbrief and XP: D1 site_blocks (Verwaltung) when a row exists, else these (today's texts). */
+export const DEFAULT_BLOCKS = {
+  "home.hero": {
+    de: { eyebrow: "Nils' Ecke im Internet", name: "Nils", lead: "Ich baue Dinge, die mir Spaß machen: Webseiten, einen Minecraft-Server für Freunde, Musik und Geschichten. Hier landet alles, sobald es fertig genug ist." },
+    en: { eyebrow: "Nils' corner of the internet", name: "Nils", lead: "I build things I enjoy: websites, a Minecraft server for friends, music and stories. Everything lands here once it's ready enough." },
+  },
+  "home.facts": {
+    de: { rows: [{ icon: "site", k: "Baut", v: "diese Seite und einen MC-Server" }, { icon: "music", k: "Macht", v: "Musik in FL Studio" }, { icon: "text", k: "Schreibt", v: "einen Roman in Kapiteln" }, { icon: "heart", k: "Mag", v: "Pixel-Art, gemütliche Spiele, Sommer" }] },
+    en: { rows: [{ icon: "site", k: "Builds", v: "this site and an MC server" }, { icon: "music", k: "Makes", v: "music in FL Studio" }, { icon: "text", k: "Writes", v: "a novel in chapters" }, { icon: "heart", k: "Likes", v: "pixel art, cosy games, summer" }] },
+  },
+  "home.xp": { "*": { value: 0.64 } },
+};
+const block = (site, key, lang) => site?.blocks?.[key]?.[lang] || DEFAULT_BLOCKS[key]?.[lang] || null;
+const unmark = (s) => String(s).replace(/\[\[([^\]|]+)\|[1-4]\]\]/g, "$1");   // [[text|n]] marker colours: plain text in this window
+
+function about(lang, site) {
+  const de = lang !== "en", L = de ? "de" : "en";
+  const hero = block(site, "home.hero", L), facts = block(site, "home.facts", L), more = site?.blocks?.["about.text"]?.[L];
+  return `<div class="pad about">${ic("cat", 72, "av")}<div><h1>${de ? "Hi, ich bin" : "Hi, I'm"} ${esc(hero.name)}.</h1>
+<p>${esc(unmark(hero.lead))}</p></div></div>
+<dl class="props">${facts.rows.map((r) => `<dt>${esc(r.k)}</dt><dd>${esc(r.v)}</dd>`).join("")}<dt>${de ? "Findest mich" : "Find me"}</dt><dd><a href="${GITHUB}" rel="noopener">GitHub</a> · <a href="${X}" rel="noopener">X</a></dd></dl>${more && more.md ? `<div class="pad about-md">${renderMarkdown(more.md)}</div>` : ""}`;
 }
 
-function portfolio(lang) {
-  const de = lang !== "en", list = PROJ[de ? "de" : "en"];
+/* D1 projects (Verwaltung) when the table has rows, else PROJ. status live|neu|bald|idee -> the label in each language. */
+const STATUS_LABEL = { live: ["live", "live"], neu: ["neu", "new"], bald: ["bald", "soon"], idee: ["Idee", "idea"] };
+export const projectRows = (rows, lang) => rows.map((r) => { const de = lang !== "en"; return [r.icon, de ? r.title_de : r.title_en || r.title_de, (STATUS_LABEL[r.status] || STATUS_LABEL.idee)[de ? 0 : 1], r.progress, de ? r.text_de : r.text_en || r.text_de, r.href]; });
+function portfolio(lang, site) {
+  const de = lang !== "en", list = site?.projects ? projectRows(site.projects, lang) : PROJ[de ? "de" : "en"];
   const live = list.filter((p) => p[2] === "live").length;
   return `<div class="explorer"><aside class="tasks"><div class="tp"><b>${de ? "Projekt-Aufgaben" : "Project tasks"}</b><a href="/blog">${de ? "Blog öffnen" : "Open the blog"}</a><a href="/guestbook" data-open="guestbook">${de ? "Ins Gästebuch schreiben" : "Sign the guestbook"}</a></div><div class="tp"><b>Details</b><span>${de ? `${list.length} Projekte<br>${live} laufen, ${list.length - live} wachsen noch` : `${list.length} projects<br>${live} running, ${list.length - live} still growing`}</span></div></aside>
 <ul class="files">${list.map(([k, t, s, n, d, href]) => `<li><a href="${esc(href)}"${winKey(href)}>${icon(k, 32)}<span><b>${esc(t)}</b><small>${esc(d)}</small></span>${bar(n)}<em class="st ${STATE_CLASS[s]}">${esc(s)}</em></a></li>`).join("")}</ul></div>`;
@@ -147,7 +167,7 @@ function searchIndex(lang) {
     ...WIKI.map((w) => ({ t: `Wiki: ${w.title}`, d: `${MC_HOST}/wiki · ${t.newTab}`, url: `${mc}/wiki/${w.slug}`, ic: "minecraft", kw: `wiki minecraft ${w.sum || ""}` })),
     { t: "GitHub · NwebNotFound", d: t.newTab, url: GITHUB, ic: "portfolio", kw: "github code" }];
 }
-export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries = [], sitekey = "", content: extra = {}, title: winTitle = "", status = 200, oneLang = "" } = {}) {
+export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries = [], sitekey = "", content: extra = {}, title: winTitle = "", status = 200, oneLang = "", site = null } = {}) {
   lang = lang === "en" ? "en" : "de";
   const t = T[lang];
   const cur = ALL.find((a) => a.k === app) || null;
@@ -157,7 +177,7 @@ export function nwebosPage({ lang = "de", app = "", path: curPath = "", entries 
   // Light windows are always in the page; heavier or dynamic ones only when they are the current window (the shell
   // fetches the others from their address when opened). The current window's section comes first.
   const game = (de, en) => `<p class="nojs-g">${lang === "en" ? en : de}</p>`;
-  const content = { about: about(lang), portfolio: portfolio(lang), guestbook: guestbook(lang, entries), music: music(lang), trash: trash(lang), soon: soon(lang),
+  const content = { about: about(lang, site), portfolio: portfolio(lang, site), guestbook: guestbook(lang, entries), music: music(lang), trash: trash(lang), soon: soon(lang),
     mines: game("Pixelminen: ein kleines Minensuch-Spiel. Es braucht JavaScript.", "Pixel Mines: a small minesweeper game. It needs JavaScript."),
     five: game("Fünf: errate das Wort mit fünf Buchstaben. Es braucht JavaScript.", "Five: guess the five-letter word. It needs JavaScript."), ...extra };
   const inl = ALL.filter((a) => a.inline && content[a.k] !== undefined);
